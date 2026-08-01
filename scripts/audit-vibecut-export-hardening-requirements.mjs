@@ -16,7 +16,20 @@ const files = {
   liveGuard: await read("scripts/guard-vibecut-k1-live-smoke.mjs"),
   cloudOutputVerifier: await read("scripts/verify-vibecut-k1-cloud-output.mjs"),
   exportMediaMetadata: await read("src/features/vibefx-studio/video/export/exportMediaMetadata.js"),
-  exportPanel: await read("src/features/vibefx-studio/video/panels/ExportVideoPanel.jsx"),
+  /*
+   * Surface export, apres la phase 7 (2026-08-01): le panneau de l'ancien front
+   * est supprime. La logique vit dans le controleur et dans `exportDownload.js`
+   * (nomme, URL signee, destination PC), le rendu dans les DEUX feuilles du
+   * nouveau front. On lit l'ensemble: les exigences portent sur la surface, pas
+   * sur un fichier.
+   */
+  exportPanel: [
+    await read("src/features/vibefx-studio/video/export/useExportController.js"),
+    await read("src/features/vibefx-studio/video/export/exportDownload.js"),
+    await read("src/features/vibecut/adapters/useExportDownload.js"),
+    await read("src/features/vibecut/quick/ExportSheet.jsx"),
+    await read("src/features/vibecut/advanced/ExportProSheet.jsx"),
+  ].join("\n"),
   exportManifest: await read("src/features/vibefx-studio/video/export/exportManifest.js"),
   exportJobService: await read("src/features/vibefx-studio/video/export/exportJobService.js"),
   functionsExport: await read("functions/src/videoExport.js"),
@@ -81,7 +94,7 @@ const requirements = [
       ["status", /Phase 5[\s\S]*Partial/],
       ["renderer", /buildFfmpegArgs/],
       ["renderer", /drawtext/],
-      ["renderer", /xfade=transition=fade/],
+      ["renderer", /xfade=transition=\$\{xfadeName\}/],
       ["renderer", /amix=inputs=/],
       ["renderer", /Text animation is not rendered/],
       ["packageJson", /smoke-vibecut-export-coverage-parity\.mjs/],

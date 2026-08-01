@@ -20,7 +20,9 @@ assert.match(source, /SIGNATURE_TOLERANCE_MS/, "render service must enforce an a
 assert.match(source, /\$\{timestamp\}\.\$\{rawBody\}/, "render service must bind HMAC signatures to timestamp and body");
 assert.match(source, /verifyMode === 'hmac'[\s\S]*verifySignature/, "render service must verify HMAC by default");
 assert.match(source, /verifyMode === 'platform-iam'[\s\S]*EXPORT_RENDERER_PRIVATE_IAM_CONFIRMED/, "render service must allow platform IAM mode only after explicit confirmation");
-assert.match(source, /xfade=transition=fade/, "render service must render adjacent fade and crossfade transitions with FFmpeg xfade");
+assert.match(source, /xfade=transition=\$\{xfadeName\}/, "render service must render the requested transition type with FFmpeg xfade, not a hard-coded fade");
+assert.match(source, /SERVER_XFADE_TRANSITION_MAP/, "render service must map VibeCut transition ids to native xfade transitions");
+assert.match(source, /resolveXfadeTransitionName/, "render service must fall back to fade for unknown transition ids");
 assert.match(source, /findAdjacentTransition/, "render service must bind xfade transitions to adjacent clip ids");
 assert.match(source, /Non-adjacent transition not rendered/, "render service must reject non-adjacent transition items");
 assert.match(source, /drawtext/, "render service must render supported text overlays with FFmpeg drawtext");
@@ -72,7 +74,28 @@ assert.match(readme, /HMAC\(timestamp\.body\)/, "render service README must docu
 assert.match(readme, /EXPORT_RENDERER_VERIFY_MODE=hmac/, "render service README must document default HMAC verification");
 assert.match(readme, /EXPORT_RENDERER_VERIFY_MODE=platform-iam/, "render service README must document private platform IAM verification");
 assert.match(readme, /anti-replay/, "render service README must document the signature anti-replay window");
-assert.match(readme, /adjacent fade\/crossfade transitions/, "render service README must document supported transition rendering");
+/*
+ * Cette assertion figeait « adjacent fade/crossfade transitions », la description
+ * d'AVANT le lot L1 (2026-07-30) - le renderer rend desormais les 15 transitions
+ * minutees, pas seulement le fondu. Elle verifie donc maintenant les deux faits
+ * qui font vraiment le contrat:
+ *   1. l'ADJACENCE reste la contrainte (une transition non adjacente est rejetee);
+ *   2. les 15 transitions du lot L1 sont bien annoncees comme rendues.
+ */
+assert.match(readme, /ADJACENT transitions are rendered/, "render service README must document the adjacency constraint");
+assert.match(readme, /15 timed transitions/, "render service README must document the 15 timed transitions delivered by lot L1");
+
+/*
+ * Le point de controle du lot L6 et la raison pour laquelle sa reponse ne porte
+ * pas la version de FFmpeg (endpoint sans authentification sur un service Cloud
+ * Run public). Voir todo.md probleme J.
+ */
+assert.match(readme, /GET `?\/capabilities`?/, "render service README must document the /capabilities checkpoint");
+assert.match(
+  readme,
+  /no FFmpeg version banner/,
+  "render service README must explain why /capabilities hides the FFmpeg version",
+);
 assert.match(readme, /drawtext/, "render service README must document supported text overlay rendering");
 assert.match(readme, /mixes source clip audio and external audio tracks/, "render service README must document audio mix support");
 assert.equal(

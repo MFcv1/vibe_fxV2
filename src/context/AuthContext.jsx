@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
@@ -13,6 +13,12 @@ import {
 import { auth } from "@/lib/firebase";
 
 const AuthContext = createContext(null);
+const makeMockUser = () => ({
+  uid: "mock-user-id",
+  email: "dev@vibefx.app",
+  displayName: "Développeur local",
+  emailVerified: true,
+});
 
 // URL vers laquelle Firebase redirige après verification mail
 const getActionCodeSettings = () => ({
@@ -25,11 +31,14 @@ const getActionCodeSettings = () => ({
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(auth));
+  const devAuthBypassRef = useRef(false);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      return;
+    }
     return onAuthStateChanged(auth, (u) => {
-      setUser(u);
+      setUser(u || (devAuthBypassRef.current ? makeMockUser() : null));
       setLoading(false);
     });
   }, []);
@@ -64,6 +73,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    devAuthBypassRef.current = false;
     setUser(null);
     if (!auth) return;
     try {
@@ -74,12 +84,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loginAsMockUser = useCallback(() => {
-    setUser({
-      uid: "mock-user-id",
-      email: "dev@vibefx.app",
-      displayName: "Développeur local",
-      emailVerified: true,
-    });
+    if (process.env.NODE_ENV !== "development") return;
+    devAuthBypassRef.current = true;
+    setUser(makeMockUser());
+    setLoading(false);
   }, []);
 
   const isAnonymous = user?.isAnonymous === true;

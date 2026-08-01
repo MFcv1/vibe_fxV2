@@ -96,7 +96,11 @@ async function prepareFirebaseSources({ manifest, onProgress }) {
     };
     const warnings = [];
     const uploadTargets = [
-        ...nextManifest.clips.map((source, index) => ({ kind: 'video', index, source })),
+        ...nextManifest.clips.map((source, index) => ({
+            kind: source.mediaType === 'image' ? 'image' : 'video',
+            index,
+            source,
+        })),
         ...nextManifest.audioTracks.map((source, index) => ({ kind: 'audio', index, source })),
     ].filter(({ source }) => !source.sourceStoragePath);
 
@@ -154,7 +158,7 @@ async function prepareFirebaseSources({ manifest, onProgress }) {
                 bucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || null,
             },
         };
-        if (target.kind === 'video') nextManifest.clips[target.index] = patch;
+        if (target.kind === 'video' || target.kind === 'image') nextManifest.clips[target.index] = patch;
         if (target.kind === 'audio') nextManifest.audioTracks[target.index] = patch;
         completed += 1;
     }
@@ -255,6 +259,11 @@ function inferContentType(name = '', kind = 'video') {
     if (lower.endsWith('.wav')) return 'audio/wav';
     if (lower.endsWith('.m4a')) return 'audio/mp4';
     if (lower.endsWith('.aac')) return 'audio/aac';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.avif')) return 'image/avif';
+    if (kind === 'image') return 'image/jpeg';
     return kind === 'audio' ? 'audio/mp4' : 'video/mp4';
 }
 
@@ -268,5 +277,10 @@ function inferExtension(name = '', contentType = '', kind = 'video') {
     if (contentType.includes('mpeg')) return 'mp3';
     if (contentType.includes('wav')) return 'wav';
     if (contentType.includes('aac')) return 'aac';
+    if (contentType.includes('jpeg')) return 'jpg';
+    if (contentType.includes('png')) return 'png';
+    if (contentType.includes('webp')) return 'webp';
+    if (contentType.includes('avif')) return 'avif';
+    if (kind === 'image') return 'jpg';
     return kind === 'audio' ? 'm4a' : 'mp4';
 }

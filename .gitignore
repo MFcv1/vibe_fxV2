@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+/functions/node_modules/
+/render-service/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -50,3 +52,6 @@ ui-debug.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Reglages Claude Code personnels (permissions gcloud) — non versionnes
+.claude/settings.local.json

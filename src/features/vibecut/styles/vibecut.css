@@ -1,0 +1,208 @@
+/*
+ * VibeCut design system - tokens + base.
+ * Scope strict: tout vit sous `.vibecut`. Aucune regle globale, aucun debordement
+ * possible vers /studio, VibeOS ou les pages publiques.
+ * Aucune dependance a Tailwind (le bundle statique de /studio n'est pas charge ici).
+ */
+
+.vibecut {
+    /* Surfaces - neutres profondes, sans teinte bleue ni neon */
+    --vc-bg: #0b0b0d;
+    --vc-bg-sunken: #070708;
+    --vc-surface: #16161a;
+    --vc-surface-2: #1d1d22;
+    --vc-surface-3: #26262c;
+    --vc-line: rgba(255, 255, 255, 0.075);
+    --vc-line-strong: rgba(255, 255, 255, 0.14);
+
+    /* Texte - 3 niveaux, jamais en dessous de 12px */
+    --vc-text: #f4f4f6;
+    --vc-text-2: #a2a2ab;
+    --vc-text-3: #6d6d77;
+    --vc-text-on-accent: #ffffff;
+
+    /* Un seul accent de marque */
+    --vc-accent: #5b7cfa;
+    --vc-accent-hover: #6f8bff;
+    --vc-accent-press: #4a68e0;
+    --vc-accent-quiet: rgba(91, 124, 250, 0.14);
+    --vc-accent-line: rgba(91, 124, 250, 0.42);
+
+    /* Semantiques - usage fonctionnel uniquement */
+    --vc-success: #3ecf8e;
+    --vc-warning: #e8b339;
+    --vc-danger: #ff5a5f;
+    --vc-danger-quiet: rgba(255, 90, 95, 0.12);
+
+    /* Typographie */
+    --vc-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    --vc-font-numeric: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --vc-text-xs: 12px;
+    --vc-text-sm: 13px;
+    --vc-text-base: 14px;
+    --vc-text-md: 16px;
+    --vc-text-lg: 20px;
+    --vc-text-xl: 26px;
+    --vc-text-2xl: 34px;
+
+    /* Espacement - base 4 */
+    --vc-space-1: 4px;
+    --vc-space-2: 8px;
+    --vc-space-3: 12px;
+    --vc-space-4: 16px;
+    --vc-space-5: 20px;
+    --vc-space-6: 24px;
+    --vc-space-8: 32px;
+    --vc-space-10: 40px;
+    --vc-space-12: 48px;
+    --vc-space-16: 64px;
+
+    /* Rayons */
+    --vc-radius-sm: 8px;
+    --vc-radius-md: 12px;
+    --vc-radius-lg: 16px;
+    --vc-radius-xl: 20px;
+    --vc-radius-pill: 999px;
+
+    /* Elevation - 3 niveaux maximum */
+    --vc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --vc-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+    --vc-shadow-3: 0 24px 56px -16px rgba(0, 0, 0, 0.7);
+
+    /* Mouvement */
+    --vc-dur-1: 120ms;
+    --vc-dur-2: 180ms;
+    --vc-dur-3: 240ms;
+    --vc-dur-4: 320ms;
+    --vc-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --vc-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* Chrome */
+    --vc-topbar-height: 56px;
+
+    background: var(--vc-bg);
+    color: var(--vc-text);
+    font-family: var(--vc-font);
+    font-size: var(--vc-text-base);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme clair - pret, non active (decision produit: sombre uniquement pour l'instant) */
+.vibecut[data-theme="light"] {
+    --vc-bg: #f6f6f8;
+    --vc-bg-sunken: #ececf0;
+    --vc-surface: #ffffff;
+    --vc-surface-2: #f2f2f5;
+    --vc-surface-3: #e7e7ec;
+    --vc-line: rgba(0, 0, 0, 0.08);
+    --vc-line-strong: rgba(0, 0, 0, 0.16);
+    --vc-text: #16161a;
+    --vc-text-2: #5a5a64;
+    --vc-text-3: #8b8b95;
+    --vc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --vc-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.14);
+    --vc-shadow-3: 0 24px 56px -16px rgba(0, 0, 0, 0.18);
+}
+
+.vibecut *,
+.vibecut *::before,
+.vibecut *::after {
+    box-sizing: border-box;
+}
+
+/*
+ * Resets d'elements en specificite ZERO (`:where`).
+ * Sans cela, `.vibecut button` (0,1,1) l'emporterait sur les classes des CSS
+ * Modules (0,1,0) et ecraserait par exemple le fond des boutons primaires.
+ */
+:where(.vibecut) :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+}
+
+:where(.vibecut) :where(button) {
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+:where(.vibecut) :where(button:disabled) {
+    cursor: not-allowed;
+}
+
+.vibecut :focus-visible {
+    outline: 2px solid var(--vc-accent);
+    outline-offset: 2px;
+    border-radius: var(--vc-radius-sm);
+}
+
+:where(.vibecut) :where(h1, h2, h3, h4) {
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--vc-text);
+}
+
+:where(.vibecut) :where(p) {
+    margin: 0;
+}
+
+.vibecut [data-numeric] {
+    font-family: var(--vc-font-numeric);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+/* Scrollbars discretes, seulement dans VibeCut */
+.vibecut ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.vibecut ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vibecut ::-webkit-scrollbar-thumb {
+    background: var(--vc-surface-3);
+    border: 3px solid transparent;
+    border-radius: var(--vc-radius-pill);
+    background-clip: content-box;
+}
+
+.vibecut ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a42;
+    background-clip: content-box;
+}
+
+.vibecut-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vibecut *,
+    .vibecut *::before,
+    .vibecut *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        /*
+         * Les delais aussi: les entrees en cascade utilisent `animation-fill-mode:
+         * both`, donc un delai non neutralise laisserait le contenu invisible
+         * pendant sa duree - exactement l'inverse du but recherche.
+         */
+        animation-delay: 0ms !important;
+        transition-delay: 0ms !important;
+    }
+}

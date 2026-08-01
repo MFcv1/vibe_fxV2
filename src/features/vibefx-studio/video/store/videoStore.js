@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { buildTimelineModel, clampVolumePercent, doesTrackAllowOverlap, findTimelineItemOverlap, getDefaultTracks, getIntroOffset, getSequencePlacement, getTimelineTrackRole, getTrackForItemType, isTrackLocked as isTimelineTrackLocked } from '../model/timelineModel';
+import { isImageMedia, normalizeImageDuration, normalizeImageMotion, normalizeMediaType } from '../model/mediaModel';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -7,6 +8,12 @@ const SEQUENCE_TRACK_ID = 'sequence-main';
 const normalizeClipFrameRate = (value) => {
     const frameRate = Number(value);
     return Number.isFinite(frameRate) && frameRate > 0 ? frameRate : null;
+};
+const MAX_CLIP_DURATION_SECONDS = 6 * 60 * 60;
+const normalizeClipDuration = (value, fallback = null) => {
+    const duration = Number(value);
+    if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_CLIP_DURATION_SECONDS) return fallback;
+    return duration;
 };
 const normalizeOrientationRotation = (value) => (
     ((Math.round((Number(value) || 0) / 90) * 90) % 360 + 360) % 360
@@ -19,6 +26,36 @@ const useVideoStore = create((set, get) => ({
     // === PROJECT ===
     projectName: 'Untitled',
     setProjectName: (name) => set({ projectName: name }),
+    restoreProject: (project = {}) => {
+        const clips = Array.isArray(project.clips) ? project.clips : [];
+        const transitions = project.transitions && typeof project.transitions === 'object' ? project.transitions : {};
+        const transitionItems = Array.isArray(project.transitionItems) ? project.transitionItems : [];
+        const totalDuration = computeTotalDuration(clips, transitions, transitionItems);
+        set({
+            projectName: project.projectName || 'Untitled',
+            clips,
+            transitions,
+            transitionItems,
+            textOverlays: Array.isArray(project.textOverlays) ? project.textOverlays : [],
+            audioTracks: Array.isArray(project.audioTracks) ? project.audioTracks : [],
+            tracks: Array.isArray(project.tracks) && project.tracks.length ? project.tracks : getDefaultTracks(),
+            sequencePreset: project.sequencePreset || 'youtube',
+            totalDuration,
+            currentTime: 0,
+            isPlaying: false,
+            selectedClipId: clips[0]?.id || null,
+            selectedTextId: null,
+            selectedTransitionId: null,
+            selectedAudioTrackId: null,
+            activePanel: null,
+            timelineEditNotice: null,
+            _history: [],
+            _future: [],
+            _historyIndex: -1,
+            _historyTransaction: null,
+        });
+        return clips.length > 0;
+    },
 
     // === CANONICAL TIMELINE MODEL ===
     tracks: getDefaultTracks(),
@@ -147,7 +184,12 @@ const useVideoStore = create((set, get) => ({
         const state = get();
         if (isTimelineTrackLocked(state.tracks, 'video-main')) {
             rejectTimelineEdit(set, 'track-locked', 'Piste video verrouillee: import ignore.');
-            return;
+            return false;
+        }
+        const safeDuration = normalizeClipDuration(clipData?.duration);
+        if (safeDuration === null) {
+            rejectTimelineEdit(set, 'media-duration-invalid', `Import refuse pour ${clipData?.name || 'ce media'}: duree absente ou invalide.`);
+            return false;
         }
         pushHistory(state);
         set((s) => {
@@ -156,8 +198,11 @@ const useVideoStore = create((set, get) => ({
                 name: clipData.name || 'Clip',
                 file: clipData.file,
                 url: clipData.url,
-                duration: clipData.duration || 0,
-                originalDuration: clipData.duration || 0,
+                mediaType: normalizeMediaType(clipData),
+                mimeType: clipData.mimeType || clipData.type || clipData.file?.type || null,
+                assetId: clipData.assetId || clipData.id || null,
+                duration: safeDuration,
+                originalDuration: safeDuration,
                 width: Number.isFinite(Number(clipData.width)) ? Number(clipData.width) : null,
                 height: Number.isFinite(Number(clipData.height)) ? Number(clipData.height) : null,
                 displayWidth: Number.isFinite(Number(clipData.displayWidth)) ? Number(clipData.displayWidth) : null,
@@ -166,7 +211,7 @@ const useVideoStore = create((set, get) => ({
                 orientationSource: clipData.orientationSource || 'browser',
                 importSessionId: clipData.importSessionId || null,
                 trimStart: 0,
-                trimEnd: clipData.duration || 0,
+                trimEnd: safeDuration,
                 thumbnails: clipData.thumbnails || [],
                 sourceFrameRate: normalizeClipFrameRate(clipData.sourceFrameRate),
                 sourceFrameRateRaw: normalizeClipFrameRate(clipData.sourceFrameRateRaw),
@@ -175,7 +220,8 @@ const useVideoStore = create((set, get) => ({
                 importFrameRateMode: clipData.importFrameRateMode || 'source',
                 socialFpsNormalized: clipData.socialFpsNormalized === true,
                 speed: 1,
-                volume: 100,
+                volume: isImageMedia(clipData) ? 0 : 100,
+                motion: isImageMedia(clipData) ? normalizeImageMotion(clipData.motion || 'none') : null,
                 filters: {
                     exposure: 0,
                     brightness: 100,
@@ -193,12 +239,15 @@ const useVideoStore = create((set, get) => ({
                     vignette: 0,
                     grain: 0,
                 },
-                waveform: clipData.waveform || { status: 'pending', peaks: [] },
+                waveform: clipData.waveform || (isImageMedia(clipData)
+                    ? { status: 'unavailable', peaks: [], reason: 'image-source' }
+                    : { status: 'pending', peaks: [] }),
             };
             const clips = [...s.clips, newClip];
             const totalDuration = computeTotalDuration(clips, s.transitions, s.transitionItems);
             return { clips, totalDuration, currentTime: clamp(s.currentTime, 0, totalDuration), timelineEditNotice: null };
         });
+        return true;
     },
 
     applyClipRotationToImportSession: (clipId) => {
@@ -222,6 +271,166 @@ const useVideoStore = create((set, get) => ({
             timelineEditNotice: null,
         }));
         return sessionClips.length;
+    },
+
+    /*
+     * Applique une PARTITION de montage: une duree et un mouvement par scene, et
+     * une transition par coupe.
+     *
+     * Action ADDITIVE, volontairement distincte de `applyGuidedTemplate` juste
+     * en dessous: cette derniere est encore lue par l'ancien front
+     * (/studio?workspace=video) jusqu'a la phase 7 et ne doit pas bouger.
+     * Elle applique une duree UNIQUE et une transition UNIQUE; celle-ci applique
+     * une partition. Les deux cohabitent jusqu'a la bascule.
+     *
+     * `score` = {
+     *   sequencePreset,
+     *   scenes: [{ duration, motion }]   // indexe comme state.clips
+     *   cuts:   [{ index, type, duration }]  // index = coupe entre i et i+1
+     *   lookPatch,
+     * }
+     * Une seule ecriture, donc une seule entree d'historique et un seul recalcul
+     * de timeline: rejouer un preset pendant que l'utilisateur change d'avis
+     * reste instantane.
+     */
+    applyMontageScore: (score = {}) => {
+        const state = get();
+        if (!state.clips.length) return false;
+        if (isTimelineTrackLocked(state.tracks, 'video-main') || isTimelineTrackLocked(state.tracks, 'transition-main')) {
+            rejectTimelineEdit(set, 'track-locked', 'Deverrouille les pistes Video et Transitions pour creer le montage guide.');
+            return false;
+        }
+        const sceneScores = Array.isArray(score.scenes) ? score.scenes : [];
+        const cutScores = Array.isArray(score.cuts) ? score.cuts : [];
+        const lookPatch = score.lookPatch && typeof score.lookPatch === 'object' ? score.lookPatch : {};
+        pushHistory(state);
+        set((s) => {
+            const clips = s.clips.map((clip, index) => {
+                const sceneScore = sceneScores[index] || null;
+                // La duree d'une video n'est jamais reecrite: on ne peut pas
+                // etirer une source. Seules les photos ont une duree libre.
+                const imageUpdates = isImageMedia(clip) && sceneScore
+                    ? (() => {
+                        const duration = normalizeImageDuration(sceneScore.duration);
+                        return {
+                            duration,
+                            originalDuration: duration,
+                            trimStart: 0,
+                            trimEnd: duration,
+                            motion: normalizeImageMotion(sceneScore.motion || 'none'),
+                        };
+                    })()
+                    : {};
+                return {
+                    ...clip,
+                    ...imageUpdates,
+                    filters: {
+                        ...(clip.filters || {}),
+                        ...lookPatch,
+                    },
+                };
+            });
+            // Les transitions posees a la main hors coupe sont preservees.
+            const freeTransitions = s.transitionItems.filter((item) => (item.params?.placement || 'free') !== 'cut');
+            const cutTransitions = cutScores.reduce((items, cut) => {
+                const fromClip = clips[cut?.index];
+                const toClip = clips[cut?.index + 1];
+                const duration = Number(cut?.duration) || 0;
+                if (!fromClip || !toClip || !cut?.type || cut.type === 'cut' || duration <= 0) return items;
+                items.push(makeCutTransitionItem(fromClip.id, toClip.id, {
+                    type: cut.type,
+                    duration,
+                    name: cut.name || cut.type,
+                }, { preserveId: false }));
+                return items;
+            }, []);
+            const transitionItems = [...freeTransitions, ...cutTransitions];
+            return {
+                clips,
+                transitions: {},
+                transitionItems,
+                totalDuration: computeTotalDuration(clips, {}, transitionItems),
+                currentTime: 0,
+                isPlaying: false,
+                sequencePreset: score.sequencePreset || s.sequencePreset,
+                selectedClipId: clips[0]?.id || null,
+                selectedTransitionId: null,
+                activePanel: null,
+                timelineEditNotice: null,
+            };
+        });
+        return true;
+    },
+
+    /*
+     * Ancien chemin guide: une duree unique et une transition unique pour tout le
+     * montage. Encore lu par l'ancien front jusqu'a la phase 7 - ne pas modifier.
+     * Le nouveau front passe par `applyMontageScore` ci-dessus.
+     */
+    applyGuidedTemplate: (template = {}) => {
+        const state = get();
+        if (!state.clips.length) return false;
+        if (isTimelineTrackLocked(state.tracks, 'video-main') || isTimelineTrackLocked(state.tracks, 'transition-main')) {
+            rejectTimelineEdit(set, 'track-locked', 'Deverrouille les pistes Video et Transitions pour creer le montage guide.');
+            return false;
+        }
+        const imageDuration = normalizeImageDuration(template.imageDuration);
+        const motionPattern = Array.isArray(template.motionPattern) && template.motionPattern.length
+            ? template.motionPattern
+            : ['zoom-in', 'pan-right', 'zoom-out', 'pan-left'];
+        const lookPatch = template.lookPatch && typeof template.lookPatch === 'object' ? template.lookPatch : {};
+        const transition = template.transition?.type === 'crossfade'
+            ? {
+                type: 'crossfade',
+                duration: clamp(Number(template.transition.duration) || 0.35, 0.1, 1.5),
+                name: template.transition.name || 'Fondu',
+                params: { placement: 'cut' },
+            }
+            : null;
+        pushHistory(state);
+        set((s) => {
+            const clips = s.clips.map((clip, index) => {
+                const imageUpdates = isImageMedia(clip)
+                    ? {
+                        duration: imageDuration,
+                        originalDuration: imageDuration,
+                        trimStart: 0,
+                        trimEnd: imageDuration,
+                        motion: normalizeImageMotion(motionPattern[index % motionPattern.length]),
+                    }
+                    : {};
+                return {
+                    ...clip,
+                    ...imageUpdates,
+                    filters: {
+                        ...(clip.filters || {}),
+                        ...lookPatch,
+                    },
+                };
+            });
+            const freeTransitions = s.transitionItems.filter((item) => (item.params?.placement || 'free') !== 'cut');
+            const cutTransitions = transition
+                ? clips.slice(0, -1).map((clip, index) => (
+                    makeCutTransitionItem(clip.id, clips[index + 1].id, transition, { preserveId: false })
+                ))
+                : [];
+            const transitionItems = [...freeTransitions, ...cutTransitions];
+            const totalDuration = computeTotalDuration(clips, {}, transitionItems);
+            return {
+                clips,
+                transitions: {},
+                transitionItems,
+                totalDuration,
+                currentTime: 0,
+                isPlaying: false,
+                sequencePreset: template.sequencePreset || s.sequencePreset,
+                selectedClipId: clips[0]?.id || null,
+                selectedTransitionId: null,
+                activePanel: null,
+                timelineEditNotice: null,
+            };
+        });
+        return true;
     },
 
     removeClip: (id) => {
@@ -292,10 +501,10 @@ const useVideoStore = create((set, get) => ({
         }
         if (options.history) pushHistory(state);
         set((s) => {
-        const normalizedUpdates = Object.prototype.hasOwnProperty.call(updates, 'volume')
-            ? { ...updates, volume: clampVolumePercent(updates.volume) }
-            : updates;
-        const clips = s.clips.map(c => c.id === id ? { ...c, ...normalizedUpdates } : c);
+        const clips = s.clips.map((clip) => {
+            if (clip.id !== id) return clip;
+            return { ...clip, ...normalizeClipUpdates(clip, updates) };
+        });
         const totalDuration = computeTotalDuration(clips, s.transitions, s.transitionItems);
         return { clips, totalDuration, currentTime: clamp(s.currentTime, 0, totalDuration), timelineEditNotice: null };
         });
@@ -870,12 +1079,50 @@ function normalizeTimelineItemUpdates(item, updates = {}, totalDuration = 0) {
 }
 
 function pickClipTimelineUpdates(updates = {}) {
-    const allowedKeys = ['trimStart', 'trimEnd', 'speed', 'volume', 'filters', 'trackId'];
+    const allowedKeys = ['duration', 'trimStart', 'trimEnd', 'speed', 'volume', 'filters', 'motion', 'trackId'];
     return Object.fromEntries(
         allowedKeys
             .filter(key => Object.prototype.hasOwnProperty.call(updates, key))
             .map(key => [key, updates[key]])
     );
+}
+
+function normalizeClipUpdates(clip = {}, updates = {}) {
+    const next = { ...updates };
+    const currentDuration = normalizeClipDuration(clip.duration, normalizeClipDuration(clip.trimEnd, 0)) || 0;
+    const requestedDuration = Object.prototype.hasOwnProperty.call(updates, 'duration')
+        ? normalizeClipDuration(updates.duration)
+        : currentDuration;
+    const duration = requestedDuration || currentDuration;
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'duration')) {
+        next.duration = isImageMedia(clip) ? normalizeImageDuration(duration) : duration;
+        if (isImageMedia(clip) && !Object.prototype.hasOwnProperty.call(updates, 'trimEnd')) {
+            next.trimEnd = next.duration;
+        }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'originalDuration')) {
+        next.originalDuration = normalizeClipDuration(updates.originalDuration, clip.originalDuration || duration);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'trimStart')) {
+        next.trimStart = clamp(Number.isFinite(Number(updates.trimStart)) ? Number(updates.trimStart) : 0, 0, duration);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'trimEnd')) {
+        const trimStart = Number(next.trimStart ?? clip.trimStart ?? 0);
+        const safeTrimEnd = Number.isFinite(Number(updates.trimEnd)) ? Number(updates.trimEnd) : duration;
+        next.trimEnd = clamp(safeTrimEnd, Math.min(duration, trimStart), duration);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'speed')) {
+        const speed = Number(updates.speed);
+        next.speed = Number.isFinite(speed) && speed > 0 ? clamp(speed, 0.1, 16) : 1;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'volume')) {
+        next.volume = clampVolumePercent(updates.volume);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'motion')) {
+        next.motion = isImageMedia(clip) ? normalizeImageMotion(updates.motion) : null;
+    }
+    return next;
 }
 
 function normalizeAudioTrack(track = {}, { id = track.id || uid(), trackId = track.trackId || getTrackForItemType('audio'), totalDuration = 0 } = {}) {
@@ -892,6 +1139,9 @@ function normalizeAudioTrack(track = {}, { id = track.id || uid(), trackId = tra
         url: track.url,
         file: track.file || null,
         volume: clampVolumePercent(track.volume ?? 100),
+        trimStart: Math.max(0, Number(track.trimStart) || 0),
+        fadeIn: Math.max(0, Number(track.fadeIn) || 0),
+        fadeOut: Math.max(0, Number(track.fadeOut) || 0),
         trackId,
         ...track,
         id,
@@ -923,6 +1173,10 @@ function normalizeTextOverlay(text = {}, { id = text.id || uid(), trackId = text
         color: '#ffffff',
         bold: true,
         italic: false,
+        // Lisibilite sur image claire: bloc de fond ou contour, rendus a
+        // l'identique dans l'apercu et par FFmpeg a l'export.
+        boxStyle: 'none',
+        boxColor: '#000000',
         animation: 'fade',
         animationOut: 'fade',
         ...text,
@@ -1184,10 +1438,12 @@ function getCutTransitionForPair(transitions = {}, transitionItems = [], fromId,
 }
 
 function getClipPlaybackDuration(clip = {}) {
-    const trimStart = Number(clip.trimStart) || 0;
-    const trimEnd = Number(clip.trimEnd ?? clip.duration ?? 0) || 0;
-    const speed = Number(clip.speed) || 1;
-    return Math.max(0, (trimEnd - trimStart) / speed);
+    const sourceDuration = normalizeClipDuration(clip.duration, normalizeClipDuration(clip.trimEnd, 0)) || 0;
+    const trimStart = clamp(Number.isFinite(Number(clip.trimStart)) ? Number(clip.trimStart) : 0, 0, sourceDuration);
+    const trimEnd = clamp(Number.isFinite(Number(clip.trimEnd)) ? Number(clip.trimEnd) : sourceDuration, trimStart, sourceDuration);
+    const rawSpeed = Number(clip.speed);
+    const speed = Number.isFinite(rawSpeed) && rawSpeed > 0 ? rawSpeed : 1;
+    return Math.min(MAX_CLIP_DURATION_SECONDS, Math.max(0, (trimEnd - trimStart) / speed));
 }
 
 function getCutTransitionConfiguredDuration(transition = null) {
@@ -1217,13 +1473,13 @@ function computeTotalDuration(clips, transitions = {}, transitionItems = []) {
         .filter(item => getSequencePlacement(item) === 'outro')
         .reduce((maxDuration, item) => Math.max(maxDuration, Number(item.duration) || 0), 0);
     total += outroDuration;
-    return Math.max(0, total);
+    return Number.isFinite(total) ? Math.min(MAX_CLIP_DURATION_SECONDS, Math.max(0, total)) : 0;
 }
 
 function computeStoreTotalDuration(state = {}, transitionItems = state.transitionItems || []) {
     return state.clips?.length
         ? computeTotalDuration(state.clips, state.transitions, transitionItems)
-        : Math.max(0, Number(state.totalDuration) || 0);
+        : Math.max(0, normalizeClipDuration(state.totalDuration, 0));
 }
 
 function resolveTransitionStartTime(transition = {}, sequencePlacement = null, duration = 0.5, maxEnd = 0.1, currentTime = 0) {

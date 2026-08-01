@@ -1,0 +1,344 @@
+/*
+ * Bibliotheques de transitions et de mouvements (phase 5).
+ * Deux colonnes: le catalogue defile, le panneau d'application reste. La page
+ * elle-meme ne defile jamais, comme les trois modes de montage.
+ */
+
+.screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    height: calc(100dvh - var(--vc-topbar-height));
+    min-height: 0;
+    overflow: hidden;
+}
+
+.screenHead {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vc-space-4);
+    flex: 0 0 auto;
+    padding: var(--vc-space-4) var(--vc-space-5);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.screenTitles {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-1);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.screenTitle {
+    font-size: var(--vc-text-lg);
+    letter-spacing: -0.01em;
+}
+
+.screenSubtitle {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    max-width: 68ch;
+}
+
+.screenAction {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex: 0 0 auto;
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    transition: border-color var(--vc-dur-2) var(--vc-ease), color var(--vc-dur-2) var(--vc-ease);
+}
+
+.screenAction:hover {
+    border-color: var(--vc-line-strong);
+    color: var(--vc-text);
+}
+
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* ---------- Catalogue ---------- */
+
+.catalog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-6);
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vc-space-5);
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+}
+
+.groupHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+}
+
+.groupTitle {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+}
+
+.groupHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+.cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-2);
+    border-radius: var(--vc-radius-lg);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    text-align: left;
+    transition: border-color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out),
+        box-shadow var(--vc-dur-2) var(--vc-ease-out);
+}
+
+.card:hover {
+    border-color: var(--vc-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vc-shadow-2);
+}
+
+.cardActive,
+.cardActive:hover {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent), var(--vc-shadow-2);
+}
+
+/* Un mouvement que le moteur ne rend pas reste lisible, mais visiblement en retrait. */
+.cardPlanned .previewCanvas {
+    opacity: 0.45;
+}
+
+.cardBody {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--vc-space-1);
+    padding: 0 var(--vc-space-1) var(--vc-space-1);
+}
+
+.cardName {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+}
+
+.cardDescription {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+    line-height: 1.45;
+}
+
+.cardCheck {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+/*
+ * Le canvas est dessine hors React par l'horloge partagee. Il est declare en
+ * `block` avec une largeur fluide: sa resolution interne reste celle de ses
+ * attributs `width`/`height`, la mise a l'echelle est purement CSS.
+ */
+.previewCanvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vc-radius-md);
+    background: #000000;
+    object-fit: cover;
+}
+
+/* ---------- Panneau d'application ---------- */
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+    flex: 0 0 336px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vc-space-5) var(--vc-space-4);
+    border-left: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.panelHead {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--vc-space-1);
+}
+
+.panelKind {
+    font-size: var(--vc-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--vc-text-3);
+}
+
+.panelTitle {
+    font-size: var(--vc-text-md);
+    font-weight: 600;
+}
+
+.subTitle {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+    color: var(--vc-text-2);
+}
+
+.trajectoryBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+}
+
+.fieldLabel {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.fieldValue {
+    font-family: var(--vc-font-numeric);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+.field input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.select {
+    height: 34px;
+    padding: 0 var(--vc-space-2);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+}
+
+.chipRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vc-space-2);
+}
+
+.chip {
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.chipActive {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+    color: var(--vc-text);
+}
+
+.chip:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+}
+
+.note {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    line-height: 1.5;
+}
+
+.warning {
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-warning);
+    line-height: 1.5;
+}
+
+.notice {
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-accent-quiet);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+/* ---------- Etroit ---------- */
+
+@media (max-width: 900px) {
+    .body {
+        flex-direction: column;
+    }
+
+    .panel {
+        flex: 0 0 auto;
+        max-height: 46dvh;
+        border-left: none;
+        border-top: 1px solid var(--vc-line);
+    }
+}

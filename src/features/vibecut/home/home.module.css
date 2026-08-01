@@ -1,0 +1,712 @@
+/* Accueil VibeCut */
+
+.page {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: var(--vc-space-10) var(--vc-space-6) var(--vc-space-16);
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-12);
+}
+
+/* ---------- En-tete ---------- */
+.hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vc-space-6);
+    flex-wrap: wrap;
+}
+
+.heroText {
+    display: flex;
+    flex: 1 1 420px;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+}
+
+.heroAction {
+    flex: 0 0 auto;
+    margin-top: var(--vc-space-1);
+}
+
+.heroTitle {
+    font-size: var(--vc-text-2xl);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+}
+
+.heroSubtitle {
+    font-size: var(--vc-text-md);
+    color: var(--vc-text-2);
+    max-width: 56ch;
+}
+
+/* ---------- Sections ---------- */
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-5);
+}
+
+.sectionHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-4);
+}
+
+.sectionTitle {
+    font-size: var(--vc-text-lg);
+}
+
+.sectionHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+.sectionLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vc-space-1);
+    font-size: var(--vc-text-sm);
+    font-weight: 550;
+    color: var(--vc-accent);
+    transition: gap var(--vc-dur-2) var(--vc-ease-out);
+}
+
+.sectionLink:hover {
+    gap: var(--vc-space-2);
+}
+
+/* ---------- Cartes de mode ---------- */
+.modes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--vc-space-4);
+}
+
+.modeCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-4);
+    padding: var(--vc-space-4);
+    text-decoration: none;
+    color: inherit;
+}
+
+.modeStage {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vc-radius-md);
+    background: var(--vc-bg-sunken);
+    border: 1px solid var(--vc-line);
+    overflow: hidden;
+}
+
+.modeBody {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    padding: 0 var(--vc-space-1) var(--vc-space-1);
+}
+
+.modeBody > span:first-child {
+    display: block;
+    min-width: 0;
+}
+
+.modeTitle {
+    display: block;
+    font-size: var(--vc-text-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.modeDescription {
+    display: block;
+    margin-top: var(--vc-space-1);
+    font-size: var(--vc-text-sm);
+    line-height: 1.4;
+    color: var(--vc-text-2);
+}
+
+.modeArrow {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-2);
+    border: 1px solid var(--vc-line);
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-2) var(--vc-ease),
+        color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out);
+}
+
+.modeCard:hover .modeArrow {
+    background: var(--vc-accent);
+    border-color: transparent;
+    color: var(--vc-text-on-accent);
+    transform: translateX(2px);
+}
+
+/* ---------- Maquettes animees des modes ---------- */
+.mock {
+    position: absolute;
+    inset: 0;
+    padding: 14px;
+    display: flex;
+}
+
+/* Montage rapide: storyboard */
+.mockQuick {
+    align-items: center;
+    gap: 8px;
+}
+
+.mockScene {
+    position: relative;
+    flex: 1 1 0;
+    height: 62%;
+    border-radius: 8px;
+    border: 1px solid var(--vc-line);
+    overflow: hidden;
+    transition: transform var(--vc-dur-4) var(--vc-ease-out);
+}
+
+.mockSceneBadge {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    display: grid;
+    place-items: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #f0f0f2;
+    font-size: 9px;
+    line-height: 1;
+}
+
+.modeCard:hover .mockScene:nth-child(1) {
+    transform: translateY(-4px);
+}
+
+.modeCard:hover .mockScene:nth-child(3) {
+    transform: translateY(4px);
+}
+
+.mockLink {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 5px;
+    background: var(--vc-surface-3);
+    color: var(--vc-text-3);
+}
+
+/* Creation guidee: etapes + apercu vertical */
+.mockGuided {
+    align-items: center;
+    gap: 14px;
+}
+
+.mockGuidedSteps {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 10px;
+    min-width: 0;
+}
+
+.mockGuidedPreview {
+    position: relative;
+    flex: 0 0 auto;
+    width: 52px;
+    aspect-ratio: 9 / 16;
+    border-radius: 7px;
+    border: 1px solid var(--vc-line-strong);
+    overflow: hidden;
+}
+
+.mockGuidedPlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.mockStepThumbs {
+    display: flex;
+    gap: 4px;
+}
+
+.mockStepThumbs > span {
+    display: block;
+    width: 22px;
+    height: 16px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.mockStep {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mockStepDot {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--vc-line-strong);
+    background: var(--vc-surface);
+}
+
+.mockStepDotDone {
+    border-color: transparent;
+    background: var(--vc-accent);
+}
+
+.mockStepBar {
+    height: 8px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-3);
+}
+
+.mockStepBarFill {
+    height: 8px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-3);
+    width: 40%;
+    overflow: hidden;
+    position: relative;
+}
+
+.mockStepBarFill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 0;
+    border-radius: inherit;
+    background: var(--vc-accent);
+    transition: width var(--vc-dur-4) var(--vc-ease-out);
+}
+
+.modeCard:hover .mockStepBarFill::after {
+    width: 100%;
+}
+
+/* Montage avance: timeline */
+.mockAdvanced {
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+}
+
+.mockRuler {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 10px;
+    margin-bottom: 2px;
+}
+
+.mockTick {
+    width: 1px;
+    background: var(--vc-line-strong);
+}
+
+.mockTrack {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 16px;
+}
+
+.mockTrackLabel {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--vc-surface-2);
+}
+
+.mockClip {
+    position: relative;
+    height: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mockPlayhead {
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 42%;
+    width: 1.5px;
+    background: var(--vc-accent);
+    transition: left var(--vc-dur-4) var(--vc-ease-out);
+}
+
+.modeCard:hover .mockPlayhead {
+    left: 66%;
+}
+
+/* ---------- Bibliotheques ---------- */
+.libraries {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vc-space-8);
+}
+
+.tileRow {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: 0;
+    background: none;
+    border: 0;
+    text-align: left;
+    color: inherit;
+    text-decoration: none;
+}
+
+.tileStage {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-bg-sunken);
+    overflow: hidden;
+    transition: border-color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out);
+}
+
+/* Indice statique de ce que fait l'effet, lisible sans survol. */
+.tileGlyph {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: rgba(10, 10, 12, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ececed;
+    backdrop-filter: blur(8px);
+    transition: background var(--vc-dur-2) var(--vc-ease);
+}
+
+.tile:hover .tileGlyph,
+.tile:focus-visible .tileGlyph {
+    background: rgba(10, 10, 12, 0.78);
+}
+
+.tile:hover .tileStage,
+.tile:focus-visible .tileStage {
+    border-color: var(--vc-accent-line);
+    transform: translateY(-2px);
+}
+
+.tileName {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tile:hover .tileName {
+    color: var(--vc-text);
+}
+
+.tilePlanned {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 1px 6px;
+    border-radius: var(--vc-radius-pill);
+    background: rgba(0, 0, 0, 0.55);
+    color: #d8d8de;
+    font-size: var(--vc-text-xs);
+    backdrop-filter: blur(6px);
+}
+
+.sceneImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Aperçu mouvement */
+.motionFrame {
+    position: absolute;
+    inset: 0;
+    transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)) rotate(var(--from-rotate, 0deg));
+    opacity: var(--from-opacity, 1);
+}
+
+.tile:hover .motionFrame,
+.tile:focus-visible .motionFrame {
+    animation: vcMotionPreview 1900ms var(--vc-ease) infinite alternate;
+}
+
+@keyframes vcMotionPreview {
+    from {
+        transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)) rotate(var(--from-rotate, 0deg));
+        opacity: var(--from-opacity, 1);
+    }
+    to {
+        transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0), var(--to-y, 0)) rotate(var(--to-rotate, 0deg));
+        opacity: var(--to-opacity, 1);
+    }
+}
+
+/* Aperçu transition: deux plans A et B */
+.transitionLayer {
+    position: absolute;
+    inset: 0;
+}
+
+.transitionLayerB {
+    opacity: 0;
+}
+
+.transitionOverlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tile:hover .transitionLayerB,
+.tile:focus-visible .transitionLayerB {
+    animation: vcTransitionIn 2000ms var(--vc-ease) infinite;
+}
+
+.tile:hover .transitionLayerA,
+.tile:focus-visible .transitionLayerA {
+    animation: vcTransitionOut 2000ms var(--vc-ease) infinite;
+}
+
+@keyframes vcTransitionIn {
+    0%, 25% { opacity: 0; transform: var(--enter-from, none); filter: var(--enter-filter-from, none); }
+    60%, 100% { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes vcTransitionOut {
+    0%, 25% { opacity: 1; transform: none; filter: none; }
+    60%, 100% { opacity: 0; transform: var(--leave-to, none); filter: var(--leave-filter-to, none); }
+}
+
+.tile[data-preview="flash"]:hover .transitionOverlay,
+.tile[data-preview="dip-white"]:hover .transitionOverlay,
+.tile[data-preview="dip-black"]:hover .transitionOverlay {
+    animation: vcTransitionOverlay 2000ms var(--vc-ease) infinite;
+}
+
+@keyframes vcTransitionOverlay {
+    0%, 25% { opacity: 0; }
+    42% { opacity: 1; }
+    60%, 100% { opacity: 0; }
+}
+
+/* ---------- Projets recents ---------- */
+.projectGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: var(--vc-space-4);
+}
+
+.projectCard {
+    padding: 0;
+}
+
+.projectPoster {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--vc-bg-sunken);
+    border-bottom: 1px solid var(--vc-line);
+    overflow: hidden;
+}
+
+.projectPoster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.projectPosterEmpty {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--vc-text-3);
+}
+
+.projectDuration {
+    position: absolute;
+    left: var(--vc-space-2);
+    bottom: var(--vc-space-2);
+    padding: 2px 6px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: var(--vc-text-xs);
+    backdrop-filter: blur(6px);
+}
+
+.projectBody {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-3);
+}
+
+.projectName {
+    font-size: var(--vc-text-sm);
+    font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.projectMeta {
+    margin-top: 2px;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.projectOpen {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+.projectActions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    position: relative;
+    z-index: 1;
+}
+
+.iconAction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--vc-radius-sm);
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.iconAction:hover {
+    background: var(--vc-surface-3);
+    color: var(--vc-text);
+}
+
+.loadingGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: var(--vc-space-4);
+}
+
+.skeleton {
+    border-radius: var(--vc-radius-lg);
+    background: linear-gradient(90deg, var(--vc-surface) 0%, var(--vc-surface-2) 50%, var(--vc-surface) 100%);
+    background-size: 200% 100%;
+    animation: vcShimmer 1400ms linear infinite;
+    height: 196px;
+}
+
+@keyframes vcShimmer {
+    to {
+        background-position: -200% 0;
+    }
+}
+
+.errorNote {
+    padding: var(--vc-space-3) var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid rgba(255, 90, 95, 0.32);
+    background: var(--vc-danger-quiet);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1080px) {
+    .modes {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .libraries {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--vc-space-10);
+    }
+}
+
+@media (max-width: 720px) {
+    .page {
+        padding: var(--vc-space-6) var(--vc-space-4) var(--vc-space-12);
+        gap: var(--vc-space-10);
+    }
+
+    .heroTitle {
+        font-size: var(--vc-text-xl);
+    }
+
+    .modes {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Rangees defilables horizontalement plutot qu'une grille interminable. */
+    .tileRow {
+        display: flex;
+        gap: var(--vc-space-3);
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        margin: 0 calc(-1 * var(--vc-space-4));
+        padding: 0 var(--vc-space-4) var(--vc-space-1);
+        scrollbar-width: none;
+    }
+
+    .tileRow::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tile {
+        flex: 0 0 46%;
+        scroll-snap-align: start;
+    }
+}

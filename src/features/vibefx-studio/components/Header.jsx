@@ -50,19 +50,51 @@ const Header = ({ isDarkMode, setIsDarkMode, view, setView, hasImages, onReset, 
                         ...(aiInterfacesEnabled ? [{ id: 'library', icon: 'Library', label: 'Library' }] : []),
                         { id: 'soundtrack', icon: 'Music2', label: 'Soundtrack' },
                         { id: 'vision-pro', icon: 'Aperture', label: 'Vision' },
-                        { id: 'video', icon: 'Film', label: 'VibeCut' }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setView(tab.id)}
-                            aria-label={tab.label}
-                            title={tab.label}
-                            className={`relative h-full shrink-0 flex items-center gap-2 px-3 md:px-6 text-[10px] uppercase font-mono tracking-widest transition-all duration-300 border-b-2 ${view === tab.id ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5' : tab.id === 'video' ? 'border-transparent text-purple-500 hover:text-purple-400 hover:bg-purple-500/5' : 'border-transparent text-neutral-500 hover:text-white hover:bg-white/5'}`}
-                        >
-                            {getIcon(tab.icon)} <span className="hidden md:inline">{tab.label}</span>
-                            {tab.id === 'video' && <span className="text-[7px] bg-purple-500/20 text-purple-400 px-1 py-px font-mono uppercase tracking-wider hidden lg:inline">New</span>}
-                        </button>
-                    ))}
+                        /*
+                         * PHASE 7 (2026-08-01): VibeCut n'est plus une vue interne du
+                         * studio, c'est une SECTION A PART, sur ses propres routes.
+                         * L'onglet devient donc un vrai lien.
+                         *
+                         * Il etait reste un `setView` apres la suppression de l'ancien
+                         * editeur: le clic changeait un etat que plus rien ne rendait,
+                         * donc l'onglet ne faisait RIEN. Un bouton mort, ce que
+                         * `plan.md` 4.2 interdit - et que seul l'usage a revele.
+                         */
+                        { id: 'video', icon: 'Film', label: 'VibeCut', href: '/video' }
+                    ].map(tab => {
+                        const tabClassName = `relative h-full shrink-0 flex items-center gap-2 px-3 md:px-6 text-[10px] uppercase font-mono tracking-widest transition-all duration-300 border-b-2 ${view === tab.id ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5' : tab.href ? 'border-transparent text-purple-500 hover:text-purple-400 hover:bg-purple-500/5' : 'border-transparent text-neutral-500 hover:text-white hover:bg-white/5'}`;
+                        const tabContent = (
+                            <>
+                                {getIcon(tab.icon)} <span className="hidden md:inline">{tab.label}</span>
+                                {tab.href && <span className="text-[7px] bg-purple-500/20 text-purple-400 px-1 py-px font-mono uppercase tracking-wider hidden lg:inline">New</span>}
+                            </>
+                        );
+                        if (tab.href) {
+                            return (
+                                <Link
+                                    key={tab.id}
+                                    href={tab.href}
+                                    aria-label={tab.label}
+                                    title={tab.label}
+                                    className={tabClassName}
+                                    data-testid="studio-tab-vibecut"
+                                >
+                                    {tabContent}
+                                </Link>
+                            );
+                        }
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setView(tab.id)}
+                                aria-label={tab.label}
+                                title={tab.label}
+                                className={tabClassName}
+                            >
+                                {tabContent}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Actions droite */}
@@ -92,8 +124,15 @@ const Header = ({ isDarkMode, setIsDarkMode, view, setView, hasImages, onReset, 
                         <UserCircle size={13} />
                         <span className="hidden xl:inline">Compte</span>
                     </Link>
-                    {/* Backoffice — visible uniquement sur VibeCut ET connecté admin */}
-                    {view === 'video' && isAdmin && (
+                    {/*
+                      * Backoffice — réservé aux admins.
+                      *
+                      * PHASE 7: la condition portait aussi sur la vue 'video', qui
+                      * n'existe plus dans le studio. Le lien était donc devenu
+                      * INJOIGNABLE, et un admin n'avait plus aucune entrée vers le
+                      * backoffice depuis cet en-tête. Elle ne porte plus que sur le rôle.
+                      */}
+                    {isAdmin && (
                         <Link href="/backoffice" className={`hidden lg:flex text-[10px] uppercase font-mono tracking-widest px-3 py-1 transition-colors duration-200 border ${isDarkMode ? 'border-cyan-500/35 bg-cyan-500/10 text-cyan-200 hover:border-cyan-300/70 hover:text-white' : 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:border-cyan-400 hover:text-cyan-900'}`}>
                             Backoffice
                         </Link>

@@ -15,10 +15,34 @@ try {
   const {
     buildExportManifest,
     estimateExportSize,
+    getServerRenderCapabilityStatus,
+    isServerRenderCapabilitySupported,
     resolveExportQualityPreset,
+    SERVER_RENDER_CAPABILITIES,
     validateExportManifest,
     validateExportRenderCoverage,
   } = await import(pathToFileURL(tempModulePath).href);
+
+  // v3 (lot L1): les transitions minutees ne sont plus 'fade'/'crossfade' seules.
+  // v4 (lot L3): le mouvement photo porte une intensite et la meme courbe lissee
+  // que l'apercu. Prouve par scripts/smoke-vibecut-motion-preview-parity.mjs.
+  assert.equal(SERVER_RENDER_CAPABILITIES.version, 4);
+  assert.equal(SERVER_RENDER_CAPABILITIES.imageMotionIntensity, true);
+  assert.ok(SERVER_RENDER_CAPABILITIES.timedTransitions.length >= 15, "au moins 15 transitions minutees attendues");
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "iris-open"), true);
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "blur-cut"), true);
+  assert.equal(isServerRenderCapabilitySupported("mediaType", "image"), true);
+  assert.equal(isServerRenderCapabilitySupported("imageMotion", "zoom-in"), true);
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "crossfade"), true);
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "cross-zoom"), false);
+  assert.equal(isServerRenderCapabilitySupported("textAnimation", "fade"), true);
+  assert.equal(isServerRenderCapabilitySupported("textAnimation", "neon-scan"), false);
+  assert.deepEqual(getServerRenderCapabilityStatus("transition", "crossfade"), {
+    supported: true,
+    status: "ready",
+    label: "Export Pro",
+  });
+  assert.equal(getServerRenderCapabilityStatus("transition", "glitch").status, "preview-only");
 
   const manifest = buildExportManifest({
     projectId: "project-1",
@@ -245,6 +269,36 @@ try {
   });
   const textCoverage = validateExportRenderCoverage(textServerManifest);
   assert.equal(textCoverage.supported, true, "basic fade text should be server-exportable");
+
+  const photoServerManifest = buildExportManifest({
+    projectName: "Photo Ken Burns",
+    generatedAt: "2026-06-03T10:00:00.000Z",
+    preset: { width: 1080, height: 1920, fps: 60 },
+    exportFps: 60,
+    renderPlan: {
+      totalDuration: 4,
+      clips: [
+        {
+          id: "photo-scene",
+          name: "Photo Scene",
+          mediaType: "image",
+          mimeType: "image/jpeg",
+          sourceStoragePath: "users/user-1/exports/export-1/sources/image/01-photo.jpg",
+          duration: 4,
+          trimStart: 0,
+          trimEnd: 4,
+          speed: 1,
+          motion: "zoom-in",
+        },
+      ],
+      allTransitions: [],
+      textOverlays: [],
+      audioTracks: [],
+    },
+  });
+  assert.equal(photoServerManifest.clips[0].mediaType, "image");
+  assert.equal(photoServerManifest.clips[0].motion.preset, "zoom-in");
+  assert.equal(validateExportRenderCoverage(photoServerManifest).supported, true, "Ken Burns photo scene should be server-exportable");
 
   const colorServerManifest = buildExportManifest({
     projectName: "Color Server",

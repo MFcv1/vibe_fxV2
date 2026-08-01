@@ -5,10 +5,12 @@
 Tout agent IA doit lire ces fichiers dans cet ordre avant de modifier le projet :
 
 1. `AGENTS.md` - regles de travail, contraintes et liens vers les docs.
-2. `map.md` - carte vivante du projet, a tenir a jour.
-3. `seo.md` - strategie SEO Google, gates de validation et sources officielles.
-4. `MEGAPROMPT.md` - prompt maitre de conception pour lancer la vraie construction.
-5. Les skills utiles dans `.agents/skills/`, surtout `cyber-neon`, `dark-ui`, `technical-ui` et `motion`.
+2. `plan.md` - plan de la reconstruction VibeCut en cours : diagnostic, architecture, direction artistique detaillee, phases et rituel de fin de phase.
+3. `todo.md` - etat d'avancement de cette reconstruction, bugs connus et prompt de relance.
+4. `map.md` - carte vivante du projet, a tenir a jour.
+5. `seo.md` - strategie SEO Google, gates de validation et sources officielles.
+6. `MEGAPROMPT.md` - prompt maitre de conception pour lancer la vraie construction.
+7. Les skills utiles dans `.agents/skills/`, surtout `cyber-neon`, `dark-ui`, `technical-ui` et `motion`.
 
 ## Intention produit
 
@@ -32,6 +34,17 @@ Le produit cible est un outil web public permettant :
 - Les secrets Meta/Firebase ne doivent jamais etre hardcodes.
 - Les parcours OAuth, publication reseaux, chiffrement token et anti-doublon restent cote serveur Firebase Functions.
 - Les pages publiques doivent etre indexables ; les surfaces studio/app privees doivent etre `noindex`.
+
+## Rituel de fin de phase (reconstruction VibeCut)
+
+A la fin de chaque grande phase et de chaque module livre, avant de passer a la suite :
+
+- Verifier : `npm run lint`, `npm run build`, la suite de tests du nouveau front et les suites impactees.
+- Mettre a jour `todo.md` (fait, reste, bugs trouves et corriges, problemes connus).
+- Mettre a jour `plan.md` (phase marquee terminee, phases suivantes ajustees).
+- Mettre a jour `map.md` (arborescence + entree de journal datee).
+- Ecrire un prompt de relance en fin de `todo.md` pour repartir dans un chat neuf sans rien relire.
+- Rapporter honnetement ce qui marche, ce qui est laisse de cote et pourquoi, et les echecs de tests preexistants.
 
 ## Discipline de deploiement et couts
 

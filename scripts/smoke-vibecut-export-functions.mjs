@@ -75,11 +75,30 @@ assert.match(functionsSource, /onTaskDispatched/, "Functions must define a task 
 assert.match(functionsSource, /EXPORT_RENDER_ORCHESTRATION/, "Functions must expose an explicit export orchestration mode");
 assert.match(functionsSource, /shouldUseTaskQueueOrchestration/, "Functions must gate task queue mode behind explicit configuration");
 assert.match(functionsSource, /getFunctions\(\)\.taskQueue\(EXPORT_TASK_QUEUE_RESOURCE\)\.enqueue/, "Functions must enqueue Cloud Tasks through the Admin SDK with an explicit supported region");
-assert.match(functionsSource, /orchestration: "taskQueue"/, "Callable responses must identify task queue orchestration when enabled");
+assert.match(
+  functionsSource,
+  /orchestration: shouldUseCloudRunJobsOrchestration\(\) \? "cloudRunJobs" : "taskQueue"/,
+  "Callable responses must identify task queue or Cloud Run Jobs orchestration when enabled",
+);
 assert.match(functionsSource, /const processVideoExportJob = onTaskDispatched/, "Functions must expose processVideoExportJob as a task queue handler");
 assert.match(functionsSource, /await processStoredVideoExportJob\(\{ jobId, uid \}\)/, "Task queue handler must process the stored Firestore job by id and uid");
 assert.match(functionsSource, /TERMINAL_STATUSES\.has\(data\.status\)[\s\S]*skipped: true/, "Task queue worker must not rerender terminal jobs");
 assert.match(functionsIndexSource, /exports\.processVideoExportJob = videoExport\.processVideoExportJob/, "Functions index must export the task queue worker");
+assert.match(functionsSource, /crypto\.timingSafeEqual/, "Download proxy tokens must use constant-time signature comparison");
+
+const proxySecret = "test-only-secret-with-at-least-32-characters";
+const proxyClaims = {
+  jobId: "job-proxy-a",
+  uid,
+  storagePath: `users/${uid}/exports/job-proxy-a/outputs/export.mp4`,
+  expiresAt: Date.now() + 60_000,
+};
+const proxyToken = videoExport.buildProxyDownloadToken(proxyClaims, proxySecret);
+assert.deepEqual(videoExport.verifyProxyDownloadToken(proxyToken, proxySecret), proxyClaims);
+assert.throws(
+  () => videoExport.verifyProxyDownloadToken(`${proxyToken.slice(0, -1)}x`, proxySecret),
+  /Signature|invalide/,
+);
 assert.match(functionsSource, /EXPORT_RENDERER_AUTH_MODE/, "Functions renderer call must expose an explicit renderer auth mode");
 assert.match(functionsSource, /function resolveRendererAuthRequirements/, "Functions must centralize renderer auth mode parsing");
 assert.match(functionsSource, /mode === "hmac"\)[\s\S]*needsHmac: true[\s\S]*needsOidc: false/, "Functions hmac mode must send HMAC only");

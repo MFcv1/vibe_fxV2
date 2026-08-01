@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { AI_INTERFACES_DEFAULT_ENABLED } from "@/config/aiLaunch";
 import { PublicationRoutePipeline } from "./components/PublicationRoutePipeline";
+import { StackLegoArchitecture } from "./components/StackLegoArchitecture";
 import HomeNav from "./components/HomeNav";
 
 export const metadata = {
@@ -196,6 +197,8 @@ export default function Home() {
       </section>
 
       <PublicationRoutePipeline />
+
+      <StackLegoArchitecture />
 
       <section className="vf-seo-faq" aria-labelledby="home-faq-title">
         <div>

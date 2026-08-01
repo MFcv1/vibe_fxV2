@@ -1,20 +1,28 @@
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const modelSourcePath = path.join(process.cwd(), "src", "features", "vibefx-studio", "video", "model", "timelineModel.js");
+const mediaModelSourcePath = path.join(process.cwd(), "src", "features", "vibefx-studio", "video", "model", "mediaModel.js");
 const storeSourcePath = path.join(process.cwd(), "src", "features", "vibefx-studio", "video", "store", "videoStore.js");
-const tempDir = await mkdtemp(path.join(process.cwd(), ".tmp-vibecut-store-"));
+const tempDir = await mkdtemp(path.join(os.tmpdir(), "vibecut-store-"));
 const tempModelPath = path.join(tempDir, "timelineModel.mjs");
+const tempMediaModelPath = path.join(tempDir, "mediaModel.mjs");
 const tempStorePath = path.join(tempDir, "videoStore.mjs");
 
 try {
   const modelSource = await readFile(modelSourcePath, "utf8");
+  const mediaModelSource = await readFile(mediaModelSourcePath, "utf8");
+  const zustandModuleUrl = import.meta.resolve("zustand");
   const storeSource = (await readFile(storeSourcePath, "utf8"))
-    .replace("../model/timelineModel", "./timelineModel.mjs");
+    .replace("from 'zustand'", `from '${zustandModuleUrl}'`)
+    .replace("../model/timelineModel", "./timelineModel.mjs")
+    .replace("../model/mediaModel", "./mediaModel.mjs");
 
   await writeFile(tempModelPath, modelSource, "utf8");
+  await writeFile(tempMediaModelPath, mediaModelSource, "utf8");
   await writeFile(tempStorePath, storeSource, "utf8");
 
   const { getDefaultTracks, resolveTimelineRenderPlan, validateTimelineRenderPlan } = await import(pathToFileURL(tempModelPath).href);
@@ -42,6 +50,83 @@ try {
       ...overrides,
     });
   };
+
+  resetStore({ totalDuration: 0 });
+  const rejectedInfiniteClip = useVideoStore.getState().addClip({
+    id: "invalid-infinite",
+    name: "Invalid infinite",
+    url: "/invalid.webm",
+    duration: Infinity,
+  });
+  assert.equal(rejectedInfiniteClip, false, "clips with Infinity duration must be rejected before entering the store");
+  assert.equal(useVideoStore.getState().clips.length, 0, "rejected clips must not mutate the timeline");
+  assert.equal(useVideoStore.getState().totalDuration, 0, "rejected clips must keep a finite empty duration");
+  assert.equal(useVideoStore.getState().timelineEditNotice?.code, "media-duration-invalid");
+
+  const rejectedNanClip = useVideoStore.getState().addClip({
+    id: "invalid-nan",
+    name: "Invalid NaN",
+    url: "/invalid-nan.webm",
+    duration: Number.NaN,
+  });
+  assert.equal(rejectedNanClip, false, "clips with NaN duration must be rejected");
+  assert.equal(useVideoStore.getState().clips.length, 0);
+
+  const acceptedFiniteClip = useVideoStore.getState().addClip({
+    id: "valid-duration",
+    name: "Valid",
+    url: "/valid.mp4",
+    duration: 2.5,
+  });
+  assert.equal(acceptedFiniteClip, true, "finite positive media duration must be accepted");
+  useVideoStore.getState().updateClip("valid-duration", { duration: Infinity, trimEnd: Infinity });
+  assert.equal(useVideoStore.getState().clips[0].duration, 2.5, "invalid duration updates must preserve the last valid duration");
+  assert.equal(useVideoStore.getState().clips[0].trimEnd, 2.5, "invalid trim updates must be clamped to the valid source duration");
+  assert.equal(useVideoStore.getState().totalDuration, 2.5, "store duration must remain finite after invalid updates");
+
+  resetStore({ totalDuration: 0 });
+  const acceptedImage = useVideoStore.getState().addClip({
+    id: "image-scene",
+    name: "Image scene",
+    url: "/scene.jpg",
+    type: "image/jpeg",
+    mediaType: "image",
+    duration: 4,
+    motion: "zoom-in",
+    thumbnails: ["/scene.jpg"],
+  });
+  assert.equal(acceptedImage, true, "image scenes must use the same canonical clip lane");
+  assert.equal(useVideoStore.getState().clips[0].mediaType, "image");
+  assert.equal(useVideoStore.getState().clips[0].volume, 0, "image scenes must not expose source audio");
+  assert.equal(useVideoStore.getState().clips[0].motion.preset, "zoom-in");
+  useVideoStore.getState().updateClip("image-scene", { duration: 6.5, motion: "pan-left" }, { history: true });
+  assert.equal(useVideoStore.getState().clips[0].trimEnd, 6.5, "changing an image scene duration must resize its canonical trim");
+  assert.equal(useVideoStore.getState().clips[0].motion.preset, "pan-left");
+  assert.equal(useVideoStore.getState().totalDuration, 6.5);
+
+  resetStore({
+    clips: [
+      { id: "photo-a", name: "Photo A", mediaType: "image", type: "image/jpeg", url: "/a.jpg", trimStart: 0, trimEnd: 4, duration: 4, speed: 1, filters: {} },
+      { id: "photo-b", name: "Photo B", mediaType: "image", type: "image/jpeg", url: "/b.jpg", trimStart: 0, trimEnd: 4, duration: 4, speed: 1, filters: {} },
+      { id: "video-c", name: "Video C", mediaType: "video", type: "video/mp4", url: "/c.mp4", trimStart: 0, trimEnd: 2, duration: 2, speed: 1, volume: 100, filters: {} },
+    ],
+    totalDuration: 10,
+  });
+  const appliedGuidedTemplate = useVideoStore.getState().applyGuidedTemplate({
+    id: "guided-smoke",
+    sequencePreset: "instagram-reel",
+    imageDuration: 3.5,
+    motionPattern: ["zoom-in", "pan-left"],
+    transition: { type: "crossfade", duration: 0.35, name: "Guided fade" },
+    lookPatch: { contrast: 108 },
+  });
+  assert.equal(appliedGuidedTemplate, true, "guided creation must build a first cut in one transaction");
+  assert.deepEqual(useVideoStore.getState().clips.slice(0, 2).map((clip) => clip.duration), [3.5, 3.5]);
+  assert.deepEqual(useVideoStore.getState().clips.slice(0, 2).map((clip) => clip.motion.preset), ["zoom-in", "pan-left"]);
+  assert.equal(useVideoStore.getState().clips[2].duration, 2, "guided creation must preserve video source duration");
+  assert.equal(useVideoStore.getState().transitionItems.filter((item) => item.params?.placement === "cut").length, 2);
+  assert.equal(useVideoStore.getState().sequencePreset, "instagram-reel");
+  assert.equal(useVideoStore.getState().currentTime, 0);
 
   resetStore({
     clips: [
@@ -295,6 +380,55 @@ try {
   useVideoStore.getState().addTextOverlay({ content: "A", startTime: 0, endTime: 1, trackId: "text-main" });
   useVideoStore.getState().addTextOverlay({ content: "B", startTime: 0.5, endTime: 1.5, trackId: "text-main" });
   assert.equal(useVideoStore.getState().textOverlays.length, 1, "explicit same text track should reject overlap");
+
+  /*
+   * Lot L3 - l'intensite du mouvement doit ARRIVER JUSQU'AU CLIP.
+   *
+   * C'est le maillon entre le plan de montage (pur, teste par
+   * smoke-vibecut-style-recipes) et le manifeste d'export, dont la parite avec
+   * l'apercu est mesuree par smoke-vibecut-motion-preview-parity. Si le store
+   * perdait l'intensite ici, l'aperçu et l'export seraient toujours d\'accord
+   * entre eux — et tous les deux faux par rapport au choix de l\'utilisateur.
+   */
+  resetStore({ totalDuration: 0 });
+  for (const id of ["photo-1", "photo-2"]) {
+    useVideoStore.getState().addClip({
+      id,
+      name: id,
+      url: `/${id}.jpg`,
+      type: "image/jpeg",
+      mediaType: "image",
+      duration: 4,
+      motion: "none",
+      thumbnails: [`/${id}.jpg`],
+    });
+  }
+  assert.equal(
+    useVideoStore.getState().applyMontageScore({
+      scenes: [
+        { duration: 3, motion: { preset: "zoom-in", intensity: 0.4 } },
+        { duration: 2, motion: { preset: "pan-right", intensity: 0.7 } },
+      ],
+      cuts: [{ index: 0, type: "crossfade", duration: 0.5, name: "Fondu" }],
+      lookPatch: {},
+    }),
+    true,
+    "applyMontageScore must apply a montage score on image scenes"
+  );
+  const scored = useVideoStore.getState().clips;
+  assert.equal(scored[0].motion.preset, "zoom-in", "montage score must set the scene motion");
+  assert.equal(scored[0].motion.intensity, 0.4, "montage score must carry the motion intensity to the clip");
+  assert.equal(scored[1].motion.intensity, 0.7, "each scene keeps its own motion intensity");
+  assert.equal(
+    useVideoStore.getState().applyGuidedTemplate({ imageDuration: 3, motionPattern: ["zoom-in"] }),
+    true,
+    "the legacy guided template stays available until phase 7"
+  );
+  assert.equal(
+    useVideoStore.getState().clips[0].motion.intensity,
+    1,
+    "a motion without a declared intensity keeps its full travel"
+  );
 
   console.log("Video store smoke passed");
 } finally {

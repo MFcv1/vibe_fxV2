@@ -22,8 +22,8 @@ import { readFile, writeFile } from "node:fs/promises";
 const defaultK1Dir = "C:\\Users\\pcpor\\OneDrive\\Bureau\\K1";
 const k1Dir        = process.env.VIBECUT_K1_DIR || defaultK1Dir;
 const ADC_PATH     = "C:\\Users\\pcpor\\AppData\\Roaming\\firebase\\matthis_fradin2_gmail.com_application_default_credentials.json";
-// App Check debug token (created once via _create-appcheck-debug-token.mjs)
-const APPCHECK_DEBUG_TOKEN = process.env.FIREBASE_APPCHECK_DEBUG_TOKEN || "efc8e844-e13a-4b58-8d30-084e3bf6d0db";
+// App Check debug token: secret local obligatoire, jamais de valeur dans le dépôt.
+const APPCHECK_DEBUG_TOKEN = process.env.FIREBASE_APPCHECK_DEBUG_TOKEN || "";
 
 loadDotEnvLocal();
 

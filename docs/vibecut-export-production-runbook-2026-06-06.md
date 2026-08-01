@@ -106,6 +106,41 @@ npm run firebase:deploy:functions
 
 Si `EXPORT_RENDER_ORCHESTRATION=taskQueue` est active, deployer aussi la Function task queue `processVideoExportJob` exposee par `functions/index.js`. La callable `createVideoExportJob` cree alors le job Firestore et enqueue une tache Cloud Tasks; le worker relit le manifest Storage owner-scoped, appelle le renderer, respecte cancel/retry et ecrit la progression Firestore.
 
+### Point de controle `/capabilities` — et pourquoi sa reponse est volontairement pauvre
+
+Le renderer expose `GET /capabilities` (depuis le lot L6). Il interroge FFmpeg
+**dans l'image qui tourne** et repond si les 15 cibles `xfade` du lot L1 sont
+presentes. Lecture seule, aucun rendu, aucun cout de calcul.
+
+```bash
+VIBECUT_RENDERER_URL=https://vibecut-render-service-<hash>-od.a.run.app \
+  node scripts/check-vibecut-renderer-image-capabilities.mjs
+```
+
+**⚠️ Subtilite a connaitre avant de modifier cet endpoint (decidee le 2026-08-01).**
+
+`/capabilities` est **sans authentification**, et `vibecut-render-service` est un
+service Cloud Run **public** (`allUsers` a `roles/run.invoker` ; seul `/render`
+est protege, par signature HMAC). Sa reponse est donc lisible par n'importe qui
+sur Internet.
+
+Par consequent, la reponse ne contient **ni la version de FFmpeg, ni le texte des
+erreurs** — seulement `ok`, la revision, les cibles manquantes et un *compteur*
+d'erreurs. Une banniere « FFmpeg 6.0, compile avec … » renseignerait gratuitement
+quelqu'un qui cherche les CVE applicables a ce build precis ; un `stderr` recopie
+tel quel pourrait fuiter des chemins internes.
+
+Le detail complet part dans les **journaux Cloud Run** :
+
+```bash
+gcloud run services logs read vibecut-render-service \
+  --region europe-west9 --project vibefx-v2 --limit 50 | grep capabilities
+```
+
+Si le service passe un jour en Cloud Run **prive** (IAM), cette precaution devient
+facultative — mais la retirer ne rapporterait rien. Le smoke
+`smoke-vibecut-library-parity.mjs` echoue si la version reapparait dans la reponse.
+
 Build Cloud Run renderer:
 
 ```bash

@@ -51,7 +51,8 @@ export const AI_FRONT_SURFACES = [
   {
     id: "video-ai-clip",
     zone: "Studio video",
-    route: "/studio?workspace=video",
+    // Phase 7: VibeCut a ses propres routes; /studio?workspace=video redirige.
+    route: "/video",
     surface: "Boutons AI clip + rail agent video",
     disabledState: "Boutons et rail IA video non montes.",
   },

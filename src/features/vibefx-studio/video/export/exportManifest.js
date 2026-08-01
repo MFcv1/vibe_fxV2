@@ -67,10 +67,126 @@ const EXPORT_COST_ASSUMPTIONS = {
     usdToEur: 0.92,
 };
 
-const SUPPORTED_SERVER_TRANSITIONS = new Set(['cut', 'fade', 'crossfade']);
-const SERVER_XFADE_TRANSITIONS = new Set(['fade', 'crossfade']);
-const SUPPORTED_SERVER_FIT_MODES = new Set(['cover', 'contain']);
-const SUPPORTED_SERVER_TEXT_ANIMATIONS = new Set(['none', 'fade']);
+/*
+ * Transitions minutees rendues par le serveur, avec leur equivalent natif `xfade`.
+ * Source unique de verite applicative : render-service/src/server.js et
+ * functions/src/videoExport.js portent la meme table, et
+ * scripts/smoke-vibecut-transition-parity.mjs verifie qu'elles ne divergent pas.
+ * Une entree n'a le droit d'etre ici que si VideoEngine.renderTransition la rend
+ * comme `xfade` la rend : sinon l'apercu ment sur l'export.
+ */
+export const SERVER_XFADE_TRANSITION_MAP = Object.freeze({
+    fade: 'fade',
+    crossfade: 'fade',
+    'dip-black': 'fadeblack',
+    'dip-white': 'fadewhite',
+    'film-dissolve': 'dissolve',
+    'desat-fade': 'fadegrays',
+    'swipe-left': 'smoothleft',
+    'swipe-right': 'smoothright',
+    'push-up': 'slideup',
+    'push-down': 'slidedown',
+    'wipe-left': 'wipeleft',
+    'blinds-open': 'vertopen',
+    'iris-open': 'circleopen',
+    'iris-close': 'circleclose',
+    'pixel-cut': 'pixelize',
+    'blur-cut': 'hblur',
+});
+
+const SERVER_TIMED_TRANSITION_IDS = Object.freeze(Object.keys(SERVER_XFADE_TRANSITION_MAP));
+
+export const SERVER_RENDER_CAPABILITIES = Object.freeze({
+    // v4 (lot L3) : le mouvement photo est rendu avec la meme courbe et la meme
+    // intensite que l'apercu. Ces deux drapeaux sont DECLARATIFS ; ce qui les
+    // prouve est `scripts/smoke-vibecut-motion-preview-parity.mjs`, qui compare
+    // un MP4 reel a l'apercu image par image.
+    version: 4,
+    mediaTypes: Object.freeze(['video', 'image']),
+    imageMotions: Object.freeze(['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'drift-up']),
+    imageMotionEasing: Object.freeze(['ease-in-out']),
+    imageMotionIntensity: true,
+    transitions: Object.freeze(['cut', ...SERVER_TIMED_TRANSITION_IDS]),
+    timedTransitions: SERVER_TIMED_TRANSITION_IDS,
+    fitModes: Object.freeze(['cover', 'contain']),
+    textAnimations: Object.freeze(['none', 'fade']),
+    textStyles: Object.freeze(['none', 'box', 'outline']),
+    audioFades: true,
+    clipSpeeds: Object.freeze([1]),
+    renderProfiles: Object.freeze(['browser-preview', 'server-cpu']),
+});
+
+export function isServerRenderCapabilitySupported(kind, value) {
+    const capabilityMap = {
+        transition: SERVER_RENDER_CAPABILITIES.transitions,
+        timedTransition: SERVER_RENDER_CAPABILITIES.timedTransitions,
+        fitMode: SERVER_RENDER_CAPABILITIES.fitModes,
+        textAnimation: SERVER_RENDER_CAPABILITIES.textAnimations,
+        textStyle: SERVER_RENDER_CAPABILITIES.textStyles,
+        clipSpeed: SERVER_RENDER_CAPABILITIES.clipSpeeds,
+        renderProfile: SERVER_RENDER_CAPABILITIES.renderProfiles,
+        mediaType: SERVER_RENDER_CAPABILITIES.mediaTypes,
+        imageMotion: SERVER_RENDER_CAPABILITIES.imageMotions,
+    };
+    const values = capabilityMap[kind] || [];
+    if (kind === 'clipSpeed') {
+        const speed = finiteNumber(value, 1);
+        return values.some(candidate => Math.abs(candidate - speed) <= 0.001);
+    }
+    return values.includes(value);
+}
+
+export function getServerRenderCapabilityStatus(kind, value) {
+    const supported = isServerRenderCapabilitySupported(kind, value);
+    return {
+        supported,
+        status: supported ? 'ready' : 'preview-only',
+        label: supported ? 'Export Pro' : 'Apercu uniquement',
+    };
+}
+
+const SUPPORTED_SERVER_TRANSITIONS = new Set(SERVER_RENDER_CAPABILITIES.transitions);
+const SERVER_XFADE_TRANSITIONS = new Set(SERVER_RENDER_CAPABILITIES.timedTransitions);
+const SUPPORTED_SERVER_FIT_MODES = new Set(SERVER_RENDER_CAPABILITIES.fitModes);
+const SUPPORTED_SERVER_TEXT_ANIMATIONS = new Set(SERVER_RENDER_CAPABILITIES.textAnimations);
+
+function normalizeMediaType(source = {}) {
+    if (source.mediaType === 'image' || source.mediaType === 'video') return source.mediaType;
+    const mimeType = String(source.mimeType || source.type || source.file?.type || '').toLowerCase();
+    return mimeType.startsWith('image/') ? 'image' : 'video';
+}
+
+function normalizeImageMotion(motion = 'none') {
+    const presetName = typeof motion === 'string' ? motion : motion?.preset;
+    const preset = SERVER_RENDER_CAPABILITIES.imageMotions.includes(presetName) ? presetName : 'none';
+    const presetFrames = {
+        none: [{ scale: 1, x: 0, y: 0 }, { scale: 1, x: 0, y: 0 }],
+        'zoom-in': [{ scale: 1, x: 0, y: 0 }, { scale: 1.14, x: 0, y: 0 }],
+        'zoom-out': [{ scale: 1.14, x: 0, y: 0 }, { scale: 1, x: 0, y: 0 }],
+        'pan-left': [{ scale: 1.12, x: 0.055, y: 0 }, { scale: 1.12, x: -0.055, y: 0 }],
+        'pan-right': [{ scale: 1.12, x: -0.055, y: 0 }, { scale: 1.12, x: 0.055, y: 0 }],
+        'drift-up': [{ scale: 1.1, x: 0, y: 0.045 }, { scale: 1.14, x: 0, y: -0.045 }],
+    }[preset];
+    const custom = typeof motion === 'object' && motion ? motion : {};
+    const normalizeFrame = (frame, fallback) => ({
+        scale: clamp(finiteNumber(frame?.scale, fallback.scale), 1, 2),
+        x: clamp(finiteNumber(frame?.x, fallback.x), -0.35, 0.35),
+        y: clamp(finiteNumber(frame?.y, fallback.y), -0.35, 0.35),
+    });
+    return {
+        preset,
+        easing: custom.easing === 'linear' ? 'linear' : 'ease-in-out',
+        /*
+         * Intensite du mouvement (lot L3). Le renderer applique exactement le
+         * meme facteur a l'ecart start -> end que `resolveImageMotionFrame`:
+         * elle DOIT donc voyager dans le manifeste, sinon l'export rejouerait
+         * un mouvement plein la ou l'apercu en montre un discret.
+         */
+        intensity: clamp(finiteNumber(custom.intensity, 1), 0, 1),
+        start: normalizeFrame(custom.start, presetFrames[0]),
+        end: normalizeFrame(custom.end, presetFrames[1]),
+    };
+}
 
 function finiteNumber(value, fallback = 0) {
     const numeric = Number(value);
@@ -231,6 +347,9 @@ export function buildExportManifest({
         sourceStoragePath: resolveStoragePath(clip),
         localPreviewUrl: resolveLocalPreviewUrl(clip),
         name: clip.name || clip.file?.name || `Clip ${index + 1}`,
+        mediaType: normalizeMediaType(clip),
+        mimeType: clip.mimeType || clip.type || clip.file?.type || null,
+        assetId: clip.assetId || clip.id || null,
         startTime: finiteNumber(clip.start ?? clip.startTime, 0),
         duration: finiteNumber(clip.duration, 0),
         trimStart: finiteNumber(clip.trimStart, 0),
@@ -241,6 +360,7 @@ export function buildExportManifest({
         crop: clip.crop || clip.params?.crop || null,
         fitMode: clip.fitMode || fitMode,
         filters: normalizeFilters(clip.filters || clip.params?.filters),
+        motion: normalizeMediaType(clip) === 'image' ? normalizeImageMotion(clip.motion) : null,
         metadata: compactObject({
             width: clip.width,
             height: clip.height,
@@ -276,6 +396,8 @@ export function buildExportManifest({
         color: text.color || '#ffffff',
         bold: text.bold === true,
         italic: text.italic === true,
+        boxStyle: ['box', 'outline'].includes(text.boxStyle) ? text.boxStyle : 'none',
+        boxColor: text.boxColor || '#000000',
         animation: text.animation || 'fade',
         animationOut: text.animationOut || 'fade',
         trackId: text.trackId || null,
@@ -291,6 +413,8 @@ export function buildExportManifest({
         trimStart: finiteNumber(track.trimStart, 0),
         trimEnd: finiteNumber(track.trimEnd, track.duration || 0),
         volume: clamp(finiteNumber(track.volume, 100), 0, 100),
+        fadeIn: Math.max(0, finiteNumber(track.fadeIn, 0)),
+        fadeOut: Math.max(0, finiteNumber(track.fadeOut, 0)),
         sourceSizeBytes: sourceSizeBytes(track),
         trackId: track.trackId || null,
         rightsId: track.rightsId || track.id || null,
@@ -365,7 +489,7 @@ export function validateExportManifest(manifest = {}, { mode = 'localMock', allo
     const clips = manifest.clips || [];
 
     if (manifest.version !== EXPORT_MANIFEST_VERSION) errors.push('Version de manifeste export non supportee.');
-    if (!clips.length) errors.push('Aucun clip video dans le manifeste.');
+    if (!clips.length) errors.push('Aucun media dans le manifeste.');
     if (duration <= 0) errors.push('Duree projet invalide dans le manifeste.');
     if (finiteNumber(render.width, 0) <= 0 || finiteNumber(render.height, 0) <= 0) errors.push('Resolution export invalide.');
     if (finiteNumber(render.fps, 0) < 12 || finiteNumber(render.fps, 0) > 60) errors.push(`FPS export invalide: ${render.fps}.`);
@@ -379,6 +503,7 @@ export function validateExportManifest(manifest = {}, { mode = 'localMock', allo
         if (!clip.localPreviewUrl && !clip.sourceStoragePath) errors.push(`Source originale introuvable pour ${label}.`);
         if (finiteNumber(clip.duration, 0) <= 0) errors.push(`Duree clip invalide: ${label}.`);
         if (finiteNumber(clip.trimEnd, 0) <= finiteNumber(clip.trimStart, 0)) errors.push(`Trim clip invalide: ${label}.`);
+        if (!SERVER_RENDER_CAPABILITIES.mediaTypes.includes(clip.mediaType || 'video')) errors.push(`Type media invalide: ${label}.`);
         if (clip.fitMode === 'fill') warnings.push(`Fit fill deformant actif sur ${label}.`);
     });
 
@@ -406,6 +531,7 @@ export function validateExportRenderCoverage(manifest = {}) {
     const degradedWarnings = [];
     const supportedFeatures = [
         'video trims',
+        'photo scenes with deterministic Ken Burns motion',
         'multi-clip concat',
         'adjacent fade/crossfade transitions',
         'cover/contain fit',
@@ -456,6 +582,13 @@ export function validateExportRenderCoverage(manifest = {}) {
             unsupportedFeatures.push('fitMode');
             blockingErrors.push(`Fit non rendu serveur sans deformation garantie: ${label}. Utilise cover ou contain.`);
         }
+        if ((clip.mediaType || 'video') === 'image') {
+            const motionPreset = clip.motion?.preset || 'none';
+            if (!SERVER_RENDER_CAPABILITIES.imageMotions.includes(motionPreset)) {
+                unsupportedFeatures.push('imageMotion');
+                blockingErrors.push(`Mouvement photo non rendu serveur: ${label}.${motionPreset}.`);
+            }
+        }
         const unsupportedFilter = Object.entries(clip.filters || {}).find(([key, value]) => DEFAULT_FILTERS[key] === undefined && finiteNumber(value, 0) !== 0);
         if (unsupportedFilter) {
             unsupportedFeatures.push('colorFilters');
@@ -464,7 +597,7 @@ export function validateExportRenderCoverage(manifest = {}) {
     });
 
     if (!blockingErrors.length) {
-        degradedWarnings.push('Renderer serveur actuel limite au socle video + transitions fade/crossfade adjacentes + textes fade + colorimetrie FFmpeg + audio source/musique externe: trims, concat/xfade, fit cover/contain, rotation, texte basique, filtres, mix audio, FPS constant et encodage MP4.');
+        degradedWarnings.push('Renderer serveur actuel couvre videos et scenes photo Ken Burns + transitions fade/crossfade adjacentes + textes fade + colorimetrie FFmpeg + audio source/musique externe.');
     }
 
     return {

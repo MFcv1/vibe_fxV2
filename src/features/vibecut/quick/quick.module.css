@@ -1,0 +1,1131 @@
+/* Montage rapide: en-tete d'ecran, apercu, inspecteur, storyboard. */
+
+/*
+ * L'editeur occupe exactement la hauteur restante sous le bandeau: c'est
+ * l'interieur (apercu, inspecteur, storyboard) qui defile, jamais la page.
+ */
+.editor {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    height: calc(100dvh - var(--vc-topbar-height));
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---------- En-tete d'ecran (les actions vivent ici, pas dans le bandeau) ---------- */
+.header {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-4);
+    flex: 0 0 auto;
+    padding: var(--vc-space-3) var(--vc-space-5);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.projectName {
+    min-width: 0;
+    max-width: 320px;
+    height: 32px;
+    padding: 0 var(--vc-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--vc-radius-sm);
+    background: transparent;
+    font-size: var(--vc-text-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    outline: none;
+}
+
+.projectName:hover {
+    border-color: var(--vc-line);
+}
+
+.projectName:focus {
+    border-color: var(--vc-accent);
+    background: var(--vc-surface);
+}
+
+.saveState {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    white-space: nowrap;
+}
+
+.headerSpacer {
+    flex: 1 1 auto;
+}
+
+/* ---------- Corps ---------- */
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.stageColumn {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.inspector {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 320px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vc-space-5);
+    gap: var(--vc-space-6);
+    border-left: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.inspectorEmpty {
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: var(--vc-space-8) var(--vc-space-4);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+}
+
+.groupHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+}
+
+.groupTitle {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+}
+
+.groupValue {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.groupNote {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    line-height: 1.4;
+}
+
+/* Slider */
+.slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-3);
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: var(--vc-shadow-1);
+}
+
+.slider::-moz-range-track {
+    height: 4px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-3);
+}
+
+.slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 50%;
+    background: #ffffff;
+}
+
+/* Grille de mouvements */
+.motionGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--vc-space-2);
+}
+
+.motionCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0;
+    border-radius: var(--vc-radius-sm);
+    text-align: left;
+    color: var(--vc-text-2);
+}
+
+.motionArt {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    overflow: hidden;
+    transition: border-color var(--vc-dur-2) var(--vc-ease);
+}
+
+.motionCard:hover .motionArt {
+    border-color: var(--vc-line-strong);
+}
+
+.motionCardActive .motionArt {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent);
+}
+
+.motionCardActive {
+    color: var(--vc-text);
+}
+
+.motionFrame {
+    position: absolute;
+    inset: 0;
+    transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)) rotate(var(--from-rotate, 0deg));
+}
+
+.motionCard:hover .motionFrame,
+.motionCardActive .motionFrame {
+    animation: vcMotionCard 1800ms var(--vc-ease) infinite alternate;
+}
+
+@keyframes vcMotionCard {
+    from {
+        transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)) rotate(var(--from-rotate, 0deg));
+    }
+    to {
+        transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0), var(--to-y, 0)) rotate(var(--to-rotate, 0deg));
+    }
+}
+
+.motionLabel {
+    font-size: var(--vc-text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.motionCheck {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+/* Liste de transitions */
+.transitionList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.transitionOption {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-2);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    text-align: left;
+    transition: border-color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.transitionOption:hover {
+    border-color: var(--vc-line-strong);
+    background: var(--vc-surface-3);
+}
+
+.transitionOptionActive {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.transitionIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    color: var(--vc-text-2);
+}
+
+.transitionOptionActive .transitionIcon {
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.transitionText {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.transitionName {
+    display: block;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text);
+}
+
+.transitionHint {
+    display: block;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Storyboard ---------- */
+.storyboard {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.storyboardHead {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3) var(--vc-space-5) 0;
+}
+
+.storyboardTitle {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+}
+
+.storyboardMeta {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.storyboardTrack {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding: var(--vc-space-3) var(--vc-space-5) var(--vc-space-4);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.sceneCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 152px;
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    overflow: hidden;
+    text-align: left;
+    cursor: grab;
+    touch-action: pan-y;
+    transition: border-color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out),
+        box-shadow var(--vc-dur-2) var(--vc-ease-out),
+        opacity var(--vc-dur-2) var(--vc-ease);
+}
+
+.sceneCard:hover {
+    border-color: var(--vc-line-strong);
+    transform: translateY(-2px);
+}
+
+.sceneCardActive {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent), var(--vc-shadow-2);
+}
+
+.sceneCardDragging {
+    z-index: 2;
+    cursor: grabbing;
+    box-shadow: var(--vc-shadow-3);
+    border-color: var(--vc-accent);
+    transition: none;
+}
+
+/* Les voisines s'ecartent pour montrer ou la scene va se poser. */
+.sceneCardShifted {
+    transition: transform var(--vc-dur-3) var(--vc-ease-out);
+}
+
+.storyboardTrack[data-dragging="true"] {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.storyboardTrack[data-dragging="true"] .sceneCard {
+    pointer-events: none;
+}
+
+.sceneThumb {
+    display: block;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--vc-bg-sunken);
+    overflow: hidden;
+}
+
+.sceneThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.sceneIndex {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    display: grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffffff;
+    font-size: var(--vc-text-xs);
+    backdrop-filter: blur(6px);
+}
+
+.sceneKind {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.62);
+    color: #e8e8ea;
+    backdrop-filter: blur(6px);
+}
+
+.sceneDuration {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    padding: 1px 6px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffffff;
+    font-size: var(--vc-text-xs);
+    backdrop-filter: blur(6px);
+}
+
+.sceneFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-2) var(--vc-space-3);
+}
+
+.sceneName {
+    min-width: 0;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sceneMotion {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+    color: var(--vc-text-3);
+    font-size: var(--vc-text-xs);
+}
+
+/* Puce de transition entre deux scenes */
+.linkSlot {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 46px;
+    align-self: flex-start;
+    padding-top: 34px;
+}
+
+.linkButton {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--vc-radius-sm);
+    border: 1px dashed var(--vc-line-strong);
+    color: var(--vc-text-3);
+    background: var(--vc-surface);
+    transition: border-color var(--vc-dur-1) var(--vc-ease),
+        color var(--vc-dur-1) var(--vc-ease),
+        transform var(--vc-dur-1) var(--vc-ease);
+}
+
+.linkButton:hover {
+    border-color: var(--vc-accent);
+    color: var(--vc-accent);
+    transform: scale(1.06);
+}
+
+.linkButtonSet {
+    border-style: solid;
+    border-color: var(--vc-accent-line);
+    background: var(--vc-accent-quiet);
+    color: var(--vc-accent);
+}
+
+.linkLabel {
+    margin-top: 3px;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    text-align: center;
+    max-width: 46px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Zone d'ajout en fin de storyboard */
+.addScene {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    width: 132px;
+    align-self: stretch;
+    min-height: 122px;
+    margin-left: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px dashed var(--vc-line-strong);
+    color: var(--vc-text-2);
+    background: transparent;
+    font-size: var(--vc-text-xs);
+    transition: border-color var(--vc-dur-2) var(--vc-ease), color var(--vc-dur-2) var(--vc-ease), background var(--vc-dur-2) var(--vc-ease);
+}
+
+.addScene:hover {
+    border-color: var(--vc-accent);
+    color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.dropIndicator {
+    flex: 0 0 auto;
+    width: 3px;
+    align-self: stretch;
+    margin: 0 2px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-accent);
+}
+
+/* ---------- Etat vide ---------- */
+.empty {
+    display: grid;
+    place-items: center;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--vc-space-8);
+}
+
+.dropZone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vc-space-4);
+    width: 100%;
+    max-width: 520px;
+    padding: var(--vc-space-12) var(--vc-space-8);
+    border-radius: var(--vc-radius-xl);
+    border: 1px dashed var(--vc-line-strong);
+    background: var(--vc-surface);
+    text-align: center;
+    transition: border-color var(--vc-dur-2) var(--vc-ease), background var(--vc-dur-2) var(--vc-ease);
+}
+
+.dropZoneActive {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.dropIcon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--vc-radius-lg);
+    background: var(--vc-surface-2);
+    color: var(--vc-accent);
+}
+
+.dropTitle {
+    font-size: var(--vc-text-lg);
+}
+
+.dropHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    max-width: 40ch;
+}
+
+.dropFormats {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Bandeau de notification ---------- */
+.notice {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    padding: var(--vc-space-2) var(--vc-space-5);
+    font-size: var(--vc-text-sm);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.noticeError {
+    border-color: rgba(255, 90, 95, 0.3);
+    background: var(--vc-danger-quiet);
+    color: #ffc9cb;
+}
+
+.noticeProgress {
+    color: var(--vc-text-2);
+}
+
+.noticeSpacer {
+    flex: 1 1 auto;
+}
+
+/* ---------- Feuille d'export ---------- */
+.sheetBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: var(--vc-space-5);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    animation: vcFade var(--vc-dur-2) var(--vc-ease);
+}
+
+@keyframes vcFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.sheet {
+    width: 100%;
+    max-width: 440px;
+    border-radius: var(--vc-radius-xl);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface);
+    box-shadow: var(--vc-shadow-3);
+    overflow: hidden;
+    animation: vcRise var(--vc-dur-3) var(--vc-ease-out);
+}
+
+@keyframes vcRise {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+.sheetHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-4) var(--vc-space-5);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.sheetTitle {
+    font-size: var(--vc-text-md);
+    font-weight: 600;
+}
+
+.sheetBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-5);
+    padding: var(--vc-space-5);
+}
+
+.sheetRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    font-size: var(--vc-text-sm);
+}
+
+.sheetRowValue {
+    color: var(--vc-text-2);
+}
+
+.sheetFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-4) var(--vc-space-5);
+    border-top: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.sheetError {
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid rgba(255, 90, 95, 0.3);
+    background: var(--vc-danger-quiet);
+    font-size: var(--vc-text-sm);
+    color: #ffc9cb;
+}
+
+.sheetProgress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1080px) {
+    .inspector {
+        flex-basis: 280px;
+    }
+}
+
+@media (max-width: 860px) {
+    .body {
+        flex-direction: column;
+    }
+
+    .inspector {
+        flex: 0 0 auto;
+        max-height: 46dvh;
+        border-left: 0;
+        border-top: 1px solid var(--vc-line);
+    }
+
+    .header {
+        flex-wrap: wrap;
+        gap: var(--vc-space-2);
+    }
+}
+
+/* ---------- Inspecteur de texte ---------- */
+.textPanel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-6);
+}
+
+.textInput {
+    width: 100%;
+    height: 36px;
+    padding: 0 var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+    outline: none;
+}
+
+.textInput:focus {
+    border-color: var(--vc-accent);
+}
+
+.inlineRow {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--vc-space-2);
+}
+
+.toggleButton {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 32px;
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text-2);
+    transition: border-color var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.toggleButton:hover {
+    color: var(--vc-text);
+    border-color: var(--vc-line-strong);
+}
+
+.toggleButtonActive {
+    background: var(--vc-accent-quiet);
+    border-color: var(--vc-accent-line);
+    color: var(--vc-accent);
+}
+
+.swatchRow {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex-wrap: wrap;
+}
+
+.swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+    transition: transform var(--vc-dur-1) var(--vc-ease), border-color var(--vc-dur-1) var(--vc-ease);
+}
+
+.swatch:hover {
+    transform: scale(1.1);
+}
+
+.swatchActive {
+    border-color: var(--vc-accent);
+}
+
+.swatchCustom {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px dashed var(--vc-line-strong);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.swatchCustom input {
+    position: absolute;
+    inset: -6px;
+    width: 200%;
+    height: 200%;
+    border: 0;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.positionGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+    width: 96px;
+    aspect-ratio: 1;
+    padding: 4px;
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-bg-sunken);
+}
+
+.positionCell {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    transition: background var(--vc-dur-1) var(--vc-ease), transform var(--vc-dur-1) var(--vc-ease);
+}
+
+.positionCell:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.06);
+}
+
+.positionCellActive {
+    background: var(--vc-accent);
+}
+
+.fieldLabel {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.select {
+    height: 32px;
+    padding: 0 var(--vc-space-2);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+    font-size: var(--vc-text-xs);
+    outline: none;
+}
+
+.select:focus {
+    border-color: var(--vc-accent);
+}
+
+/* ---------- Musique ---------- */
+.audioTrack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+}
+
+.audioHead {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+}
+
+.audioIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    color: var(--vc-text-2);
+}
+
+.audioName {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--vc-text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.musicDrop {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    width: 100%;
+    padding: var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px dashed var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    text-align: left;
+    transition: border-color var(--vc-dur-2) var(--vc-ease), background var(--vc-dur-2) var(--vc-ease);
+}
+
+.musicDrop:hover {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.musicDropFilled {
+    border-style: solid;
+    border-color: var(--vc-accent-line);
+}
+
+.musicDrop strong {
+    display: block;
+    font-size: var(--vc-text-sm);
+    font-weight: 550;
+}
+
+.musicDrop small {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.musicDropIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    color: var(--vc-accent);
+}
+
+.checkboxRow {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vc-space-3);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    cursor: pointer;
+}
+
+.checkboxRow input {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--vc-accent);
+    flex: 0 0 auto;
+}
+
+/* Badge texte sur une carte de scene */
+.sceneText {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+    color: var(--vc-text-3);
+}
+
+.historyGroup {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-right: var(--vc-space-2);
+    border-right: 1px solid var(--vc-line);
+}
+
+.linkAction {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-accent);
+    background: none;
+    padding: 0;
+}
+
+.linkAction:hover {
+    text-decoration: underline;
+}
+
+.exportDone {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-accent-line);
+    background: var(--vc-accent-quiet);
+}
+
+.exportDoneIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.exportDone strong {
+    display: block;
+    font-size: var(--vc-text-sm);
+}
+
+.exportDone small {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.textArea {
+    width: 100%;
+    min-height: 62px;
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+    line-height: 1.4;
+    resize: vertical;
+    outline: none;
+}
+
+.textArea:focus {
+    border-color: var(--vc-accent);
+}
+
+.chip {
+    height: 30px;
+    padding: 0 var(--vc-space-3);
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text-2);
+    font-size: var(--vc-text-xs);
+    transition: border-color var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.chip:hover {
+    color: var(--vc-text);
+    border-color: var(--vc-line-strong);
+}
+
+.chipActive {
+    background: var(--vc-accent-quiet);
+    border-color: var(--vc-accent-line);
+    color: var(--vc-accent);
+}
+
+.audioRow {
+    display: flex;
+    gap: var(--vc-space-3);
+}
+
+/*
+ * Format reel du fichier produit (phase 7). Ces trois lignes reprennent
+ * l'information que l'ancien panneau d'export affichait: conteneur, codec et
+ * type MIME lus du rendu, jamais ecrits en dur.
+ */
+.exportMeta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-1);
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+}

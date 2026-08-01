@@ -8,6 +8,7 @@ const admin = require("firebase-admin");
 const { getFunctions } = require("firebase-admin/functions");
 const crypto = require("crypto");
 const { shouldEnforceAppCheck } = require("./appCheck");
+const { RENDER_PROFILES, selectRenderProfile } = require("./videoRenderProfiles");
 
 const REGION = "europe-west9";
 const TASK_QUEUE_REGION = "europe-west1";
@@ -21,22 +22,46 @@ const RETRYABLE_STATUSES = new Set(["failed", "cancelled"]);
 const MAX_MANIFEST_BYTES = 750 * 1024;
 const EXPORT_QUOTAS = Object.freeze({
   maxManifestBytes: MAX_MANIFEST_BYTES,
-  maxDurationSeconds: 180,
-  maxClips: 10,
-  maxAudioTracks: 4,
+  maxDurationSeconds: 15 * 60,
+  maxClips: 240,
+  maxAudioTracks: 8,
   maxWidth: 3840,
   maxHeight: 3840,
   maxPixels: 3840 * 2160,
   maxFps: 60,
   maxVideoBitrate: 60_000_000,
   maxAudioBitrate: 320_000,
-  maxSourceBytes: 2 * 1024 * 1024 * 1024,
+  maxSourceBytes: 6 * 1024 * 1024 * 1024,
 });
 const DOWNLOAD_URL_TTL_MS = 15 * 60 * 1000;
-const SUPPORTED_SERVER_TRANSITIONS = new Set(["cut", "fade", "crossfade"]);
-const SERVER_XFADE_TRANSITIONS = new Set(["fade", "crossfade"]);
+/*
+ * Transitions minutees acceptees a la validation serveur. Doit rester identique a
+ * SERVER_XFADE_TRANSITION_MAP (render-service/src/server.js et exportManifest.js) :
+ * scripts/smoke-vibecut-transition-parity.mjs echoue si les trois divergent.
+ */
+const SERVER_XFADE_TRANSITIONS = new Set([
+  "fade",
+  "crossfade",
+  "dip-black",
+  "dip-white",
+  "film-dissolve",
+  "desat-fade",
+  "swipe-left",
+  "swipe-right",
+  "push-up",
+  "push-down",
+  "wipe-left",
+  "blinds-open",
+  "iris-open",
+  "iris-close",
+  "pixel-cut",
+  "blur-cut",
+]);
+const SUPPORTED_SERVER_TRANSITIONS = new Set(["cut", ...SERVER_XFADE_TRANSITIONS]);
 const SUPPORTED_SERVER_FIT_MODES = new Set(["cover", "contain"]);
 const SUPPORTED_SERVER_TEXT_ANIMATIONS = new Set(["none", "fade"]);
+const SUPPORTED_SERVER_MEDIA_TYPES = new Set(["video", "image"]);
+const SUPPORTED_SERVER_IMAGE_MOTIONS = new Set(["none", "zoom-in", "zoom-out", "pan-left", "pan-right", "drift-up"]);
 const DEFAULT_FILTERS = Object.freeze({
   exposure: 0,
   brightness: 100,
@@ -334,7 +359,7 @@ function validateOwnerSourceStoragePath({ storagePath, uid, mediaType, field, er
     errors.push(`${field} chemin Storage invalide`);
     return;
   }
-  const typeFolder = mediaType === "audio" ? "audio" : "video";
+  const typeFolder = mediaType === "audio" ? "audio" : mediaType === "image" ? "image" : "video";
   if (!uid) {
     if (!storagePath.includes(`/sources/${typeFolder}/`)) {
       errors.push(`${field} doit pointer vers sources/${typeFolder}`);
@@ -417,6 +442,13 @@ function validateExportRenderCoverage(manifest, errors) {
 
   clips.forEach((clip, index) => {
     const label = clip.name || clip.id || `clip-${index + 1}`;
+    const mediaType = clip.mediaType || "video";
+    if (!SUPPORTED_SERVER_MEDIA_TYPES.has(mediaType)) {
+      errors.push(`type media non rendu serveur: ${label}.${mediaType}`);
+    }
+    if (mediaType === "image" && !SUPPORTED_SERVER_IMAGE_MOTIONS.has(clip.motion?.preset || "none")) {
+      errors.push(`mouvement photo non rendu serveur: ${label}.${clip.motion?.preset || "none"}`);
+    }
     const speed = finiteNumber(clip.speed, 1);
     if (Math.abs(speed - 1) > 0.001) {
       errors.push(`vitesse clip non rendue serveur: ${label}`);
@@ -516,7 +548,7 @@ function validateExportManifest(manifest, context = {}) {
       validateOwnerSourceStoragePath({
         storagePath: clip.sourceStoragePath,
         uid,
-        mediaType: "video",
+        mediaType: clip.mediaType === "image" ? "image" : "video",
         field: `clips[${index}].sourceStoragePath`,
         errors,
       });
@@ -574,7 +606,163 @@ function getExportRenderOrchestrationMode() {
 }
 
 function shouldUseTaskQueueOrchestration() {
-  return getExportRenderOrchestrationMode() === "taskqueue";
+  return ["taskqueue", "cloudrunjobs"].includes(getExportRenderOrchestrationMode());
+}
+
+function shouldUseCloudRunJobsOrchestration() {
+  return getExportRenderOrchestrationMode() === "cloudrunjobs";
+}
+
+function getCloudRunProjectId() {
+  return String(
+    process.env.EXPORT_RENDERER_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    admin.app().options.projectId ||
+    ""
+  ).trim();
+}
+
+function getCloudRunJobsRegion() {
+  return String(process.env.EXPORT_RENDERER_JOBS_REGION || TASK_QUEUE_REGION).trim();
+}
+
+function getCloudRunApiBaseUrl() {
+  return String(process.env.EXPORT_CLOUD_RUN_API_BASE_URL || "https://run.googleapis.com").replace(/\/+$/, "");
+}
+
+function cloudRunJobResource(profile) {
+  const projectId = getCloudRunProjectId();
+  if (!projectId) {
+    throw new HttpsError("failed-precondition", "Projet Google Cloud introuvable pour Cloud Run Jobs.");
+  }
+  return `projects/${projectId}/locations/${getCloudRunJobsRegion()}/jobs/${profile.jobName}`;
+}
+
+async function getGoogleAccessToken() {
+  const credential = admin.app().options.credential;
+  if (!credential || typeof credential.getAccessToken !== "function") {
+    throw new HttpsError("failed-precondition", "Credential Google Cloud sans jeton d'acces.");
+  }
+  const result = await credential.getAccessToken();
+  const token = result?.access_token || result?.accessToken;
+  if (!token) {
+    throw new HttpsError("failed-precondition", "Jeton Google Cloud indisponible.");
+  }
+  return token;
+}
+
+async function callCloudRunApi(resourceName, action, body = {}) {
+  const token = await getGoogleAccessToken();
+  const url = `${getCloudRunApiBaseUrl()}/v2/${resourceName}:${action}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new HttpsError("internal", `Cloud Run ${action} a echoue.`, {
+      status: response.status,
+      message: payload.error?.message || payload.message || "cloud-run-api-error",
+    });
+  }
+  return payload;
+}
+
+async function claimCloudRunJobLaunch(ref, profile) {
+  return admin.firestore().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.exists ? snapshot.data() || {} : {};
+    if (TERMINAL_STATUSES.has(data.status) || data.cloudRun?.launchClaimedAt) {
+      return false;
+    }
+    transaction.set(ref, {
+      status: "queued",
+      phase: "launching",
+      progress: 24,
+      renderProfile: profile.id,
+      cloudRun: {
+        jobName: profile.jobName,
+        region: getCloudRunJobsRegion(),
+        launchClaimedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      logs: admin.firestore.FieldValue.arrayUnion(publicLog(`Profil ${profile.id} selectionne; lancement Cloud Run Job.`)),
+    }, { merge: true });
+    return true;
+  });
+}
+
+async function launchCloudRunJobForExport({ ref, data, jobId, uid, manifest }) {
+  const profile = selectRenderProfile(manifest, {
+    gpuEnabled: process.env.EXPORT_GPU_ENABLED === "true",
+    explicitProfile: data.renderProfile,
+  });
+  const claimed = await claimCloudRunJobLaunch(ref, profile);
+  if (!claimed) {
+    return {
+      jobId,
+      status: data.status,
+      phase: data.phase || data.status,
+      progress: data.progress || 0,
+      skipped: true,
+    };
+  }
+
+  const bucketName = admin.storage().bucket().name;
+  const resourceName = cloudRunJobResource(profile);
+  const operation = await callCloudRunApi(resourceName, "run", {
+    overrides: {
+      taskCount: 1,
+      timeout: "7200s",
+      containerOverrides: [{
+        env: [
+          { name: "VIBECUT_EXPORT_JOB_ID", value: jobId },
+          { name: "VIBECUT_EXPORT_UID", value: uid },
+          { name: "FIREBASE_PROJECT_ID", value: getCloudRunProjectId() },
+          { name: "STORAGE_BUCKET", value: bucketName },
+          { name: "MANIFEST_STORAGE_PATH", value: data.manifestStoragePath },
+          { name: "OUTPUT_STORAGE_PATH", value: data.outputStoragePath || buildOutputStoragePath(uid, jobId) },
+          { name: "RENDER_PROFILE", value: profile.id },
+          { name: "EXPORT_RENDERER_ALLOCATED_VCPU", value: String(profile.vcpu) },
+          { name: "EXPORT_RENDERER_ALLOCATED_MEMORY_GIB", value: String(profile.memoryGib) },
+        ],
+      }],
+    },
+  });
+
+  await ref.set({
+    phase: "launched",
+    progress: 28,
+    cloudRun: {
+      jobName: profile.jobName,
+      jobResource: resourceName,
+      operationName: operation.name || null,
+      region: getCloudRunJobsRegion(),
+      launchedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    logs: admin.firestore.FieldValue.arrayUnion(publicLog("Cloud Run Job lance; le worker prend la main sur le rendu.")),
+  }, { merge: true });
+
+  return {
+    jobId,
+    status: "queued",
+    phase: "launched",
+    progress: 28,
+    renderProfile: profile.id,
+    operationName: operation.name || null,
+  };
+}
+
+async function cancelCloudRunExecution(executionName) {
+  if (!executionName) return false;
+  await callCloudRunApi(executionName, "cancel");
+  return true;
 }
 
 function getExportSigningSecret() {
@@ -603,6 +791,87 @@ async function createOutputDownloadUrl(storagePath, expiresInMs = 60 * 60 * 1000
   } catch {
     return null;
   }
+}
+
+function buildProxyDownloadToken({
+  jobId,
+  uid,
+  storagePath,
+  expiresAt = Date.now() + DOWNLOAD_URL_TTL_MS,
+}, secretOverride = "") {
+  const secret = String(secretOverride || getExportSigningSecret()).trim();
+  if (!secret) {
+    throw new Error("EXPORT_SIGNING_SECRET indisponible.");
+  }
+  const payload = Buffer.from(JSON.stringify({
+    v: 1,
+    jobId: requireJobId(jobId),
+    uid,
+    storagePath,
+    exp: expiresAt,
+  }), "utf8").toString("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function verifyProxyDownloadToken(token, secretOverride = "") {
+  const secret = String(secretOverride || getExportSigningSecret()).trim();
+  if (!secret || typeof token !== "string" || token.length > 4096) {
+    throw new Error("Jeton de telechargement invalide.");
+  }
+  const parts = token.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("Jeton de telechargement invalide.");
+  }
+  const expected = crypto.createHmac("sha256", secret).update(parts[0]).digest();
+  let provided;
+  try {
+    provided = Buffer.from(parts[1], "base64url");
+  } catch {
+    throw new Error("Jeton de telechargement invalide.");
+  }
+  if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) {
+    throw new Error("Signature de telechargement invalide.");
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+  } catch {
+    throw new Error("Jeton de telechargement invalide.");
+  }
+  const expiresAt = finiteNumber(payload.exp, 0);
+  if (
+    payload.v !== 1 ||
+    expiresAt <= Date.now() ||
+    expiresAt > Date.now() + DOWNLOAD_URL_TTL_MS + 60_000
+  ) {
+    throw new Error("Jeton de telechargement expire ou invalide.");
+  }
+  const jobId = requireJobId(payload.jobId);
+  const uid = payload.uid;
+  if (
+    typeof uid !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(uid) ||
+    !isOwnerOutputStoragePath(uid, payload.storagePath)
+  ) {
+    throw new Error("Portee du jeton de telechargement invalide.");
+  }
+  return {
+    jobId,
+    uid,
+    storagePath: payload.storagePath,
+    expiresAt,
+  };
+}
+
+function buildProxyDownloadUrl({ jobId, uid, storagePath, expiresAt }) {
+  const token = buildProxyDownloadToken({ jobId, uid, storagePath, expiresAt });
+  const serviceUrl = String(process.env.EXPORT_DOWNLOAD_SERVICE_URL || "").trim().replace(/\/+$/, "");
+  if (!serviceUrl) {
+    throw new HttpsError("failed-precondition", "Service de telechargement VibeCut non configure.");
+  }
+  return `${serviceUrl}/download?token=${encodeURIComponent(token)}`;
 }
 
 async function writeManifestToStorage(storagePath, manifest) {
@@ -933,6 +1202,20 @@ async function processStoredVideoExportJob({ jobId, uid }) {
   }
 
   const outputStoragePath = data.outputStoragePath || buildOutputStoragePath(uid, jobId);
+  if (shouldUseCloudRunJobsOrchestration()) {
+    try {
+      return await launchCloudRunJobForExport({
+        ref,
+        data,
+        jobId,
+        uid,
+        manifest,
+      });
+    } catch (error) {
+      await markJobFailedUnlessCancelled(ref, error);
+      throw error;
+    }
+  }
   const rendererUrlConfigured = Boolean(getExportRendererUrl());
   try {
     return await executeRendererForJob({
@@ -1054,6 +1337,7 @@ function publicAdminExportJob(snapshot) {
     rendererResult: data.rendererResult || null,
     costEstimate: data.costEstimate || null,
     estimatedComputeCost: data.estimatedComputeCost ?? null,
+    estimatedGpuCost: data.estimatedGpuCost ?? data.costEstimate?.estimatedGpuCost ?? null,
     estimatedStorageCost: data.estimatedStorageCost ?? null,
     estimatedRequestCost: data.estimatedRequestCost ?? null,
     estimatedTotalCost: data.estimatedTotalCost ?? null,
@@ -1135,6 +1419,9 @@ const createVideoExportJob = onCall(
     const manifestSummary = buildManifestSummary(manifest, manifestStoragePath);
     const planAccess = resolveExportPlanAccess(request);
     const rendererUrlConfigured = Boolean(getExportRendererUrl());
+    const renderProfile = selectRenderProfile(manifest, {
+      gpuEnabled: process.env.EXPORT_GPU_ENABLED === "true",
+    });
     await writeManifestToStorage(manifestStoragePath, manifest);
     const devRun = request.auth?.token?.email
       ? (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean).includes(request.auth.token.email.toLowerCase())
@@ -1151,16 +1438,26 @@ const createVideoExportJob = onCall(
       manifestStoragePath,
       manifestSummary,
       render: manifest.render,
+      renderProfile: renderProfile.id,
       outputStoragePath,
       estimates: manifest.estimates || null,
       billingGate: planAccess,
       renderer: {
-        mode: "cloud-run-ffmpeg",
+        mode: shouldUseCloudRunJobsOrchestration() ? "cloud-run-job-ffmpeg" : "cloud-run-ffmpeg",
         urlConfigured: rendererUrlConfigured,
-        service: process.env.EXPORT_RENDERER_SERVICE || null,
-        region: process.env.EXPORT_RENDERER_REGION || REGION,
-        allocatedVcpu: Number(process.env.EXPORT_RENDERER_ALLOCATED_VCPU || 2),
-        allocatedMemoryGib: Number(process.env.EXPORT_RENDERER_ALLOCATED_MEMORY_GIB || 2),
+        service: shouldUseCloudRunJobsOrchestration()
+          ? renderProfile.jobName
+          : process.env.EXPORT_RENDERER_SERVICE || null,
+        region: shouldUseCloudRunJobsOrchestration()
+          ? getCloudRunJobsRegion()
+          : process.env.EXPORT_RENDERER_REGION || REGION,
+        allocatedVcpu: shouldUseCloudRunJobsOrchestration()
+          ? renderProfile.vcpu
+          : Number(process.env.EXPORT_RENDERER_ALLOCATED_VCPU || 2),
+        allocatedMemoryGib: shouldUseCloudRunJobsOrchestration()
+          ? renderProfile.memoryGib
+          : Number(process.env.EXPORT_RENDERER_ALLOCATED_MEMORY_GIB || 2),
+        accelerator: renderProfile.accelerator,
       },
       createdAt: now,
       updatedAt: now,
@@ -1194,7 +1491,8 @@ const createVideoExportJob = onCall(
         output: null,
         warnings: [],
         rendererConfigured: rendererUrlConfigured,
-        orchestration: "taskQueue",
+        orchestration: shouldUseCloudRunJobsOrchestration() ? "cloudRunJobs" : "taskQueue",
+        renderProfile: renderProfile.id,
       };
     }
 
@@ -1233,10 +1531,31 @@ const cancelVideoExportJob = onCall(
     }
 
     const now = admin.firestore.FieldValue.serverTimestamp();
+    let executionCancellation = {
+      requested: false,
+      succeeded: false,
+      error: null,
+    };
+    if (data.cloudRun?.executionName) {
+      executionCancellation.requested = true;
+      try {
+        executionCancellation.succeeded = await cancelCloudRunExecution(data.cloudRun.executionName);
+      } catch (error) {
+        executionCancellation.error = error.message || "cloud-run-cancel-failed";
+        logger.warn("Cloud Run execution cancellation failed", {
+          jobId,
+          executionName: data.cloudRun.executionName,
+          error: executionCancellation.error,
+        });
+      }
+    }
+
     await ref.set({
       status: "cancelled",
       phase: "cancelled",
+      cancelRequested: true,
       progress: data.progress || 0,
+      cloudRunCancellation: executionCancellation,
       cancelledAt: now,
       updatedAt: now,
       logs: admin.firestore.FieldValue.arrayUnion({
@@ -1251,6 +1570,7 @@ const cancelVideoExportJob = onCall(
       status: "cancelled",
       phase: "cancelled",
       progress: data.progress || 0,
+      cloudRunCancellation: executionCancellation,
     };
   }
 );
@@ -1291,6 +1611,9 @@ const retryVideoExportJob = onCall(
     const manifestSummary = buildManifestSummary(manifest, manifestStoragePath);
     const outputStoragePath = buildOutputStoragePath(uid, ref.id);
     const rendererUrlConfigured = Boolean(getExportRendererUrl());
+    const renderProfile = selectRenderProfile(manifest, {
+      gpuEnabled: process.env.EXPORT_GPU_ENABLED === "true",
+    });
     await writeManifestToStorage(manifestStoragePath, manifest);
     await ref.set({
       uid,
@@ -1302,13 +1625,19 @@ const retryVideoExportJob = onCall(
       manifestStoragePath,
       manifestSummary,
       render: data.render || manifest.render,
+      renderProfile: renderProfile.id,
       outputStoragePath,
       estimates: manifest.estimates || null,
       billingGate: resolveExportPlanAccess(request),
       retryOf: jobId,
       renderer: {
-        mode: "cloud-run-ffmpeg",
+        mode: shouldUseCloudRunJobsOrchestration() ? "cloud-run-job-ffmpeg" : "cloud-run-ffmpeg",
         urlConfigured: rendererUrlConfigured,
+        service: shouldUseCloudRunJobsOrchestration() ? renderProfile.jobName : null,
+        region: shouldUseCloudRunJobsOrchestration() ? getCloudRunJobsRegion() : null,
+        allocatedVcpu: renderProfile.vcpu,
+        allocatedMemoryGib: renderProfile.memoryGib,
+        accelerator: renderProfile.accelerator,
       },
       createdAt: now,
       updatedAt: now,
@@ -1342,7 +1671,8 @@ const retryVideoExportJob = onCall(
         warnings: [],
         rendererConfigured: rendererUrlConfigured,
         retryOf: jobId,
-        orchestration: "taskQueue",
+        orchestration: shouldUseCloudRunJobsOrchestration() ? "cloudRunJobs" : "taskQueue",
+        renderProfile: renderProfile.id,
       };
     }
 
@@ -1394,6 +1724,7 @@ const getVideoExportDownloadUrl = onCall(
   {
     region: REGION,
     enforceAppCheck: ENFORCE_EXPORT_APP_CHECK,
+    secrets: [EXPORT_SIGNING_SECRET],
   },
   async (request) => {
     const uid = assertAuthenticated(request);
@@ -1414,16 +1745,25 @@ const getVideoExportDownloadUrl = onCall(
       throw new HttpsError("permission-denied", "Chemin output export invalide pour cet utilisateur.");
     }
 
-    const downloadUrl = await createOutputDownloadUrl(storagePath, DOWNLOAD_URL_TTL_MS);
+    const expiresAt = Date.now() + DOWNLOAD_URL_TTL_MS;
+    let downloadMode = "gcs-signed-url";
+    let downloadUrl = await createOutputDownloadUrl(storagePath, DOWNLOAD_URL_TTL_MS);
     if (!downloadUrl) {
-      throw new HttpsError("failed-precondition", "Impossible de generer l'URL de telechargement MP4.");
+      downloadMode = "vibecut-proxy";
+      downloadUrl = buildProxyDownloadUrl({
+        jobId,
+        uid,
+        storagePath,
+        expiresAt,
+      });
     }
 
     return {
       jobId,
       storagePath,
       downloadUrl,
-      expiresAt: new Date(Date.now() + DOWNLOAD_URL_TTL_MS).toISOString(),
+      downloadMode,
+      expiresAt: new Date(expiresAt).toISOString(),
       sizeBytes: data.output?.sizeBytes || null,
       contentType: data.output?.contentType || "video/mp4",
     };
@@ -1467,9 +1807,13 @@ module.exports = {
   getVideoExportAdminTelemetry,
   validateExportManifest,
   EXPORT_QUOTAS,
+  RENDER_PROFILES,
+  selectRenderProfile,
   buildManifestSummary,
   summarizeAdminExportJobs,
   getCloudBillingTelemetry,
   parseBillingExportTable,
   processStoredVideoExportJob,
+  buildProxyDownloadToken,
+  verifyProxyDownloadToken,
 };

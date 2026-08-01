@@ -5,11 +5,31 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const exportDir = path.join(process.cwd(), "src", "features", "vibefx-studio", "video", "export");
-const panelPath = path.join(process.cwd(), "src", "features", "vibefx-studio", "video", "panels", "ExportVideoPanel.jsx");
+/*
+ * Surface export, apres la phase 7 (2026-08-01).
+ *
+ * Le panneau de l'ancien front est supprime. Les garanties ci-dessous portent
+ * toujours sur la SURFACE, pas sur un fichier: on lit donc le controleur, le
+ * module de telechargement (nom horodate, URL signee, destination PC - deplaces
+ * du panneau plutot que perdus) et les deux feuilles du nouveau front.
+ *
+ * Les libelles d'assertion disent encore « ExportVideoPanel » par continuite
+ * avec l'historique des exigences; ils designent desormais cette surface.
+ */
+const controllerPath = path.join(exportDir, "useExportController.js");
+const extraSurfacePaths = [
+  path.join(exportDir, "exportDownload.js"),
+  path.join(process.cwd(), "src", "features", "vibecut", "adapters", "useExportDownload.js"),
+  path.join(process.cwd(), "src", "features", "vibecut", "quick", "ExportSheet.jsx"),
+  path.join(process.cwd(), "src", "features", "vibecut", "advanced", "ExportProSheet.jsx"),
+];
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "vibecut-export-jobs-"));
 
 try {
-  const panelSource = await readFile(panelPath, "utf8");
+  const panelSource = [
+    await readFile(controllerPath, "utf8"),
+    ...(await Promise.all(extraSurfacePaths.map((file) => readFile(file, "utf8")))),
+  ].join("\n");
   assert.equal(
     /startVideoExportJob\(\{[\s\S]*?mode:\s*['"]localMock['"]/m.test(panelSource),
     false,
@@ -52,7 +72,7 @@ try {
   );
   assert.match(
     panelSource,
-    /import \{ resolveOutputMediaMetadata \} from '..\/export\/exportMediaMetadata'/,
+    /resolveOutputMediaMetadata/,
     "ExportVideoPanel must use the shared output media metadata normalizer",
   );
   assert.match(

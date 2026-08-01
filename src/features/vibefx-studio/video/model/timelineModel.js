@@ -28,6 +28,14 @@ const DEFAULT_FILTERS = {
     grain: 0,
 };
 export const DEFAULT_SNAP_THRESHOLD_SECONDS = 0.08;
+export const MAX_TIMELINE_DURATION_SECONDS = 6 * 60 * 60;
+export const MAX_SNAP_GRID_POINTS = 3600;
+
+export function normalizeTimelineDuration(value, fallback = 0) {
+    const duration = finiteNumber(value, fallback);
+    if (!Number.isFinite(duration) || duration <= 0) return Math.max(0, finiteNumber(fallback, 0));
+    return Math.min(duration, MAX_TIMELINE_DURATION_SECONDS);
+}
 
 export function clampVolumePercent(volume = 100) {
     return clamp(finiteNumber(volume, 100), 0, 100);
@@ -108,10 +116,11 @@ function hasActiveClipFilters(filters = {}) {
 }
 
 function getClipPlaybackDuration(clip = {}) {
-    const speed = finiteNumber(clip.speed, 1) || 1;
-    const trimStart = finiteNumber(clip.trimStart, 0);
-    const trimEnd = finiteNumber(clip.trimEnd, clip.duration || 0);
-    return Math.max(0, (trimEnd - trimStart) / speed);
+    const speed = Math.max(0.01, finiteNumber(clip.speed, 1) || 1);
+    const sourceDuration = normalizeTimelineDuration(clip.duration, finiteNumber(clip.trimEnd, 0));
+    const trimStart = clamp(finiteNumber(clip.trimStart, 0), 0, sourceDuration);
+    const trimEnd = clamp(finiteNumber(clip.trimEnd, sourceDuration), trimStart, sourceDuration);
+    return normalizeTimelineDuration((trimEnd - trimStart) / speed, 0);
 }
 
 function getCutTransitionConfiguredDuration(transition = null) {
@@ -271,14 +280,15 @@ export function buildTimelineSnapPoints({
     totalDuration = 0,
     currentTime = 0,
 } = {}) {
+    const safeTotalDuration = normalizeTimelineDuration(totalDuration, 0);
     const points = new Map();
     const addPoint = (time, type = 'marker', label = '') => {
         const normalized = finiteNumber(time, 0);
-        if (normalized < -0.001 || normalized > totalDuration + 0.001) return;
+        if (normalized < -0.001 || normalized > safeTotalDuration + 0.001) return;
         const key = normalized.toFixed(3);
         if (!points.has(key)) {
             points.set(key, {
-                time: Math.max(0, Math.min(totalDuration, normalized)),
+                time: Math.max(0, Math.min(safeTotalDuration, normalized)),
                 type,
                 label: label || `${normalized.toFixed(2)}s`,
             });
@@ -286,8 +296,8 @@ export function buildTimelineSnapPoints({
     };
 
     addPoint(0, 'start', 'Timeline start');
-    if (totalDuration > 0) addPoint(totalDuration, 'end', 'Timeline end');
-    if (currentTime > 0 && currentTime < totalDuration) addPoint(currentTime, 'playhead', 'Playhead');
+    if (safeTotalDuration > 0) addPoint(safeTotalDuration, 'end', 'Timeline end');
+    if (currentTime > 0 && currentTime < safeTotalDuration) addPoint(currentTime, 'playhead', 'Playhead');
 
     let cursor = getIntroOffset(transitionItems);
     clips.forEach((clip, index) => {
@@ -303,7 +313,7 @@ export function buildTimelineSnapPoints({
         cursor += duration - resolveCutTransitionOverlap(transition, duration, getClipPlaybackDuration(nextClip));
     });
 
-    resolveTimelineTransitions({ clips, transitions, transitionItems, totalDuration })
+    resolveTimelineTransitions({ clips, transitions, transitionItems, totalDuration: safeTotalDuration })
         .filter(transition => transition.params?.placement !== 'cut')
         .forEach((transition) => {
             const label = transition.name || transition.id || transition.type || 'transition';
@@ -327,7 +337,8 @@ export function buildTimelineSnapPoints({
         addPoint(end, 'audio-end', `${label} out`);
     });
 
-    for (let second = 1; second < totalDuration; second += 1) {
+    const gridStepSeconds = Math.max(1, Math.ceil(safeTotalDuration / MAX_SNAP_GRID_POINTS));
+    for (let second = gridStepSeconds; second < safeTotalDuration; second += gridStepSeconds) {
         addPoint(second, 'second', `${second}s`);
     }
 

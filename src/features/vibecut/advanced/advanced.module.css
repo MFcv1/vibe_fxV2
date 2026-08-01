@@ -1,0 +1,1257 @@
+/*
+ * Montage avance.
+ * Quatre zones: bibliotheque, apercu, inspecteur, timeline. L'ecran occupe
+ * exactement la hauteur disponible; ce sont les zones internes qui defilent,
+ * jamais la page (plan.md § 4.4).
+ */
+
+.editor {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: calc(100dvh - var(--vc-topbar-height));
+    overflow: hidden;
+    background: var(--vc-bg);
+}
+
+/* ---------- Bandeau d'ecran ---------- */
+.header {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    height: 56px;
+    padding: 0 var(--vc-space-4);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.projectName {
+    width: 200px;
+    height: 34px;
+    padding: 0 var(--vc-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--vc-radius-sm);
+    background: transparent;
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+    color: var(--vc-text);
+    transition: background var(--vc-dur-1) var(--vc-ease), border-color var(--vc-dur-1) var(--vc-ease);
+}
+
+.projectName:hover,
+.projectName:focus {
+    background: var(--vc-surface-2);
+    border-color: var(--vc-line);
+    outline: none;
+}
+
+.saveState {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    white-space: nowrap;
+}
+
+.headerSpacer {
+    flex: 1 1 auto;
+}
+
+.headerGroup {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-1);
+    padding-right: var(--vc-space-3);
+    border-right: 1px solid var(--vc-line);
+}
+
+/* ---------- Bandeaux d'information ---------- */
+.notice {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex: 0 0 auto;
+    padding: var(--vc-space-2) var(--vc-space-4);
+    font-size: var(--vc-text-sm);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.noticeProgress {
+    color: var(--vc-text-2);
+    background: var(--vc-surface-2);
+}
+
+.noticeError {
+    color: var(--vc-danger);
+    background: var(--vc-danger-quiet);
+}
+
+.noticeSpacer {
+    flex: 1 1 auto;
+}
+
+/* ---------- Corps ---------- */
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.panelTitle {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+}
+
+/* ---------- Bibliotheque ---------- */
+.library {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 268px;
+    min-height: 0;
+    border-right: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.libraryHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-4) var(--vc-space-4) var(--vc-space-3);
+}
+
+.libraryFilters {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: 0 var(--vc-space-4) var(--vc-space-3);
+}
+
+.searchField {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    height: 34px;
+    padding: 0 var(--vc-space-3);
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    color: var(--vc-text-3);
+}
+
+.searchField input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    background: none;
+    outline: none;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text);
+}
+
+.sortField select {
+    width: 100%;
+    height: 32px;
+    padding: 0 var(--vc-space-2);
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.libraryList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-1);
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 var(--vc-space-3) var(--vc-space-4);
+    overflow-y: auto;
+}
+
+.libraryItem {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--vc-radius-md);
+    text-align: left;
+    transition: background var(--vc-dur-1) var(--vc-ease), border-color var(--vc-dur-1) var(--vc-ease);
+}
+
+.libraryItem:hover {
+    background: var(--vc-surface-2);
+}
+
+.libraryItem[data-selected="true"] {
+    background: var(--vc-accent-quiet);
+    border-color: var(--vc-accent-line);
+}
+
+.libraryThumb {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 38px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    color: var(--vc-text-3);
+    overflow: hidden;
+}
+
+.libraryThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.libraryMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.libraryName {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.libraryDetail {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Colonne d'apercu ---------- */
+.stageColumn {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    background: var(--vc-bg-sunken);
+}
+
+/*
+ * Double classe volontaire (0,2,0): `.stage` vient d'un AUTRE module CSS, et
+ * l'ordre d'injection des modules n'est pas garanti. A specificite egale, le
+ * masquage pourrait perdre.
+ */
+.stageHidden.stageHidden {
+    display: none;
+}
+
+.stageEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vc-space-3);
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--vc-space-8);
+    text-align: center;
+}
+
+.stageEmptyIcon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: var(--vc-radius-lg);
+    background: var(--vc-surface-2);
+    color: var(--vc-text-2);
+}
+
+.stageEmptyTitle {
+    font-size: var(--vc-text-lg);
+}
+
+.stageEmptyBody {
+    max-width: 42ch;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+/* ---------- Inspecteur ---------- */
+.inspector {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 312px;
+    min-height: 0;
+    padding: 0 0 var(--vc-space-6);
+    border-left: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* Les sections repliables n'ont pas de marge propre: c'est le panneau qui la donne. */
+.inspectorPanels {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-5);
+    min-width: 0;
+    padding: var(--vc-space-4);
+}
+
+.inspectorHead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0 var(--vc-space-2);
+    padding: var(--vc-space-4);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.inspectorHead .inspectorKind {
+    grid-column: 1;
+}
+
+.inspectorHead .panelTitle {
+    grid-column: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inspectorHead .inspectorTiming {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.inspectorTiming {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.inspectorEmpty {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-8) var(--vc-space-5);
+    text-align: center;
+}
+
+.inspectorEmptyTitle {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+    color: var(--vc-text-2);
+}
+
+.inspectorEmptyBody {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+.readout {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text);
+}
+
+.note {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    line-height: 1.5;
+}
+
+.warning {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-warning);
+    line-height: 1.5;
+}
+
+.chipRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vc-space-2);
+}
+
+.chip {
+    height: 30px;
+    padding: 0 var(--vc-space-3);
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.chip:hover {
+    color: var(--vc-text);
+}
+
+.chip[aria-pressed="true"] {
+    background: var(--vc-accent);
+    border-color: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.motionGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vc-space-2);
+}
+
+.motionChip {
+    height: 34px;
+    padding: 0 var(--vc-space-2);
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.motionChip[aria-pressed="true"] {
+    background: var(--vc-accent);
+    border-color: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.sliderRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-1);
+}
+
+.sliderLabel {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.sliderValue {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.sliderRow input[type="range"] {
+    width: 100%;
+    accent-color: var(--vc-accent);
+}
+
+/*
+ * Un curseur desactive doit SE VOIR desactive. Sans cela, l'intensite du
+ * mouvement s'affichait pleine et reglable alors qu'elle ne repondait pas,
+ * faute de mouvement choisi.
+ */
+.sliderRow input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    accent-color: var(--vc-text-3);
+}
+
+/* ---------- Transition vers le plan suivant ---------- */
+.transitionList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vc-space-2);
+}
+
+.transitionOption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-1);
+    min-height: 34px;
+    padding: var(--vc-space-1) var(--vc-space-2);
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    text-align: left;
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.transitionOption:hover {
+    color: var(--vc-text);
+}
+
+.transitionOption[aria-pressed="true"] {
+    background: var(--vc-accent);
+    border-color: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.transitionName {
+    font-size: var(--vc-text-xs);
+    line-height: 1.25;
+}
+
+.transitionFlag {
+    flex: 0 0 auto;
+    font-size: 10px;
+    color: var(--vc-text-3);
+}
+
+.transitionOption[aria-pressed="true"] .transitionFlag {
+    color: var(--vc-text-on-accent);
+}
+
+.groupLabel {
+    margin-top: var(--vc-space-3);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.legend {
+    padding: 0;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+/* ---------- Timeline ---------- */
+/*
+ * Hauteur proportionnelle, pas fixe: a 322 px en dur, une fenetre de 720 px ne
+ * laissait que ~250 px a l'apercu, qui devenait un timbre-poste entoure de noir.
+ * Le plancher garde les sept pistes atteignables, le plafond garde la valeur
+ * confortable des grands ecrans.
+ */
+.timeline {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    height: clamp(196px, 32dvh, 268px);
+    min-height: 0;
+    border-top: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.timelineBar {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex: 0 0 auto;
+    height: 46px;
+    padding: 0 var(--vc-space-3);
+    border-bottom: 1px solid var(--vc-line);
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.timelineBar > * {
+    flex: 0 0 auto;
+}
+
+.timelineTitle {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+}
+
+.timelineTotal {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.barSpacer {
+    flex: 1 1 auto;
+}
+
+.snapHint {
+    padding: 2px var(--vc-space-2);
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-accent-quiet);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+.timelineScroller {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.timelineRows {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 100%;
+}
+
+.ruler {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    min-width: 100%;
+    height: 30px;
+    background: var(--vc-surface-2);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.rulerHead {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    flex: 0 0 176px;
+    width: 176px;
+    background: var(--vc-surface-2);
+    border-right: 1px solid var(--vc-line);
+}
+
+.rulerBody {
+    position: relative;
+    flex: 1 0 auto;
+    height: 100%;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--vc-line-strong);
+}
+
+.tickLabel {
+    position: absolute;
+    top: 6px;
+    left: 5px;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    white-space: nowrap;
+}
+
+.lane {
+    display: flex;
+    min-width: 100%;
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.laneHead {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex: 0 0 176px;
+    width: 176px;
+    padding: 0 var(--vc-space-2) 0 var(--vc-space-3);
+    background: var(--vc-surface);
+    border-right: 1px solid var(--vc-line);
+}
+
+.laneName {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.laneTools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.laneToggle {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+}
+
+.laneGlyph {
+    font-size: var(--vc-text-xs);
+    line-height: 1;
+}
+
+.laneBody {
+    position: relative;
+    flex: 1 0 auto;
+    background: var(--vc-bg-sunken);
+}
+
+.lane[data-track-locked="true"] .laneBody {
+    background: repeating-linear-gradient(
+        135deg,
+        var(--vc-bg-sunken),
+        var(--vc-bg-sunken) 8px,
+        var(--vc-surface) 8px,
+        var(--vc-surface) 16px
+    );
+}
+
+.laneEmpty {
+    position: absolute;
+    top: 50%;
+    left: var(--vc-space-3);
+    transform: translateY(-50%);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.item {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    border: 1px solid var(--vc-line-strong);
+    overflow: hidden;
+    transition: border-color var(--vc-dur-1) var(--vc-ease), box-shadow var(--vc-dur-1) var(--vc-ease);
+}
+
+.item[data-selected="true"] {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent);
+}
+
+.item[data-dragging="true"] {
+    z-index: 4;
+    box-shadow: var(--vc-shadow-2);
+    opacity: 0.9;
+}
+
+.item[data-track-item-type="transition"] {
+    background: var(--vc-accent-quiet);
+}
+
+.item[data-track-item-type="text"] {
+    background: color-mix(in srgb, var(--vc-success) 22%, var(--vc-surface-3));
+}
+
+.item[data-track-item-type="audio"] {
+    background: color-mix(in srgb, var(--vc-warning) 18%, var(--vc-surface-3));
+}
+
+.itemBody {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    width: 100%;
+    height: 100%;
+    padding: 0 var(--vc-space-2);
+    text-align: left;
+    touch-action: none;
+    cursor: grab;
+}
+
+.item[data-dragging="true"] .itemBody {
+    cursor: grabbing;
+}
+
+.itemThumb {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 100%;
+    max-height: 44px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.itemLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+.handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 9px;
+    background: var(--vc-accent);
+    opacity: 0;
+    cursor: ew-resize;
+    touch-action: none;
+    transition: opacity var(--vc-dur-1) var(--vc-ease);
+}
+
+.item:hover .handle,
+.item[data-selected="true"] .handle {
+    opacity: 0.75;
+}
+
+.handleLeft {
+    left: 0;
+}
+
+.handleRight {
+    right: 0;
+}
+
+.dropIndicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--vc-accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--vc-accent) 40%, transparent);
+    pointer-events: none;
+}
+
+/* ---------- Plans de la rangee Video (Timeline V2) ---------- */
+
+/*
+ * Un plan occupe la largeur qui lui appartient: jointif au MILIEU de sa
+ * transition, jamais recouvert par son voisin. C'est ce qui fait qu'un plan de
+ * 4 s se lit 4 s, et non 2,6 s comme dans la premiere version.
+ */
+.clip {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    border: 1px solid var(--vc-line-strong);
+    overflow: hidden;
+    transition: border-color var(--vc-dur-1) var(--vc-ease), box-shadow var(--vc-dur-1) var(--vc-ease);
+}
+
+.clip[data-selected="true"] {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent);
+    z-index: 2;
+}
+
+.clip[data-dragging="true"] {
+    z-index: 5;
+    box-shadow: var(--vc-shadow-2);
+    opacity: 0.9;
+}
+
+.clipBody {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    width: 100%;
+    height: 100%;
+    padding: 0 var(--vc-space-2);
+    text-align: left;
+    touch-action: none;
+    cursor: grab;
+}
+
+/* Le libelle laisse la place a la bande de son, quand il y en a une. */
+.clipBody[data-with-audio="true"] {
+    padding-bottom: 12px;
+}
+
+.clip[data-dragging="true"] .clipBody {
+    cursor: grabbing;
+}
+
+.clipThumb {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 38px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.clipLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+/*
+ * Les badges disent ce que porte le plan, a la place des anciennes fausses
+ * pistes. Ils sont FRERES du bouton du plan, jamais ses enfants: un bouton dans
+ * un bouton est du HTML invalide et le clic se propagerait (bug 11).
+ */
+.clipBadges {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: flex;
+    gap: 2px;
+    z-index: 3;
+}
+
+.clipBadge {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--vc-bg) 72%, transparent);
+    border: 1px solid var(--vc-line-strong);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.clipBadge:hover {
+    background: var(--vc-accent);
+    border-color: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+/* Son du plan: attache au plan (A/V lies), pas sur une rangee a part. */
+.clipAudio {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    padding: 0 2px;
+    background: color-mix(in srgb, var(--vc-warning) 16%, transparent);
+    pointer-events: none;
+}
+
+.clipAudio[data-muted="true"] {
+    opacity: 0.25;
+}
+
+.clipWave {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    width: 100%;
+    height: 100%;
+}
+
+.waveBar {
+    flex: 1 1 0;
+    min-width: 1px;
+    background: color-mix(in srgb, var(--vc-warning) 70%, transparent);
+    border-radius: 1px 1px 0 0;
+}
+
+/* ---------- Transition, a cheval sur la coupe ---------- */
+
+/*
+ * Convention DaVinci / Premiere: la transition se pose SUR la piste video, a
+ * cheval sur la jointure. Elle n'existe pas independamment d'une coupe - la
+ * sortir de la piste video la couperait de ce qui lui donne son sens.
+ */
+.transition {
+    position: absolute;
+    top: 1px;
+    height: 22px;
+    display: flex;
+    align-items: stretch;
+    border-radius: var(--vc-radius-sm);
+    background: repeating-linear-gradient(
+        135deg,
+        var(--vc-accent-quiet),
+        var(--vc-accent-quiet) 4px,
+        color-mix(in srgb, var(--vc-accent) 26%, transparent) 4px,
+        color-mix(in srgb, var(--vc-accent) 26%, transparent) 8px
+    );
+    border: 1px solid var(--vc-accent-line);
+    overflow: hidden;
+    z-index: 4;
+}
+
+.transition[data-selected="true"] {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent);
+}
+
+.transition[data-dragging="true"] {
+    z-index: 6;
+    box-shadow: var(--vc-shadow-2);
+}
+
+.transitionBody {
+    display: grid;
+    place-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0 2px;
+    font-size: 10px;
+    line-height: 1;
+    color: var(--vc-text);
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.transitionGlyph {
+    pointer-events: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.transitionEdge {
+    flex: 0 0 auto;
+    width: 7px;
+    background: color-mix(in srgb, var(--vc-accent) 55%, transparent);
+    cursor: ew-resize;
+    touch-action: none;
+}
+
+.transitionEdge:hover {
+    background: var(--vc-accent);
+}
+
+.foldedToggles {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-right: var(--vc-space-2);
+    border-right: 1px solid var(--vc-line);
+}
+
+.sectionHint {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.inspectorKind {
+    display: block;
+    font-size: var(--vc-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vc-text-3);
+}
+
+.playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    width: 0;
+    pointer-events: none;
+}
+
+.playhead::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -1px;
+    width: 2px;
+    background: var(--vc-danger);
+}
+
+.playheadKnob {
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    padding: 1px var(--vc-space-2);
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-danger);
+    color: #ffffff;
+    font-size: var(--vc-text-xs);
+    white-space: nowrap;
+}
+
+/* ---------- Feuille d'export ---------- */
+.sheetBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: var(--vc-space-4);
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(6px);
+}
+
+.sheet {
+    display: flex;
+    flex-direction: column;
+    width: min(520px, 100%);
+    max-height: 90dvh;
+    border: 1px solid var(--vc-line);
+    border-radius: var(--vc-radius-lg);
+    background: var(--vc-surface);
+    box-shadow: var(--vc-shadow-3);
+    overflow: hidden;
+}
+
+.sheetHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-4) var(--vc-space-5);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.sheetTitle {
+    font-size: var(--vc-text-md);
+}
+
+.sheetBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-4);
+    padding: var(--vc-space-5);
+    overflow-y: auto;
+}
+
+.sheetRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.sheetRowValue {
+    color: var(--vc-text);
+}
+
+.sheetError {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-danger-quiet);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-danger);
+}
+
+.sheetProgress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+}
+
+.exportDone {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    background: color-mix(in srgb, var(--vc-success) 12%, transparent);
+    font-size: var(--vc-text-sm);
+}
+
+.exportDone small {
+    display: block;
+    color: var(--vc-text-2);
+}
+
+.exportDoneIcon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--vc-success);
+    color: #06251a;
+}
+
+.sheetFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-4) var(--vc-space-5);
+    border-top: 1px solid var(--vc-line);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+    .body {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .library {
+        flex: 0 0 auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--vc-line);
+    }
+
+    .libraryList {
+        flex-direction: row;
+        max-height: 96px;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .libraryItem {
+        flex: 0 0 auto;
+        width: 200px;
+    }
+
+    /*
+     * En colonne, l'apercu passe EN PREMIER: on ne fait pas defiler la
+     * bibliotheque pour voir ce qu'on est en train de monter.
+     */
+    .stageColumn {
+        order: -1;
+        min-height: 320px;
+    }
+
+    .inspector {
+        flex: 0 0 auto;
+        border-left: 0;
+        border-top: 1px solid var(--vc-line);
+    }
+}
+
+@media (max-width: 720px) {
+    .header {
+        height: auto;
+        flex-wrap: wrap;
+        padding: var(--vc-space-2) var(--vc-space-3);
+    }
+
+    .projectName {
+        width: 140px;
+    }
+
+    .timeline {
+        height: 240px;
+    }
+
+    /* Le total est deja lisible sur la reglette: on rend la place aux outils. */
+    .timelineTotal,
+    .snapHint {
+        display: none;
+    }
+}
+
+/*
+ * Format reel du fichier produit (phase 7). Ces trois lignes reprennent
+ * l'information que l'ancien panneau d'export affichait: conteneur, codec et
+ * type MIME lus du rendu, jamais ecrits en dur.
+ */
+.exportMeta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-1);
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+}

@@ -1,4 +1,11 @@
 import { resolveActiveTransition } from '../model/timelineModel';
+import {
+    applyImageMotionTransform,
+    DEFAULT_IMAGE_DURATION_SECONDS,
+    isImageMedia,
+    normalizeImageDuration,
+} from '../model/mediaModel';
+import { isXfadeTransition, renderXfadeTransition } from './xfadeTransitions';
 
 /**
  * VideoEngine — Moteur video natif navigateur
@@ -11,21 +18,106 @@ export function isWebCodecsSupported() {
 
 export const SOCIAL_IMPORT_FPS = 30;
 export const HIGH_FPS_IMPORT_THRESHOLD = 50;
+export const MIN_MEDIA_DURATION_SECONDS = 1 / 120;
+export const MAX_MEDIA_DURATION_SECONDS = 6 * 60 * 60;
+export const MEDIA_DURATION_RESOLVE_TIMEOUT_MS = 4500;
+
+export function normalizeMediaDuration(value, fallback = null) {
+    const duration = Number(value);
+    if (!Number.isFinite(duration)) return fallback;
+    if (duration < MIN_MEDIA_DURATION_SECONDS || duration > MAX_MEDIA_DURATION_SECONDS) return fallback;
+    return duration;
+}
+
+export async function resolveFiniteMediaDuration(
+    video,
+    { fileName = 'media', timeoutMs = MEDIA_DURATION_RESOLVE_TIMEOUT_MS } = {}
+) {
+    const immediateDuration = normalizeMediaDuration(video?.duration);
+    if (immediateDuration !== null) return immediateDuration;
+
+    const duration = await new Promise((resolve) => {
+        let settled = false;
+        let timer = null;
+        const events = ['durationchange', 'loadeddata', 'timeupdate', 'progress'];
+
+        const finish = (value = null) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            events.forEach((eventName) => video?.removeEventListener?.(eventName, checkDuration));
+            resolve(value);
+        };
+        const checkDuration = () => {
+            const nextDuration = normalizeMediaDuration(video?.duration);
+            if (nextDuration !== null) finish(nextDuration);
+        };
+
+        events.forEach((eventName) => video?.addEventListener?.(eventName, checkDuration));
+        timer = setTimeout(() => finish(null), Math.max(250, Number(timeoutMs) || MEDIA_DURATION_RESOLVE_TIMEOUT_MS));
+
+        // Some WebM files report Infinity until a far seek forces the browser to
+        // parse the final cluster. The resolved value is still validated above.
+        try {
+            video.currentTime = Number.MAX_SAFE_INTEGER;
+        } catch {
+            // The timeout below converts an unsupported seek into a recoverable import error.
+        }
+        checkDuration();
+    });
+
+    if (duration === null) {
+        const error = new Error(`Duree video illisible pour ${fileName}. Convertissez le fichier en MP4 H.264 ou WebM avec une duree explicite.`);
+        error.code = 'media-duration-invalid';
+        throw error;
+    }
+
+    try {
+        video.currentTime = 0;
+    } catch {
+        // Reset is best effort; metadata remains usable even when the browser rejects it.
+    }
+    return duration;
+}
 
 export function loadVideoFile(file) {
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(file);
         const video = document.createElement('video');
+        let settled = false;
         video.preload = 'auto';
         video.muted = true;
         video.playsInline = true;
 
+        const fail = (error) => {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(url);
+            reject(error);
+        };
+
         video.onloadedmetadata = async () => {
             try {
-                const [frameRateInfo, displayMetadata] = await Promise.all([
-                    estimateVideoFrameRate(video),
-                    readVideoDisplayMetadata(file),
-                ]);
+                const duration = await resolveFiniteMediaDuration(video, { fileName: file.name });
+                let frameRateInfo = { fps: null, rawFps: null, status: 'unavailable' };
+                let displayMetadata = {
+                    rotation: 0,
+                    width: null,
+                    height: null,
+                    frameRate: null,
+                    frameRateStatus: 'unavailable',
+                    source: 'browser',
+                };
+
+                try {
+                    [frameRateInfo, displayMetadata] = await Promise.all([
+                        estimateVideoFrameRate(video),
+                        readVideoDisplayMetadata(file),
+                    ]);
+                } catch (error) {
+                    console.warn('Video metadata detection failed:', error);
+                }
+
                 const metadataFrameRate = Number.isFinite(displayMetadata.frameRate) ? displayMetadata.frameRate : null;
                 const sourceFrameRate = metadataFrameRate || (Number.isFinite(frameRateInfo.fps) ? frameRateInfo.fps : null);
                 const socialFpsNormalized = false;
@@ -37,10 +129,11 @@ export function loadVideoFile(file) {
                     displayMetadata
                 );
 
+                settled = true;
                 resolve({
                     file, url,
                     name: file.name,
-                    duration: video.duration,
+                    duration,
                     width: video.videoWidth,
                     height: video.videoHeight,
                     displayWidth: displaySize.width,
@@ -58,32 +151,60 @@ export function loadVideoFile(file) {
                     videoElement: video,
                 });
             } catch (error) {
-                console.warn('Video metadata detection failed:', error);
-                resolve({
-                    file, url,
-                    name: file.name,
-                    duration: video.duration,
-                    width: video.videoWidth,
-                    height: video.videoHeight,
-                    displayWidth: video.videoWidth,
-                    displayHeight: video.videoHeight,
-                    orientationRotation: 0,
-                    orientationSource: 'unavailable',
-                    type: file.type,
-                    size: file.size,
-                    sourceFrameRate: null,
-                    sourceFrameRateRaw: null,
-                    sourceFrameRateStatus: 'unavailable',
-                    importFrameRate: null,
-                    importFrameRateMode: 'source',
-                    socialFpsNormalized: false,
-                    videoElement: video,
-                });
+                fail(error);
             }
         };
 
-        video.onerror = () => reject(new Error(`Impossible de charger: ${file.name}`));
+        video.onerror = () => fail(new Error(`Impossible de charger: ${file.name}`));
         video.src = url;
+    });
+}
+
+export function loadImageFile(file, { duration = DEFAULT_IMAGE_DURATION_SECONDS } = {}) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        let settled = false;
+
+        const fail = (error) => {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(url);
+            reject(error);
+        };
+        const succeed = () => {
+            if (settled) return;
+            const width = Number(image.naturalWidth || image.width || 0);
+            const height = Number(image.naturalHeight || image.height || 0);
+            if (!width || !height) {
+                fail(new Error(`Dimensions image illisibles pour ${file.name}.`));
+                return;
+            }
+            settled = true;
+            resolve({
+                file,
+                url,
+                name: file.name,
+                duration: normalizeImageDuration(duration),
+                width,
+                height,
+                displayWidth: width,
+                displayHeight: height,
+                orientationRotation: 0,
+                orientationSource: 'browser-image',
+                mediaType: 'image',
+                type: file.type,
+                size: file.size,
+                imageElement: image,
+            });
+        };
+
+        image.onload = succeed;
+        image.onerror = () => fail(new Error(`Impossible de charger l'image: ${file.name}`));
+        image.src = url;
+        image.decode?.().then(succeed).catch(() => {
+            // onload remains the compatibility fallback for browsers without decode support.
+        });
     });
 }
 
@@ -342,6 +463,14 @@ function normalizeDetectedFrameRate(rawFps) {
 }
 
 export async function extractThumbnails(videoUrl, duration, count = 8, thumbHeight = 60, displayMetadata = {}) {
+    const safeDuration = normalizeMediaDuration(duration);
+    if (safeDuration === null) {
+        const error = new Error('Extraction des miniatures ignoree: duree media invalide.');
+        error.code = 'media-duration-invalid';
+        throw error;
+    }
+    const safeCount = Math.max(1, Math.min(24, Math.round(Number(count) || 8)));
+    const safeThumbHeight = Math.max(24, Math.min(320, Math.round(Number(thumbHeight) || 60)));
     const video = document.createElement('video');
     video.src = videoUrl;
     video.muted = true;
@@ -361,25 +490,51 @@ export async function extractThumbnails(videoUrl, duration, count = 8, thumbHeig
     const aspect = displaySize.width && displaySize.height
         ? displaySize.width / displaySize.height
         : video.videoWidth / video.videoHeight;
-    const thumbWidth = Math.round(thumbHeight * aspect);
+    const thumbWidth = Math.max(1, Math.round(safeThumbHeight * (Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9)));
 
     const canvas = document.createElement('canvas');
     canvas.width = thumbWidth;
-    canvas.height = thumbHeight;
+    canvas.height = safeThumbHeight;
     const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Extraction des miniatures indisponible: canvas non initialise.');
 
     const thumbnails = [];
-    const interval = duration / count;
+    const interval = safeDuration / safeCount;
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < safeCount; i++) {
         const time = i * interval + interval / 2;
-        video.currentTime = Math.min(time, duration - 0.1);
-        await new Promise((resolve) => { video.onseeked = resolve; });
-        drawSourceCover(ctx, video, thumbWidth, thumbHeight, displayMetadata);
+        video.currentTime = Math.max(0, Math.min(time, Math.max(0, safeDuration - 0.1)));
+        await waitForVideoSeek(video);
+        drawSourceCover(ctx, video, thumbWidth, safeThumbHeight, displayMetadata);
         thumbnails.push(canvas.toDataURL('image/jpeg', 0.6));
     }
 
     return thumbnails;
+}
+
+function waitForVideoSeek(video, timeoutMs = 2500) {
+    return new Promise((resolve, reject) => {
+        let timer = null;
+        const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            video.removeEventListener('seeked', handleSeeked);
+            video.removeEventListener('error', handleError);
+        };
+        const handleSeeked = () => {
+            cleanup();
+            resolve();
+        };
+        const handleError = () => {
+            cleanup();
+            reject(new Error('Impossible de lire une frame pour la miniature.'));
+        };
+        video.addEventListener('seeked', handleSeeked, { once: true });
+        video.addEventListener('error', handleError, { once: true });
+        timer = setTimeout(() => {
+            cleanup();
+            reject(new Error('Delai depasse pendant la creation des miniatures.'));
+        }, timeoutMs);
+    });
 }
 
 export async function extractFrame(videoUrl, time, width, height) {
@@ -432,6 +587,27 @@ function easeInCubic(t) {
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+/*
+ * Volume effectif d'une piste audio a un instant donne, fondus compris.
+ * Le meme calcul est reproduit cote serveur par `afade`, pour que l'apercu et
+ * l'export sonnent pareil.
+ */
+function resolveAudioFadeVolume(track = {}, globalTime = 0) {
+    const base = clampMediaVolume(track.volume ?? 100);
+    const start = Number(track.startTime) || 0;
+    const end = Number(track.endTime) || start + (Number(track.duration) || 0);
+    const span = Math.max(0.001, end - start);
+    const fadeIn = Math.max(0, Math.min(Number(track.fadeIn) || 0, span / 2));
+    const fadeOut = Math.max(0, Math.min(Number(track.fadeOut) || 0, span / 2));
+    const elapsed = globalTime - start;
+    let factor = 1;
+    if (fadeIn > 0 && elapsed < fadeIn) factor = Math.max(0, elapsed / fadeIn);
+    if (fadeOut > 0 && elapsed > span - fadeOut) {
+        factor = Math.min(factor, Math.max(0, (span - elapsed) / fadeOut));
+    }
+    return base * factor;
 }
 
 function clampMediaVolume(volume = 100) {
@@ -617,22 +793,37 @@ function drawSourceCover(ctx, source, w, h, clip = {}) {
     ctx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
 }
 
-function drawFilteredSource(ctx, source, clip, w, h) {
+function getClipVisualProgress(clip = {}, localTime = 0) {
+    const trimStart = Number(clip.trimStart || 0);
+    const trimEnd = Number(clip.trimEnd ?? clip.duration ?? trimStart);
+    const duration = Math.max(0.001, trimEnd - trimStart);
+    return clamp((Number(localTime || 0) - trimStart) / duration, 0, 1);
+}
+
+function drawFilteredSource(ctx, source, clip, w, h, localTime = 0) {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
     ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.clip();
     ctx.filter = buildFilterString(clip?.filters);
+    if (isImageMedia(clip)) {
+        // Transformation posee par `mediaModel.applyImageMotionTransform`: c'est
+        // elle que `smoke-vibecut-motion-preview-parity` compare au rendu FFmpeg.
+        applyImageMotionTransform(ctx, clip.motion, getClipVisualProgress(clip, localTime), w, h);
+    }
     drawSourceCover(ctx, source, w, h, clip);
     ctx.restore();
     applyPostFilters(ctx, clip?.filters, w, h);
 }
 
-function makeFilteredFrame(source, clip, w, h) {
+function makeFilteredFrame(source, clip, w, h, localTime = 0) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-    drawFilteredSource(ctx, source, clip, w, h);
+    drawFilteredSource(ctx, source, clip, w, h, localTime);
     return canvas;
 }
 
@@ -810,7 +1001,25 @@ function getResolvedActiveClipAtTime(clips = [], transitions = {}, globalTime = 
  * @param {number} w - canvas width
  * @param {number} h - canvas height
  */
-function renderTransition(ctx, fromPlayer, toPlayer, progress, type, w, h) {
+/*
+ * Exportee depuis la phase 5: la bibliotheque de transitions (`/video/transitions`)
+ * dessine ses apercus avec CETTE fonction, pas avec une imitation CSS. Une carte
+ * de la bibliotheque montre donc exactement ce que l'apercu du montage jouera -
+ * et, pour les 15 transitions minutees, ce que l'export rendra.
+ * Aucun changement de comportement: seule la visibilite du symbole change.
+ */
+export function renderTransition(ctx, fromPlayer, toPlayer, progress, type, w, h) {
+    /*
+     * Les transitions exportables passent par leur implementation calquee sur le
+     * filtre `xfade` de FFmpeg, avec une progression LINEAIRE : c'est ce que le
+     * serveur rend. Les autres gardent l'accelere/decelere historique — elles
+     * restent « apercu uniquement ».
+     */
+    if (isXfadeTransition(type)) {
+        renderXfadeTransition(ctx, fromPlayer, toPlayer, progress, type, w, h);
+        return;
+    }
+
     const p = easeInOut(progress);
 
     switch (type) {
@@ -1483,7 +1692,30 @@ export class PlaybackEngine {
 
     async loadClip(clip) {
         if (this.players.has(clip.id)) return;
-        if (!clip?.url) throw new Error(`Clip video sans URL: ${clip?.name || clip?.id || 'clip'}`);
+        if (!clip?.url) throw new Error(`Media sans URL: ${clip?.name || clip?.id || 'media'}`);
+        if (isImageMedia(clip)) {
+            const image = new Image();
+            image.decoding = 'async';
+            await new Promise((resolve, reject) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    resolve();
+                };
+                const fail = () => {
+                    if (settled) return;
+                    settled = true;
+                    reject(new Error(`Failed to load image clip: ${clip.name}`));
+                };
+                image.onload = finish;
+                image.onerror = fail;
+                image.src = clip.url;
+                image.decode?.().then(finish).catch(() => {});
+            });
+            this.players.set(clip.id, image);
+            return;
+        }
         const video = createVideoPlayer(clip.url);
         video.playbackRate = clip.speed || 1;
         video.volume = clampMediaVolume(clip.volume);
@@ -1594,7 +1826,7 @@ export class PlaybackEngine {
     }
 
     async waitForSeek(player, targetTime, tolerance = 0.015) {
-        if (!player || !Number.isFinite(targetTime)) return;
+        if (!player || !Number.isFinite(targetTime) || typeof player.currentTime !== 'number') return;
         const duration = Number.isFinite(player.duration) ? player.duration : targetTime;
         const safeTime = clamp(targetTime, 0, Math.max(0, duration - 0.001));
         if (Math.abs(player.currentTime - safeTime) <= tolerance && player.readyState >= 2) return;
@@ -1649,7 +1881,9 @@ export class PlaybackEngine {
             connected.push(source);
         };
 
-        this.players.forEach(connectPlayer);
+        this.players.forEach((player) => {
+            if (typeof player.play === 'function') connectPlayer(player);
+        });
         this.audioPlayers.forEach(connectPlayer);
         this.audioDestinationNodes.add(destination);
 
@@ -1725,7 +1959,7 @@ export class PlaybackEngine {
             let renderMode = 'clip';
             let targetClipId = null;
             // Only seek if time difference is significant
-            if (Math.abs(player.currentTime - localTime) > 0.05) {
+            if (!isImageMedia(clip) && Math.abs(player.currentTime - localTime) > 0.05) {
                 player.currentTime = localTime;
             }
 
@@ -1740,11 +1974,11 @@ export class PlaybackEngine {
                 const targetClip = targetResult?.clip || clip;
                 const targetLocalTime = targetResult?.localTime ?? localTime;
 
-                const fromFrame = makeFilteredFrame(player, clip, w, h);
-                if (targetPlayer && Math.abs(targetPlayer.currentTime - targetLocalTime) > 0.05) {
+                const fromFrame = makeFilteredFrame(player, clip, w, h, localTime);
+                if (targetPlayer && !isImageMedia(targetClip) && Math.abs(targetPlayer.currentTime - targetLocalTime) > 0.05) {
                     targetPlayer.currentTime = targetLocalTime;
                 }
-                const toFrame = makeFilteredFrame(targetPlayer, targetClip, w, h);
+                const toFrame = makeFilteredFrame(targetPlayer, targetClip, w, h, targetLocalTime);
                 renderTransition(this.ctx, fromFrame, toFrame, timelineProgress, timelineTransition.type, w, h);
                 renderMode = 'timeline-transition';
                 targetClipId = targetClip.id || null;
@@ -1754,23 +1988,23 @@ export class PlaybackEngine {
                     const nextLocalTime = hasResolvedVideoTiming(clips)
                         ? getClipLocalTime(nextClip, globalTime, getResolvedClipStart(nextClip))
                         : nextClip.trimStart + transitionProgress * ((nextClip.trimEnd - nextClip.trimStart) / (nextClip.speed || 1)) * 0.1;
-                    if (Math.abs(nextPlayer.currentTime - nextLocalTime) > 0.05) {
+                    if (!isImageMedia(nextClip) && Math.abs(nextPlayer.currentTime - nextLocalTime) > 0.05) {
                         nextPlayer.currentTime = nextLocalTime;
                     }
                     // Render real transition using filtered frame snapshots.
-                    const fromFrame = makeFilteredFrame(player, clip, w, h);
-                    const toFrame = makeFilteredFrame(nextPlayer, nextClip, w, h);
+                    const fromFrame = makeFilteredFrame(player, clip, w, h, localTime);
+                    const toFrame = makeFilteredFrame(nextPlayer, nextClip, w, h, nextLocalTime);
                     renderTransition(this.ctx, fromFrame, toFrame, transitionProgress, transition.type, w, h);
                     renderMode = 'cut-transition';
                     targetClipId = nextClip.id || null;
                 } else {
                     // Next clip not loaded, draw current
-                    drawFilteredSource(this.ctx, player, clip, w, h);
+                    drawFilteredSource(this.ctx, player, clip, w, h, localTime);
                     renderMode = 'cut-transition-fallback';
                     targetClipId = nextClip.id || null;
                 }
             } else {
-                drawFilteredSource(this.ctx, player, clip, w, h);
+                drawFilteredSource(this.ctx, player, clip, w, h, localTime);
             }
             return {
                 rendered: true,
@@ -1848,13 +2082,15 @@ export class PlaybackEngine {
         const activeResult = this.getActiveClipAtTime(clips, transitions, globalTime, transitionItems);
         this.players.forEach((player, id) => {
             const isActive = activeResult?.clip?.id === id;
+            const clip = clips.find((item) => item.id === id);
+            if (isImageMedia(clip)) return;
             if (!isActive) {
                 player.pause();
                 return;
             }
-            const clip = activeResult.clip;
-            player.volume = clampMediaVolume(clip.volume ?? 100);
-            player.playbackRate = (clip.speed || 1) * playbackSpeed;
+            const activeClip = activeResult.clip;
+            player.volume = clampMediaVolume(activeClip.volume ?? 100);
+            player.playbackRate = (activeClip.speed || 1) * playbackSpeed;
             if (Math.abs(player.currentTime - activeResult.localTime) > 0.18) {
                 player.currentTime = activeResult.localTime;
             }
@@ -1877,8 +2113,11 @@ export class PlaybackEngine {
                 return;
             }
 
-            const localTime = Math.max(0, globalTime - start);
-            audio.volume = clampMediaVolume(track.volume ?? 100);
+            // `trimStart` = point de depart DANS le morceau, distinct de `startTime`
+            // qui est la position sur la timeline.
+            const trimStart = Math.max(0, Number(track.trimStart) || 0);
+            const localTime = Math.max(0, globalTime - start) + trimStart;
+            audio.volume = clampMediaVolume(resolveAudioFadeVolume(track, globalTime));
             audio.playbackRate = playbackSpeed;
             if (Math.abs(audio.currentTime - localTime) > 0.18) {
                 audio.currentTime = localTime;
@@ -1892,7 +2131,7 @@ export class PlaybackEngine {
         const activeResult = this.getActiveClipAtTime(clips, transitions, currentTime, transitionItems);
         const clip = activeResult?.clip;
         const player = clip ? this.players.get(clip.id) : null;
-        if (!clip || !player || player.paused || player.readyState < 2) return null;
+        if (!clip || isImageMedia(clip) || !player || player.paused || player.readyState < 2) return null;
 
         const timelineStart = getResolvedClipStart(clip);
         const trimStart = Number(clip.trimStart || 0);
@@ -1907,6 +2146,7 @@ export class PlaybackEngine {
 
     hasActiveVideoWaitingForPlayback(clips, transitions, currentTime, transitionItems = []) {
         const activeResult = this.getActiveClipAtTime(clips, transitions, currentTime, transitionItems);
+        if (isImageMedia(activeResult?.clip)) return false;
         const player = activeResult?.clip ? this.players.get(activeResult.clip.id) : null;
         return Boolean(player && (player.paused || player.readyState < 2));
     }
@@ -1915,7 +2155,7 @@ export class PlaybackEngine {
         if (!hasResolvedVideoTiming(clips) || !framePlayer || !Number.isFinite(mediaTime)) return null;
         const activeResult = this.getActiveClipAtTime(clips, transitions, currentTime, transitionItems);
         const clip = activeResult?.clip;
-        if (!clip || this.players.get(clip.id) !== framePlayer) return null;
+        if (!clip || isImageMedia(clip) || this.players.get(clip.id) !== framePlayer) return null;
         const timelineStart = getResolvedClipStart(clip);
         const trimStart = Number(clip.trimStart || 0);
         const speed = Number(clip.speed || 1);
@@ -1982,6 +2222,7 @@ export class PlaybackEngine {
             if (!hasResolvedVideoTiming(clips)) return false;
             const activeResult = this.getActiveClipAtTime(clips, transitions, timelineTime, transitionItems);
             const player = activeResult?.clip ? this.players.get(activeResult.clip.id) : null;
+            if (isImageMedia(activeResult?.clip)) return false;
             if (!player || typeof player.requestVideoFrameCallback !== 'function') return false;
             this.videoFrameCallbackPlayer = player;
             this.videoFrameCallbackId = player.requestVideoFrameCallback((_now, metadata = {}) => {
@@ -2043,7 +2284,7 @@ export class PlaybackEngine {
         }
         this.videoFrameCallbackId = null;
         this.videoFrameCallbackPlayer = null;
-        this.players.forEach(player => { player.pause(); });
+        this.players.forEach((player) => { player.pause?.(); });
         this.audioPlayers.forEach(player => { player.pause(); });
     }
 
@@ -2054,8 +2295,8 @@ export class PlaybackEngine {
     dispose() {
         this.stopPlayback();
         this.players.forEach((player) => {
-            player.pause();
-            player.src = '';
+            player.pause?.();
+            player.removeAttribute?.('src');
         });
         this.audioPlayers.forEach((player) => {
             player.pause();

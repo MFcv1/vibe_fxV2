@@ -12,11 +12,26 @@ function blocked(...parts) {
   return new RegExp(parts.join(""), "i");
 }
 
+/*
+ * PROBLEME A, corrige le 2026-08-01.
+ *
+ * Le garde interdisait le mot « jardin » tout court. Il attrapait donc un texte
+ * immobilier parfaitement legitime de `themedTemplates.jsx` (« jardin » y decrit
+ * un bien a vendre), et `npm run test:scope` echouait en permanence - au point
+ * d'etre documente comme un echec « preexistant » a ignorer, ce qui est la pire
+ * chose qui puisse arriver a un garde: on cesse de le lire.
+ *
+ * Ce qu'il faut interdire est le NOM COMPLET du projet source, pas un mot du
+ * dictionnaire. Les separateurs sont tolerants (espace, tiret, souligne, ou
+ * rien), donc toutes les graphies du nom source tombent, et le mot seul passe.
+ *
+ * Le nom n'est jamais ecrit d'un bloc dans ce fichier - pas meme en commentaire:
+ * `blocked()` assemble ses morceaux precisement pour que le garde ne s'attrape
+ * pas lui-meme en scannant `scripts/`.
+ */
 const forbiddenPatterns = [
-  blocked("Jar", "dins?"),
+  blocked("jar", "dins?", "[\\s_-]*", "de", "[\\s_-]*", "cha", "wi"),
   blocked("Cha", "wi"),
-  blocked("jar", "dins", "de", "cha", "wi"),
-  blocked("jar", "dins", "-de-", "cha", "wi"),
   blocked("paysa", "gisme"),
   blocked("Fl", "ers"),
   blocked("create", "Quote", "Request"),
@@ -67,9 +82,35 @@ const functionsAiRouter = read("functions/src/ai/router.js");
 const functionsAiProviderRegistry = read("functions/src/ai/providerRegistry.js");
 const functionsPackage = JSON.parse(read("functions/package.json"));
 assert.equal(functionsPackage.type, "commonjs");
-assert.equal(functionsPackage.engines?.node, "20");
-assert.match(functionsPackage.dependencies?.["firebase-functions"] || "", /^\^6\./);
-assert.match(functionsPackage.dependencies?.["firebase-admin"] || "", /^\^13\./);
+/*
+ * Node 22. Le projet a migre (`.nvmrc`, `package.json` racine et
+ * `functions/package.json` le declarent tous les trois); seule cette assertion
+ * etait restee sur 20, ce qui faisait echouer `npm run test:scope` en
+ * permanence. On l'aligne, et on verifie que les TROIS declarations concordent -
+ * une seule d'entre elles qui deriverait ferait echouer le deploiement.
+ */
+assert.equal(functionsPackage.engines?.node, "22");
+assert.equal(
+  JSON.parse(read("package.json")).engines?.node,
+  functionsPackage.engines?.node,
+  "la version de Node doit etre la meme a la racine et dans functions/",
+);
+assert.equal(
+  read(".nvmrc").trim(),
+  functionsPackage.engines?.node,
+  ".nvmrc doit declarer la meme version de Node que functions/package.json",
+);
+/*
+ * Les SDK Firebase ont ete montes de major (functions 6 -> 7, admin 13 -> 14)
+ * en meme temps que Node 22. Les assertions etaient restees sur les anciens
+ * majors, deuxieme cause de l'echec permanent de `npm run test:scope`.
+ *
+ * On garde une assertion de MAJOR - le but est de detecter une montee de version
+ * non voulue, pas de figer un correctif - et on l'aligne sur ce qui est
+ * reellement installe.
+ */
+assert.match(functionsPackage.dependencies?.["firebase-functions"] || "", /^\^7\./);
+assert.match(functionsPackage.dependencies?.["firebase-admin"] || "", /^\^14\./);
 assert.match(functionsPackage.scripts?.lint || "", /src\/account\.js/);
 assert.match(functionsPackage.scripts?.lint || "", /src\/appCheck\.js/);
 assert.match(functionsPackage.scripts?.lint || "", /src\/ai\/reconciliation\.js/);
@@ -307,6 +348,278 @@ const studioLayout = read("src/app/studio/layout.js");
 assert.match(studioLayout, /features\/vibefx-layout\/vibefx-tailwind\.css/);
 assert.match(studioLayout, /features\/vibefx-layout\/vibefx-layout\.css/);
 assert.match(studioLayout, /features\/publications\/publications\.css/);
+
+// --- VibeCut v2 (route /video): surface isolee ---
+const vibeCutLayout = read("src/app/video/layout.js");
+assert.match(vibeCutLayout, /features\/vibecut\/styles\/vibecut\.css/);
+assert.match(vibeCutLayout, /StudioAuthGate/);
+assert.match(vibeCutLayout, /index: false/);
+// La feuille Tailwind statique de /studio ne doit jamais etre chargee sur /video.
+assert.doesNotMatch(vibeCutLayout, /vibefx-tailwind|vibefx-layout|publications\.css/);
+
+const vibeCutFiles = listFiles("src/features/vibecut");
+for (const file of vibeCutFiles) {
+  const source = read(file);
+  // Le nouveau front ne consomme que des modeles/moteurs/services, jamais l'ancienne UI.
+  assert.doesNotMatch(
+    source,
+    /vibefx-studio\/(?:VideoApp|VibeFxStudio|video\/(?:VideoEditor|panels|timeline|preview|vibecut-premium))/,
+    `${file} importe l'ancienne interface VibeCut`
+  );
+  /*
+   * PHASE 7 (2026-08-01): ces modules n'existent plus. L'assertion ci-dessus
+   * devient donc un garde contre leur REAPPARITION, et celle ci-dessous verifie
+   * qu'ils sont bien partis - sans quoi on pourrait croire le nettoyage fait
+   * alors qu'un fichier serait resté sur le disque.
+   */
+  // Styles strictement scopes: pas de classes utilitaires Tailwind dans le nouveau front.
+  assert.doesNotMatch(
+    source,
+    /className="[^"]*\b(?:flex-1|text-\[\d+px\]|bg-neutral-\d{3}|border-neutral-\d{3})\b/,
+    `${file} utilise des classes Tailwind, or /video ne charge pas Tailwind`
+  );
+}
+
+// Phase 4: le montage avance est reel, plus un ecran d'attente.
+const advancedRoute = read("src/app/video/avance/page.js");
+assert.match(advancedRoute, /features\/vibecut\/advanced\/AdvancedEditor/);
+assert.doesNotMatch(advancedRoute, /PhasePlaceholder/, "le montage avance ne doit plus etre un placeholder");
+
+// Phase 4: UN SEUL moteur d'apercu, hisse dans le shell (constat n° 8 du plan).
+const previewStage = read("src/features/vibecut/preview/PreviewStage.jsx");
+assert.doesNotMatch(previewStage, /new PlaybackEngine/, "PreviewStage ne doit plus creer de moteur");
+assert.match(previewStage, /usePreviewStageMount/);
+const previewHost = read("src/features/vibecut/preview/PreviewEngineHost.jsx");
+assert.match(previewHost, /new PlaybackEngine/);
+const vibeCutShell = read("src/features/vibecut/shell/VibeCutShell.jsx");
+assert.match(vibeCutShell, /PreviewEngineProvider/);
+
+// Phase 4: la timeline multipiste se construit sur le modele canonique.
+const timelineAdapter = read("src/features/vibecut/adapters/useTimeline.js");
+assert.match(timelineAdapter, /buildTimelineModel/);
+
+/*
+ * Timeline V2. Le repliement sept pistes -> quatre rangees est une projection
+ * d'AFFICHAGE: le modele canonique reste le contrat d'export, et l'ancien front
+ * s'en sert jusqu'a la phase 7.
+ */
+assert.match(timelineAdapter, /buildDisplayLanes/, "la projection d'affichage doit exister");
+assert.match(
+  timelineAdapter,
+  /MAX_TRANSITION_SHARE/,
+  "le plafond d'une transition doit reutiliser la constante des presets guides, pas une copie",
+);
+const timelineView = read("src/features/vibecut/advanced/TimelineView.jsx");
+assert.match(timelineView, /displayLanes/, "la timeline doit rendre les rangees d'affichage");
+assert.doesNotMatch(
+  timelineView,
+  /TRACK_LABELS\[/,
+  "les sept libelles de pistes n'ont plus a etre rendus tels quels",
+);
+assert.match(timelineAdapter, /buildTimelineSnapPoints/);
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-advanced-v2\.spec\.cjs/);
+
+/* ---------- Phase 7: l'ancien front video n'existe plus ---------- */
+
+/*
+ * La bascule est faite: `/studio?workspace=video` redirige, et l'ancien editeur
+ * est supprime. On verifie les DEUX, parce que l'un sans l'autre laisserait soit
+ * un lien mort, soit du code mort.
+ */
+const studioRoute = read("src/app/studio/page.js");
+assert.match(
+  studioRoute,
+  /redirect\("\/video"\)/,
+  "/studio?workspace=video doit rediriger vers /video (phase 7)",
+);
+assert.doesNotMatch(
+  studioRoute,
+  /"video"\s*,?\s*\]\)/,
+  "'video' ne doit plus faire partie des workspaces du studio",
+);
+
+for (const gone of [
+  "src/features/vibefx-studio/VideoApp.jsx",
+  "src/features/vibefx-studio/video/VideoEditor.jsx",
+  "src/features/vibefx-studio/video/vibecut-premium.css",
+  "src/features/vibefx-studio/video/panels",
+  "src/features/vibefx-studio/video/timeline",
+  "src/features/vibefx-studio/video/preview",
+  "scripts/smoke-video-ui.spec.cjs",
+]) {
+  assert.equal(
+    existsSync(join(root, gone)),
+    false,
+    `${gone} devait etre supprime en phase 7`,
+  );
+}
+
+/*
+ * BOUTONS MORTS LAISSES PAR LA SUPPRESSION - trouves A L'USAGE, pas par les tests.
+ *
+ * Supprimer un ecran ne suffit pas: il faut aussi supprimer, ou rebrancher, tout
+ * ce qui y menait. Deux defauts sont passes entre les mailles de la premiere
+ * passe de la phase 7:
+ *   1. l'onglet VIBECUT de l'en-tete appelait encore `setView('video')`, un etat
+ *      que plus rien ne rendait: le clic ne faisait RIEN;
+ *   2. le lien Backoffice etait conditionne a `view === 'video'`, devenu
+ *      impossible: un admin n'avait plus aucune entree vers le backoffice.
+ *
+ * Ces deux assertions existent pour que la regression ne revienne pas.
+ */
+const studioHeader = read("src/features/vibefx-studio/components/Header.jsx");
+assert.match(
+  studioHeader,
+  /label: 'VibeCut', href: '\/video'/,
+  "l'onglet VibeCut de l'en-tete studio doit etre un LIEN vers /video, pas un setView",
+);
+/*
+ * On cherche une CONDITION DE RENDU, pas une mention: le fichier explique en
+ * commentaire pourquoi cette condition a disparu, et un garde qui interdirait
+ * d'en parler interdirait surtout de le documenter (meme piege que le garde
+ * `requestAnimationFrame` de la phase 5).
+ */
+assert.doesNotMatch(
+  studioHeader,
+  /\{\s*view === 'video'/,
+  "plus rien dans l'en-tete studio ne doit dependre d'une vue 'video' qui n'existe plus",
+);
+
+const studioShell = read("src/features/vibefx-studio/VibeFxStudio.jsx");
+assert.doesNotMatch(studioShell, /VideoApp/, "le shell studio ne doit plus monter l'ancien editeur video");
+assert.match(
+  studioShell,
+  /router\.push\('\/video\/rapide'\)/,
+  "le passage bande-son -> video doit naviguer vers le nouveau front",
+);
+
+/*
+ * Ce que le panneau supprime portait et que le nouveau front doit conserver:
+ * destination PC, nom de fichier horodate, regeneration d'URL signee. Deplace
+ * dans la couche export plutot que perdu.
+ */
+const exportDownload = read("src/features/vibefx-studio/video/export/exportDownload.js");
+for (const symbol of [
+  "showDirectoryPicker",
+  "vibecut-export-destination-v1",
+  "buildExportFileName",
+  "resolveExportOutputDownloadUrl",
+]) {
+  assert.match(exportDownload, new RegExp(symbol), `${symbol} perdu avec l'ancien panneau d'export`);
+}
+
+/* ---------- Phase 5: les bibliotheques sont reelles ---------- */
+
+for (const [route, component] of [
+  ["src/app/video/transitions/page.js", "library/TransitionLibrary"],
+  ["src/app/video/mouvements/page.js", "library/MotionLibrary"],
+]) {
+  const source = read(route);
+  assert.match(source, new RegExp(component.replace("/", "\\/")));
+  assert.doesNotMatch(
+    source,
+    /PhasePlaceholder/,
+    `${route} ne doit plus etre un ecran d'attente: la phase 5 est livree`,
+  );
+}
+
+/*
+ * Les apercus des bibliotheques sont dessines par LE MOTEUR, jamais imites en
+ * CSS. C'est ce qui interdit a une carte de deriver du rendu qu'elle annonce:
+ * une imitation, elle, ne serait couverte par aucun test de parite.
+ */
+const transitionPreview = read("src/features/vibecut/library/TransitionPreview.jsx");
+assert.match(
+  transitionPreview,
+  /import \{ renderTransition \} from '@\/features\/vibefx-studio\/video\/engine\/VideoEngine'/,
+  "l'apercu de transition doit appeler le moteur, pas imiter la transition en CSS",
+);
+const motionPreview = read("src/features/vibecut/library/MotionPreview.jsx");
+assert.match(
+  motionPreview,
+  /applyImageMotionTransform/,
+  "l'apercu de mouvement doit appeler la transformation de production (mediaModel)",
+);
+
+/*
+ * Une seule horloge pour toutes les vignettes: une `requestAnimationFrame` par
+ * carte donnerait quarante boucles concurrentes sur un ecran de catalogue.
+ */
+for (const file of [
+  "src/features/vibecut/library/TransitionPreview.jsx",
+  "src/features/vibecut/library/MotionPreview.jsx",
+]) {
+  assert.match(read(file), /subscribeToPreviewTicker/, `${file} doit passer par l'horloge partagee`);
+  /*
+   * On cherche un APPEL, pas une mention: les deux fichiers expliquent en
+   * commentaire pourquoi ils n'ouvrent pas leur propre boucle, et un garde qui
+   * interdirait d'en parler interdirait surtout de le documenter.
+   */
+  assert.doesNotMatch(
+    read(file),
+    /requestAnimationFrame\s*\(/,
+    `${file} ne doit pas ouvrir sa propre boucle d'animation`,
+  );
+}
+
+/* Chemin d'ecriture unique: les bibliotheques n'atteignent jamais le store. */
+for (const file of [
+  "src/features/vibecut/library/TransitionLibrary.jsx",
+  "src/features/vibecut/library/MotionLibrary.jsx",
+]) {
+  const source = read(file);
+  assert.doesNotMatch(
+    source,
+    /video\/store\/videoStore/,
+    `${file} doit passer par les adaptateurs, jamais par le store`,
+  );
+  assert.doesNotMatch(
+    source,
+    /video\/panels\//,
+    `${file} ne doit importer aucun panneau de l'ancien front`,
+  );
+}
+
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-library-parity\.mjs/);
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-library-v2\.spec\.cjs/);
+
+/* ---------- Lots L4 et L5 ---------- */
+
+/*
+ * L4: les cartes de preset sont baties sur les miniatures reelles, avec un repli
+ * qui ne doit PAS disparaitre - l'extraction est asynchrone.
+ */
+const stepStyle = read("src/features/vibecut/guided/StepStyle.jsx");
+assert.match(stepStyle, /PresetFilmstrip/, "l'etape 2 doit monter la pellicule du lot L4");
+const filmstrip = read("src/features/vibecut/library/../guided/PresetFilmstrip.jsx");
+assert.match(filmstrip, /StylePreview/, "le repli sur la vignette SVG doit rester");
+assert.match(filmstrip, /data-source="thumbnails"/);
+
+/*
+ * L5: `titleStyle` et `audioProfile` etaient portes par le modele sans etre
+ * appliques (probleme H). Les resolveurs vivent dans le module PUR, et le
+ * parcours guide les appelle vraiment.
+ */
+const styleRecipes = read("src/features/vibecut/data/styleRecipes.js");
+assert.doesNotMatch(
+  styleRecipes,
+  /^\s*import\s/m,
+  "styleRecipes.js doit rester sans import",
+);
+for (const symbol of [
+  "resolveTitleOverlayStyle",
+  "applyTitleCasing",
+  "resolveAudioProfile",
+  "buildBeatStrip",
+]) {
+  assert.match(styleRecipes, new RegExp(`export function ${symbol}`), `${symbol} manquant (lot L5)`);
+}
+const guidedFlow = read("src/features/vibecut/guided/GuidedFlow.jsx");
+for (const symbol of ["resolveTitleOverlayStyle", "applyTitleCasing", "resolveAudioProfile"]) {
+  assert.match(guidedFlow, new RegExp(symbol), `le parcours guide doit appliquer ${symbol}`);
+}
+const stepRhythm = read("src/features/vibecut/guided/StepRhythm.jsx");
+assert.match(stepRhythm, /BeatStrip/, "l'etape 3 doit montrer la partition (lot L5)");
 
 const vibeFxLayout = read("src/features/vibefx-layout/VibeFxLayout.jsx");
 assert.doesNotMatch(vibeFxLayout, new RegExp(">J" + "C<"));

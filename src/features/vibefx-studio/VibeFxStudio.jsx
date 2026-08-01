@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAiLaunchSettings } from '@/hooks/useAiLaunchSettings';
 
 
@@ -21,7 +22,6 @@ import CompareModal from './components/modals/CompareModal';
 import LumenShaderModal from './components/modals/LumenShaderModal';
 import AssetLibrary from './components/library/AssetLibrary';
 import AssetLibraryModal from './components/modals/AssetLibraryModal';
-import VideoApp from './VideoApp';
 import StudioAiRail from './components/ai/StudioAiRail';
 import SoundtrackPage from './soundtrack/SoundtrackPage';
 import { useSoundtrackController } from './soundtrack/hooks/useSoundtrackController';
@@ -155,6 +155,8 @@ const buildVisionDiagnosticWarnings = (delta, performanceInfo) => {
 // --- APP PRINCIPALE ---
 function App({ onImportToPublication, onOpenPublications, initialView = 'studio' }) {
     const { aiInterfacesEnabled } = useAiLaunchSettings();
+    // Phase 7: la bande-son envoie vers /video, elle ne change plus de vue interne.
+    const router = useRouter();
     const [view, setView] = useState(initialView);
     const soundtrack = useSoundtrackController();
     const [images, setImages] = useState([]);
@@ -1189,8 +1191,16 @@ function App({ onImportToPublication, onOpenPublications, initialView = 'studio'
             waveform: track.waveform || { status: 'pending', peaks: [] },
             rightsManifest: buildTrackRightsManifest({ ...track, id, rightsStatus: videoRightsStatus }),
         });
-        setView('video');
-    }, [setView]);
+        /*
+         * PHASE 7: on NAVIGUE vers le nouveau front au lieu de changer de vue.
+         *
+         * `router.push` et non `window.location`: la navigation reste cote
+         * client, donc le module Zustand survit - et la piste qu'on vient
+         * d'ajouter au store juste au-dessus est bien la a l'arrivee. Un
+         * rechargement complet de la page la perdrait.
+         */
+        router.push('/video/rapide');
+    }, [router]);
 
     // --- COMPARE MODAL RENDERING ---
     useEffect(() => {
@@ -1232,9 +1242,11 @@ function App({ onImportToPublication, onOpenPublications, initialView = 'studio'
 
     const activeConfig = selectedSlotIndex !== null ? (slotConfigs[selectedSlotIndex] || { zoom: 1, x: 0, y: 0, border: 0, blur: 0 }) : null;
 
-    if (view === 'video') {
-        return <VideoApp onBack={() => setView('studio')} />;
-    }
+    /*
+     * PHASE 7 (2026-08-01): la vue 'video' n'existe plus ici. L'editeur video a
+     * ses propres routes sous `/video`, et `/studio?workspace=video` y redirige
+     * cote serveur (src/app/studio/page.js).
+     */
 
     return (
         <div className={`min-h-screen flex flex-col h-screen overflow-hidden font-sans transition-colors duration-300 ${isDarkMode ? 'bg-black text-gray-300 selection:bg-indigo-900 selection:text-white' : 'bg-gray-50 text-gray-900 selection:bg-indigo-200 selection:text-indigo-900'}`}>

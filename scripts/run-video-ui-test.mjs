@@ -73,9 +73,28 @@ function findExistingNextUrl(output) {
   return matches.at(-1)?.[1] || null;
 }
 
+const requestedSpecs = process.argv.slice(2);
+
 function runPlaywright(baseUrl) {
   const playwrightCli = "node_modules/@playwright/test/cli.js";
-  return spawnNode([playwrightCli, "test", "scripts/smoke-video-ui.spec.cjs", "--reporter=line"], {
+  return spawnNode([
+    playwrightCli,
+    "test",
+    ...(requestedSpecs.length > 0
+      ? requestedSpecs
+      /*
+       * Phase 7: `smoke-video-ui.spec.cjs` couvrait l'ancien front, supprime.
+       * La suite par defaut est desormais celle du nouveau front.
+       */
+      : [
+          "scripts/smoke-vibecut-ui-v2.spec.cjs",
+          "scripts/smoke-vibecut-quick-v2.spec.cjs",
+          "scripts/smoke-vibecut-guided-v2.spec.cjs",
+          "scripts/smoke-vibecut-advanced-v2.spec.cjs",
+          "scripts/smoke-vibecut-library-v2.spec.cjs",
+        ]),
+    "--reporter=line",
+  ], {
     stdio: "inherit",
     env: {
       ...process.env,

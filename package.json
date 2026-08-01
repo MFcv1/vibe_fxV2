@@ -2,6 +2,9 @@
   "name": "vibe_fxv2",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -39,32 +42,39 @@
     "test:vision-ui": "node scripts/audit-vision-filters.mjs && node scripts/run-vision-ui-test.mjs",
     "check:vision-corpus": "node scripts/check-vision-corpus.mjs",
     "test:vision-corpus": "node scripts/check-vision-corpus.mjs && node scripts/run-vision-corpus-test.mjs",
-    "test:video-ui": "node scripts/smoke-video-timeline-model.mjs && node scripts/smoke-video-store.mjs && node scripts/smoke-vibecut-export-manifest.mjs && node scripts/smoke-vibecut-export-media-metadata.mjs && node scripts/smoke-vibecut-export-jobs.mjs && node scripts/run-video-ui-test.mjs",
-    "test:vibecut-export": "node scripts/smoke-export-professional-settings.mjs && node scripts/smoke-vibecut-export-manifest.mjs && node scripts/smoke-vibecut-export-media-metadata.mjs && node scripts/smoke-vibecut-export-jobs.mjs && node scripts/smoke-vibecut-export-functions.mjs && node scripts/smoke-vibecut-render-service-contract.mjs && node scripts/smoke-vibecut-export-coverage-parity.mjs && node scripts/prepare-vibecut-k1-live-smoke.mjs && node scripts/prepare-vibecut-pro-fixtures.mjs && node scripts/smoke-vibecut-export-runbook.mjs && node scripts/smoke-vibecut-export-status-audit.mjs && node scripts/audit-vibecut-export-hardening-requirements.mjs",
+    "test:video-ui": "node scripts/smoke-video-timeline-model.mjs && node scripts/smoke-video-store.mjs && node scripts/smoke-video-project-persistence.mjs && node scripts/smoke-vibecut-export-manifest.mjs && node scripts/smoke-vibecut-export-media-metadata.mjs && node scripts/smoke-vibecut-export-jobs.mjs && node scripts/smoke-vibecut-image-render.mjs",
+    "test:vibecut-export": "node scripts/smoke-export-professional-settings.mjs && node scripts/smoke-vibecut-export-manifest.mjs && node scripts/smoke-vibecut-export-media-metadata.mjs && node scripts/smoke-vibecut-export-jobs.mjs && node scripts/smoke-vibecut-export-functions.mjs && node scripts/smoke-vibecut-cloud-run-jobs.mjs && node scripts/smoke-vibecut-gpu-profile.mjs && node scripts/smoke-vibecut-render-service-contract.mjs && node scripts/smoke-vibecut-export-coverage-parity.mjs && node scripts/smoke-vibecut-transition-parity.mjs && node scripts/prepare-vibecut-k1-live-smoke.mjs && node scripts/prepare-vibecut-pro-fixtures.mjs && node scripts/smoke-vibecut-export-runbook.mjs && node scripts/smoke-vibecut-export-status-audit.mjs && node scripts/audit-vibecut-export-hardening-requirements.mjs",
     "audit:vibecut-export-requirements": "node scripts/audit-vibecut-export-hardening-requirements.mjs",
     "prepare:vibecut-k1-smoke": "node scripts/prepare-vibecut-k1-live-smoke.mjs",
     "guard:vibecut-k1-live": "node scripts/guard-vibecut-k1-live-smoke.mjs",
     "smoke:vibecut-k1-cloud-run-live": "node scripts/run-vibecut-k1-cloud-run-live-smoke.mjs",
+    "smoke:vibecut-mvp-live": "node scripts/smoke-vibecut-mvp-live.mjs",
     "smoke:vibecut-k1-cloud-run-direct": "node scripts/run-vibecut-k1-cloud-run-direct-smoke.mjs",
     "verify:vibecut-k1-cloud-output": "node scripts/verify-vibecut-k1-cloud-output.mjs",
     "prepare:vibecut-pro-fixtures": "node scripts/prepare-vibecut-pro-fixtures.mjs",
     "test:vibecut-k1-local-mp4": "node scripts/render-vibecut-k1-local-mp4-smoke.mjs",
+    "test:vibecut-xfade-local-mp4": "node scripts/render-vibecut-xfade-transitions-local-smoke.mjs",
+    "test:vibecut-xfade-preview-parity": "node scripts/smoke-vibecut-xfade-preview-parity.mjs",
+    "test:vibecut-motion-parity": "node scripts/smoke-vibecut-motion-preview-parity.mjs",
     "test:vibecut-pro-fixtures-local-mp4": "node scripts/render-vibecut-pro-fixtures-local-smoke.mjs",
     "test:vibecut-renderer-local-contract": "node scripts/render-vibecut-renderer-local-contract-smoke.mjs",
-    "test:vibecut-export-local-mp4": "npm run test:vibecut-k1-local-mp4 && npm run test:vibecut-pro-fixtures-local-mp4 && npm run test:vibecut-renderer-local-contract",
-    "test:vibecut-tools": "playwright test scripts/smoke-vibecut-quick-tools.spec.cjs --reporter=line --workers=1",
+    "test:vibecut-image-render": "node scripts/smoke-vibecut-image-render.mjs",
+    "test:vibecut-export-local-mp4": "npm run test:vibecut-k1-local-mp4 && npm run test:vibecut-pro-fixtures-local-mp4 && npm run test:vibecut-renderer-local-contract && npm run test:vibecut-xfade-local-mp4",
+    "test:vibecut-ui-v2": "node scripts/smoke-vibecut-style-recipes.mjs && node scripts/smoke-vibecut-library-parity.mjs && node scripts/smoke-vibecut-xfade-preview-parity.mjs && node scripts/smoke-vibecut-motion-preview-parity.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibecut-ui-v2.spec.cjs scripts/smoke-vibecut-quick-v2.spec.cjs scripts/smoke-vibecut-guided-v2.spec.cjs scripts/smoke-vibecut-advanced-v2.spec.cjs scripts/smoke-vibecut-library-v2.spec.cjs",
     "test:vibecut-slowmo": "playwright test scripts/smoke-vibecut-slowmo-samples.spec.cjs --reporter=line --workers=1",
     "test:vibecut-orientation": "playwright test scripts/smoke-vibecut-desktop-video-orientation.spec.cjs --reporter=line --workers=1",
     "functions:lint": "npm --prefix functions run lint",
     "firebase:deploy:backend": "node scripts/firebase-deploy.mjs backend",
-    "firebase:deploy:functions": "node scripts/firebase-deploy.mjs functions"
+    "firebase:deploy:functions": "node scripts/firebase-deploy.mjs functions",
+    "test:vibecut-recipes": "node scripts/smoke-vibecut-style-recipes.mjs",
+    "test:vibecut-library": "node scripts/smoke-vibecut-library-parity.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "firebase": "^12.13.0",
+    "firebase": "^12.16.0",
     "howler": "^2.2.4",
     "lucide-react": "^1.16.0",
-    "next": "16.2.6",
+    "next": "^16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "three": "^0.184.0",
@@ -73,14 +83,17 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.12",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
-    "firebase-tools": "^15.19.0"
+    "firebase-tools": "^15.24.0"
   },
   "overrides": {
-    "postcss": "8.5.10",
+    "postcss": "8.5.25",
+    "protobufjs": "7.6.5",
+    "tar": "7.5.22",
     "tmp": "0.2.7",
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "websocket-driver": "0.7.5"
   }
 }

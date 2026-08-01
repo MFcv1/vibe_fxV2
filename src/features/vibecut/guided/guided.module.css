@@ -1,0 +1,1342 @@
+/*
+ * Creation guidee.
+ * Un ecran, trois colonnes: rail d'etapes, une seule decision, apercu reel.
+ * Comme le montage rapide, la page ne defile jamais: seules les colonnes le font.
+ */
+
+.flow {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    height: calc(100dvh - var(--vc-topbar-height));
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---------- En-tete d'ecran ---------- */
+.header {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-4);
+    flex: 0 0 auto;
+    padding: var(--vc-space-3) var(--vc-space-5);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.projectName {
+    min-width: 0;
+    max-width: 320px;
+    height: 32px;
+    padding: 0 var(--vc-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--vc-radius-sm);
+    background: transparent;
+    font-size: var(--vc-text-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    outline: none;
+}
+
+.projectName:hover {
+    border-color: var(--vc-line);
+}
+
+.projectName:focus {
+    border-color: var(--vc-accent);
+    background: var(--vc-surface);
+}
+
+.saveState {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    white-space: nowrap;
+}
+
+.headerSpacer {
+    flex: 1 1 auto;
+}
+
+.stepCount {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    white-space: nowrap;
+}
+
+/* ---------- Corps ---------- */
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Rail d'etapes: la progression est toujours visible, le retour toujours libre. */
+.rail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 0 0 232px;
+    padding: var(--vc-space-5) var(--vc-space-3);
+    border-right: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    overflow-y: auto;
+}
+
+.railItem {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-2) var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    text-align: left;
+    color: var(--vc-text-3);
+    font-size: var(--vc-text-sm);
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.railItem:not(:disabled):hover {
+    background: var(--vc-surface-2);
+    color: var(--vc-text-2);
+}
+
+.railItem:disabled {
+    opacity: 0.45;
+}
+
+.railItemDone {
+    color: var(--vc-text-2);
+}
+
+.railItemActive,
+.railItemActive:not(:disabled):hover {
+    background: var(--vc-accent-quiet);
+    color: var(--vc-text);
+}
+
+.railBullet {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+    transition: background var(--vc-dur-1) var(--vc-ease), border-color var(--vc-dur-1) var(--vc-ease);
+}
+
+.railItemDone .railBullet {
+    border-color: var(--vc-accent-line);
+    background: var(--vc-accent-quiet);
+    color: var(--vc-accent);
+}
+
+.railItemActive .railBullet {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.railLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Panneau central: une seule decision par ecran. */
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-6);
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vc-space-6) var(--vc-space-8) var(--vc-space-6);
+}
+
+.panelHead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    max-width: 62ch;
+}
+
+.panelTitle {
+    font-size: var(--vc-text-xl);
+}
+
+.panelSubtitle {
+    font-size: var(--vc-text-base);
+    color: var(--vc-text-2);
+}
+
+.panelSection {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+}
+
+.panelSectionHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+}
+
+.sectionTitle {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+}
+
+.sectionHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+/* Reglage secondaire dans une section deja titree (intensite du mouvement). */
+.subsectionTitle {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+    color: var(--vc-text-2);
+}
+
+.note {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+    line-height: 1.5;
+    max-width: 62ch;
+}
+
+/* Colonne d'apercu: le montage reel, jamais une simulation. */
+.previewColumn {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 320px;
+    min-height: 0;
+    border-left: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.previewHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    padding: var(--vc-space-3) var(--vc-space-4);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.previewTitle {
+    font-size: var(--vc-text-sm);
+    font-weight: 600;
+}
+
+.previewMeta {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Pied: navigation entre etapes ---------- */
+.footer {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    padding: var(--vc-space-3) var(--vc-space-5);
+    border-top: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.footerSpacer {
+    flex: 1 1 auto;
+}
+
+.footerHint {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Etape 1: medias ---------- */
+.dropZone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vc-space-4);
+    padding: var(--vc-space-10) var(--vc-space-8);
+    border-radius: var(--vc-radius-xl);
+    border: 1px dashed var(--vc-line-strong);
+    background: var(--vc-surface);
+    text-align: center;
+    transition: border-color var(--vc-dur-2) var(--vc-ease), background var(--vc-dur-2) var(--vc-ease);
+}
+
+.dropZoneActive {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.dropIcon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: var(--vc-radius-lg);
+    background: var(--vc-surface-2);
+    color: var(--vc-accent);
+}
+
+.dropTitle {
+    font-size: var(--vc-text-md);
+}
+
+.dropHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    max-width: 46ch;
+}
+
+.dropFormats {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* Ajout de medias quand il y en a deja: une rangee, pas une grande zone vide. */
+.addZone {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3) var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px dashed var(--vc-line-strong);
+    background: var(--vc-surface);
+    transition: border-color var(--vc-dur-2) var(--vc-ease), background var(--vc-dur-2) var(--vc-ease);
+}
+
+.addZoneIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    color: var(--vc-accent);
+}
+
+.addZoneText {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.mediaGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.mediaCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    overflow: hidden;
+}
+
+.mediaThumb {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--vc-bg-sunken);
+    overflow: hidden;
+}
+
+.mediaThumb img,
+.mediaThumb svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mediaIndex {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    display: grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffffff;
+    font-size: var(--vc-text-xs);
+}
+
+.mediaRemove {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--vc-radius-sm);
+    background: rgba(0, 0, 0, 0.62);
+    color: #ffffff;
+    opacity: 0;
+    transition: opacity var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.mediaCard:hover .mediaRemove,
+.mediaRemove:focus-visible {
+    opacity: 1;
+}
+
+.mediaRemove:hover {
+    background: var(--vc-danger);
+}
+
+.mediaFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-2) var(--vc-space-3);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.mediaName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mediaDuration {
+    flex: 0 0 auto;
+    color: var(--vc-text-3);
+}
+
+/* ---------- Etape 2: styles ---------- */
+/* Les quatre styles doivent tenir sur une seule rangee: c'est la decision de
+ * l'ecran, elle ne doit pas demander de faire defiler pour etre comparee. */
+/*
+ * Six presets depuis le lot L2: on borne a trois colonnes pour obtenir deux
+ * rangees pleines. En `auto-fit`, la grille passait a quatre colonnes et laissait
+ * une rangee de deux cartes orphelines.
+ */
+/*
+ * Lot L4: les cartes montrent desormais de VRAIES photos, donc elles grandissent
+ * - une miniature de 168 px de large ne se lit pas. La grille retombe a 2 puis
+ * 1 colonne plutot que de retrecir les vignettes en dessous du lisible.
+ */
+.styleGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--vc-space-3);
+}
+
+@media (min-width: 460px) {
+    .styleGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 900px) {
+    .styleGrid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.styleCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-lg);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    text-align: left;
+    transition: border-color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out),
+        box-shadow var(--vc-dur-2) var(--vc-ease-out);
+    animation: vcRise var(--vc-dur-4) var(--vc-ease-out) both;
+    animation-delay: calc(var(--vc-stagger, 0) * 45ms);
+}
+
+.styleCard:hover {
+    border-color: var(--vc-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vc-shadow-2);
+}
+
+.styleCardActive,
+.styleCardActive:hover {
+    border-color: var(--vc-accent);
+    box-shadow: 0 0 0 1px var(--vc-accent), var(--vc-shadow-2);
+}
+
+.styleStage {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 5;
+    /* Meme gabarit que `.filmStage`: le repli ne doit pas faire sauter la carte. */
+    max-height: 200px;
+    border-radius: var(--vc-radius-md);
+    background: #000000;
+    overflow: hidden;
+}
+
+.styleArt {
+    position: absolute;
+    inset: 0;
+}
+
+.styleArt svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/*
+ * Les vignettes jouent EN CONTINU, sans attendre le survol.
+ *
+ * Decision produit du porteur du projet (2026-07-30): les demonstrations
+ * declenchees au survol restaient invisibles, on arrivait sur un ecran fige et
+ * on ne pouvait comparer deux styles qu'en les survolant l'un apres l'autre.
+ * Elles tournent donc en boucle, et les quatre styles se comparent d'un coup
+ * d'oeil. `prefers-reduced-motion` les arrete toutes.
+ *
+ * Deux animations jouent ensemble, et toutes deux durent `--vc-cycle`, la duree
+ * REELLE d'une photo dans ce style. La vignette bat donc au tempo du style.
+ */
+.styleArt {
+    animation: vcStyleMotion var(--vc-cycle, 3.2s) var(--vc-ease) infinite alternate;
+}
+
+/*
+ * Enchainement des deux plans. La longueur du fondu vient du style lui-meme
+ * (`data-pace`), pas d'une valeur decorative: « Net et direct » coupe franchement
+ * ici comme il coupera franchement dans la video.
+ */
+.styleArtB {
+    opacity: 0;
+    animation:
+        vcStyleMotion var(--vc-cycle, 3.2s) var(--vc-ease) infinite alternate,
+        vcSwapSoft var(--vc-cycle, 3.2s) linear infinite alternate;
+}
+
+.styleStage[data-pace="cut"] .styleArtB {
+    animation-name: vcStyleMotion, vcSwapCut;
+}
+
+.styleStage[data-pace="fast"] .styleArtB {
+    animation-name: vcStyleMotion, vcSwapFast;
+}
+
+.styleStage[data-pace="long"] .styleArtB {
+    animation-name: vcStyleMotion, vcSwapLong;
+}
+
+@keyframes vcStyleMotion {
+    from { transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)); }
+    to { transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0), var(--to-y, 0)); }
+}
+
+/* Coupe franche: aucun fondu, le plan change d'un coup. */
+@keyframes vcSwapCut {
+    0%, 49.9% { opacity: 0; }
+    50%, 100% { opacity: 1; }
+}
+
+@keyframes vcSwapFast {
+    0%, 44% { opacity: 0; }
+    56%, 100% { opacity: 1; }
+}
+
+@keyframes vcSwapSoft {
+    0%, 38% { opacity: 0; }
+    62%, 100% { opacity: 1; }
+}
+
+@keyframes vcSwapLong {
+    0%, 26% { opacity: 0; }
+    74%, 100% { opacity: 1; }
+}
+
+/* ---------- Lot L5: pellicule de battement ---------- */
+
+/*
+ * Chaque bloc est un plan, sa largeur est sa duree. AUCUN espacement entre les
+ * blocs: les jointures sont posees en absolu sur un pourcentage cumule, un `gap`
+ * les decalerait de sa valeur a chaque coupe.
+ */
+.beatStrip {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 34px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-2);
+    overflow: hidden;
+}
+
+.beatStripCompact {
+    height: 18px;
+}
+
+.beatBlock {
+    display: block;
+    flex-basis: 0;
+    min-width: 2px;
+    background: var(--vc-accent);
+    /* Le trait separateur est INTERIEUR: il ne prend pas de largeur, donc il ne
+     * fausse pas la proportion que le bloc represente. */
+    box-shadow: inset -1px 0 0 var(--vc-bg);
+    opacity: 0.72;
+}
+
+/* Une video garde sa duree d'origine: le preset ne l'a pas choisie. */
+.beatBlock[data-kind="video"] {
+    background: var(--vc-text-3);
+    opacity: 0.5;
+}
+
+/* Un plan anime se distingue d'un plan fixe: la choregraphie fait partie de la forme. */
+.beatBlock[data-motion="none"] {
+    opacity: 0.4;
+}
+
+/*
+ * Jointure minutee. Elle chevauche la coupe, comme la transition chevauche
+ * reellement les deux plans - meme convention que la timeline du montage avance.
+ */
+.beatJoint {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    margin-left: -3px;
+    background: var(--vc-bg);
+    box-shadow: inset 0 0 0 1px var(--vc-line-strong);
+}
+
+.beatJointAccent {
+    background: var(--vc-accent-quiet);
+    box-shadow: inset 0 0 0 1px var(--vc-accent);
+}
+
+.beatLegend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vc-space-3);
+    margin-top: var(--vc-space-2);
+    color: var(--vc-text-3);
+    font-size: 12px;
+}
+
+/* ---------- Lot L4: pellicule sur les miniatures reelles ---------- */
+
+/*
+ * Trois panneaux tires des photos du projet. La scene partage la geometrie et
+ * les calques (`styleFade`, `styleVignette`) de la vignette SVG: seul le media
+ * change, donc le repli et le cas nominal se ressemblent au pixel pres.
+ *
+ * Le cycle complet dure TROIS plans (`--vc-cycle` est la duree d'UN plan du
+ * preset): la vignette bat au tempo reel du preset, comme depuis la phase 3.
+ */
+.filmStage {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 5;
+    max-height: 200px;
+    border-radius: var(--vc-radius-md);
+    background: #000000;
+    overflow: hidden;
+}
+
+.filmPanel {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation:
+        vcFilmMotion calc(var(--vc-cycle, 3.2s) * 3) var(--vc-ease) infinite,
+        vcFilmSwapSoft calc(var(--vc-cycle, 3.2s) * 3) linear infinite;
+}
+
+/*
+ * La longueur du fondu vient du preset lui-meme (`data-pace`), jamais d'une
+ * valeur decorative: « Reel dynamique » coupe franchement ici parce qu'il
+ * coupera franchement dans la video.
+ */
+.filmStage[data-pace="cut"] .filmPanel {
+    animation-name: vcFilmMotion, vcFilmSwapCut;
+}
+
+.filmStage[data-pace="fast"] .filmPanel {
+    animation-name: vcFilmMotion, vcFilmSwapFast;
+}
+
+.filmStage[data-pace="long"] .filmPanel {
+    animation-name: vcFilmMotion, vcFilmSwapLong;
+}
+
+.filmImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/*
+ * Le mouvement joue sur le tiers ou le panneau est visible, puis revient a son
+ * cadrage de depart A 50 %, c'est-a-dire bien apres la fin du plus long fondu
+ * (33,33 % + 8 %). Le retour est donc toujours hors champ: aucun saut visible.
+ */
+@keyframes vcFilmMotion {
+    0% { transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)); }
+    33.33% { transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0), var(--to-y, 0)); }
+    50% { transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0), var(--to-y, 0)); }
+    50.01% { transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)); }
+    100% { transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0), var(--from-y, 0)); }
+}
+
+@keyframes vcFilmSwapCut {
+    0%, 33.33% { opacity: 1; }
+    33.34%, 99.99% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes vcFilmSwapFast {
+    0%, 33.33% { opacity: 1; }
+    37.33%, 96% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes vcFilmSwapSoft {
+    0%, 33.33% { opacity: 1; }
+    39.33%, 94% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes vcFilmSwapLong {
+    0%, 33.33% { opacity: 1; }
+    41.33%, 92% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.styleFade {
+    position: absolute;
+    inset: 0;
+    background: #f3efe6;
+    pointer-events: none;
+}
+
+.styleVignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.styleCheck {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.styleBody {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.styleName {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+    color: var(--vc-text);
+}
+
+.styleDescription {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.styleBest {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Etape 3: rythme et mouvements ---------- */
+.choiceRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.choiceCard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    text-align: left;
+    transition: border-color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.choiceCard:hover {
+    border-color: var(--vc-line-strong);
+    background: var(--vc-surface-2);
+}
+
+.choiceCardActive,
+.choiceCardActive:hover {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.choiceName {
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+    color: var(--vc-text);
+}
+
+.choiceDescription {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.choiceValue {
+    margin-top: var(--vc-space-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+/* Vignettes de mouvement: le meme motif que la carte de style, en petit. */
+.motionRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.motionCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    text-align: left;
+    transition: border-color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+    animation: vcRise var(--vc-dur-4) var(--vc-ease-out) both;
+    animation-delay: calc(var(--vc-stagger, 0) * 45ms);
+}
+
+.motionCard:hover {
+    border-color: var(--vc-line-strong);
+}
+
+.motionCardActive,
+.motionCardActive:hover {
+    border-color: var(--vc-accent);
+    background: var(--vc-accent-quiet);
+}
+
+.motionCard:disabled {
+    opacity: 0.45;
+}
+
+.motionStage {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vc-radius-sm);
+    background: #000000;
+    overflow: hidden;
+}
+
+.motionArt {
+    position: absolute;
+    inset: 0;
+}
+
+.motionArt svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/*
+ * Meme demonstration que les cartes de style, en petit et en continu: deux plans
+ * qui s'enchainent, chacun avec un mouvement different du motif. C'est ce qui
+ * distingue « Doux » (zoom avant puis zoom arriere) de « Varie » (zoom avant
+ * puis panoramique) sans lire leur description.
+ */
+.motionArt {
+    animation: vcStyleMotion var(--vc-cycle, 2.6s) var(--vc-ease) infinite alternate;
+}
+
+/* Second plan: il faut une specificite superieure, sinon le raccourci ci-dessus
+   annule le fondu et le plan reste invisible. */
+.motionArt.styleArtB {
+    animation:
+        vcStyleMotion var(--vc-cycle, 2.6s) var(--vc-ease) infinite alternate,
+        vcSwapSoft var(--vc-cycle, 2.6s) linear infinite alternate;
+}
+
+/* ---------- Etape 4: son et textes ---------- */
+.blockList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+}
+
+.blockHead {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+}
+
+.blockIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--vc-radius-sm);
+    background: var(--vc-surface-3);
+    color: var(--vc-text-2);
+}
+
+.blockText {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Ces deux lignes sont des `span` dans un `span`: sans `display: block` elles se
+ * collent l'une a l'autre sur la meme ligne. */
+.blockTitle {
+    display: block;
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+}
+
+.blockHint {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+.titleField {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+}
+
+.textInput {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 36px;
+    padding: 0 var(--vc-space-3);
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+    outline: none;
+}
+
+.textInput:focus {
+    border-color: var(--vc-accent);
+}
+
+/* ---------- Etape 5: recapitulatif ---------- */
+.summary {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    overflow: hidden;
+}
+
+.summaryRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vc-space-4);
+    padding: var(--vc-space-3) var(--vc-space-4);
+    font-size: var(--vc-text-sm);
+    border-bottom: 1px solid var(--vc-line);
+}
+
+.summaryRow:last-child {
+    border-bottom: 0;
+}
+
+.summaryLabel {
+    color: var(--vc-text-2);
+}
+
+.summaryValue {
+    color: var(--vc-text);
+    text-align: right;
+}
+
+.exportNote {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vc-space-3);
+    padding: var(--vc-space-3) var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-accent-line);
+    background: var(--vc-accent-quiet);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+}
+
+.exportNoteIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--vc-accent);
+    color: var(--vc-text-on-accent);
+}
+
+.handoff {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--vc-space-3);
+}
+
+.handoffCard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--vc-space-4);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    text-align: left;
+    color: var(--vc-text-2);
+    transition: border-color var(--vc-dur-2) var(--vc-ease), transform var(--vc-dur-2) var(--vc-ease-out);
+}
+
+.handoffCard:hover {
+    border-color: var(--vc-accent);
+    transform: translateY(-2px);
+}
+
+.handoffTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    font-size: var(--vc-text-base);
+    font-weight: 600;
+    color: var(--vc-text);
+}
+
+.handoffHint {
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-3);
+}
+
+/* ---------- Bandeau de notification ---------- */
+.notice {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    padding: var(--vc-space-2) var(--vc-space-5);
+    font-size: var(--vc-text-sm);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-surface);
+    color: var(--vc-text-2);
+}
+
+.noticeError {
+    border-color: rgba(255, 90, 95, 0.3);
+    background: var(--vc-danger-quiet);
+    color: #ffc9cb;
+}
+
+.noticeSpacer {
+    flex: 1 1 auto;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+    .previewColumn {
+        flex-basis: 268px;
+    }
+
+    .rail {
+        flex-basis: 196px;
+    }
+
+    .panel {
+        padding: var(--vc-space-6) var(--vc-space-5);
+    }
+}
+
+@media (max-width: 940px) {
+    .body {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    /* Sur mobile le rail devient une barre horizontale qui defile. */
+    .rail {
+        flex: 0 0 auto;
+        flex-direction: row;
+        gap: var(--vc-space-2);
+        padding: var(--vc-space-3);
+        border-right: 0;
+        border-bottom: 1px solid var(--vc-line);
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .railItem {
+        flex: 0 0 auto;
+    }
+
+    .railLabel {
+        max-width: 14ch;
+    }
+
+    .panel {
+        overflow: visible;
+    }
+
+    .previewColumn {
+        flex: 0 0 auto;
+        min-height: 52dvh;
+        border-left: 0;
+        border-top: 1px solid var(--vc-line);
+    }
+}
+
+/* ==========================================================================
+   Mouvement
+   Regle (plan.md 4.5): une animation explique, elle ne decore pas.
+   Ici elles disent trois choses: ou on en est, dans quel sens on avance, et ce
+   qu'un reglage va produire. `prefers-reduced-motion` les neutralise toutes,
+   globalement, depuis vibecut.css.
+   ========================================================================== */
+
+/* Entree commune des cartes et des lignes. */
+@keyframes vcRise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+/*
+ * Barre de progression du parcours. Elle grandit d'une etape a l'autre: on voit
+ * qu'on avance sans avoir a relire « Etape 3 sur 5 ».
+ */
+.progress {
+    position: relative;
+    flex: 0 0 auto;
+    height: 2px;
+    background: var(--vc-line);
+}
+
+.progressBar {
+    height: 100%;
+    background: var(--vc-accent);
+    border-radius: var(--vc-radius-pill);
+    transition: width var(--vc-dur-4) var(--vc-ease-out);
+}
+
+/*
+ * Changement d'etape: le contenu entre du cote d'ou il vient. Avancer pousse
+ * depuis la droite, revenir en arriere ramene depuis la gauche. C'est ce qui
+ * rend le retour arriere lisible plutot que brutal.
+ */
+.stepBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-6);
+    animation: vcStepForward var(--vc-dur-4) var(--vc-ease-out) both;
+}
+
+.stepBody[data-direction="back"] {
+    animation-name: vcStepBack;
+}
+
+@keyframes vcStepForward {
+    from { opacity: 0; transform: translateX(18px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes vcStepBack {
+    from { opacity: 0; transform: translateX(-18px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Le titre de l'etape arrive juste apres son contenu: la question se pose, puis
+   les reponses apparaissent. */
+.panelHead {
+    animation: vcRise var(--vc-dur-3) var(--vc-ease-out) both;
+}
+
+/* Rail: la pastille d'une etape terminee se coche avec une breve impulsion. */
+.railItemDone .railBullet {
+    animation: vcBulletPop var(--vc-dur-3) var(--vc-ease-out);
+}
+
+@keyframes vcBulletPop {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.22); }
+    100% { transform: scale(1); }
+}
+
+/* Etape courante: un liseré accent qui se deploie a gauche. */
+.railItem {
+    position: relative;
+}
+
+.railItemActive::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 20px;
+    margin-top: -10px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-accent);
+    animation: vcRailMark var(--vc-dur-3) var(--vc-ease-out) both;
+}
+
+@keyframes vcRailMark {
+    from { transform: scaleY(0); opacity: 0; }
+    to { transform: scaleY(1); opacity: 1; }
+}
+
+/* La colonne d'apercu apparait a l'etape 2, quand il y a enfin quelque chose a
+   montrer: elle glisse depuis le bord plutot que de surgir. */
+.previewColumn {
+    animation: vcPreviewIn var(--vc-dur-4) var(--vc-ease-out) both;
+}
+
+@keyframes vcPreviewIn {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Bandeau d'import: il descend depuis l'en-tete d'ou il vient. */
+.notice {
+    animation: vcNoticeIn var(--vc-dur-3) var(--vc-ease-out) both;
+}
+
+@keyframes vcNoticeIn {
+    from { opacity: 0; transform: translateY(-100%); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Les scenes importees arrivent en cascade, dans leur ordre de montage. */
+.mediaCard {
+    animation: vcRise var(--vc-dur-3) var(--vc-ease-out) both;
+    animation-delay: calc(var(--vc-stagger, 0) * 40ms);
+    transition: border-color var(--vc-dur-2) var(--vc-ease),
+        transform var(--vc-dur-2) var(--vc-ease-out),
+        box-shadow var(--vc-dur-2) var(--vc-ease-out);
+}
+
+.mediaCard:hover {
+    border-color: var(--vc-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vc-shadow-2);
+}
+
+/* Recapitulatif: les lignes se posent une a une, on lit le bilan au lieu de le
+   voir apparaitre d'un bloc. */
+.summaryRow {
+    animation: vcRowIn var(--vc-dur-3) var(--vc-ease-out) both;
+    animation-delay: calc(var(--vc-stagger, 0) * 55ms);
+}
+
+@keyframes vcRowIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Les deux sorties du parcours arrivent en dernier, une fois le bilan lu. */
+.handoffCard {
+    animation: vcRise var(--vc-dur-3) var(--vc-ease-out) both;
+    animation-delay: calc(340ms + var(--vc-stagger, 0) * 70ms);
+}
+
+/* Le pave de conformite export se signale une fois, sans clignoter. */
+.exportNoteIcon {
+    animation: vcCheckIn var(--vc-dur-4) var(--vc-ease-out) both;
+    animation-delay: 300ms;
+}
+
+@keyframes vcCheckIn {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Fleche du bouton « Continuer »: elle avance au survol, dans le sens du parcours. */
+.footer button:hover svg:last-child {
+    transform: translateX(3px);
+}
+
+.footer button svg:last-child {
+    transition: transform var(--vc-dur-1) var(--vc-ease-out);
+}
+
+/*
+ * Depart decale d'une vignette a l'autre. Le delai est NEGATIF: la boucle
+ * demarre deja entamee, au lieu d'attendre. Sans lui, les quatre styles
+ * basculeraient au meme instant et la grille entiere clignoterait ensemble.
+ *
+ * Ce bloc doit rester le DERNIER du fichier: un `animation-delay` isole est
+ * annule par tout raccourci `animation` declare apres lui.
+ */
+.styleCard .styleArt,
+.styleCard .styleArt.styleArtB,
+.motionCard .motionArt,
+.motionCard .motionArt.styleArtB {
+    animation-delay: calc(var(--vc-stagger, 0) * -0.6s);
+}

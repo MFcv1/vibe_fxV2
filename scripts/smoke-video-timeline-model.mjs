@@ -141,6 +141,22 @@ try {
   assert.equal(snappedToFreeTransition.start, 1.2);
   assert.equal(snappedToFreeTransition.snap.point.type, "transition-start");
 
+  const nonFiniteSnapPoints = buildTimelineSnapPoints({
+    clips: [{ id: "invalid-duration", name: "Invalid", duration: Infinity, trimStart: 0, trimEnd: Infinity }],
+    totalDuration: Infinity,
+    currentTime: Infinity,
+  });
+  assert.deepEqual(nonFiniteSnapPoints, [
+    { time: 0, type: "start", label: "Timeline start" },
+  ], "non-finite media/timeline durations must collapse to a safe empty snap grid");
+
+  const longTimelineSnapPoints = buildTimelineSnapPoints({
+    clips: [{ id: "long", name: "Long", duration: 6 * 60 * 60, trimStart: 0, trimEnd: 6 * 60 * 60 }],
+    totalDuration: 6 * 60 * 60,
+  });
+  assert.ok(longTimelineSnapPoints.length <= 3610, "long timelines must keep the snap grid bounded");
+  assert.equal(longTimelineSnapPoints.at(-1).time, 6 * 60 * 60, "bounded snap grids must retain the timeline end");
+
   const plan = resolveTimelineRenderPlan({ clips, transitions, transitionItems, textOverlays, audioTracks, totalDuration });
   assert.equal(plan.clips.length, 2);
   assert.equal(plan.transitionItems.length, 1);
