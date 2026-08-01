@@ -1,15 +1,15 @@
 # TODO — Reconstruction de l'interface VibeCut
 
 > État d'avancement. Plan complet et direction artistique : [plan.md](plan.md).
-> **Dernière mise à jour : 2026-08-01.**
+> **Dernière mise à jour : 2026-08-02.**
 
 ---
 
 ## Où on en est
 
-**Phases 0 à 5 terminées, et la phase 3b n'a plus qu'un rollout devant elle.**
-Le nouveau front vit sur `/video`. L'ancien (`/studio?workspace=video`) est
-intact, il ne sera supprimé qu'en phase 7.
+**La reconstruction est terminée. Toutes les phases, du 0 au 7.**
+Il n'y a plus qu'une interface VibeCut, sur `/video`, et la production rend ce
+que l'aperçu montre.
 
 **Livré le 2026-08-01 : L4, L5 et toute la phase 5.**
 - **L4** — les cartes de preset sont bâties sur les **miniatures réelles** du
@@ -38,8 +38,17 @@ du PC, nom de fichier horodaté, régénération d'URL signée), et un quatrièm
 oubli a été rattrapé au passage : le nouveau front annonçait « MP4 » sans jamais
 relire ce que le rendu avait produit.
 
-**Toutes les phases du plan sont terminées.** La suite est en phase 6
-(extensions moteur) et dans ce que l'usage réel fera remonter.
+**Toutes les phases du plan de reconstruction sont terminées.**
+
+**Prochain chantier, décidé le 2026-08-02 : les DEUX BIBLIOTHÈQUES.**
+Elles existent depuis la phase 5 mais restent un catalogue fonctionnel, pas une
+page où l'on a envie de rester. Le porteur du projet veut la **fondation du
+design** des deux écrans — avec des **avant / après** — bâtie sur le contenu
+**déjà en place**. Le contenu supplémentaire (nouveaux mouvements, effets
+pendant le rush, transitions supplémentaires) vient **après**.
+
+> **Feuille de route : [docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
+> Lot **B1** en premier (design), puis B2 (vraies vidéos), puis B3 (contenu).
 
 | Phase | État |
 |---|---|
@@ -50,7 +59,8 @@ relire ce que le rendu avait produit.
 | 3b · Presets de montage | ✅ **terminée** — L1 à L6 livrés, rollout inclus |
 | 4 · Montage avancé | ✅ 2026-07-31 |
 | 5 · Bibliothèques | ✅ **2026-08-01** |
-| 6 · Extensions moteur | ⬜ **seule phase restante** |
+| 6 · Extensions moteur | ⬜ — devient le lot **B3** de la roadmap bibliothèques |
+| B · Bibliothèques (design → contenu) | 🟡 **chantier en cours** — B1 à faire |
 | 7 · Bascule et nettoyage | ✅ **terminée le 2026-08-01** |
 
 ---
@@ -749,36 +759,86 @@ Deux tests l'ancrent désormais (l'onglet mène vraiment à `/video`), et
 
 ## Reste à faire
 
-### ✅ L6 — fait le 2026-08-01
+> **Chantier en cours : les deux bibliothèques.**
+> Feuille de route complète : **[docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
 
-Rien ne bloque plus la production. Détail en § « Phase 3b · L6 — DÉPLOYÉ ».
+### Lot B1 — Fondation du design des deux bibliothèques · **prioritaire**
 
-### ✅ Phase 7 — faite le 2026-08-01
+Le lot demandé le 2026-08-02. **Aucun contenu nouveau** : on présente à fond ce
+qui existe déjà (38 transitions, 6 mouvements réels + 7 annoncés).
 
-Une seule interface. Détail en § « Phase 7 — Bascule et nettoyage ».
+- [ ] Squelette commun : `LibraryScreen`, `LibraryFilterBar`, `LibraryCard`,
+      `BeforeAfterStage`, `LibraryContextStrip`, `useFavorites`.
+      Les deux écrans ne fournissent plus que leurs **données**.
+- [ ] **`BeforeAfterStage`** — le cœur. Deux canvas superposés, le second découpé
+      par un **séparateur déplaçable**. Pour une transition : « avant » = la
+      **coupe franche**, « après » = la transition. Pour un mouvement :
+      « avant » = le plan **fixe**, « après » = le plan animé. On ne montre pas un
+      effet, on montre **ce qu'il change**.
+- [ ] **Défilement manuel de l'animation** (image par image). Le canvas est déjà
+      dessiné à partir d'une progression 0 → 1 : exposer un curseur qui la pilote
+      est **gratuit**, et c'est ce qui fait passer la page de « joli » à « on y
+      reste ». Plus une bascule « Aperçu en boucle ».
+- [ ] **Favoris** persistés en **IndexedDB** (pas `localStorage` : le projet
+      stocke déjà tout le reste là), filtre ★, section « Tes favoris » en tête,
+      **et rappel dans l'inspecteur du montage avancé** — c'est le besoin exprimé,
+      puisqu'il n'y a pas la place d'y afficher des aperçus.
+- [ ] Cartes agrandies, cascade à l'entrée, boucle décalée carte par carte,
+      survol sobre. Recherche + familles. Responsive 390 px. Clavier.
+      `prefers-reduced-motion` arrête la boucle **sans** retirer les commandes.
+
+**Ce qui ne bouge pas** — acquis de la phase 5, verrouillés par `audit-scope` :
+les canvas restent dessinés par `renderTransition` et
+`applyImageMotionTransform` (jamais imités en CSS), l'horloge reste **unique**,
+les badges de parité restent **lus** du manifeste, et les mouvements `planned`
+restent listés **sans aucun réglage**.
+
+**Gate B1** — sur le **visible**, pas sur l'écrit (leçon de l'audit de phase 4) :
+déplacer le séparateur change réellement les pixels ; « avant » et « après »
+diffèrent à la mesure ; le curseur de progression fige et déplace l'animation ;
+un favori se retrouve dans le filtre **et dans le montage avancé** ; il survit au
+rechargement ; recherche et filtres réduisent la grille ; 390 px sans
+débordement ; zéro erreur console.
+
+### Lot B2 — De vraies vidéos dans les aperçus
+- [ ] `useLibraryMedia` : vidéos du projet → photos → clips de démo → repli dessiné.
+- [ ] 3-4 clips de démo (2 s, 720p, ~1,5 Mo au total, chargés paresseusement).
+      **Sources décidées : Mixkit ou Pexels**, téléchargés et compressés par
+      l'agent, **validés par le porteur du projet**.
+- [ ] ⚠️ **Droits déclarés comme pour la musique** : manifeste versionné avec
+      source, licence et URL. Le projet refuse déjà toute piste audio sans
+      déclaration ; introduire des médias sans provenance ici serait le laxisme
+      qu'on a précisément évité.
+
+### Lot B3 — Le contenu qui manque (ex-phase 6)
+- [ ] Les 7 mouvements `planned` : descente, orbite, parallaxe, rotation,
+      apparition, rebond, glitch.
+- [ ] **Mouvements applicables aux vidéos** (aujourd'hui : photos seulement).
+- [ ] **Effets pendant le rush** — c'est là que le retard sur Premiere et DaVinci
+      est réel, et le porteur du projet l'a relevé lui-même : secousse, flou
+      directionnel animé, fuite de lumière, vignettage animé, grain animé, zoom
+      pulsé. **Aucun n'existe aujourd'hui.**
+- [ ] Transitions supplémentaires : `xfade` expose **46** cibles natives, **15**
+      sont employées. Trier les 31 restantes — toutes ne méritent pas d'exister
+      (`zoom-punch` a été écarté après mesure, problème F).
+- [ ] **Thèmes éditoriaux** sur les 51 entrées (`Réseaux sociaux`, `Voyage`,
+      `Produit`, `Récit`, `Souvenirs`, `Musique`), en plus des familles techniques.
+- [ ] **Courbe d'accélération libre** : le contrôle existe déjà, désactivé.
+      L'activer demande que le renderer lise `motion.easing` **et** que
+      `SERVER_RENDER_CAPABILITIES.imageMotionEasing` déclare la courbe.
+
+**Pour chaque ajout, sans exception** : parité prouvée par MP4 réel comparé image
+par image ; `|x| ≤ (zoom − 1) / 2` (problème I) ; un id ajouté dans une seule des
+trois tables fait échouer `smoke-vibecut-transition-parity` ; **un seul** rollout
+Cloud Run à la fin du lot.
 
 ### Reste ouvert sur le montage avancé, volontairement hors MVP
 - [ ] **Texte petit en portrait** : le facteur d'échelle vaut `fontSize × largeur/1920`.
       En 9:16 un titre à 64 pt fait 36 px. L'aperçu **et** `drawtext` appliquent la
-      **même** formule (`server.js:593`) : la parité est intacte, mais le réglage par
-      défaut est petit. Le corriger demande de changer les **deux** côtés et de
-      relancer la parité — c'est un lot à part.
-      *Atténué par L5* : les trois crans de titre d'un preset partent de 56/80/112 pt
-      au lieu de 64. Contournement immédiat : le curseur monte à 160.
+      **même** formule : la parité est intacte, mais le réglage par défaut est
+      petit. Le corriger demande de changer les **deux** côtés et de relancer la
+      parité. *Atténué par L5* : les crans de titre partent de 56/80/112 pt.
 - [ ] Pas d'inspecteur propre pour la piste Volets (`sequence`).
-
-### Phase 6 — Extensions moteur
-- [ ] Orbite, parallaxe, rotation, apparition, rebond, glitch — les 7 entrées
-      `planned` de `motionCatalog.js`, déjà listées et marquées « Bientôt » dans
-      `/video/mouvements`.
-- [ ] Mouvements applicables aux vidéos.
-- [ ] **Courbe d'accélération libre** : le contrôle existe déjà dans
-      `/video/mouvements`, désactivé. L'activer demande que le renderer lise
-      `motion.easing` au lieu d'écrire `smoothstep` en dur, et que le manifeste
-      déclare la courbe dans `imageMotionEasing` — le gate de parité échouera
-      alors et rappellera d'activer le contrôle.
-- [ ] Parité serveur pour chaque ajout, et **contrainte du problème I** à vérifier :
-      tout nouveau mouvement doit tenir `|x| ≤ (zoom − 1) / 2`.
 
 ### Améliorations transverses en attente
 - [ ] Rail IA (`StudioAiRail`) en panneau latéral optionnel, derrière `aiInterfacesEnabled`.
@@ -809,11 +869,11 @@ VIBECUT_RENDERER_URL=<url> node scripts/check-vibecut-renderer-image-capabilitie
 
 ---
 
-## Prompt de relance — phase 6 (extensions moteur)
+## Prompt de relance — lot B1 (fondation du design des deux bibliothèques)
 
 > À copier tel quel dans un nouveau chat.
-> **Toutes les phases du plan de reconstruction sont terminées** : le rollout
-> Cloud Run (L6) et la bascule (phase 7) ont eu lieu le 2026-08-01.
+> **Toute la reconstruction est terminée** (phases 0 à 7, rollout Cloud Run
+> inclus, le 2026-08-01). Ce qui suit est le chantier suivant.
 
 ```
 Tu reprends le développement de VibeCut dans le projet Vibe_fx V2
@@ -821,120 +881,156 @@ Tu reprends le développement de VibeCut dans le projet Vibe_fx V2
 
 AVANT TOUTE CHOSE, lis dans cet ordre :
 1. AGENTS.md   — règles de travail, discipline de déploiement et de coûts
-2. plan.md     — architecture, direction artistique, § 4 (DA) et § 8 (parité)
-3. todo.md     — état exact, bugs 1 à 38, problèmes connus B, C, D, F, G, I, J
-4. map.md      — carte du projet
+2. plan.md     — architecture et DIRECTION ARTISTIQUE (§ 4 en entier : interdits
+                 § 4.2, composition § 4.4, mouvement § 4.5, accessibilité § 4.6,
+                 pièges techniques § 4.7) et parité § 8
+3. docs/vibecut-bibliotheques-roadmap-2026-08-02.md — TA FEUILLE DE ROUTE.
+                 Ta mission est le lot B1, décrit en § 6.
+4. todo.md     — état exact, bugs 1 à 40, problèmes connus B, C, D, F, G, I, J
+5. map.md      — carte du projet
 
-CONTEXTE — la reconstruction est TERMINÉE
-Il n'y a plus qu'UNE interface VibeCut, sur /video :
-  /video              accueil, 3 modes
-  /video/rapide       montage rapide
-  /video/guide        création guidée, 5 étapes, 6 presets
-  /video/avance       montage avancé, timeline multipiste
-  /video/transitions  bibliothèque de transitions (38 entrées)
-  /video/mouvements   bibliothèque de mouvements (13 entrées)
-
-L'ancien front (/studio?workspace=video) est SUPPRIMÉ ; cette adresse redirige
-vers /video côté serveur. `src/features/vibefx-studio/video/` ne contient plus
-aucune interface — seulement modèles, moteurs, export, store, persistance.
-
-La production est à jour : le renderer Cloud Run tourne sur la révision
-00006-6fw (image l6-af59e70-20260801), qui rend les 15 transitions et le
-mouvement lissé. Ce que l'aperçu montre est ce que l'export produit.
+CONTEXTE — l'état réel du produit
+Une seule interface VibeCut, sur /video :
+  /video, /video/rapide, /video/guide, /video/avance,
+  /video/transitions, /video/mouvements
+L'ancien front est SUPPRIMÉ ; /studio?workspace=video redirige côté serveur.
+La production tourne sur la révision Cloud Run 00006-6fw : les 15 transitions
+et le mouvement lissé sont rendus à l'export. L'aperçu ne ment plus.
 
 Gates au vert au 2026-08-01 : lint (0 erreur), build, test:scope,
 test:vibecut-ui-v2 (43 tests navigateur), test:vibecut-export, test:video-ui,
 lint Functions.
 
-TA MISSION : phase 6 — les EXTENSIONS MOTEUR.
-- Les 7 mouvements `planned` de data/motionCatalog.js sont DÉJÀ listés et
-  marqués « Bientôt » dans /video/mouvements, sans aucun réglage : orbite,
-  parallaxe, rotation, apparition, rebond, glitch, descente douce. Les rendre
-  réels demande le moteur canvas ET l'expression `zoompan` du renderer.
-- Mouvements applicables aux VIDÉOS (aujourd'hui : photos seulement).
-- Courbe d'accélération libre : le contrôle existe déjà dans /video/mouvements,
-  DÉSACTIVÉ. Pour l'activer il faut que le renderer lise `motion.easing` au lieu
-  d'écrire `smoothstep` en dur ET que SERVER_RENDER_CAPABILITIES.imageMotionEasing
-  déclare la courbe. Le gate smoke-vibecut-library-parity échouera alors et te
-  rappellera d'activer le contrôle — c'est voulu.
+TA MISSION : lot B1 — LA FONDATION DU DESIGN DES DEUX BIBLIOTHÈQUES.
 
-RÈGLE ABSOLUE POUR CHAQUE AJOUT
-1. PARITÉ : rien n'est proposé qui ne soit rendu à l'identique par l'aperçu ET
-   par l'export. Sinon : badge « Aperçu uniquement » ou « Bientôt », et AUCUN
-   réglage exposé.
-2. PROBLÈME I : tout mouvement doit tenir |x| <= (zoom - 1) / 2. `zoompan` borne
-   sa fenêtre à l'image, le canvas non — 74/255 d'écart mesuré sur un cas
-   débordant. smoke-vibecut-library-parity le vérifie sur les six mouvements
-   livrés ; ajoute les tiens à cette vérification.
-3. PREUVE, PAS DÉCLARATION : un ajout de mouvement se prouve par
-   test:vibecut-motion-parity — MP4 réel rendu par la commande que le renderer
-   construit lui-même, comparé image par image à l'aperçu dans Chromium. Ce test
-   porte trois assertions (parité, effet réel, sentinelle) ; ne le réduis pas.
+Demande exacte du porteur du projet (2026-08-02) :
+« Créer la fondation du design des deux bibliothèques avec les avant/après. On
+reste sur le thème OS Apple ultra moderne comme pour les 3 modes, mais cette
+fois il faut BLINDER le design : c'est important que ça claque, pour que
+l'utilisateur passe du temps à apprécier les animations. La page doit vraiment
+donner envie de cliquer et de parcourir. Tu peux les créer avec les animations,
+mouvements et transitions DÉJÀ EN PLACE. »
 
-CE QUI EST DÉJÀ RÉGLÉ — ne le refais pas, ne le « corrige » pas
-- 15 transitions minutées exportables, rendues à l'identique par
-  engine/xfadeTransitions.js. La MÊME table est portée par exportManifest.js,
-  functions/src/videoExport.js et render-service/src/server.js.
-  N'ajoute JAMAIS un id dans une seule des trois.
-- ATTENTION : la table xfade compte SEIZE clés pour QUINZE transitions visibles.
-  `fade` est l'alias historique de `crossfade`, DÉCLARÉ comme tel dans
-  smoke-vibecut-library-parity.mjs. Un nouvel alias non déclaré fera échouer le
-  gate, et c'est voulu.
-- `xfade` progresse LINÉAIREMENT : ces transitions sont routées AVANT l'easeInOut
-  de VideoEngine.renderTransition. Ne remets pas d'easing dessus.
-- Les courbes des fondus par couleur sont MESURÉES sur des rendus FFmpeg réels.
-- zoom-punch (xfade=zoomin) est ÉCARTÉ volontairement (problème F).
-- mediaModel.js et styleRecipes.js doivent rester SANS AUCUN IMPORT : les tests
-  de parité les chargent tels quels.
-- UN SEUL PlaybackEngine sert les trois modes, canvas singleton déplacé jamais
-  recréé (preview/PreviewEngineHost.jsx). N'y remets pas de portail React.
-- La timeline du montage avancé rend QUATRE rangées d'affichage ; le modèle
-  canonique GARDE ses sept pistes (contrat d'export). Une transition se dessine
-  SUR la piste vidéo, à cheval sur la coupe.
-- Les aperçus des bibliothèques sont dessinés par LE MOTEUR (`renderTransition`,
-  `applyImageMotionTransform`), jamais imités en CSS. UNE SEULE horloge
-  (library/previewTicker.js) pour toutes les vignettes.
-- `GET /capabilities` du renderer ne renvoie NI la version de FFmpeg NI le texte
-  des erreurs : endpoint sans authentification sur un service Cloud Run public
-  (problème J). Le détail va dans les journaux. Un test le verrouille.
-- Les fonctions d'export sauvées de la phase 7 (dossier PC, nom horodaté,
-  régénération d'URL signée) vivent dans export/exportDownload.js. Ne les
-  réimplémente pas ailleurs.
+⚠️ AUCUN CONTENU NOUVEAU DANS CE LOT. On présente à fond ce qui existe :
+38 transitions (15 exportables, 23 « aperçu uniquement ») et 13 mouvements
+(6 réels, 7 marqués « Bientôt »). Ajouter des mouvements ou des effets est le
+lot B3, explicitement plus tard.
+
+CE QUI EXISTE DÉJÀ ET QU'IL FAUT REMANIER, PAS JETER
+src/features/vibecut/library/ contient déjà TransitionLibrary, MotionLibrary,
+TransitionPreview, MotionPreview, previewTicker, useLibraryImages,
+library.module.css. Le lot B1 en extrait un squelette commun (LibraryScreen,
+LibraryFilterBar, LibraryCard, BeforeAfterStage, LibraryContextStrip,
+useFavorites) pour que les deux écrans ne fournissent plus que leurs données.
+
+ACQUIS À NE PAS CASSER — audit-scope les verrouille
+- Les vignettes sont DESSINÉES PAR LE MOTEUR : `renderTransition` (exportée de
+  VideoEngine.js) et `mediaModel.applyImageMotionTransform`. JAMAIS une
+  imitation CSS. C'est ce qui interdit à une carte de mentir sur le rendu, et ce
+  qui la fait couvrir gratuitement par les tests de parité L1 et L3.
+- UNE SEULE horloge (library/previewTicker.js) pour toutes les vignettes, plus
+  un IntersectionObserver par carte. N'ouvre pas de requestAnimationFrame par
+  carte : ce serait quarante boucles concurrentes.
+- Les badges de compatibilité sont LUS de getServerRenderCapabilityStatus,
+  jamais écrits en dur.
+- Les mouvements `planned` restent listés, marqués « Bientôt », et n'exposent
+  AUCUN réglage (un curseur mort serait le défaut n° 32 de l'audit de phase 4).
+- La courbe linéaire reste affichée DÉSACTIVÉE tant que le renderer écrit
+  smoothstep en dur.
+- L'éditeur de trajectoire FAIT RESPECTER |x| <= (zoom-1)/2 (problème I).
+- Les bibliothèques passent par sceneActions (applyTransition, setSceneMotion…),
+  jamais par le store, et appellent saveNow() après chaque application
+  (l'autosave est debouncée à 1,2 s et on quitte l'écran aussitôt — bug 33).
+
+LE CŒUR DU LOT : BeforeAfterStage
+Deux canvas superposés, le second découpé par un SÉPARATEUR DÉPLAÇABLE
+(clip-path: inset). Les deux dessinés par le moteur, à la même progression, par
+la même horloge.
+  - transition : « avant » = LA COUPE FRANCHE, « après » = la transition
+  - mouvement  : « avant » = le plan FIXE,     « après » = le plan animé
+On ne montre pas un effet, on montre CE QU'IL CHANGE. C'est ce couple qui rend
+la page pédagogique.
+Plus un CURSEUR DE PROGRESSION qui fait défiler l'animation à la main, image par
+image : le canvas est déjà dessiné à partir d'une progression 0 → 1, donc c'est
+gratuit — et c'est le détail qui fait passer la page de « joli » à « on y reste ».
+Pointer events, et `setPointerCapture` via le helper qui n'explose pas (bug 31).
+
+FAVORIS
+Stockés en IndexedDB via services/projectLibrary.js sous une clé dédiée.
+PAS localStorage : le projet stocke déjà tout le reste en IndexedDB, deux
+stockages feraient deux sources de vérité. Étoile sur chaque carte, filtre ★,
+section « Tes favoris » en tête, ET RAPPEL DANS L'INSPECTEUR DU MONTAGE AVANCÉ —
+c'est le besoin exprimé : il n'y a pas la place d'y afficher des aperçus.
+
+DESIGN — ce qui doit « claquer », dans l'ordre
+1. La TAILLE et la qualité des aperçus. Une vignette de 196 px ne fait pas rêver.
+2. Le mouvement permanent, DÉCALÉ carte par carte (la grille respire au lieu de
+   battre à l'unisson). Acquis du 2026-07-30, à conserver.
+3. L'entrée en cascade au défilement.
+4. La réponse au survol : élévation subtile, rien de plus — l'animation joue déjà.
+5. Le séparateur : trait fin, poignée ronde, ombre douce. Il doit avoir l'air
+   d'un objet physique qu'on attrape.
+Le châssis reste DISCRET et laisse les aperçus occuper la place : c'est
+exactement la règle de plan.md § 4 (« l'impact visuel est concentré sur le
+contenu, jamais sur le châssis »), et ici elle joue en notre faveur.
+
+DISPOSITION : DEUX colonnes, pas trois. Un rail de familles à gauche ferait un
+second système de navigation à côté du bandeau VibeCut — interdit (§ 4.4). Les
+familles deviennent une barre de filtres horizontale, repliée en menu sous 720 px.
 
 RÈGLES NON NÉGOCIABLES
-- Ne propose jamais une fonction que le moteur ne rend pas : marque-la
-  « Bientôt » et n'expose AUCUN réglage dessus.
+- Ne propose jamais une fonction que le moteur ne rend pas : « Bientôt », et
+  AUCUN réglage dessus.
 - Aucun composant de features/vibecut/ n'importe le store ni IndexedDB
   directement : tout passe par features/vibecut/adapters/.
 - Zéro Tailwind sur /video. CSS Modules + tokens de styles/vibecut.css.
-- Respecte plan.md § 4 en entier, pièges techniques § 4.7 compris.
-- NE DÉPLOIE PAS sans demander. Un rollout engage Cloud Build et Artifact
-  Registry. Le pré-vol est
-  `node scripts/check-vibecut-renderer-image-capabilities.mjs` (local, gratuit),
-  puis la même commande avec VIBECUT_RENDERER_URL après le rollout.
+- Aucun bouton mort. Aucun texte sous 12 px. Pas de néon, pas de glassmorphism
+  généralisé, pas de dégradé violet décoratif.
+- prefers-reduced-motion arrête la boucle SANS retirer les commandes : le
+  séparateur et le curseur restent utilisables.
+- NE DÉPLOIE PAS. Ce lot ne touche pas au renderer.
 
-LEÇON DE MÉTHODE, la plus importante du projet
-Les 24 tests de la phase 4 passaient tous alors que la colorimétrie « ne se
-voyait pas » et qu'aucune transition n'était posable : ils vérifiaient que
-l'action ÉCRIT dans le modèle, jamais qu'elle SE VOIT. MESURE les pixels
-(getImageData) avant/après, et vérifie qu'un contrôle absent est bien ABSENT —
-pas qu'un libellé existe. Les tests des bibliothèques font ça, imite-les.
+GATE DU LOT — sur le VISIBLE, pas sur l'écrit
+La leçon la plus importante du projet : les 24 tests de la phase 4 passaient tous
+alors que la colorimétrie « ne se voyait pas » et qu'aucune transition n'était
+posable. Ils vérifiaient que l'action ÉCRIT dans le modèle, jamais qu'elle SE
+VOIT. Corollaire trouvé en phase 7 : l'onglet VIBECUT du studio était mort et
+aucun des 42 tests ne cliquait dessus (bug 39).
+Donc, pour B1 :
+1. déplacer le séparateur change RÉELLEMENT les pixels affichés (getImageData) ;
+2. « avant » et « après » DIFFÈRENT à la mesure ;
+3. le curseur de progression fige et déplace l'animation ;
+4. un favori se retrouve dans le filtre ET dans le montage avancé ;
+5. il survit au rechargement de la page ;
+6. recherche et filtres réduisent la grille (comptage), « aucun résultat » dit
+   quoi faire ;
+7. responsive 390 px sans débordement horizontal ;
+8. zéro erreur console ;
+9. prefers-reduced-motion : boucle arrêtée, séparateur toujours utilisable.
+Plus : lint, build, test:scope, test:vibecut-ui-v2, test:vibecut-library.
 
-Corollaire trouvé en phase 7 : les smokes qui lisent le SOURCE ont sauvé trois
-fonctions d'export d'une suppression silencieuse, là où aucun test navigateur ne
-les couvrait. Les deux familles de tests se complètent, ne sacrifie ni l'une ni
-l'autre.
+RISQUE À SURVEILLER
+Quarante canvas animés plus deux canvas d'aperçu peuvent faire ramer la page.
+MESURE les images par seconde avant et après. Si nécessaire : n'animer que les
+cartes visibles, la carte survolée et la carte sélectionnée. L'horloge unique et
+l'IntersectionObserver sont déjà là pour ça.
+
+APRÈS B1 — ne l'anticipe pas
+B2 : de vraies vidéos dans les aperçus (médias du projet d'abord, puis 3-4 clips
+de démo Mixkit/Pexels, avec droits déclarés comme pour la musique).
+B3 : le contenu qui manque — les 7 mouvements « planned », les mouvements sur
+vidéo, les VRAIS effets pendant le rush (secousse, flou animé, fuite de lumière…
+aucun n'existe aujourd'hui), les transitions supplémentaires parmi les 46 cibles
+xfade natives, et les thèmes éditoriaux.
 
 ÉCHECS DE TESTS PRÉEXISTANTS, à ne pas confondre avec tes régressions
-- scripts/smoke-vibecut-media-safety.spec.cjs : 3 échecs, crash du moteur de
-  rendu Chromium sur des fixtures WebM de 7 Mo (problème B).
+- scripts/smoke-vibecut-media-safety.spec.cjs : 3 échecs, crash Chromium sur des
+  fixtures WebM de 7 Mo (problème B).
 - npm run test:vibecut-export-local-mp4 : fixtures pointant une machine Windows
   (problème C).
-- Les .mp4 de videotest/ sont des pointeurs Git LFS de 132 octets (problème D) —
-  les smokes fabriquent leurs médias avec ffmpeg-static.
+- Les .mp4 de videotest/ sont des pointeurs Git LFS de 132 octets (problème D).
 - La suite navigateur peut être INSTABLE sous charge : deux tests ont échoué une
-  fois puis repassé au vert seuls le 2026-08-01. Relance avant de conclure à une
-  régression.
+  fois puis repassé au vert seuls le 2026-08-01. Relance avant de conclure.
 - test:scope est VERT depuis le 2026-08-01. S'il échoue, c'est une régression.
 
 MÉTHODE
@@ -945,10 +1041,10 @@ MÉTHODE
    VIBECUT_SHOT_DIR=/tmp/shots node scripts/run-video-ui-test.mjs <spec>
    Les captures 720p compressées trompent : quand un doute porte sur un état,
    MESURE-le (aria-pressed, getComputedStyle, getImageData).
-4. Rituel de fin de phase (plan.md § 9) : todo.md, plan.md, map.md, puis un
-   nouveau prompt de relance en fin de todo.md.
+4. Rituel de fin de lot (plan.md § 9) : todo.md, plan.md, map.md, la roadmap des
+   bibliothèques, puis un nouveau prompt de relance en fin de todo.md.
 5. Rapporte honnêtement : ce qui marche, ce qui est laissé de côté et pourquoi,
-   et les échecs PRÉEXISTANTS — ne les présente pas comme des régressions.
+   et les échecs PRÉEXISTANTS.
 
 COMMANDES
 npm run dev                     # http://localhost:3000/video
@@ -956,10 +1052,6 @@ npm run lint && npm run build
 npm run test:scope
 npm run test:vibecut-ui-v2      # recettes + parités + 43 tests navigateur
 npm run test:vibecut-library    # parité catalogue ↔ moteur ↔ capacités serveur
-npm run test:vibecut-recipes
 npm run test:vibecut-export
-npm run test:video-ui           # modèles et store (plus d'interface dedans)
-npm run test:vibecut-motion-parity          # mouvement : MP4 réel vs aperçu
-npm run test:vibecut-xfade-preview-parity   # transitions : canvas vs FFmpeg
-node scripts/check-vibecut-renderer-image-capabilities.mjs   # pré-vol renderer
+npm run test:video-ui           # modèles et store
 ```

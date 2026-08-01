@@ -268,6 +268,22 @@ Orbite, parallaxe, rotation, apparition, rebond, glitch · mouvements sur vidéo
 
 ---
 
+### Chantier B — Les deux bibliothèques · 🟡 **en cours depuis le 2026-08-02**
+
+La reconstruction étant terminée, le chantier suivant est de faire des deux bibliothèques des écrans où l'on a **envie de rester**, et non un catalogue fonctionnel.
+
+**Feuille de route : [docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
+
+- **B1 — fondation du design**, sur le contenu **déjà en place** (38 transitions, 6 mouvements réels + 7 annoncés). Squelette commun aux deux écrans, **Avant / Après avec séparateur déplaçable**, défilement manuel de l'animation image par image, favoris persistés et rappelés dans le montage avancé, recherche et familles.
+- **B2 — de vraies vidéos** dans les aperçus : médias du projet d'abord, puis 3-4 clips de démo (Mixkit/Pexels) avec **droits déclarés comme pour la musique**.
+- **B3 — le contenu qui manque** (ex-phase 6) : les 7 mouvements annoncés, les mouvements sur vidéo, et surtout les **vrais effets pendant le rush** — secousse, flou animé, fuite de lumière, grain animé. **Aucun n'existe aujourd'hui**, et c'est le retard réel sur Premiere et DaVinci.
+
+**Point de conception qui commande tout le lot B1** : « avant » n'est pas une image neutre. Pour une transition, « avant » est la **coupe franche** ; pour un mouvement, le **plan fixe**. On ne montre pas un effet, on montre **ce qu'il change** — c'est ce qui rend la page pédagogique plutôt que décorative.
+
+**Contrainte structurante conservée** : les aperçus restent **dessinés par le moteur** (`renderTransition`, `applyImageMotionTransform`), jamais imités en CSS. Une carte ne peut donc pas diverger du rendu qu'elle annonce, et les tests de parité L1/L3 la couvrent gratuitement.
+
+---
+
 ## 8. Parité aperçu ↔ export
 
 Règle absolue : **rien n'est proposé dans l'interface si l'export ne sait pas le rendre**, sauf mention explicite « aperçu seulement ».

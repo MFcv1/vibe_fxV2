@@ -43,6 +43,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       `-- vibrant-accents/
 |-- docs/
 |   |-- studio-ai-agents-megaprompt.md  # Prompt d'integration de la colonne d'agents IA contextualisee par onglet studio
+|   |-- vibecut-bibliotheques-roadmap-2026-08-02.md # Feuille de route des deux bibliotheques : inventaire verifie du contenu existant, ce qu'on prend et ce qu'on jette de la reference, direction artistique, architecture cible (squelette commun, BeforeAfterStage, favoris IndexedDB), lots B1 design / B2 vraies videos / B3 contenu manquant, risques et ce qu'on ne fait pas
 |   |-- vibecut-audit-mvp-ux-roadmap-2026-07-29.md # Audit code + test reel de l'editeur : crash WebM, ecarts preview/export, absence photo/Ken Burns, simplification Storyboard, modele media cible, roadmap vertical slice et gates MVP/cloud
 |   |-- vibecut-cost-telemetry-architecture-2026-06-07.md # Architecture cible telemetry couts VibeCut : estimation live, Cloud Monitoring/Logging, Billing Export BigQuery, reconciliation, UX backoffice et discipline de deploiement
 |   |-- vibecut-export-hardening-status-2026-06-06.md # Statut par phase Export Pro : done/partial/not done, blocages live K1, emulators Java, renderer frame-by-frame et fixtures MP4
@@ -500,6 +501,19 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-02
+
+- **Nouveau chantier ouvert : les deux bibliothèques.** La reconstruction étant
+  terminée, l'objectif devient de faire de `/video/transitions` et
+  `/video/mouvements` des écrans où l'on a envie de rester. Feuille de route :
+  `docs/vibecut-bibliotheques-roadmap-2026-08-02.md`, lot **B1** (design) en
+  premier, sur le contenu **déjà en place**.
+- Inventaire vérifié à cette date : **38 transitions** (15 exportables,
+  23 « aperçu uniquement ») réparties en 7 familles, et **13 mouvements** dont
+  **6 réels** — et applicables aux photos seulement. Côté « pendant le rush », le
+  produit a 6 mouvements et 6 réglages de couleur : c'est le retard réel sur
+  Premiere et DaVinci, et il est documenté comme tel plutôt que masqué.
 
 ## Journal — 2026-08-01 (phase 7)
 
