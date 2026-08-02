@@ -274,11 +274,13 @@ La reconstruction étant terminée, le chantier suivant est de faire des deux bi
 
 **Feuille de route : [docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
 
-- **B1 — fondation du design**, sur le contenu **déjà en place** (38 transitions, 6 mouvements réels + 7 annoncés). Squelette commun aux deux écrans, **Avant / Après avec séparateur déplaçable**, défilement manuel de l'animation image par image, favoris persistés et rappelés dans le montage avancé, recherche et familles.
+- **B1 — fondation du design**, sur le contenu **déjà en place** (38 transitions, 6 mouvements réels + 7 annoncés). Squelette commun aux deux écrans, **hover scrub** sur chaque vignette (la position horizontale du pointeur *est* le temps), **bypass** au clavier pour voir sans l'effet en plein cadre, grand aperçu sur la **vraie coupe** du projet, favoris persistés et rappelés **dans les deux modes de montage**, recherche et familles.
 - **B2 — de vraies vidéos** dans les aperçus : médias du projet d'abord, puis 3-4 clips de démo (Mixkit/Pexels) avec **droits déclarés comme pour la musique**.
 - **B3 — le contenu qui manque** (ex-phase 6) : les 7 mouvements annoncés, les mouvements sur vidéo, et surtout les **vrais effets pendant le rush** — secousse, flou animé, fuite de lumière, grain animé. **Aucun n'existe aujourd'hui**, et c'est le retard réel sur Premiere et DaVinci.
 
-**Point de conception qui commande tout le lot B1** : « avant » n'est pas une image neutre. Pour une transition, « avant » est la **coupe franche** ; pour un mouvement, le **plan fixe**. On ne montre pas un effet, on montre **ce qu'il change** — c'est ce qui rend la page pédagogique plutôt que décorative.
+**Point de conception qui commande tout le lot B1** : une bibliothèque, ce sont **deux moments** qui demandent **deux outils**. *Auditionner* 38 entrées demande de la **vitesse** → le hover scrub, sans un clic. *Juger* une entrée retenue demande de la **précision** → grand aperçu sur la vraie coupe, avec bypass. Les confondre était l'erreur du premier jet de la roadmap.
+
+**Écarté après recherche sur DaVinci Resolve, Final Cut Pro et CapCut** : l'avant/après à **séparateur déplaçable**. Il compare deux états d'un même instant coupés dans l'**espace**, alors que mouvements et transitions sont des différences dans le **temps** — sur un mouvement il donnerait une image cassée en deux, sur une transition deux moitiés identiques 80 % du temps. Les trois outils font tous du **hover scrub**. Le séparateur est rangé pour une éventuelle bibliothèque de **looks colorimétriques**, où c'est le bon outil.
 
 **Contrainte structurante conservée** : les aperçus restent **dessinés par le moteur** (`renderTransition`, `applyImageMotionTransform`), jamais imités en CSS. Une carte ne peut donc pas diverger du rendu qu'elle annonce, et les tests de parité L1/L3 la couvrent gratuitement.
 

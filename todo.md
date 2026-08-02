@@ -764,41 +764,76 @@ Deux tests l'ancrent désormais (l'onglet mène vraiment à `/video`), et
 
 ### Lot B1 — Fondation du design des deux bibliothèques · **prioritaire**
 
-Le lot demandé le 2026-08-02. **Aucun contenu nouveau** : on présente à fond ce
-qui existe déjà (38 transitions, 6 mouvements réels + 7 annoncés).
+Objectif, dans les mots du porteur du projet (2026-08-02) : *« les meilleures
+bibliothèques pour tester les animations, avec des aperçus qui permettent de
+**juger**, pouvoir les mettre en **favori**, et donc les **utiliser dans les modes
+en connaissance de cause** »*.
 
-- [ ] Squelette commun : `LibraryScreen`, `LibraryFilterBar`, `LibraryCard`,
-      `BeforeAfterStage`, `LibraryContextStrip`, `useFavorites`.
-      Les deux écrans ne fournissent plus que leurs **données**.
-- [ ] **`BeforeAfterStage`** — le cœur. Deux canvas superposés, le second découpé
-      par un **séparateur déplaçable**. Pour une transition : « avant » = la
-      **coupe franche**, « après » = la transition. Pour un mouvement :
-      « avant » = le plan **fixe**, « après » = le plan animé. On ne montre pas un
-      effet, on montre **ce qu'il change**.
-- [ ] **Défilement manuel de l'animation** (image par image). Le canvas est déjà
-      dessiné à partir d'une progression 0 → 1 : exposer un curseur qui la pilote
-      est **gratuit**, et c'est ce qui fait passer la page de « joli » à « on y
-      reste ». Plus une bascule « Aperçu en boucle ».
-- [ ] **Favoris** persistés en **IndexedDB** (pas `localStorage` : le projet
-      stocke déjà tout le reste là), filtre ★, section « Tes favoris » en tête,
-      **et rappel dans l'inspecteur du montage avancé** — c'est le besoin exprimé,
-      puisqu'il n'y a pas la place d'y afficher des aperçus.
-- [ ] Cartes agrandies, cascade à l'entrée, boucle décalée carte par carte,
-      survol sobre. Recherche + familles. Responsive 390 px. Clavier.
-      `prefers-reduced-motion` arrête la boucle **sans** retirer les commandes.
+**Aucun contenu nouveau** : on présente à fond ce qui existe (38 transitions,
+6 mouvements réels + 7 annoncés).
+
+**Décision de conception, prise après recherche sur DaVinci, Final Cut et CapCut**
+Le premier jet proposait un avant/après avec **séparateur déplaçable**. Écarté :
+un séparateur compare deux états d'un même instant coupés dans l'**espace**, or
+mouvements et transitions sont des différences dans le **temps**. Sur un
+mouvement, les deux moitiés donneraient une image cassée en deux ; sur une
+transition, elles seraient identiques 80 % du temps.
+**Les trois outils font tous la même chose : le hover scrub.** On l'adopte.
+*(Le séparateur reste le bon outil pour la colorimétrie — rangé pour une future
+bibliothèque de looks.)*
+
+- [ ] **Squelette commun** : `LibraryScreen`, `LibraryFilterBar`, `LibraryCard`,
+      `LibraryStage`, `LibraryContextStrip`, `useFavorites`. Les deux écrans ne
+      fournissent plus que leurs **données**.
+- [ ] **AUDITIONNER — hover scrub sur chaque vignette.** La position
+      **horizontale** du pointeur *est* le temps : on balaye la grille et on a vu
+      38 transitions en quelques secondes. Liseré de progression sous la vignette.
+      Boucle quand la vignette est visible (jamais de grille morte), le survol
+      reprend la main, la sortie relance la boucle.
+      **Équivalent clavier obligatoire** — sinon l'écran est inutilisable sans souris.
+- [ ] **Au repos, la vignette se fige au POINT CULMINANT de l'effet**, jamais à
+      l'instant 0. Détail petit et décisif : un fondu à t=0 ne ressemble à rien, et
+      une grille figée à t=0 serait **38 fois la même image**.
+- [ ] **JUGER — le grand aperçu sur la VRAIE coupe** du projet, pas une démo.
+      **Bypass** : maintenir une touche montre le rendu **sans** l'effet, en plein
+      cadre — c'est la comparaison avant/après, en séquence plutôt qu'en surface.
+      Curseur de temps pour s'arrêter à l'instant exact, bascule boucle, et
+      réglages **live** (l'aperçu suit pendant qu'on tire, sans appliquer).
+- [ ] **Chaque vignette joue la coupe réelle de l'utilisateur.** DaVinci met du
+      générique dans la vignette parce qu'il ne sait pas où on en est ; VibeCut le
+      sait. **Aucun des trois outils ne fait ça.**
+- [ ] **FAVORIS**, persistés en **IndexedDB** (pas `localStorage` : le projet
+      stocke déjà tout le reste là). Étoile, filtre ★, section « Tes favoris ».
+- [ ] **Et leur retour dans les modes** — c'est la moitié du besoin :
+      - **montage avancé** : les favoris remontent en tête de la liste de
+        transitions de l'inspecteur (il n'y a pas la place d'y afficher des
+        aperçus, d'où l'intérêt d'avoir jugé en amont) ;
+      - **montage rapide** : `SceneInspector` propose aujourd'hui **six raccourcis
+        écrits en dur**. Ils deviennent **les favoris de l'utilisateur**, avec
+        repli sur les six actuels tant qu'il n'en a posé aucun.
+- [ ] Cartes agrandies, cascade à l'entrée, survol sobre, recherche + familles,
+      responsive 390 px, `prefers-reduced-motion` (arrête la boucle **sans**
+      retirer les commandes).
 
 **Ce qui ne bouge pas** — acquis de la phase 5, verrouillés par `audit-scope` :
-les canvas restent dessinés par `renderTransition` et
-`applyImageMotionTransform` (jamais imités en CSS), l'horloge reste **unique**,
-les badges de parité restent **lus** du manifeste, et les mouvements `planned`
-restent listés **sans aucun réglage**.
+canvas dessinés par `renderTransition` et `applyImageMotionTransform` (jamais
+imités en CSS), horloge **unique**, badges de parité **lus** du manifeste,
+mouvements `planned` **sans aucun réglage**.
 
-**Gate B1** — sur le **visible**, pas sur l'écrit (leçon de l'audit de phase 4) :
-déplacer le séparateur change réellement les pixels ; « avant » et « après »
-diffèrent à la mesure ; le curseur de progression fige et déplace l'animation ;
-un favori se retrouve dans le filtre **et dans le montage avancé** ; il survit au
-rechargement ; recherche et filtres réduisent la grille ; 390 px sans
-débordement ; zéro erreur console.
+**Gate B1** — sur le **visible**, pas sur l'écrit :
+hover scrub (deux positions de souris → deux images différentes, mesurées) ;
+la sortie relance la boucle, l'entrée la fige ; **deux vignettes au repos montrent
+deux images différentes** (preuve que le point culminant est bien choisi) ;
+le bypass change réellement les pixels et les rend au relâchement ;
+le curseur de temps fige et déplace ; **équivalent clavier** ; un favori se
+retrouve dans le filtre, **dans le montage avancé** et **dans les raccourcis du
+montage rapide** ; il survit au rechargement ; recherche et filtres réduisent la
+grille ; 390 px sans débordement ; zéro erreur console.
+
+**Risque à surveiller** : le hover scrub redessine à chaque mouvement de souris.
+La progression doit s'écrire dans une `ref` et redessiner le canvas
+**directement**, jamais via un `setState` — c'est le correctif du bug 3 (playhead
+saccadé) rejoué ici.
 
 ### Lot B2 — De vraies vidéos dans les aperçus
 - [ ] `useLibraryMedia` : vidéos du projet → photos → clips de démo → repli dessiné.
@@ -942,25 +977,70 @@ ACQUIS À NE PAS CASSER — audit-scope les verrouille
   jamais par le store, et appellent saveNow() après chaque application
   (l'autosave est debouncée à 1,2 s et on quitte l'écran aussitôt — bug 33).
 
-LE CŒUR DU LOT : BeforeAfterStage
-Deux canvas superposés, le second découpé par un SÉPARATEUR DÉPLAÇABLE
-(clip-path: inset). Les deux dessinés par le moteur, à la même progression, par
-la même horloge.
-  - transition : « avant » = LA COUPE FRANCHE, « après » = la transition
-  - mouvement  : « avant » = le plan FIXE,     « après » = le plan animé
-On ne montre pas un effet, on montre CE QU'IL CHANGE. C'est ce couple qui rend
-la page pédagogique.
-Plus un CURSEUR DE PROGRESSION qui fait défiler l'animation à la main, image par
-image : le canvas est déjà dessiné à partir d'une progression 0 → 1, donc c'est
-gratuit — et c'est le détail qui fait passer la page de « joli » à « on y reste ».
-Pointer events, et `setPointerCapture` via le helper qui n'explose pas (bug 31).
+LE CŒUR DU LOT : DEUX MOMENTS, DEUX OUTILS
 
-FAVORIS
+Une bibliothèque, ce sont DEUX écrans superposés, et les confondre est l'erreur
+qui a été commise au premier jet de ce plan :
+
+  AUDITIONNER (38 entrées à balayer)  -> il faut de la VITESSE, zéro clic
+  JUGER (une entrée retenue)          -> il faut de la PRÉCISION, en grand
+
+1) AUDITIONNER — le HOVER SCRUB, sur chaque vignette
+La position HORIZONTALE du pointeur sur la vignette EST le curseur de temps. On
+survole, on balaye de gauche à droite, l'animation se déroule. Aucun clic, aucun
+bouton lecture. C'est exactement ce que font DaVinci Resolve (« Hover Scrub
+Preview ») et Final Cut Pro (« skimming »), et c'est ce qui permet de voir
+38 transitions en quelques secondes.
+  - liseré de progression sous la vignette ;
+  - la vignette BOUCLE quand elle est visible (on n'arrive jamais sur une grille
+    morte — décision produit du 2026-07-30, qui tient) ;
+  - le survol prend la main, la sortie relance la boucle ;
+  - ÉQUIVALENT CLAVIER OBLIGATOIRE : le hover scrub n'est pas atteignable sans
+    souris, l'écran serait sinon inutilisable au clavier.
+
+2) AU REPOS, LA VIGNETTE SE FIGE AU POINT CULMINANT DE L'EFFET
+Jamais à l'instant 0. Détail petit et décisif : un fondu enchaîné à t=0 ne
+ressemble à rien, et une grille figée à t=0 serait 38 FOIS LA MÊME IMAGE.
+
+3) JUGER — le grand aperçu, sur LA VRAIE COUPE de l'utilisateur
+  - BYPASS : maintenir une touche montre le rendu SANS l'effet, en PLEIN CADRE.
+    C'est la comparaison avant/après, en séquence plutôt qu'en surface — la
+    bonne forme pour une différence temporelle, et c'est ainsi que travaillent
+    les étalonneurs.
+  - curseur de temps pour s'arrêter à l'instant exact + bascule boucle ;
+  - réglages LIVE : l'aperçu suit pendant qu'on tire, sans avoir à appliquer.
+
+4) CE QUE VIBECUT FAIT MIEUX QUE LES TROIS, ET QUI NE COÛTE RIEN
+Chaque vignette joue LA COUPE RÉELLE du projet. DaVinci met du contenu générique
+dans la vignette et n'affiche le vrai montage qu'après le clic, parce qu'il ne
+sait pas où on en est. VibeCut le sait. Aucun des trois ne fait ça.
+
+CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI — ne le réintroduis pas
+Le premier jet proposait un avant/après avec SÉPARATEUR DÉPLAÇABLE. Écarté après
+recherche : un séparateur compare deux états d'un MÊME INSTANT, coupés dans
+l'ESPACE. Or un mouvement et une transition sont des différences dans le TEMPS.
+Sur un mouvement, les deux moitiés montreraient deux cadrages différents de la
+même photo — une image cassée en deux. Sur une transition, elles seraient
+IDENTIQUES pendant 80 % de la durée.
+Le séparateur reste le bon outil pour la COLORIMÉTRIE (différence spatiale sur
+image figée) : rangé pour une éventuelle bibliothèque de looks, pas jeté.
+
+Interactions en pointer events, `setPointerCapture` via le helper qui n'explose
+pas (bug 31).
+
+FAVORIS — ET LEUR RETOUR DANS LES MODES
+C'est la moitié du besoin exprimé : « pouvoir les mettre en favori et donc les
+utiliser dans les modes EN CONNAISSANCE DE CAUSE ».
 Stockés en IndexedDB via services/projectLibrary.js sous une clé dédiée.
 PAS localStorage : le projet stocke déjà tout le reste en IndexedDB, deux
-stockages feraient deux sources de vérité. Étoile sur chaque carte, filtre ★,
-section « Tes favoris » en tête, ET RAPPEL DANS L'INSPECTEUR DU MONTAGE AVANCÉ —
-c'est le besoin exprimé : il n'y a pas la place d'y afficher des aperçus.
+stockages feraient deux sources de vérité.
+  - étoile sur chaque vignette, filtre ★, section « Tes favoris » en tête ;
+  - MONTAGE AVANCÉ : les favoris remontent en tête de la liste de transitions de
+    l'inspecteur. Il n'y a pas la place d'y afficher des aperçus — d'où l'intérêt
+    d'avoir jugé en amont dans la bibliothèque ;
+  - MONTAGE RAPIDE : `SceneInspector` propose aujourd'hui SIX RACCOURCIS ÉCRITS
+    EN DUR. Ils deviennent LES FAVORIS DE L'UTILISATEUR, avec repli sur les six
+    actuels tant qu'il n'en a posé aucun.
 
 DESIGN — ce qui doit « claquer », dans l'ordre
 1. La TAILLE et la qualité des aperçus. Une vignette de 196 px ne fait pas rêver.
@@ -997,23 +1077,33 @@ posable. Ils vérifiaient que l'action ÉCRIT dans le modèle, jamais qu'elle SE
 VOIT. Corollaire trouvé en phase 7 : l'onglet VIBECUT du studio était mort et
 aucun des 42 tests ne cliquait dessus (bug 39).
 Donc, pour B1 :
-1. déplacer le séparateur change RÉELLEMENT les pixels affichés (getImageData) ;
-2. « avant » et « après » DIFFÈRENT à la mesure ;
-3. le curseur de progression fige et déplace l'animation ;
-4. un favori se retrouve dans le filtre ET dans le montage avancé ;
-5. il survit au rechargement de la page ;
-6. recherche et filtres réduisent la grille (comptage), « aucun résultat » dit
+1. HOVER SCRUB : deux positions horizontales différentes du pointeur sur la même
+   vignette donnent DEUX IMAGES DIFFÉRENTES (getImageData) ;
+2. sortir de la vignette RELANCE la boucle, y entrer la FIGE ;
+3. AU REPOS, deux vignettes différentes montrent DEUX IMAGES DIFFÉRENTES — c'est
+   ce qui prouve que le point culminant est bien choisi et que la grille n'est
+   pas 38 fois la même image ;
+4. BYPASS : la touche maintenue change réellement les pixels, et les rend au
+   relâchement ;
+5. le curseur de temps du grand aperçu fige et déplace l'animation ;
+6. ÉQUIVALENT CLAVIER : une vignette au focus se scrube aux flèches ;
+7. un favori se retrouve dans le filtre, DANS LE MONTAGE AVANCÉ, et DANS LES
+   RACCOURCIS DU MONTAGE RAPIDE ;
+8. il survit au rechargement de la page ;
+9. recherche et filtres réduisent la grille (comptage), « aucun résultat » dit
    quoi faire ;
-7. responsive 390 px sans débordement horizontal ;
-8. zéro erreur console ;
-9. prefers-reduced-motion : boucle arrêtée, séparateur toujours utilisable.
+10. responsive 390 px sans débordement horizontal ; zéro erreur console ;
+    prefers-reduced-motion : boucle arrêtée, commandes TOUJOURS utilisables.
 Plus : lint, build, test:scope, test:vibecut-ui-v2, test:vibecut-library.
 
-RISQUE À SURVEILLER
-Quarante canvas animés plus deux canvas d'aperçu peuvent faire ramer la page.
-MESURE les images par seconde avant et après. Si nécessaire : n'animer que les
-cartes visibles, la carte survolée et la carte sélectionnée. L'horloge unique et
-l'IntersectionObserver sont déjà là pour ça.
+RISQUES À SURVEILLER
+1. Le HOVER SCRUB redessine à chaque mouvement de souris. La progression doit
+   s'écrire dans une `ref` et redessiner le canvas DIRECTEMENT, jamais via un
+   `setState` : c'est le correctif du bug 3 (playhead saccadé) rejoué ici.
+2. Quarante canvas animés plus l'aperçu peuvent faire ramer la page. MESURE les
+   images par seconde avant et après. Si nécessaire : n'animer que les vignettes
+   visibles, la survolée et la sélectionnée. L'horloge unique et
+   l'IntersectionObserver sont déjà là pour ça.
 
 APRÈS B1 — ne l'anticipe pas
 B2 : de vraies vidéos dans les aperçus (médias du projet d'abord, puis 3-4 clips
