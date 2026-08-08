@@ -158,7 +158,19 @@ try {
     SERVER_RENDER_CAPABILITIES.timedTransitions.length - aliasCount,
     "le catalogue doit exposer exactement les transitions minutees du serveur, alias exclus"
   );
-  assert.equal(exportableIds.length, 15, "le lot L1 a livre 15 transitions exportables");
+  /*
+   * 15 au lot L1 (2026-07-30), 33 au lot B3a (2026-08-02), 48 au lot B3b
+   * (2026-08-03). Les quinze dernieres n'avaient aucune cible `xfade` native qui
+   * rende leur effet : elles sont construites comme des sous-graphes de filtres
+   * natifs rampes. Ces nombres sont ecrits en dur VOLONTAIREMENT - les deriver du
+   * manifeste ne prouverait rien, alors qu'une baisse non voulue doit se voir.
+   */
+  assert.equal(exportableIds.length, 48, "48 transitions exportables depuis le lot B3b");
+  assert.equal(
+    TRANSITION_CATALOG.length - exportableIds.length,
+    0,
+    "plus aucune transition « aperçu uniquement »: le catalogue entier est rendu a l'export"
+  );
 
   /* ---------- 2. Mouvements ---------- */
 

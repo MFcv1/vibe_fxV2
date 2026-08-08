@@ -233,6 +233,23 @@ export function useSnapEnabled() {
     return useVideoStore((state) => state.snapEnabled);
 }
 
+
+/*
+ * LES DEUX EMPLACEMENTS DE SEQUENCE, lus par l'interface.
+ *
+ * Un hook d'adaptateur et non une lecture directe du magasin: aucun composant de
+ * `features/vibecut/` n'importe le store, c'est la regle du projet.
+ */
+export function useSequenceTransitions() {
+    const transitionItems = useVideoStore((state) => state.transitionItems);
+    return useMemo(() => {
+        const bySlot = (slot) => transitionItems.find(
+            (item) => (item?.params?.placement || null) === slot,
+        ) || null;
+        return { intro: bySlot('intro'), outro: bySlot('outro') };
+    }, [transitionItems]);
+}
+
 export function useTimelineActions() {
     const updateTimelineItem = useVideoStore((state) => state.updateTimelineItem);
     const updateClip = useVideoStore((state) => state.updateClip);
@@ -242,6 +259,11 @@ export function useTimelineActions() {
     const removeTextOverlay = useVideoStore((state) => state.removeTextOverlay);
     const removeAudioTrack = useVideoStore((state) => state.removeAudioTrack);
     const removeTransitionItem = useVideoStore((state) => state.removeTransitionItem);
+    const addTransitionItem = useVideoStore((state) => state.addTransitionItem);
+    const updateTransitionItem = useVideoStore((state) => state.updateTransitionItem);
+    // Necessaire pour savoir si l'emplacement est DEJA occupe: un slot de
+    // sequence est unique, on remplace au lieu d'empiler.
+    const sequenceItems = useVideoStore((state) => state.transitionItems);
     const setTrackState = useVideoStore((state) => state.setTrackState);
     const setSnapEnabled = useVideoStore((state) => state.setSnapEnabled);
     const setSelectedClipId = useVideoStore((state) => state.setSelectedClipId);
@@ -349,6 +371,49 @@ export function useTimelineActions() {
         updateClip(clipId, { motion }, { history });
     }, [updateClip]);
 
+    /*
+     * OUVERTURE ET FIN DE SEQUENCE (2026-08-04).
+     *
+     * Le magasin sait DEJA les porter : un item de transition marque
+     * `placement: 'intro' | 'outro'` va sur la piste `sequence-main`, en
+     * exemplaire unique par emplacement, et `getIntroOffset` DECALE tous les
+     * plans d'autant. Une ouverture ALLONGE donc le montage au lieu de rogner le
+     * premier plan - ce qu'une transition entre deux plans, elle, fait par
+     * definition.
+     *
+     * Ce qui manquait n'etait pas la mecanique mais le CHEMIN : rien dans
+     * VibeCut n'appelait `addTransitionItem` avec un placement. Les sept
+     * ouvertures et fins du catalogue etaient donc nommees pour un role qu'aucun
+     * ecran ne savait leur donner.
+     */
+    const setSequenceTransition = useCallback((slot, entry) => {
+        if (slot !== 'intro' && slot !== 'outro') return;
+        const existing = sequenceItems.find((item) => (
+            (item?.params?.placement || null) === slot
+        ));
+        if (!entry) {
+            if (existing) removeTransitionItem(existing.id);
+            return;
+        }
+        const duration = Math.max(0.2, Number(entry.duration || entry.defaultDuration) || 1);
+        if (existing) {
+            updateTransitionItem(existing.id, {
+                type: entry.engineId || entry.id,
+                name: entry.name,
+                duration,
+                params: { ...(existing.params || {}), placement: slot, sequenceSlot: slot, singleton: true },
+            });
+            return;
+        }
+        addTransitionItem({
+            type: entry.engineId || entry.id,
+            name: entry.name,
+            duration,
+            category: slot,
+            params: { placement: slot, sequenceSlot: slot, singleton: true },
+        });
+    }, [addTransitionItem, removeTransitionItem, sequenceItems, updateTransitionItem]);
+
     const setClipSpeed = useCallback((clipId, speed) => {
         updateClip(clipId, { speed }, { history: true });
     }, [updateClip]);
@@ -385,6 +450,7 @@ export function useTimelineActions() {
         setClipRotation,
         setTrackState,
         setSnapEnabled,
+        setSequenceTransition,
         beginHistoryTransaction,
         commitHistoryTransaction,
         seekTo,

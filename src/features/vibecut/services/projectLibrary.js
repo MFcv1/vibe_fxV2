@@ -229,6 +229,66 @@ export async function deleteProject(id) {
     });
 }
 
+/* ------------------------------------------------------------------ *
+ * Favoris des bibliotheques (lot B1).
+ *
+ * Stockes ICI, dans la meme base IndexedDB que les projets, sous une cle
+ * dediee. PAS dans `localStorage`: le projet stocke deja tout le reste en
+ * IndexedDB, et melanger les deux ferait DEUX sources de verite - c'est
+ * exactement le risque note dans la feuille de route des bibliotheques.
+ *
+ * L'enregistrement porte `kind: 'favorites'` et une cle prefixee `favorites:`.
+ * `listProjects()` ne lit que les cles `meta:`, il ne peut donc pas le
+ * confondre avec un projet.
+ * ------------------------------------------------------------------ */
+
+const FAVORITES_KEY = 'favorites:v1';
+
+/** Les deux bibliotheques ont leurs favoris propres: une transition n'est pas un mouvement. */
+export const FAVORITE_KINDS = ['transitions', 'motions'];
+
+function normalizeFavorites(record) {
+    const pick = (value) => (Array.isArray(value)
+        ? value.filter((id) => typeof id === 'string' && id.length > 0)
+        : []);
+    return {
+        transitions: pick(record?.transitions),
+        motions: pick(record?.motions),
+    };
+}
+
+/** Relit les favoris. Un navigateur sans IndexedDB renvoie des listes vides, jamais une erreur. */
+export async function loadFavorites() {
+    if (!isAvailable()) return normalizeFavorites(null);
+    try {
+        const record = await withStore('readonly', (store) => toPromise(store.get(FAVORITES_KEY)));
+        return normalizeFavorites(record);
+    } catch {
+        /*
+         * Un favori est un confort, pas une donnee de production: son echec de
+         * lecture ne doit jamais empecher la bibliotheque de s'afficher.
+         */
+        return normalizeFavorites(null);
+    }
+}
+
+/** Ecrit les favoris. Renvoie ce qui a reellement ete ecrit. */
+export async function saveFavorites(favorites) {
+    const next = normalizeFavorites(favorites);
+    if (!isAvailable()) return next;
+    try {
+        await withStore('readwrite', (store) => toPromise(store.put({
+            id: FAVORITES_KEY,
+            kind: 'favorites',
+            ...next,
+            savedAt: new Date().toISOString(),
+        })));
+    } catch {
+        // Idem: on n'interrompt pas l'ecran pour un favori non ecrit.
+    }
+    return next;
+}
+
 export function formatProjectDuration(seconds = 0) {
     const total = Math.max(0, Math.round(Number(seconds) || 0));
     const minutes = Math.floor(total / 60);

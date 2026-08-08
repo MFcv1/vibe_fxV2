@@ -3,7 +3,10 @@
 > Document d'implémentation, demandé le **2026-08-02**.
 > Rattaché à [plan.md](../plan.md) § 4 (direction artistique) et § 7 (phase 5),
 > et à [todo.md](../todo.md).
-> **État : à faire. Lot B1 en premier.**
+> **État : lots B1 et B3a ✅ LIVRÉS le 2026-08-02. Prochain : B2.**
+> Ordre modifié le 2026-08-02 **par décision du porteur du projet** : l'écart
+> d'export (§ 6, lot B3a) est traité avant B2. Voir « Recommandation d'ordre »
+> au § 7.
 > **Révisé le 2026-08-02** après recherche sur DaVinci Resolve, Final Cut Pro et
 > CapCut : le séparateur avant/après est remplacé par le **hover scrub** et le
 > **bypass** (§ 3.3 à 3.5).
@@ -204,8 +207,10 @@ Ce qui doit « claquer », dans l'ordre d'importance :
    (`IntersectionObserver`, déjà présent pour le dessin — on le réutilise).
 4. **La réponse au survol.** Élévation subtile (`--vc-shadow-2`), et le nom qui
    passe en pleine opacité. Rien de plus : l'animation joue déjà.
-5. **Le séparateur Avant/Après.** Trait fin, poignée ronde, ombre douce. Il doit
-   avoir l'air d'un objet physique qu'on attrape.
+5. **Le bypass.** Un cadre franc et une pastille « Sans l'effet » : on doit savoir
+   en un coup d'œil que ce qu'on regarde n'est *pas* l'effet.
+   *(Ce point disait « le séparateur Avant/Après » avant la révision du § 3.3 ;
+   le séparateur est écarté, voir § 9.)*
 
 **Interdits rappelés** : pas de néon, pas de glassmorphism généralisé, pas de
 texte sous 12 px, pas d'`uppercase` + `letter-spacing` sur les libellés
@@ -360,7 +365,7 @@ appartenir à plusieurs thèmes**. Filtre secondaire dans la barre.
 
 ## 6. Les lots
 
-### B1 — Fondation du design des deux bibliothèques ⭐ **à faire en premier**
+### B1 — Fondation du design des deux bibliothèques ✅ **livré le 2026-08-02**
 
 Le lot demandé. **Aucun contenu nouveau** : on présente à fond ce qui existe.
 Objectif, dans les mots du porteur du projet : *« les meilleures bibliothèques
@@ -437,7 +442,128 @@ l'audit de la phase 4, et du bug 39 trouvé à l'usage) :
 
 Plus : `lint`, `build`, `test:scope`, `test:vibecut-ui-v2`, `test:vibecut-library`.
 
-### B2 — De vraies vidéos dans les aperçus
+**Résultat au 2026-08-02** — les dix points du gate sont couverts par
+`scripts/smoke-vibecut-library-b1.spec.cjs` (**17 tests**, suite navigateur portée
+à **60**). Ils mesurent les **pixels** des aperçus (`getImageData` : moyenne RVB
+plus une grille de 16 sondes) et les attributs que le rendu écrit dans le DOM
+(`data-preview-mode`, `data-preview-progress`, `data-preview-bypass`), jamais un
+libellé.
+
+Trois écarts par rapport au plan écrit ici, tous assumés et dits :
+
+1. **`useFavorites` vit dans `adapters/`, pas dans `library/`.** La règle d'or de
+   `plan.md` § 5.3 — aucun composant n'atteint IndexedDB directement, tout passe
+   par un adaptateur — est plus forte que le rangement proposé au § 5.1.
+2. **Les flèches scrubent, elles ne naviguent pas entre vignettes** (le § 5.3 les
+   voulait pour les deux). La navigation d'une carte à l'autre reste au **Tab**,
+   qui la fait déjà : détourner les flèches aurait retiré le **seul** accès
+   clavier au temps, qui est la fonction centrale de l'écran.
+3. **Le hover scrub ne s'arme pas sur pointeur tactile.** Un scrub au doigt
+   avalerait le tap de sélection. Sur téléphone la vignette continue de boucler,
+   et le jugement précis se fait dans le grand aperçu, qui a son curseur.
+
+**Seconde passe, après relecture de l'écran fini** — cinq corrections :
+la page Mouvements ouvre désormais sur les **six qui marchent**, les sept
+annoncées passant dans une **annexe en bas** ; le tri « exportables d'abord »
+(perdu au passage à l'ossature commune) est **rétabli**, complété d'un filtre
+**Export Pro** et d'un **avertissement au moment où l'on applique** une transition
+qui se dégradera ; les six curseurs de trajectoire sont **repliés par défaut** ;
+les images par seconde sont **mesurées** (60,2 au repos, 60,1 avec un scrub, sur
+38 vignettes) et le restent par un test ; les scènes de repli ont gagné du
+**relief** — un dégradé lisse zoomé à 116 % reste le même dégradé, la moitié des
+effets ne se voyaient donc pas avant d'avoir importé ses propres médias.
+
+**Deux défauts d'interaction trouvés par le test, pas par la relecture** (todo.md,
+bugs 41 à 43) : écrire `input.value` directement neutralise `onChange` côté React
+— le curseur de temps était mort une fois sur deux ; et le garde « ne pas
+déclencher B quand on tape » ignorait *tout* `INPUT`, donc le bypass devenait
+sourd juste après avoir déplacé ce curseur. Les deux étaient **silencieux**.
+
+### B3a — Fermeture de l'écart d'export ✅ **livré le 2026-08-02**
+
+**Décision du porteur du projet, prise le 2026-08-02** : traiter d'abord la part
+de B3 qui ferme l'écart d'export (cf. « Recommandation d'ordre », § 7). B2 passe
+après.
+
+**Le point de départ** : 23 des 38 transitions jouaient dans l'aperçu et
+repartaient en simple fondu à l'export. Quelqu'un pouvait mettre un glitch en
+favori, le poser sur son montage, et récupérer un fondu dans sa vidéo.
+
+**Ce qui a été fait** — les 31 cibles `xfade` natives inutilisées ont été
+**rendues et mesurées**, pas jugées sur leur nom :
+
+- **8 entrées existantes** pointent désormais sur la cible native qui tient
+  vraiment leur promesse : `smooth-cut` et `non-additive-dissolve` → `fade`
+  (elles étaient *déjà* dessinées comme un fondu simple dans l'aperçu, seule la
+  table de capacités l'ignorait), `whip-pan` → `slideleft`, `flash` →
+  `fadewhite`, `intro-cinematic-bars` → `horzopen`, `outro-cinematic-fade` →
+  `fadeblack`, `outro-neon-close` → `vertclose`, `outro-signal-collapse` →
+  `squeezev`.
+- **10 entrées nouvelles** ouvrent les sens qui manquaient et deux formes que le
+  catalogue n'avait pas du tout : volets et balayages dans les quatre
+  directions (`wiperight`, `wipeup`, `wipedown`, `slideright`, `smoothup`,
+  `smoothdown`), fermeture horizontale (`horzclose`), **rognage par le noir** en
+  cercle et en rectangle (`circlecrop`, `rectcrop`), **compression** (`squeezeh`).
+
+**Résultat : 15 → 33 transitions exportables, sur un catalogue passé de 38 à 48.
+Les « aperçu uniquement » tombent de 23 à 15.**
+
+**Trois courbes ont été RELEVÉES, pas devinées** (méthode du lot L1) :
+`circlecrop` suit `rayon = |1−2t|³ × hypot(w/2, h/2)` — le cube n'était pas
+devinable, et une décroissance linéaire aurait donné un tout autre effet ;
+`rectcrop` suit la même forme *sans* le cube ; `squeezeh`/`squeezev` compriment
+le plan sortant d'un facteur `1 − t` exactement, et le **mettent à l'échelle**
+plutôt que de le rogner (vérifié en comptant les bandes de couleur du plan
+source dans le résultat).
+
+**Trois cibles ont été ÉCARTÉES après mesure**, et c'est le vrai travail :
+
+| Écartée | Pourquoi |
+|---|---|
+| `fadefast`, `fadeslow` | Leur poids de mélange dépend de la **valeur du pixel**, pas seulement du temps : mesuré sur quatre gris, le poids va de 0,703 à 0,612 au même instant. Une table de courbe ne peut pas les reproduire, donc l'aperçu mentirait. `fadeslow` est de surcroît **indistinguable de `fade`** sur les couleurs saturées. |
+| `zoomin` | Déjà écarté au lot L1 (problème F), confirmé sur la planche de contact : le plan entrant arrive délavé. |
+| `distance`, `radial`, les 4 `diag*`, les 4 `wipe*` de coin, les 4 `*slice` | Pas de défaut mesuré — simplement pas retenues. Les `*slice` demandent de reconstituer le motif de lamelles de FFmpeg au pixel près pour un gain visuel modeste ; `radial` demande un dégradé conique à calibrer. À rouvrir si le besoin se fait sentir : les 10 cibles restantes sont documentées ici. |
+
+**Gate B3a** — tout mesuré, rien de déclaratif :
+1. `test:vibecut-xfade-preview-parity` : **29 cibles natives**, chacune comparée
+   image par image au rendu FFmpeg. Les rognages et compressions sont
+   échantillonnés **plus densément** (10 points au lieu de 4) parce que c'est
+   leur *courbe* qu'il faut prouver, pas seulement leur sens.
+2. `test:vibecut-xfade-local-mp4` : **34 MP4 réels**, construits par le
+   `buildFfmpegArgs` **du renderer lui-même**, pas par une commande réécrite.
+3. `test:vibecut-library` : 48 au catalogue, 33 exportables, 15 en aperçu seul —
+   les trois nombres écrits en dur, pour qu'une baisse se voie.
+4. Plus : `lint`, `build`, `test:scope`, `test:vibecut-ui-v2`,
+   `test:vibecut-export`.
+
+**Deux pièges payés, tous deux invisibles à la relecture** :
+
+- Un point d'échantillonnage qui **ne tombe pas sur une image entière** fait
+  comparer deux instants différents. `0,05 × 50 = 2,5` est arrondi à l'image 3,
+  soit `t = 0,06` côté FFmpeg contre `0,05` côté canvas ; sur une courbe aussi
+  raide que le rayon de `circlecrop`, ce centième suffit à faire échouer un test
+  pourtant juste. Le test **refuse** désormais un point hors grille.
+- Le test de rendu local exigeait que l'image du milieu **ne soit pas noire** —
+  or pour les deux rognages, être noir à mi-parcours **est** l'effet. L'assertion
+  a été inversée pour eux (noir au milieu **et** image encore présente au quart),
+  ce qui est plus fort que le contrôle générique : un rendu entièrement noir ne
+  passerait pas.
+
+**✅ DÉPLOYÉ le 2026-08-02** — révision **`00007-b5c`**, image
+`b3a-7ff9c28-20260802`. Pré-vol sur le service réel : **29 cibles `xfade` sur
+29**, `missing: []`, `errorCount: 0`, et `/render` répond toujours 401 sans
+signature. La révision `00006-6fw` reste disponible pour un retour arrière
+immédiat. **Le badge « Export Pro » ne devance plus la production.**
+
+**Ce qui reste « aperçu uniquement » (15)**, et pourquoi c'est le bon compte :
+`additive-dissolve`, `blur-dissolve`, `cross-blur`, `motion-blur`, `cross-zoom`,
+`snap-zoom`, `parallax-zoom`, `light-leak`, `strobe-cut`, `glitch`, `rgb-split`,
+`chromatic`, `intro-title-scan`, `intro-grid-reveal`, `intro-neon-doors`.
+**Aucune cible `xfade` native ne les rend.** Les faire passer demanderait
+d'écrire de vraies chaînes de filtres FFmpeg (flou directionnel animé, décalage
+de couches, bruit) — c'est du B3 complet, pas de la table de correspondance.
+
+### B2 — De vraies vidéos dans les aperçus ✅ **livré le 2026-08-03**
 
 Aujourd'hui les vignettes tournent sur des **images fixes** (miniatures). Un
 mouvement de caméra sur une photo se voit ; une transition entre deux rushs
@@ -461,6 +587,72 @@ animés, c'est autre chose.
 smoke ; la sélection de média suit bien l'ordre vidéo → photo → démo → dessin ;
 le poids ajouté au bundle est mesuré et sous le seuil décidé.
 
+**✅ Livré le 2026-08-03 — et sur un point, autrement que prévu.**
+
+- `useLibraryImages` → **`useLibraryMedia`**, avec les quatre étages. Les
+  **vidéos passent devant les photos** même quand une photo arrive plus tôt dans
+  le montage : c'est tout l'objet du lot.
+- **Les clips ne viennent pas d'une banque d'images, ils sont GÉNÉRÉS.** Le plan
+  prévoyait Mixkit ou Pexels. Deux raisons ont fait choisir autrement.
+  **Les droits** : ces clips sont servis à *tous* les visiteurs, pas seulement à
+  celui qui les importe, et le projet bloque déjà l'export d'une musique sans
+  déclaration de droits — il aurait fallu une licence lue et validée avant de
+  committer quoi que ce soit. **La cohérence** : en rejouant les deux scènes
+  dessinées du repli (`libraryFallbackScene.js`) dans un Chromium sans fenêtre,
+  les clips ont *par construction* l'aspect exact du repli, donc on ne voit pas
+  l'étage changer sous ses pieds. `build-vibecut-library-demo-clips.mjs` les
+  reproduit à l'identique. **77 Ko pour les deux**, contre un plafond de 1,5 Mo.
+  Passer à du vrai rush reste un changement de **données**, pas de code.
+- **Une décision de conception imposée par un test** : hors de la boucle, la
+  vignette dessine désormais une **copie figée** de la source
+  (`librarySourceFreeze.js`). Sans elle, le rush continuait de tourner sous un
+  scrub arrêté — donc le hover scrub comparait deux instants différents du plan,
+  et surtout le **bypass ne prouvait plus rien** : les deux états différaient par
+  l'effet *et* par le contenu. C'est l'assertion « le relâchement rend l'effet »
+  du lot B1 qui l'a trouvé, en se mettant à échouer dès l'arrivée des clips.
+- **Cadence tenue** : 60,3 images/seconde grille au repos, 60,1 avec un scrub en
+  cours, sur des sources vidéo — contre 60,2 sur images fixes. Plancher de test
+  à 24.
+- **Gate** : `smoke-vibecut-library-media.mjs` (droits, présence des fichiers,
+  poids, 6 règles d'ordre) + `smoke-vibecut-library-b2.spec.cjs` (4 tests
+  navigateur). Suite portée de 60 à **64 tests**.
+
+### B3b — Les 15 dernières transitions ✅ **terminé le 2026-08-03**
+
+> Parité verte, sentinelles 5/5, rollout fait (révision `00008-8gr`).
+
+Plan et retour d'expérience complets, séparés parce que c'est long :
+**[vibecut-transitions-b3b-plan-2026-08-02.md](vibecut-transitions-b3b-plan-2026-08-02.md)**
+— le **§ 10** est la partie utile pour la suite : il consigne ce que la mesure a
+contredit.
+
+Décision du porteur du projet le 2026-08-02 : les traiter **d'un bloc**. Aucune
+cible `xfade` native ne les rend — chacune est donc **construite** avec des
+filtres natifs posés sur la queue du plan sortant et la tête du plan entrant.
+La voie par expression par pixel reste **écartée** (facteur ~40 sur le temps de
+rendu). Résultat : **48 exportables sur 48**, plus aucune entrée « Aperçu
+uniquement ».
+
+**Le fait marquant, à retenir pour tout ajout futur** : `sendcmd` — la façon
+évidente de faire varier une option dans le temps — **diffuse ses commandes à
+tous les filtres du graphe** portant le nom visé, et le nommage d'instance
+(`gblur@…`) ne fonctionne pas dans le build FFmpeg déployé. Conséquence mesurée :
+sur un montage à deux coupes, **la deuxième coupe rendait un fondu simple**. Les
+rampes sont donc des **chaînes de douze filtres à valeur constante**, chacun
+ouvert sur un douzième de la fenêtre par sa porte `enable`. **Un test sur deux
+plans n'aurait rien vu** : le gate exige désormais un enchaînement de trois.
+
+Deuxième leçon de coût : la dépense n'était pas l'effet mais l'aller-retour
+`yuv420p ↔ gbrp`, **1,1 s à lui seul** sur tout un montage. Le confiner à la
+fenêtre fait tomber l'aberration chromatique de 2,20 s à 0,83 s.
+
+**Conséquence sur l'écran** : le badge « Export Pro » aurait été sur les 48
+cartes et le filtre du même nom ne retirait plus rien — un contrôle qui ne filtre
+jamais est un bouton mort. Les deux portent maintenant l'usage
+(**ouverture / fin de séquence**), et le filtre devient « Entre deux plans »
+(41 sur 48). L'avertissement d'export subsiste, lu à l'exécution : il
+reviendrait de lui-même si une capacité serveur disparaissait.
+
 ### B3 — Le contenu qui manque
 
 Le vrai chantier, et le plus long. **Chaque ajout coûte deux implémentations**
@@ -471,9 +663,9 @@ Le vrai chantier, et le plus long. **Chaque ajout coûte deux implémentations**
 - **Effets pendant le rush** — c'est là que le retard sur Premiere/DaVinci est
   réel : secousse, flou directionnel animé, fuite de lumière, vignettage animé,
   grain animé, zoom pulsé sur le rythme.
-- **Transitions** : le filtre `xfade` expose **46** cibles natives ; **15** sont
-  employées. Les 31 restantes sont à trier — toutes ne méritent pas d'exister
-  (`zoom-punch` a été écarté après mesure, cf. problème F).
+- ~~**Transitions**~~ — **fait** : 29 cibles `xfade` natives employées au lot B3a,
+  puis les 15 sans équivalent natif construites au lot B3b. Le catalogue est
+  complet et **entièrement exportable**.
 - **Thèmes éditoriaux** sur les 51 entrées.
 
 **Contraintes non négociables pour chaque ajout** :
@@ -494,6 +686,39 @@ Le vrai chantier, et le plus long. **Chaque ajout coûte deux implémentations**
 | 1 | **B1 — design** | C'est ce qui a été demandé. Il ne dépend d'aucun contenu nouveau, et il définit le cadre que B2 et B3 rempliront. Le faire après B3 obligerait à tout redessiner. |
 | 2 | **B2 — vraies vidéos** | Rend les aperçus crédibles. Indépendant de B3. |
 | 3 | **B3 — contenu** | Le plus long et le plus risqué. Une fondation qui absorbe le contenu sans être redessinée est la condition pour que ce lot soit rentable. |
+
+### Recommandation d'ordre, écrite après avoir livré B1 — décision au porteur du projet
+
+L'ordre ci-dessus tient toujours pour B1. Pour la suite, ce que la livraison a
+rendu visible mérite d'être posé noir sur blanc :
+
+> **23 des 38 transitions ne survivent pas à l'export.** Elles jouent dans
+> l'aperçu, et le serveur les remplace par un fondu. B1 l'a rendu impossible à
+> ignorer (tri, filtre, avertissement à l'application), mais **le trou reste
+> entier**, et il est du ressort de B3.
+
+Or B2 rend la page **plus séduisante** — de vraies vidéos dans les vignettes —
+tandis que faire passer une partie de ces 23 du côté « vraiment rendue » rend la
+bibliothèque **fiable**. Aujourd'hui, quelqu'un peut mettre un glitch en favori,
+le poser sur son montage, et récupérer un fondu dans sa vidéo finale.
+
+**Ma recommandation** : traiter en premier la part de B3 qui ferme cet écart
+(trier les 31 cibles `xfade` natives inutilisées, en retenir celles qui valent la
+peine, prouver la parité), puis faire B2.
+
+**L'argument contraire, qui est réel** : chaque transition ajoutée coûte **deux**
+implémentations — navigateur et expression FFmpeg — plus une preuve de parité
+image par image et un rollout Cloud Run. B2 est bien plus rapide et donne
+immédiatement quelque chose à montrer. Si l'objectif court terme est de
+démontrer le produit, B2 d'abord est le bon choix.
+
+**La décision appartient au porteur du projet ; rien n'a été réordonné sans lui.**
+
+> **TRANCHÉ le 2026-08-02 : fermer d'abord l'écart d'export.** Le lot **B3a**
+> (§ 6) en est le résultat — 15 → 33 transitions exportables. **B2 vient
+> ensuite.** Le trou n'est pas entièrement comblé : 15 entrées restent en aperçu
+> seul faute de cible `xfade` native, et elles relèvent de vraies chaînes de
+> filtres FFmpeg, donc du B3 complet.
 
 ---
 

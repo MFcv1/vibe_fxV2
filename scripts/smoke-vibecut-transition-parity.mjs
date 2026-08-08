@@ -18,6 +18,8 @@ import { pathToFileURL } from "node:url";
 
 import {
   SERVER_XFADE_TRANSITION_MAP as RENDERER_MAP,
+  SERVER_TRANSITION_EFFECTS as RENDERER_EFFECTS,
+  TRANSITION_EFFECT_STEPS as RENDERER_STEPS,
   resolveXfadeTransitionName,
   validateManifest as validateRendererManifest,
 } from "../render-service/src/server.js";
@@ -31,7 +33,13 @@ try {
   const manifestModule = await importAppModule(
     path.join("src", "features", "vibefx-studio", "video", "export", "exportManifest.js"),
   );
-  const { SERVER_XFADE_TRANSITION_MAP: APP_MAP, SERVER_RENDER_CAPABILITIES, validateExportRenderCoverage } = manifestModule;
+  const {
+    SERVER_XFADE_TRANSITION_MAP: APP_MAP,
+    SERVER_TRANSITION_EFFECTS: APP_EFFECTS,
+    TRANSITION_EFFECT_STEPS: APP_STEPS,
+    SERVER_RENDER_CAPABILITIES,
+    validateExportRenderCoverage,
+  } = manifestModule;
 
   // 1. Les deux tables sont identiques, cle par cle et valeur par valeur.
   assert.deepEqual(
@@ -39,6 +47,37 @@ try {
     RENDERER_MAP,
     "la table xfade de exportManifest.js et celle du renderer doivent etre identiques",
   );
+
+  /*
+   * Lot B3b : une SECONDE table est tripliquee, celle des effets. Les memes
+   * nombres sont lus par le renderer et par l'apercu canvas ; s'ils divergeaient,
+   * l'apercu montrerait un flou plus fort ou un zoom plus court que l'export,
+   * et aucune mesure de parite ne le dirait - elle compare deux images produites
+   * par deux tables differentes, chacune coherente avec elle-meme.
+   */
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(APP_EFFECTS)),
+    JSON.parse(JSON.stringify(RENDERER_EFFECTS)),
+    "la table d'effets de exportManifest.js et celle du renderer doivent etre identiques",
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(functionsExport.SERVER_TRANSITION_EFFECTS)),
+    JSON.parse(JSON.stringify(RENDERER_EFFECTS)),
+    "la table d'effets de functions/src/videoExport.js doit etre identique aux deux autres",
+  );
+  assert.equal(APP_STEPS, RENDERER_STEPS, "le nombre de paliers doit etre le meme des deux cotes");
+  assert.equal(functionsExport.TRANSITION_EFFECT_STEPS, RENDERER_STEPS, "le nombre de paliers doit etre le meme cote Functions");
+  assert.deepEqual(
+    [...functionsExport.SERVER_XFADE_TRANSITIONS].sort(),
+    Object.keys(RENDERER_MAP).sort(),
+    "la liste d'ids acceptes par Functions doit etre exactement celle de la table xfade",
+  );
+  Object.keys(RENDERER_EFFECTS).forEach((id) => {
+    assert.ok(
+      Object.hasOwn(RENDERER_MAP, id),
+      `${id} a un effet declare mais n'est pas dans la table xfade: il ne serait jamais rendu`,
+    );
+  });
 
   const ids = Object.keys(RENDERER_MAP);
   assert.ok(ids.length >= 16, `au moins 16 transitions minutees attendues, ${ids.length} trouvees`);
@@ -84,6 +123,19 @@ try {
       `xfadeTransitions.js ne rend pas '${xfadeName}' : l'apercu mentirait sur l'export`,
     );
   });
+  /*
+   * Les transitions du lot B3b partagent leur cible de jointure : verifier la
+   * cible ne dirait donc RIEN d'elles. C'est le nom de leur EFFET qui doit etre
+   * aiguille, sans quoi elles retomberaient toutes sur un simple fondu a l'apercu
+   * pendant que l'export, lui, poserait bien les filtres.
+   */
+  new Set(Object.values(RENDERER_EFFECTS).map((effect) => effect.effect)).forEach((kind) => {
+    assert.match(
+      xfadeSource,
+      new RegExp(`case '${kind}'`),
+      `xfadeTransitions.js n'aiguille pas l'effet '${kind}' : l'apercu rendrait un fondu la ou l'export pose un filtre`,
+    );
+  });
 
   // 4. Les trois validations acceptent chaque id, et refusent un id hors table.
   const accepted = ids.map((id) => {
@@ -97,7 +149,13 @@ try {
     return { id, xfade: RENDERER_MAP[id] };
   });
 
-  const unknown = makeManifest("light-leak");
+  /*
+   * Temoin negatif. `light-leak` servait ici jusqu'au lot B3b ; il est desormais
+   * rendu, donc il ne prouve plus rien. Un id qui n'existe dans AUCUNE table le
+   * remplace - si celui-la venait a etre accepte, c'est que la validation ne
+   * valide plus rien.
+   */
+  const unknown = makeManifest("transition-qui-n-existe-pas");
   assert.equal(validateExportRenderCoverage(unknown).supported, false, "une transition hors table doit rester refusee cote client");
   assert.ok(functionsExport.validateExportManifest(unknown, { uid }).length > 0, "une transition hors table doit rester refusee cote Functions");
   assert.ok(validateRendererManifest(unknown).errors.length > 0, "une transition hors table doit rester refusee cote renderer");

@@ -1129,3 +1129,66 @@
     border: 1px solid var(--vc-line);
     background: var(--vc-surface-2);
 }
+
+/*
+ * Mention « Aperçu » sur un raccourci non exportable. Elle n'apparait que si
+ * l'utilisateur a mis en favori une transition que le renderer ne rend pas: on
+ * respecte son choix, mais on ne le laisse pas construire un montage qu'il ne
+ * pourra pas exporter sans l'avoir su.
+ */
+.transitionFlag {
+    margin-left: var(--vc-space-2);
+    padding: 1px 6px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-surface-3);
+    font-size: var(--vc-text-xs);
+    font-weight: 500;
+    color: var(--vc-warning);
+}
+
+/*
+ * ACCENTS (effets pendant le plan) - lot B3.
+ * Rangee distincte de la grille de mouvements: un accent se COMPOSE avec le
+ * mouvement, il ne le remplace pas.
+ */
+.accentRow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--vc-line);
+}
+
+.accentLabel {
+    font-size: 13px;
+    color: var(--vc-text-2);
+}
+
+.accentChoices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.accentChip {
+    padding: 7px 14px;
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    color: var(--vc-text-2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background var(--vc-dur-2) var(--vc-ease), color var(--vc-dur-2) var(--vc-ease);
+}
+
+.accentChip:hover {
+    background: var(--vc-surface-3);
+    color: var(--vc-text);
+}
+
+.accentChipActive {
+    background: var(--vc-accent-quiet);
+    border-color: var(--vc-accent-line);
+    color: var(--vc-text);
+}

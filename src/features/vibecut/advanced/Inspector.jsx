@@ -3,14 +3,17 @@
 import React, { useCallback, useMemo } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
 import { getServerRenderCapabilityStatus } from '@/features/vibefx-studio/video/export/exportManifest';
+import { IMAGE_MOTION_ACCENTS } from '@/features/vibefx-studio/video/model/mediaModel';
 import { Badge, Button, Collapsible } from '../primitives';
 import {
     MIN_TRANSITION_DURATION,
     clampTransitionDuration,
     getMaxTransitionDuration,
+    useSequenceTransitions,
 } from '../adapters/useTimeline';
 import { getAvailableMotions } from '../data/motionCatalog';
 import { TRANSITION_CATALOG } from '../data/transitionCatalog';
+import useFavorites from '../adapters/useFavorites';
 import TextInspector from '../quick/TextInspector';
 import styles from './advanced.module.css';
 
@@ -42,6 +45,91 @@ function formatSeconds(value = 0) {
     return `${(Math.round((Number(value) || 0) * 100) / 100).toFixed(2)} s`;
 }
 
+
+/*
+ * OUVERTURE ET FIN DE SEQUENCE (2026-08-04).
+ *
+ * POURQUOI ICI, quand rien n'est selectionne. Une ouverture n'appartient a aucun
+ * plan: elle appartient au MONTAGE. La ranger dans l'inspecteur d'un plan aurait
+ * laisse croire qu'elle se pose sur ce plan-la, et aurait rendu la fin de
+ * sequence introuvable - le dernier plan n'a pas de panneau de transition.
+ *
+ * CE QU'ELLES FONT, ET EN QUOI C'EST DIFFERENT D'UNE TRANSITION ENTRE DEUX
+ * PLANS. Une transition de coupe fait CHEVAUCHER deux plans: elle raccourcit le
+ * montage. Une ouverture, elle, ALLONGE le montage - elle occupe un temps propre
+ * avant le premier plan, qui est decale d'autant (`getIntroOffset`). C'est la
+ * difference entre « fondre A vers B » et « ouvrir sur A ».
+ */
+function SequencePanel({ actions, intro, outro }) {
+    const entries = useMemo(() => {
+        const decorate = (usage) => TRANSITION_CATALOG
+            .filter((entry) => entry.usage === usage)
+            .map((entry) => ({
+                ...entry,
+                status: getServerRenderCapabilityStatus('timedTransition', entry.engineId || entry.id),
+            }));
+        return { opening: decorate('opening'), closing: decorate('closing') };
+    }, []);
+
+    const renderSlot = (slot, label, hint, list, current) => (
+        <Collapsible
+            title={label}
+            defaultOpen={false}
+            value={<Badge tone="neutral">{current?.name || 'Aucune'}</Badge>}
+            testId={`vibecut-sequence-${slot}`}
+        >
+            <p className={styles.sectionHint}>{hint}</p>
+            <div className={styles.transitionList}>
+                <button
+                    type="button"
+                    className={styles.transitionOption}
+                    aria-pressed={!current}
+                    onClick={() => actions.setSequenceTransition(slot, null)}
+                    data-testid={`vibecut-sequence-${slot}-none`}
+                >
+                    <span className={styles.transitionName}>Aucune</span>
+                </button>
+                {list.map((entry) => (
+                    <button
+                        key={entry.id}
+                        type="button"
+                        className={styles.transitionOption}
+                        aria-pressed={(current?.type || null) === (entry.engineId || entry.id)}
+                        onClick={() => actions.setSequenceTransition(slot, entry)}
+                        data-testid={`vibecut-sequence-${slot}-${entry.id}`}
+                    >
+                        <span className={styles.transitionName}>{entry.name}</span>
+                        {entry.status.supported ? null : (
+                            <span className={styles.transitionFlag}>Aperçu</span>
+                        )}
+                    </button>
+                ))}
+            </div>
+        </Collapsible>
+    );
+
+    return (
+        <div data-testid="vibecut-sequence-panel">
+            {renderSlot(
+                'intro',
+                'Ouverture de séquence',
+                'Se joue AVANT le premier plan et allonge le montage d’autant : '
+                + 'elle ne rogne pas ta première image, contrairement à une transition entre deux plans.',
+                entries.opening,
+                intro,
+            )}
+            {renderSlot(
+                'outro',
+                'Fin de séquence',
+                'Se joue APRÈS le dernier plan. C’est le seul endroit du montage où une fin '
+                + 'peut réellement fermer la séquence.',
+                entries.closing,
+                outro,
+            )}
+        </div>
+    );
+}
+
 function EmptyInspector() {
     return (
         <div className={styles.inspectorEmpty} data-testid="vibecut-inspector-empty">
@@ -62,21 +150,49 @@ function EmptyInspector() {
  * plan qui la precede, comme dans le montage rapide, en passant par la meme
  * action `applyTransition`.
  *
- * Les 15 transitions minutees rendues par le serveur viennent en premier; les
- * autres restent proposables mais annoncent qu'elles ne survivront pas a
- * l'export Pro. On n'en cache aucune, on ne ment sur aucune.
+ * Les transitions minutees rendues par le serveur — 15 au lot L1, 33 depuis le
+ * lot B3a — viennent en premier; les autres restent proposables mais annoncent
+ * qu'elles ne survivront pas a l'export Pro. On n'en cache aucune, on ne ment
+ * sur aucune.
  */
 function TransitionToNextPanel({ scene, scenes, sceneActions, defaultOpen = false, focusKey = 'none' }) {
+    /*
+     * LOT B1 - les favoris remontent EN TETE.
+     *
+     * Il n'y a pas la place d'afficher des apercus dans cette liste, et c'est
+     * precisement pourquoi les favoris comptent ici: on a juge en amont, en
+     * grand, dans la bibliotheque. L'inspecteur LIT `useFavorites`, il ne
+     * duplique aucun etat - une seconde source de verite etait le risque
+     * identifie dans la feuille de route.
+     */
+    const { favorites } = useFavorites('transitions');
+    /*
+     * LES TROIS USAGES SONT RANGES SEPAREMENT (2026-08-04).
+     *
+     * Les quarante-huit entrees arrivaient en une seule liste ou les sept
+     * ouvertures et fins de sequence etaient noyees au milieu des jointures. Le
+     * badge de la bibliotheque le disait, ce panneau non - et c'est ICI qu'on
+     * choisit vraiment. Chercher « la fin cinema » dans une liste de quarante-
+     * huit revenait a la connaitre par coeur.
+     *
+     * L'ordre suit le montage lui-meme: ce qui ouvre, ce qui joint, ce qui
+     * termine. Une section vide ne s'affiche pas - un intertitre sans contenu
+     * est une coquille morte (plan.md § 4.2).
+     */
     const options = useMemo(() => {
         const decorated = TRANSITION_CATALOG.map((entry) => ({
             ...entry,
             status: getServerRenderCapabilityStatus('timedTransition', entry.engineId || entry.id),
         }));
+        const isFavorite = (entry) => favorites.includes(entry.id);
+        const rest = decorated.filter((entry) => !isFavorite(entry));
         return {
-            exportable: decorated.filter((entry) => entry.status.supported),
-            previewOnly: decorated.filter((entry) => !entry.status.supported),
+            favorites: decorated.filter(isFavorite),
+            opening: rest.filter((entry) => entry.usage === 'opening'),
+            between: rest.filter((entry) => !entry.usage),
+            closing: rest.filter((entry) => entry.usage === 'closing'),
         };
-    }, []);
+    }, [favorites]);
 
     const current = scene.transitionToNext;
     const activeId = current?.type || null;
@@ -140,13 +256,43 @@ function TransitionToNextPanel({ scene, scenes, sceneActions, defaultOpen = fals
                 >
                     <span className={styles.transitionName}>Coupe franche</span>
                 </button>
-                {options.exportable.map(renderOption)}
             </div>
 
-            <p className={styles.groupLabel}>Aperçu uniquement</p>
-            <div className={styles.transitionList}>
-                {options.previewOnly.map(renderOption)}
-            </div>
+            {/* Les favoris passent AVANT le reste: c'est tout leur interet ici. */}
+            {options.favorites.length > 0 ? (
+                <>
+                    <p className={styles.groupLabel} data-testid="vibecut-adv-transition-favorites">Tes favoris</p>
+                    <div className={styles.transitionList}>
+                        {options.favorites.map(renderOption)}
+                    </div>
+                </>
+            ) : null}
+
+            {/*
+              * L'ordre du montage: ce qui OUVRE, ce qui JOINT, ce qui TERMINE.
+              * L'avertissement d'export n'a plus d'intertitre depuis le lot B3b -
+              * les quarante-huit entrees sont rendues, donc un titre « Rendues a
+              * l'export » coifferait la liste entiere. Il est porte par la carte
+              * elle-meme (« Aperçu »), et il revient de lui-meme si une capacite
+              * serveur disparait.
+              */}
+            {[
+                { id: 'opening', label: 'Ouverture de séquence', entries: options.opening },
+                { id: 'between', label: 'Entre deux plans', entries: options.between },
+                { id: 'closing', label: 'Fin de séquence', entries: options.closing },
+            ].map((section) => (section.entries.length === 0 ? null : (
+                <React.Fragment key={section.id}>
+                    <p
+                        className={styles.groupLabel}
+                        data-testid={`vibecut-adv-transition-group-${section.id}`}
+                    >
+                        {section.label}
+                    </p>
+                    <div className={styles.transitionList}>
+                        {section.entries.map(renderOption)}
+                    </div>
+                </React.Fragment>
+            )))}
 
             {current ? (
                 <>
@@ -222,15 +368,27 @@ function ClipPanels({ item, actions, motions, scene, scenes, sceneActions, focus
 
     return (
         <>
-            {isImage ? (
-                <Collapsible
-                    key={`motion-${focusKey}`}
-                    title="Mouvement"
-                    defaultOpen={focusSection ? focusSection === 'motion' : true}
-                    testId="vibecut-inspector-motion"
-                >
+            {/*
+              * BUG TROUVE LE 2026-08-04 en pilotant le montage avance sur de
+              * vrais rushs : ce bloc etait pose sous `isImage`, donc un plan
+              * VIDEO n'offrait aucun mouvement ici.
+              *
+              * Le garde n'avait plus de raison d'etre depuis le lot B3
+              * (2026-08-03), qui a leve la restriction photo dans le moteur : le
+              * recadrage anime est pose sur une video comme sur une photo, et
+              * `smoke-vibecut-motion-preview-parity` le prouve image par image
+              * (cas « pan-right sur VIDEO »). Le mode rapide et la bibliotheque
+              * avaient ete mis a jour, l'inspecteur avance avait ete oublie -
+              * l'interface la plus complete etait donc la moins capable.
+              */}
+            <Collapsible
+                key={`motion-${focusKey}`}
+                title="Mouvement"
+                defaultOpen={focusSection ? focusSection === 'motion' : true}
+                testId="vibecut-inspector-motion"
+            >
                     <p className={styles.sectionHint}>
-                        Anime la photo pendant toute sa durée à l’écran.
+                        Anime le plan pendant toute sa durée à l’écran, photo comme vidéo.
                     </p>
                     <div className={styles.motionGrid}>
                         {motions.map((entry) => (
@@ -245,10 +403,19 @@ function ClipPanels({ item, actions, motions, scene, scenes, sceneActions, focus
                                  * et la photo continuerait de zoomer alors que
                                  * l'interface annoncerait « Fixe ».
                                  */
+                                /*
+                                 * L'ACCENT SURVIT au changement de preset. Sans
+                                 * ces deux lignes, choisir un mouvement effacerait
+                                 * l'effet pose a cote - `setClipMotion` remplace
+                                 * l'objet entier. Le mode rapide a deja paye ce
+                                 * defaut (voir useScenes.js).
+                                 */
                                 onClick={() => actions.setClipMotion(clip.id, {
                                     preset: entry.engineId,
                                     easing: motion.easing,
                                     intensity: motion.intensity,
+                                    accent: motion.accent || 'none',
+                                    accentIntensity: motion.accentIntensity ?? 1,
                                 })}
                                 data-testid={`vibecut-adv-motion-${entry.id}`}
                             >
@@ -275,6 +442,8 @@ function ClipPanels({ item, actions, motions, scene, scenes, sceneActions, focus
                                 preset: motion.preset,
                                 easing: motion.easing,
                                 intensity: Number(event.target.value) / 100,
+                                accent: motion.accent || 'none',
+                                accentIntensity: motion.accentIntensity ?? 1,
                             }, { history: false })}
                             aria-label="Intensité du mouvement"
                             data-testid="vibecut-motion-intensity"
@@ -283,10 +452,49 @@ function ClipPanels({ item, actions, motions, scene, scenes, sceneActions, focus
                     <p className={styles.note}>
                         {motion.preset === 'none'
                             ? 'Choisis d’abord un mouvement : l’intensité n’a rien à régler sur un plan fixe.'
-                            : 'L’intensité raccourcit la course du mouvement sans recadrer la photo. L’export applique exactement le même facteur.'}
+                            : 'L’intensité raccourcit la course du mouvement sans recadrer le plan. L’export applique exactement le même facteur.'}
                     </p>
+
+                    {/*
+                      * LES EFFETS PENDANT LE PLAN, absents du montage avance
+                      * jusqu'au 2026-08-04 : ils n'existaient que dans le mode
+                      * rapide, donc l'interface la plus complete du produit
+                      * etait la seule a ne pas les proposer.
+                      *
+                      * Une rangee separee et non une carte de plus dans la
+                      * grille : un accent se COMPOSE avec le mouvement, il ne le
+                      * remplace pas - une secousse sur un zoom avant est le cas
+                      * le plus courant.
+                      */}
+                    <div className={styles.accentRow} data-testid="vibecut-accent-row">
+                        <span className={styles.sliderLabel}>Effet pendant le plan</span>
+                        <div className={styles.chipRow}>
+                            {IMAGE_MOTION_ACCENTS.map((accent) => (
+                                <button
+                                    key={accent.id}
+                                    type="button"
+                                    className={styles.motionChip}
+                                    aria-pressed={(motion.accent || 'none') === accent.id}
+                                    title={accent.description}
+                                    data-testid={`vibecut-accent-${accent.id}`}
+                                    onClick={() => actions.setClipMotion(clip.id, {
+                                        preset: motion.preset,
+                                        easing: motion.easing,
+                                        intensity: motion.intensity,
+                                        accent: accent.id,
+                                        accentIntensity: motion.accentIntensity ?? 1,
+                                    })}
+                                >
+                                    {accent.name}
+                                </button>
+                            ))}
+                        </div>
+                        <p className={styles.note}>
+                            Un effet se pose EN PLUS du mouvement : une secousse sur un zoom
+                            avant garde les deux.
+                        </p>
+                    </div>
                 </Collapsible>
-            ) : null}
 
             <Collapsible
                 key={`transform-${focusKey}`}
@@ -466,6 +674,9 @@ export default function Inspector({
     item, actions, totalDuration, sceneActions, scenes = [], focusSection = null,
 }) {
     const motions = useMemo(() => getAvailableMotions(), []);
+    // Les deux emplacements de sequence: lus meme quand un plan est selectionne,
+    // parce qu'un hook ne peut pas etre appele conditionnellement.
+    const { intro: sequenceIntro, outro: sequenceOutro } = useSequenceTransitions();
     /*
      * Une transition selectionnee renvoie a la scene qui la PRECEDE: c'est elle
      * qui la porte, et `applyTransition` reste le chemin d'ecriture unique.
@@ -484,6 +695,7 @@ export default function Inspector({
         return (
             <aside className={styles.inspector} data-testid="vibecut-advanced-inspector" aria-label="Inspecteur">
                 <EmptyInspector />
+                <SequencePanel actions={actions} intro={sequenceIntro} outro={sequenceOutro} />
             </aside>
         );
     }
@@ -550,6 +762,18 @@ export default function Inspector({
                         onRemove={() => sceneActions.removeMusic(item.id)}
                     />
                 ) : null}
+
+                {/*
+                  * TOUJOURS EN BAS, quelle que soit la selection. Premier jet:
+                  * ce panneau n'apparaissait QUE lorsque rien n'etait
+                  * selectionne - or apres un import un plan est selectionne
+                  * d'office, donc il fallait deviner qu'il fallait deselectionner
+                  * pour le trouver. Un reglage qu'on ne trouve pas n'existe pas.
+                  * Il ne depend d'aucun plan: il est donc pose apres tout le
+                  * reste, la ou on ne le confondra pas avec les reglages du plan
+                  * selectionne.
+                  */}
+                <SequencePanel actions={actions} intro={sequenceIntro} outro={sequenceOutro} />
             </div>
         </aside>
     );

@@ -1,7 +1,17 @@
 /*
- * Bibliotheques de transitions et de mouvements (phase 5).
- * Deux colonnes: le catalogue defile, le panneau d'application reste. La page
- * elle-meme ne defile jamais, comme les trois modes de montage.
+ * Les deux bibliotheques - transitions et mouvements (lot B1).
+ *
+ * DIRECTION ARTISTIQUE (plan.md § 4): le chassis est DISCRET, les apercus
+ * prennent la place. C'est l'ecran ou cette regle joue le plus en notre faveur,
+ * puisque le contenu ici, ce sont les animations elles-memes.
+ *
+ * Concretement: le catalogue est pose sur le fond ENFONCE et les cartes sont des
+ * surfaces claires qui flottent dessus. Aucune couleur decorative, aucun degrade,
+ * aucun neon - l'accent ne sert qu'a dire ce qui est selectionne.
+ *
+ * Deux colonnes, jamais trois: un rail de familles a gauche ferait un second
+ * systeme de navigation a cote du bandeau VibeCut (interdit, § 4.4). Les familles
+ * sont une barre horizontale, repliee en menu sous 720 px.
  */
 
 .screen {
@@ -13,13 +23,14 @@
     overflow: hidden;
 }
 
+/* ---------- En-tete ---------- */
+
 .screenHead {
     display: flex;
     align-items: flex-start;
     gap: var(--vc-space-4);
     flex: 0 0 auto;
-    padding: var(--vc-space-4) var(--vc-space-5);
-    border-bottom: 1px solid var(--vc-line);
+    padding: var(--vc-space-5) var(--vc-space-6) var(--vc-space-4);
     background: var(--vc-bg);
 }
 
@@ -32,12 +43,13 @@
 }
 
 .screenTitle {
-    font-size: var(--vc-text-lg);
-    letter-spacing: -0.01em;
+    font-size: var(--vc-text-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
 }
 
 .screenSubtitle {
-    font-size: var(--vc-text-sm);
+    font-size: var(--vc-text-base);
     color: var(--vc-text-2);
     max-width: 68ch;
 }
@@ -60,41 +72,212 @@
     color: var(--vc-text);
 }
 
+/* ---------- Barre de filtres ---------- */
+
+.filters {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+    flex: 0 0 auto;
+    padding: 0 var(--vc-space-6) var(--vc-space-4);
+    border-bottom: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.searchField {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 0 0 240px;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 10px;
+    color: var(--vc-text-3);
+    pointer-events: none;
+}
+
+.searchInput {
+    width: 100%;
+    height: 34px;
+    padding: 0 30px 0 30px;
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+}
+
+.searchInput::-webkit-search-cancel-button {
+    /* On fournit notre propre croix: celle du navigateur ne suit pas le theme. */
+    appearance: none;
+}
+
+.searchClear {
+    position: absolute;
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    color: var(--vc-text-3);
+}
+
+.searchClear:hover {
+    color: var(--vc-text);
+}
+
+.filterChips {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    /* Une rangee de familles qui deborde doit defiler, pas casser la mise en page. */
+    scrollbar-width: none;
+}
+
+.filterChips::-webkit-scrollbar {
+    display: none;
+}
+
+/* Le bord droit s'estompe: une pastille coupee net se lit comme un defaut de
+ * mise en page, un degrade dit « ca continue, fais defiler ». */
+@supports (mask-image: linear-gradient(90deg, #000, transparent)) {
+    .filterChips {
+        mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    }
+}
+
+.filterChip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vc-space-1);
+    flex: 0 0 auto;
+    height: 30px;
+    padding: 0 var(--vc-space-3);
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid transparent;
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text-2);
+    white-space: nowrap;
+    transition: background var(--vc-dur-1) var(--vc-ease), color var(--vc-dur-1) var(--vc-ease);
+}
+
+.filterChip:hover {
+    background: var(--vc-surface-3);
+    color: var(--vc-text);
+}
+
+.filterChipActive,
+.filterChipActive:hover {
+    border-color: var(--vc-accent-line);
+    background: var(--vc-accent-quiet);
+    color: var(--vc-text);
+}
+
+.filterChipStar {
+    padding-left: var(--vc-space-2);
+}
+
+.filterCount {
+    font-family: var(--vc-font-numeric);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.filterDivider {
+    flex: 0 0 auto;
+    margin: 0 var(--vc-space-1);
+    width: 1px;
+    height: 18px;
+    background: var(--vc-line-strong);
+}
+
+.filterSelect {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 var(--vc-space-2);
+    border-radius: var(--vc-radius-pill);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface);
+    color: var(--vc-text);
+    font-size: var(--vc-text-sm);
+}
+
+.filterResult {
+    flex: 0 0 auto;
+    font-family: var(--vc-font-numeric);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    white-space: nowrap;
+}
+
+/* ---------- Corps ---------- */
+
 .body {
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
 }
 
-/* ---------- Catalogue ---------- */
-
 .catalog {
     display: flex;
     flex-direction: column;
-    gap: var(--vc-space-6);
+    gap: var(--vc-space-8);
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--vc-space-5);
+    padding: var(--vc-space-6);
+    /* Fond enfonce: les cartes flottent dessus au lieu de s'y fondre. */
+    background: var(--vc-bg-sunken);
 }
 
 .group {
     display: flex;
     flex-direction: column;
-    gap: var(--vc-space-3);
+    gap: var(--vc-space-4);
 }
 
 .groupHead {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
     gap: var(--vc-space-3);
+    flex-wrap: wrap;
+}
+
+/*
+ * La section des entrees annoncees est une ANNEXE, pas une famille: trait de
+ * separation, titre en retrait, vignettes attenuees. Sur la bibliotheque de
+ * mouvements, sept entrees sur treize sont dans ce cas - leur donner la meme
+ * presence qu'aux six qui marchent faisait passer le catalogue pour a moitie
+ * vide, alors que ce qui est disponible tient tres bien debout.
+ */
+.groupMuted {
+    margin-top: var(--vc-space-4);
+    padding-top: var(--vc-space-6);
+    border-top: 1px solid var(--vc-line);
+}
+
+.groupMuted .groupTitle {
+    font-size: var(--vc-text-base);
+    color: var(--vc-text-2);
+}
+
+.groupMuted .card {
+    background: transparent;
 }
 
 .groupTitle {
-    font-size: var(--vc-text-base);
+    font-size: var(--vc-text-md);
     font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
 .groupHint {
@@ -104,28 +287,44 @@
 
 .cardGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-    gap: var(--vc-space-3);
+    /* Cartes AGRANDIES: une vignette de 196 px ne fait pas rêver. */
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    gap: var(--vc-space-4);
 }
+
+/* ---------- Une vignette ---------- */
 
 .card {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--vc-space-2);
-    padding: var(--vc-space-2);
     border-radius: var(--vc-radius-lg);
     border: 1px solid var(--vc-line);
     background: var(--vc-surface);
-    text-align: left;
+    overflow: hidden;
     transition: border-color var(--vc-dur-2) var(--vc-ease),
         transform var(--vc-dur-2) var(--vc-ease-out),
         box-shadow var(--vc-dur-2) var(--vc-ease-out);
+    /*
+     * Entree en cascade au defilement. `fill-mode: both` est indispensable pour
+     * que la carte parte invisible - et c'est aussi pourquoi `vibecut.css` remet
+     * les DELAIS a zero sous `prefers-reduced-motion` (bug 13): un delai qui
+     * survivrait laisserait le contenu invisible.
+     */
+    animation: vcCardIn var(--vc-dur-4) var(--vc-ease-out) both;
+    animation-delay: calc(var(--vc-card-index, 0) * 35ms);
+}
+
+@keyframes vcCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
 }
 
 .card:hover {
     border-color: var(--vc-line-strong);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     box-shadow: var(--vc-shadow-2);
 }
 
@@ -137,20 +336,62 @@
 
 /* Un mouvement que le moteur ne rend pas reste lisible, mais visiblement en retrait. */
 .cardPlanned .previewCanvas {
-    opacity: 0.45;
+    opacity: 0.4;
+}
+
+.cardSelect {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-3);
+    width: 100%;
+    padding: 0 0 var(--vc-space-3);
+    text-align: left;
+}
+
+.cardFrame {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+/*
+ * Le liseré de progression du hover scrub. Il ne s'allume que pendant le scrub:
+ * le faire suivre la boucle couterait une ecriture DOM par image et par carte,
+ * pour une information que l'animation donne deja.
+ */
+.cardTrack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity var(--vc-dur-1) var(--vc-ease);
+}
+
+.cardTrack[data-active="true"] {
+    opacity: 1;
+}
+
+.cardTrackFill {
+    display: block;
+    width: var(--vc-scrub, 0%);
+    height: 100%;
+    background: var(--vc-accent);
 }
 
 .cardBody {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--vc-space-1);
-    padding: 0 var(--vc-space-1) var(--vc-space-1);
+    gap: 2px;
+    padding: 0 var(--vc-space-3);
 }
 
 .cardName {
-    font-size: var(--vc-text-sm);
+    font-size: var(--vc-text-base);
     font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
 .cardDescription {
@@ -159,10 +400,31 @@
     line-height: 1.45;
 }
 
+/*
+ * Badge et coche sont poses SUR la vignette: `pointer-events: none` est
+ * obligatoire, sans quoi ils creveraient des trous dans la zone de hover scrub
+ * et le temps se figerait en passant dessus.
+ */
+.cardBadge {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    padding: 3px 8px;
+    border-radius: var(--vc-radius-pill);
+    background: rgba(0, 0, 0, 0.62);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-warning);
+    pointer-events: none;
+}
+
+.cardBadgeReady {
+    color: var(--vc-success);
+}
+
 .cardCheck {
     position: absolute;
     right: 10px;
-    top: 10px;
+    bottom: 10px;
     display: grid;
     place-items: center;
     width: 22px;
@@ -170,6 +432,31 @@
     border-radius: 50%;
     background: var(--vc-accent);
     color: var(--vc-text-on-accent);
+    pointer-events: none;
+}
+
+.cardStar {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--vc-text-2);
+    transition: color var(--vc-dur-1) var(--vc-ease), background var(--vc-dur-1) var(--vc-ease);
+}
+
+.cardStar:hover {
+    background: rgba(0, 0, 0, 0.75);
+    color: var(--vc-text);
+}
+
+.cardStar[aria-pressed="true"] {
+    color: var(--vc-warning);
 }
 
 /*
@@ -182,36 +469,151 @@
     width: 100%;
     height: auto;
     aspect-ratio: 16 / 10;
-    border-radius: var(--vc-radius-md);
     background: #000000;
     object-fit: cover;
 }
 
-/* ---------- Panneau d'application ---------- */
+/* ---------- Panneau: grand apercu, reglages, contexte ---------- */
 
 .panel {
     display: flex;
     flex-direction: column;
-    gap: var(--vc-space-3);
-    flex: 0 0 336px;
+    gap: var(--vc-space-4);
+    flex: 0 0 396px;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--vc-space-5) var(--vc-space-4);
+    padding: var(--vc-space-5);
     border-left: 1px solid var(--vc-line);
     background: var(--vc-surface);
 }
 
-.panelHead {
+.stage {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: var(--vc-space-2);
+}
+
+.stageFrame {
+    position: relative;
+    border-radius: var(--vc-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--vc-shadow-2);
+}
+
+.stageCanvas {
+    aspect-ratio: 16 / 10;
+}
+
+/* Un liseré franc pendant le bypass: on doit savoir en un coup d'oeil que ce
+ * qu'on regarde n'est PAS l'effet. */
+.stageFrame[data-bypassing="true"] {
+    box-shadow: 0 0 0 2px var(--vc-warning), var(--vc-shadow-2);
+}
+
+.stageFlag {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    padding: 3px 8px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-warning);
+    font-size: var(--vc-text-xs);
+    font-weight: 600;
+    color: #1a1204;
+    pointer-events: none;
+}
+
+.transport {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-3);
+}
+
+.transportButton {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    color: var(--vc-text);
+}
+
+.transportButton:hover {
+    background: var(--vc-surface-3);
+}
+
+.transportSlider {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.transportTime {
+    flex: 0 0 auto;
+    font-family: var(--vc-font-numeric);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.bypassRow {
+    display: flex;
+    flex-direction: column;
     gap: var(--vc-space-1);
+}
+
+.bypassButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vc-space-2);
+    height: 32px;
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-surface-2);
+    font-size: var(--vc-text-sm);
+    color: var(--vc-text);
+}
+
+.bypassButton[aria-pressed="true"] {
+    border-color: var(--vc-warning);
+    color: var(--vc-warning);
+}
+
+.kbd {
+    padding: 1px 6px;
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line-strong);
+    background: var(--vc-bg);
+    font-family: var(--vc-font-numeric);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+}
+
+.bypassHint {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+    line-height: 1.5;
+}
+
+.panelHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vc-space-3);
+    padding-top: var(--vc-space-1);
+}
+
+.panelTitles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .panelKind {
     font-size: var(--vc-text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
     color: var(--vc-text-3);
 }
 
@@ -225,6 +627,73 @@
     font-weight: 600;
     color: var(--vc-text-2);
 }
+
+/* ---------- Bande de contexte ---------- */
+
+.context {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2);
+    margin-top: auto;
+    padding: var(--vc-space-3);
+    border-radius: var(--vc-radius-md);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-bg);
+}
+
+.contextLabel {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-3);
+}
+
+.contextRow {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    min-width: 0;
+}
+
+.contextSlot {
+    display: flex;
+    align-items: center;
+    gap: var(--vc-space-2);
+    min-width: 0;
+}
+
+.contextThumb {
+    display: block;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 22px;
+    border-radius: var(--vc-radius-sm);
+    border: 1px solid var(--vc-line);
+    background: var(--vc-surface-2);
+    object-fit: cover;
+}
+
+.contextName {
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.contextArrow {
+    flex: 0 0 auto;
+    color: var(--vc-text-3);
+}
+
+.contextHere {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: var(--vc-radius-pill);
+    background: var(--vc-accent-quiet);
+    font-size: var(--vc-text-xs);
+    color: var(--vc-text);
+}
+
+/* ---------- Reglages ---------- */
 
 .trajectoryBlock {
     display: flex;
@@ -330,6 +799,12 @@
 
 /* ---------- Etroit ---------- */
 
+@media (max-width: 1180px) {
+    .panel {
+        flex-basis: 340px;
+    }
+}
+
 @media (max-width: 900px) {
     .body {
         flex-direction: column;
@@ -337,8 +812,63 @@
 
     .panel {
         flex: 0 0 auto;
-        max-height: 46dvh;
+        max-height: 52dvh;
         border-left: none;
         border-top: 1px solid var(--vc-line);
+    }
+
+    .context {
+        margin-top: 0;
+    }
+}
+
+@media (max-width: 720px) {
+    .screenHead,
+    .filters {
+        padding-left: var(--vc-space-4);
+        padding-right: var(--vc-space-4);
+    }
+
+    .screenHead {
+        align-items: center;
+    }
+
+    /*
+     * Le sous-titre decrit le HOVER SCRUB. Un telephone n'a pas de survol - la
+     * phrase y serait fausse, et elle coutait quarante pixels a une colonne dont
+     * tout l'interet est qu'on puisse y parcourir. On la retire donc, plutot que
+     * de promettre une interaction qui n'existe pas ici.
+     */
+    .screenSubtitle {
+        display: none;
+    }
+
+    .filters {
+        flex-wrap: wrap;
+    }
+
+    .searchField {
+        flex: 1 1 160px;
+    }
+
+    .catalog {
+        padding: var(--vc-space-4);
+        gap: var(--vc-space-6);
+    }
+
+    /* Sur telephone, le panneau ne doit pas devorer la grille: on garde de quoi
+     * parcourir, puisque parcourir est la fonction principale de l'ecran. */
+    .panel {
+        max-height: 42dvh;
+        padding: var(--vc-space-4);
+    }
+
+    .cardGrid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: var(--vc-space-3);
+    }
+
+    .cardName {
+        font-size: var(--vc-text-sm);
     }
 }

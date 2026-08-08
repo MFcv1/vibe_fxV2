@@ -89,6 +89,68 @@ async function dragBy(page, locator, deltaX) {
 }
 
 test.describe("VibeCut v2 - montage avance", () => {
+  /*
+   * DEUX DEFAUTS TROUVES LE 2026-08-04 EN PILOTANT LE MONTAGE AVANCE SUR DE
+   * VRAIS RUSHS, et pas par relecture. Ce test les verrouille.
+   *
+   *  1. Le bloc « Mouvement » etait pose sous `isImage` : un plan VIDEO n'en
+   *     proposait aucun. Le garde n'avait plus lieu d'etre depuis le lot B3, qui
+   *     a leve la restriction photo dans le moteur - le mode rapide et la
+   *     bibliotheque avaient suivi, l'inspecteur avance non. L'interface la plus
+   *     complete du produit etait donc la moins capable.
+   *  2. Les cinq effets pendant le plan n'existaient QUE dans le mode rapide.
+   *
+   * Le troisieme controle est le plus subtil et n'a jamais echoue en production:
+   * `setClipMotion` REMPLACE l'objet mouvement entier, donc choisir un preset
+   * effacait l'accent pose a cote. Le mode rapide avait deja paye exactement ce
+   * defaut (voir useScenes.js). On le verrouille ici avant qu'il ne se produise.
+   */
+  test("un plan VIDEO recoit mouvement ET effet, et choisir l'un n'efface pas l'autre", async ({ page }) => {
+    const videos = getVideoFixtures(2);
+    test.skip(videos.length < 2, "ffmpeg indisponible pour fabriquer les fixtures");
+
+    await openAdvancedEditor(page);
+    await page.getByTestId("vibecut-media-input").setInputFiles(videos);
+    await expect(page.getByTestId("vibecut-item-video-1")).toBeVisible({ timeout: 45000 });
+
+    await page.getByTestId("vibecut-item-video-0").click();
+
+    // 1. Le bloc mouvement existe SUR UNE VIDEO.
+    await expect(
+      page.getByTestId("vibecut-inspector-motion"),
+      "un plan video doit proposer les mouvements: le moteur les rend depuis le lot B3",
+    ).toBeVisible();
+    await page.getByTestId("vibecut-adv-motion-zoom-in").click();
+    await expect(page.getByTestId("vibecut-adv-motion-zoom-in")).toHaveAttribute("aria-pressed", "true");
+
+    // 2. Les effets pendant le plan sont la, tous.
+    await expect(page.getByTestId("vibecut-accent-row")).toBeVisible();
+    for (const id of ["none", "shake", "pulse", "leak", "grain", "softness"]) {
+      await expect(
+        page.getByTestId(`vibecut-accent-${id}`),
+        `l'effet « ${id} » doit etre proposable dans le montage avance`,
+      ).toBeVisible();
+    }
+
+    // 3. Poser un effet NE DOIT PAS defaire le mouvement...
+    await page.getByTestId("vibecut-accent-grain").click();
+    await expect(page.getByTestId("vibecut-accent-grain")).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByTestId("vibecut-adv-motion-zoom-in"),
+      "poser un effet a efface le mouvement",
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // ... et changer de mouvement NE DOIT PAS defaire l'effet.
+    await page.getByTestId("vibecut-adv-motion-pan-right").click();
+    await expect(page.getByTestId("vibecut-adv-motion-pan-right")).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByTestId("vibecut-accent-grain"),
+      "changer de mouvement a efface l'effet pose a cote",
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await shoot(page, "advanced-motion-accent-video");
+  });
+
   test("etat vide: l'ecran explique quoi faire, l'export reste ferme", async ({ page }) => {
     await openAdvancedEditor(page);
     await expect(page.getByTestId("vibecut-advanced-empty")).toBeVisible();

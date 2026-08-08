@@ -1,7 +1,66 @@
 # TODO — Reconstruction de l'interface VibeCut
 
 > État d'avancement. Plan complet et direction artistique : [plan.md](plan.md).
-> **Dernière mise à jour : 2026-08-02.**
+> **Dernière mise à jour : 2026-08-03.**
+
+---
+
+## POINT SITUATIONNEL — 2026-08-03
+
+**Où en est VibeCut, en une page.**
+
+| Surface | État | Ce qui manque |
+|---|---|---|
+| `/video` accueil, `/video/rapide`, `/video/guide`, `/video/avance` | ✅ | rien de bloquant |
+| `/video/transitions` | ✅ **complet** | rien |
+| `/video/mouvements` | ✅ **12 sur 12 rendus** (2026-08-04), photos **et vidéos** | rien |
+| Export serveur | ✅ **déployé** `00016-thk` (2026-08-04) | rien — aucun écart aperçu ↔ production |
+
+**Chiffres relevés par les tests, pas déclarés :**
+
+| | Transitions | Mouvements |
+|---|---|---|
+| Entrées au catalogue | 48 | 12 |
+| Réellement rendues à l'export | **48** | **12** |
+| Annoncées « Bientôt », sans réglage | 0 | **0** |
+
+**Ce qui est testable tout de suite** — `npm run dev`, puis `http://localhost:3000/video` :
+- les deux bibliothèques tournent sur de **vraies vidéos** (clips de démo avant
+  tout import, tes propres rushs dès que tu en importes) ;
+- les 48 transitions s'appliquent **et s'exportent** réellement ;
+- le survol scrube, la touche **B** montre la coupe sans l'effet, les favoris
+  reviennent dans les deux modes de montage.
+
+> **MISE À JOUR 2026-08-04 — les deux bibliothèques sont closes.**
+> `glitch` est livré comme mouvement : **48 transitions sur 48** et **12
+> mouvements sur 12**, plus une seule entrée « Bientôt » nulle part. Les clips de
+> démonstration passent de **2 à 4**. Le point 1 ci-dessous est donc caduc, sauf
+> pour ce qu'il dit de la parallaxe (retirée) — voir la section « Lot glitch ».
+
+**Ce qui reste, dans l'ordre où je le ferais :**
+
+1. ~~**Les 4 mouvements restants.**~~ ✅ **Réglé.** Rotation et Apparition
+   livrées, Parallaxe retirée (impossible sur une image plate), **Glitch livré le
+   2026-08-04**. Texte d'origine conservé ci-dessous parce qu'il dit pourquoi
+   chacun coûtait cher.
+   - **Rotation** — demande le filtre `rotate` côté serveur et un `ctx.rotate`
+     côté aperçu. Faisable, mais c'est une nouvelle capacité à mesurer.
+   - **Apparition** — demande l'**opacité**, que le modèle de mouvement ne porte
+     pas du tout, et un zoom **sous 1** qui laisserait un bord à l'image.
+   - **Parallaxe** — « plans avant et arrière à vitesses différentes » est
+     **impossible sur une photo plate** sans estimation de profondeur. À
+     renommer ou à retirer : c'est une décision produit, pas un développement.
+   - **Glitch** — ce n'est pas un mouvement de caméra mais un **effet**. Il
+     relève du point 3.
+2. ~~**Les mouvements sur vidéo**~~ — ✅ **fait le 2026-08-03.**
+3. ~~**Les effets pendant le plan**~~ — ✅ **terminé le 2026-08-04.** Les cinq
+   accents sont livrés et rendus : secousse, respiration, **grain animé**, **flou
+   animé** et **fuite de lumière**. Voir « Lot effets pendant le plan ».
+
+**Coût de chacun de ces ajouts, pour fixer les attentes** : deux
+implémentations (canvas **et** expression FFmpeg), une preuve de parité image par
+image sur un MP4 réel, la contrainte `|x| ≤ (zoom − 1) / 2`, et **un seul**
+rollout Cloud Run en fin de lot.
 
 ---
 
@@ -40,7 +99,406 @@ relire ce que le rendu avait produit.
 
 **Toutes les phases du plan de reconstruction sont terminées.**
 
-**Prochain chantier, décidé le 2026-08-02 : les DEUX BIBLIOTHÈQUES.**
+**Lot B1 livré le 2026-08-02 : la fondation du design des deux bibliothèques.**
+`/video/transitions` et `/video/mouvements` partagent une **ossature commune**,
+chaque vignette se **scrube au survol** (la position du pointeur *est* le temps),
+se **fige au point culminant** au repos, le grand aperçu a un **bypass** à la
+touche **B**, et les **favoris** persistés en IndexedDB **reviennent dans les deux
+modes de montage**. Suite navigateur portée de 43 à **60 tests**, qui mesurent les
+**pixels** et non les libellés.
+
+**Lot B3a livré le 2026-08-02 : l'écart d'export est refermé aux trois quarts.**
+Le porteur du projet a tranché la recommandation d'ordre laissée en fin de B1 :
+**fermer l'écart d'export d'abord, B2 ensuite.** Les 31 cibles `xfade` natives
+inutilisées ont été **rendues et mesurées** une par une. Huit entrées existantes
+pointent désormais sur la cible qui tient vraiment leur promesse, dix entrées
+nouvelles ouvrent les sens manquants et deux formes absentes du catalogue.
+**15 → 33 transitions exportables** ; catalogue 38 → **48** ; « aperçu
+uniquement » 23 → **15**.
+✅ **Déployé le 2026-08-02** : révision **`00007-b5c`**, image
+`b3a-7ff9c28-20260802`. Vérifié sur le service réel : **29 cibles `xfade` sur
+29**, `missing: []`, `errorCount: 0`, `/render` toujours protégé (401 sans
+signature). L'ancienne révision `00006-6fw` reste disponible pour un retour
+arrière immédiat. **Ce que la bibliothèque annonce est ce que l'export produit.**
+
+**Lot B3 (4ᵉ tranche) ✅ LIVRÉ le 2026-08-04 : le catalogue de mouvements est terminé.**
+**Rotation** et **Apparition** livrées, **Parallaxe retirée**. Il reste une seule
+entrée annoncée — le glitch, qui est un effet et non un mouvement de caméra.
+**11 mouvements rendus sur 12.** Déployé : révision **`00012-xht`**.
+Ces deux-là sortent du modèle de recadrage, et chacun a coûté sa propre leçon :
+- **Rotation** — une image qui bascule laisse des **coins vides**. Le premier jet
+  agrandissait puis tournait : faux, parce que `zoompan` rend une image **déjà
+  ajustée au cadre**, sans rien au-delà de ses bords. Écart mesuré : 4,6/255,
+  *identique* à 40 % et à 100 % d'intensité — un défaut constant, donc pas une
+  erreur d'angle. Corrigé en faisant rendre un cadre **plus grand**, en tournant
+  celui-là, puis en recadrant au centre : l'écart tombe à **1,47**.
+- **Rotation, deuxième piège** : `on` (le numéro d'image) n'existe **que** dans
+  `zoompan`. Donné au filtre `rotate`, il fait échouer le graphe à la
+  configuration sans jamais dire quelle variable manque. L'angle est donc écrit
+  **deux fois**, avec la variable de temps de chaque filtre.
+- **Apparition** — le fondu est en **numéros d'image** et non en secondes : en
+  secondes il lirait les horodatages, qui ne sont remis à zéro qu'après cette
+  chaîne. C'est exactement le décalage qui avait coûté une image au lot B3b.
+**Quatre sentinelles vérifiées** (sens de bascule inversé, couverture retirée,
+fondu supprimé, fondu deux fois trop long).
+
+**Lot B3 (3ᵉ tranche) ✅ LIVRÉ le 2026-08-04 : les premiers EFFETS PENDANT LE PLAN.**
+**Secousse** (caméra portée) et **Respiration** (zoom qui pulse) existent enfin.
+Ce sont les deux premiers effets qui durent pendant tout le plan, là où un
+mouvement va d'un cadrage à un autre et où une transition joint deux plans.
+Ils se **composent** avec un mouvement — une secousse sur un zoom avant — d'où
+une rangée à part dans l'inspecteur et non une carte de plus.
+Choisis en premier **parce qu'ils se ramènent à un décalage du cadrage** : ils
+entrent donc dans l'expression `zoompan` existante, dont la parité est déjà
+prouvée image par image. Le grain et le flou animé n'ont pas cette propriété.
+⚠️ **Deux erreurs trouvées à la mesure, pas à la relecture** (bugs 58 et 59) :
+la fréquence choisie au premier jet n'était échantillonnée que **4 fois par
+cycle** à 30 images/s — la secousse aurait sauté entre quatre positions au lieu
+de trembler — et **le test de parité était aveugle** à un accent d'amplitude
+fausse, parce qu'un décalage de 2 px passe sous le seuil toléré pour le
+rééchantillonnage. Le test compare désormais **l'amplitude du mouvement** de
+chaque côté, et non plus seulement les images. **Quatre sentinelles vérifiées.**
+Déployé : révision **`00011-6nb`**, `capabilitiesVersion 7`. Suite navigateur
+portée à **66 tests**.
+
+**Lot B3 (2ᵉ tranche) ✅ LIVRÉ le 2026-08-03 : les mouvements s'appliquent aux VIDÉOS.**
+Un rush peut enfin recevoir un mouvement de caméra. Ce n'était pas un manque du
+moteur : le recadrage animé est un simple recadrage, `getClipVisualProgress`
+mesure la course sur le segment rogné quel que soit le média, et **`zoompan` sur
+entrée vidéo avait déjà été mesuré sans réserve au lot B3b**. C'était un garde
+`isImageMedia` posé à **six endroits** — moteur canvas, renderer, manifeste,
+store (à l'import **et** à la mise à jour), adaptateur, interface — dont plus
+aucun n'avait de justification. Deux d'entre eux ne se voyaient pas à l'écran :
+le store remettait le mouvement à `null` à l'import, et le manifeste le perdait
+en route, si bien que l'interface pouvait très bien l'afficher sans qu'il
+survive.
+⚠️ **Aucun test existant ne pouvait le voir** : les onze tests de mouvement
+utilisent des **photos**. D'où deux ajouts — un cas de parité sur une **source
+vidéo rognée à 0,5 s** (qui prouve aussi que la course se mesure sur le segment
+et non sur la source entière), et un test navigateur qui importe une vraie vidéo
+et vérifie que la carte reste active après rechargement. **Sentinelle vérifiée** :
+remettre le garde du renderer fait bien échouer le cas vidéo.
+Déployé : révision **`00010-trj`**. Suite navigateur portée à **65 tests**.
+
+**Lot B3 (1ʳᵉ tranche) ✅ LIVRÉ le 2026-08-03 : la bibliothèque de mouvements passe de 6 à 9.**
+**Descente**, **orbite** et **rebond** sont désormais rendus des deux côtés et
+**déployés** (révision **`00009-8b7`**). Il restait 7 promesses, il en reste **4**.
+Le modèle de mouvement — une droite `start → end` parcourue en `smoothstep` —
+a été **généralisé une fois**, en gardant la forme qui rend la parité démontrable
+par construction :
+- **`arc`** : un écart *perpendiculaire* au trajet, nul aux deux bouts, maximal
+  au milieu. C'est ce qui fait qu'une orbite **contourne** au lieu de longer.
+- **`curve: 'overshoot'`** : une courbe qui **dépasse** sa cible avant de se
+  poser. Un `smoothstep` accoste, il ne rebondit pas.
+Les deux restent un polynôme ou un sinus, donc s'écrivent telles quelles dans
+l'expression `zoompan` — c'est **le critère** qui a fait retenir ces trois
+mouvements-là et écarter les quatre autres (voir *Reste à faire*).
+⚠️ **Un nouveau gate, et il a trouvé sa raison d'être tout de suite.**
+`smoke-vibecut-motion-envelope` échantillonne la trajectoire **entière** de
+chaque preset à quatre intensités. Jusqu'ici le **problème I** (`|x| ≤ (zoom−1)/2`)
+était vérifié **à la main sur les deux extrémités** — ce qui suffit tant qu'un
+mouvement est une droite, puisque le pire point est alors forcément un bout.
+Ce n'est plus vrai : la bosse de l'orbite culmine **au milieu**, et le
+dépassement du rebond va **au-delà** de sa cible. Un preset peut donc être sage
+aux deux bouts et sortir du cadre en route. Le même test vérifie que les
+**quatre** tables de presets disent la même chose. Trois sentinelles vérifiées.
+`/capabilities` passe en **version 6** et rapporte les mouvements : le pré-vol
+refusait bien la production d'avant le lot, vérifié **avant** de déployer.
+
+**Lot B2 ✅ LIVRÉ le 2026-08-03 : les bibliothèques tournent sur de vraies vidéos.**
+`useLibraryImages` devient **`useLibraryMedia`** et descend quatre étages :
+**vidéos du projet → photos du projet → clips de démonstration → repli dessiné**.
+Les vidéos passent devant les photos même quand une photo arrive plus tôt dans le
+montage — c'est tout l'objet du lot.
+Les **clips de démonstration ne viennent pas d'une banque d'images : ils sont
+générés** par `scripts/build-vibecut-library-demo-clips.mjs`, qui rejoue les deux
+scènes dessinées du repli dans un Chromium sans fenêtre. Motif : ces clips sont
+servis à *tous* les visiteurs, et le projet bloque déjà l'export d'une musique
+sans déclaration de droits — du rush tiers aurait exigé une licence validée avant
+tout commit. Bénéfice au passage : ils ont **par construction** l'aspect du repli,
+donc on ne voit pas l'étage changer sous ses pieds. **77 Ko pour les deux**,
+plafond 1,5 Mo. Passer à du vrai rush Mixkit/Pexels reste un changement de
+**données**, pas de code.
+⚠️ **Un test a imposé une décision de conception** : hors de la boucle, la
+vignette dessine maintenant une **copie figée** de la source
+(`librarySourceFreeze.js`). Sans elle le rush continuait de tourner sous un scrub
+arrêté, donc le **bypass ne prouvait plus rien** — les deux états différaient par
+l'effet *et* par le contenu. Voir bug 53.
+Cadence tenue : **60,3 img/s** au repos et **60,1** avec un scrub, sur des sources
+vidéo. Suite navigateur portée de 60 à **64 tests**.
+
+**Lot B3b ✅ TERMINÉ le 2026-08-03, rollout inclus.**
+`test:vibecut-xfade-preview-parity` est **vert**, les **5 sentinelles sur 5** sont
+attrapées pour la première fois, et le renderer est **déployé** :
+révision **`00008-8gr`**, image `b3b-21b8030-20260803`, `capabilitiesVersion 5`,
+**29 cibles `xfade` sur 29** et **20 filtres sur 20** vérifiés sur le service
+réel, `missing: []`, `errorCount: 0`, `/render` toujours protégé (401 sans
+signature). **Il n'y a plus aucun écart aperçu ↔ production.** Retour arrière :
+`00007-b5c`.
+
+
+---
+
+## Lot ouverture et fin de séquence — 2026-08-04. Terminé.
+
+**Rollout : révision `vibecut-render-service-00016-thk`**, image
+`sequence2-20260804`. Vérifié sur le service réel : 29 cibles `xfade`, 20 filtres,
+12 mouvements, 6 accents, `errorCount: 0`. Retour arrière : `00014-gq9`.
+
+**Le problème.** Une transition s'accroche **entre deux plans** — `applyTransition`
+refuse s'il n'y a pas de plan suivant, et le dernier plan n'affiche aucun panneau.
+Les sept entrées « Ouverture / Fin de séquence » ne pouvaient donc **ni ouvrir ni
+finir** : « Fin cinéma » ne savait se poser qu'à une coupe interne. Sept noms
+promettaient un rôle impossible.
+
+**Le modèle savait déjà le faire.** Le magasin porte `placement: 'intro' | 'outro'`
+sur une piste `sequence-main`, en exemplaire unique, et `getIntroOffset` décale
+tous les plans d'autant. Ce qui manquait n'était pas la mécanique mais le
+**chemin** : rien dans VibeCut n'appelait `addTransitionItem` avec un placement.
+
+**Livré :**
+- **Le panneau de droite range par usage** — « Ouverture de séquence », « Entre
+  deux plans », « Fin de séquence ». Les sept étaient noyées au milieu de 48.
+- Panneau « Ouverture et fin de séquence », **toujours visible en bas** de
+  l'inspecteur. Premier jet : il n'apparaissait que si rien n'était sélectionné,
+  or un plan l'est d'office après un import. Un réglage qu'on ne trouve pas
+  n'existe pas.
+- **Une ouverture ALLONGE le montage** au lieu de rogner le premier plan :
+  mesuré 20,01 s → 21,01 s. C'est ce qui la distingue d'une transition de coupe,
+  laquelle fait chevaucher deux plans et raccourcit (30,01 → 29,21).
+- **Rendu à l'aperçu** (`renderSequenceEdge`) : avant, tout instant sans plan
+  actif était peint en noir — or une ouverture occupe justement un temps où
+  aucun plan n'existe encore.
+- **Rendu à l'export** (`appendSequenceEdges`). Prouvé sur un vrai MP4 :
+  2,00 s sans les bords, **2,97 s avec**, luminance début 0, milieu 126, fin 0.
+
+⚠️ **LES DEUX BORDS NE SONT PAS SYMÉTRIQUES, et c'est le porteur du projet qui
+l'a vu à l'essai** — pas un test. Premier jet : les deux ajoutaient leur durée.
+À l'écran, la dernière image se **figeait** une seconde puis s'éteignait. Verdict
+de l'essai : « elle se met quand tout est terminé, ça n'a pas de logique. »
+C'était exact, et la raison est simple : **une ouverture n'a rien avant elle**,
+elle doit donc créer son temps ; **une fermeture a le dernier plan sous la main**,
+elle doit l'éteindre PENDANT qu'il joue. Corrigé des trois côtés — magasin
+(la durée totale n'ajoute plus la fin), aperçu (le fondu se pose sur le plan
+actif), export (le montage est coupé en deux, la queue est éteinte sur place).
+
+**Deux bugs corrigés en chemin :**
+- **La fin était posée à `total − durée`** alors que `computeTotalDuration`
+  **ajoute** sa durée après les plans : elle chevauchait le dernier plan et
+  laissait une seconde vide en queue. `updateTransitionItem` avait raison,
+  `resolveTransitionStartTime` avait tort — deux chemins d'écriture qui
+  disaient deux choses différentes.
+- **Le lecteur n'était pas repositionné** avant de figer l'image : une vidéo
+  jamais lue n'a aucune image décodée à donner.
+
+⚠️ **Leçon de méthode, et elle a coûté une heure.** J'ai cru la fin cassée parce
+que ma mesure était une **moyenne de luminance** : le dernier plan était un fond
+noir, et une moyenne ne distingue pas « vidéo sombre qui s'éteint » de « écran
+noir ». L'instrumentation disait pourtant que tout allait bien — image source à
+193, progression correcte. **Regarder la capture d'écran a tranché en dix
+secondes.** Quand la mesure contredit l'instrumentation, c'est la mesure qu'il
+faut suspecter d'abord.
+
+**Choix technique à ne pas repayer.** On ne peut pas réutiliser l'étiquette d'un
+plan pour en figer la première image : dans un graphe FFmpeg une étiquette se
+consomme **une fois**, et le composite l'a déjà prise. On part donc du composite,
+qu'on `split`. `tpad=stop_mode=clone` fabrique le gel sans `reverse`, lequel
+bufferise tout le montage en mémoire pour retrouver une seule image. La longueur
+d'un `xfade` vaut `duréeA + duréeB − duréeTransition` : avec deux morceaux de
+durée `d` et une transition de `d`, le segment sort à exactement `d`.
+
+---
+
+## Lot effets pendant le plan — 2026-08-04. Les trois derniers sont livrés.
+
+**Rollout fait, une seule fois : révision `vibecut-render-service-00014-gq9`**,
+image `accents-20260804`. Vérifié sur le service réel : 29 cibles `xfade`,
+20 filtres, **12 mouvements sur 12**, **6 accents sur 6**, `errorCount: 0`.
+Retour arrière : `00013-szb` (glitch sans les accents), puis `00012-xht`.
+
+**Ce qui est livré.** Grain animé, flou animé et fuite de lumière. C'était le
+vrai retard sur Premiere et DaVinci, et c'est comblé. Les accents passent de
+**2 à 5** (`shake`, `pulse`, `leak`, `grain`, `softness`).
+
+**Pourquoi ils n'avaient pas pu être livrés avec la secousse et la respiration.**
+Ces deux-là se ramènent à un décalage du **cadrage** : ils entrent dans
+l'expression `zoompan` qui existait déjà et dont la parité était prouvée. Les
+trois nouveaux modifient l'**image elle-même**, après le recadrage. Ils ont donc
+leur propre chemin des deux côtés — une chaîne de filtres après le `zoompan` à
+l'export, un filtre de contexte et des calques à l'aperçu — et c'est
+`kind: 'image'` qui les distingue dans le modèle.
+
+**Trois mécaniques différentes, une par effet :**
+
+- **Fuite de lumière** — un halo chaud qui traverse le cadre pendant que son
+  intensité respire, à **deux fréquences indépendantes** : avec une seule, les
+  deux seraient synchronisés et l'œil verrait un motif se répéter. Rendu par
+  `geq` sur l'image et non par un halo posé en `overlay` comme le fait la
+  transition du même nom — un `overlay` demande une **seconde entrée**, donc un
+  vrai graphe, alors que la chaîne d'un plan est linéaire. **Parité exacte :
+  rapport d'amplitude 0,99, et 0,96 à 40 % d'intensité.**
+- **Flou animé** — `gblur` n'accepte **pas** d'expression pour son sigma, et
+  `sendcmd` est proscrit depuis le lot B3b (il diffuse à tous les filtres du même
+  nom). On pose donc une **chaîne de flous à valeur constante**, un par palier,
+  gatés par `enable` — 24 paliers et non 12, parce que sur un plan de plusieurs
+  secondes la quantification des transitions se verrait avancer par à-coups.
+- **Grain** — un seul filtre `noise`, temporel (`allf=t`) : sans ça il serait
+  figé, et un grain figé se lit comme une salissure d'écran.
+
+**Ce que la mesure a contredit, et c'est là qu'est la valeur :**
+
+- **Le flou était à 0,59 au lieu de 1, et ce n'était pas le sigma.** C'était les
+  **bords** : FFmpeg échantillonne hors cadre en **rabattant sur le bord**, le
+  canvas en prenant du **transparent**. Un `blur()` CSS posé tel quel délave les
+  quatre bords sur une bande de ~3 sigma. Piège déjà payé sur les transitions le
+  2026-08-02, repayé ici faute d'y avoir pensé. Corrigé en floutant une image
+  bordée par étirement : **0,59 → 0,74**.
+- **La quantification n'était PAS la cause du reste.** Aligner l'aperçu sur les
+  mêmes 24 paliers que l'export n'a rien changé à la mesure — ce qui a permis de
+  l'écarter au lieu de la soupçonner. Reste un écart de **noyau** : Chromium
+  approxime la gaussienne par des flous de boîte, et l'écart est maximal aux
+  **petits sigmas** — celui-ci culmine à 1,9 px. C'est le même écart structurel
+  que le noyau de `blur-cut`, déjà documenté (problème G). Bande posée à
+  0,65-1,45 avec sa mesure datée, **après** les deux corrections et pas à leur
+  place.
+- **Le grain de l'aperçu était 4,9 fois trop faible.** `noise=alls=N` ajoute un
+  écart d'amplitude N ; un mélange `overlay` à l'opacité *a* ajoute environ
+  *a* × 0,58 × luminance. Les deux ne se correspondent pas terme à terme. Le
+  diviseur (45) est **mesuré**, pas deviné : **export +1,424 d'écart-type contre
+  aperçu +1,391**, rapport **1,02**.
+
+**Le grain est jugé autrement que les autres, et c'est assumé.** FFmpeg tire un
+nombre aléatoire par pixel et par image avec **son** générateur : aucun canvas ne
+reproduira cette suite, et comparer les pixels reviendrait à comparer deux
+tirages de dés. Ce qui est prouvé est la **quantité** de grain ajoutée, via
+l'écart-type. `meanFrame` reste exigé — il porte sur la couleur moyenne, que le
+grain ne doit pas déplacer, et c'est exactement ce qu'un grain mal centré
+casserait.
+
+**Un plancher d'existence par accent.** Le halo est un effet doux : son amplitude
+vaut ~3 là où une secousse en fait 12. Exiger le même plancher pour tous
+reviendrait à refuser un effet correct parce qu'il est discret.
+
+---
+
+## Lot glitch — 2026-08-04. Les deux bibliothèques sont closes.
+
+**Ce qui est livré.** `glitch` était la dernière entrée « Bientôt » du produit.
+Il est maintenant un **mouvement rendu**, dans l'aperçu comme à l'export :
+48 transitions sur 48, **12 mouvements sur 12**, zéro promesse non tenue.
+
+**Ce qu'il fait, et pourquoi ce n'est pas une secousse.** Le cadre saute
+latéralement, tient sa position quelques images, puis revient. C'est un
+**escalier**, pas une oscillation : une secousse (`shake`) est un sinus, elle
+tremble en continu ; un décrochage numérique est discontinu par nature. Le motif
+fait huit paliers dont **cinq à zéro** — c'est ce qui le rend *bref* plutôt que
+permanent. Horizontal seulement : un décrochage vidéo décroche en ligne, et
+ajouter du vertical le ferait ressembler à `shake`, qui le fait déjà mieux.
+
+**Les deux pièges payés ici, à ne pas repayer.**
+
+- **La cadence de 11,37 Hz n'est pas ronde exprès.** Le palier se lit
+  `floor(secondes × cadence)`. Une frontière de palier qui tomberait *exactement*
+  sur un instant d'image ferait dépendre `floor` du dernier bit du calcul
+  flottant : l'aperçu et l'export liraient alors des paliers voisins, et l'écart
+  vaudrait **un saut entier**, pas une fraction de pixel. À 12 Hz et 30 im/s, une
+  frontière tombe sur une image toutes les cinq. Avec 11,37, aucune ne coïncide à
+  24, 25, 30 ni 60 im/s.
+- **Le calcul part des SECONDES et jamais de la progression.** Les secondes sont
+  la seule grandeur que les deux côtés écrivent pareil (`on/fps` au rendu,
+  `progression × durée` à l'aperçu). La progression, elle, vaut `on/(images−1)`
+  d'un côté et `image/(fps × durée)` de l'autre — **un écart d'une image**, sans
+  conséquence sur une courbe lisse, fatal sur un escalier.
+
+**Un bug trouvé en chemin, antérieur au glitch.** `buildImageMotionFilter`
+n'écrivait **aucun `zoompan` à intensité zéro**, alors que l'aperçu garde le
+cadrage de départ du preset. Sur `zoom-out` (départ 1,14), `bounce` (1,18) ou
+`glitch` (1,08), l'aperçu montrait donc une image agrandie et l'export l'image
+entière. Personne ne l'avait vu parce que la parité n'avait jamais été mesurée à
+intensité nulle. Le garde ne teste plus l'intensité.
+
+**Le test a été renforcé, pas seulement étendu.** Les deux cadrages du glitch
+étant identiques, **tout** ce qui bouge vient du décrochage : un renderer qui
+l'oublierait rendrait un plan fixe, et un plan fixe des deux côtés est
+parfaitement « en parité ». La comparaison image par image ne pouvait donc rien
+prouver. Le glitch passe désormais par la mesure d'**amplitude** créée pour les
+accents (export 30,6 contre aperçu 28,5 à pleine intensité ; 13,1 contre 12,4 à
+40 %, ce qui prouve aussi que l'intensité est appliquée), plus une assertion que
+l'expression `zoompan` **porte** bien un palier.
+
+**Les clips de démonstration passent de 2 à 4** (`aube.mp4`, `orage.mp4`), comme
+le plan du lot B2 le prévoyait. Ce qui les distingue n'est pas la palette mais la
+**structure** : `aube` remonte l'horizon à 0,74 (l'eau occupe les trois quarts du
+cadre), `orage` le descend à 0,44 avec le point le plus clair dans un **coin**.
+Deux clips qui ne diffèrent que par leur teinte se comportent pareil sous une
+transition — ils n'ajouteraient rien à juger. Une graine par scène, sinon les
+scènes 2 et 3 rejouaient le relief, les reflets et le grain de la scène 1.
+**132 Ko** pour quatre clips, plafond du lot 1,5 Mo.
+
+⚠️ **Ces clips restent GÉNÉRÉS et non filmés.** Ils ne viennent ni de Mixkit ni
+de Pexels. Choix confirmé par le porteur du projet le 2026-08-04 : aucune licence
+tierce à faire valider, et l'écran garde le même aspect qu'un clip soit chargé ou
+non. Passer à du vrai rush reste un changement de **données** — déposer les
+fichiers, ajouter leur entrée dans `libraryMediaManifest.js` avec licence et URL
+d'origine. Aucun code ne bouge.
+
+---
+
+**Re-vérifié le 2026-08-04**, sans modifier une ligne de code, parce qu'un prompt
+de relance périmé annonçait ces deux points comme encore ouverts :
+- `test:vibecut-xfade-preview-parity` **vert deux fois de suite**, 202
+  échantillons. `additive-dissolve` retombe sur sa mesure inscrite : pire
+  `meanFrame` **2,9**, pire `meanPixel` **1,4**, pour des seuils de 5 et 10. Le
+  seuil n'a pas eu besoin d'être touché, et `qStep = quantizeProgress(t)` est bien
+  à l'état sain.
+- `test:vibecut-transition-sentinels` **mené au bout à nouveau : 5 sur 5**, et les
+  deux fichiers patchés restaurés à l'octet près (empreintes comparées à un
+  instantané pris avant le lancement).
+- **Aucun rollout.** Le service réel est déjà en **`00012-xht`**,
+  `capabilitiesVersion 7`, 29 cibles `xfade` et 20 filtres, `missing: []`,
+  `errorCount: 0` — soit deux lots devant la révision que le prompt croyait en
+  production. Redéployer n'aurait rien changé et aurait coûté un build.
+
+⚠️ **Ce qui bloquait la parité n'était pas du bruit, c'était un défaut de
+sentinelle laissé dans le code** (bug 52). `smoke-vibecut-transition-sentinels`
+écrit de vrais défauts dans la production puis les restaure ; **interrompu, il en
+laisse un derrière lui**. `xfadeTransitions.js` portait encore la charge de la
+4ᵉ sentinelle — l'aperçu lisait la courbe en continu au lieu des douze paliers.
+Le symptôme avait été pris pour de la rasterisation Chromium, et **le seuil monté
+deux fois pour l'absorber**. Deux mesures consécutives sans rien changer ont rendu
+des valeurs **identiques au dixième** : il n'y avait aucun bruit. L'écart se
+prédisait même au dixième (6,5 / 1,1 / 9,1 attendus contre 6,0 / 2,0 / 8,9
+mesurés). Détail complet et signes de reconnaissance :
+[docs/vibecut-transitions-b3b-plan-2026-08-02.md](docs/vibecut-transitions-b3b-plan-2026-08-02.md) § 10.9.
+
+Les 15 transitions qui n'avaient **aucune** cible `xfade` native sont construites
+comme des **sous-graphes de filtres natifs** posés sur la queue du plan sortant et
+la tête du plan entrant. **48 transitions exportables sur 48** ; il n'y a plus une
+seule entrée « Aperçu uniquement » dans la bibliothèque.
+Plan et retour d'expérience : **[docs/vibecut-transitions-b3b-plan-2026-08-02.md](docs/vibecut-transitions-b3b-plan-2026-08-02.md)** (§ 10).
+
+⚠️ **Le fait marquant du lot, à retenir avant tout ajout FFmpeg futur.**
+`sendcmd` — la façon évidente de faire varier une option dans le temps, et celle
+que le plan prévoyait — **diffuse ses commandes à TOUS les filtres du graphe**
+portant le nom visé, pas à celui qui le suit. Sur un montage à deux coupes, la
+commande qui clôt la première écrasait la rampe de la seconde : **la deuxième
+coupe rendait un fondu simple**, et rien ne le signalait. La parade documentée
+(nommer l'instance, `gblur@…`) **ne fonctionne pas** dans le build FFmpeg déployé.
+Les rampes sont donc des **chaînes de douze filtres à valeur constante**, chacun
+ouvert sur un douzième de la fenêtre par sa porte `enable`.
+**Seul un test à TROIS plans pouvait le voir.** Un test sur deux plans passait.
+
+⚠️ **Une architecture a été écartée après mesure, et c'est le cœur du plan.**
+`xfade=transition=custom:expr=` permet tout, mais coûte **8,6 s pour une
+transition de 0,6 s en 1080p** contre **0,2 s** en natif — un facteur ~40
+inhérent à l'évaluateur d'expressions de FFmpeg, pas à la complexité des
+formules. Un montage à 6 transitions ajouterait 2 à 4 minutes par export, sur un
+service facturé à la seconde. **La voie retenue** est d'appliquer de vrais
+filtres natifs sur la **queue de A** et la **tête de B** puis une jointure
+`xfade` native : même effet, **0,2 à 0,4 s**, et une forme qui correspond à ce
+que le canvas fait déjà.
+
+**Chantier en cours, décidé le 2026-08-02 : les DEUX BIBLIOTHÈQUES.**
 Elles existent depuis la phase 5 mais restent un catalogue fonctionnel, pas une
 page où l'on a envie de rester. Le porteur du projet veut la **fondation du
 design** des deux écrans — avec des **avant / après** — bâtie sur le contenu
@@ -48,7 +506,10 @@ design** des deux écrans — avec des **avant / après** — bâtie sur le cont
 pendant le rush, transitions supplémentaires) vient **après**.
 
 > **Feuille de route : [docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
-> Lot **B1** en premier (design), puis B2 (vraies vidéos), puis B3 (contenu).
+> Lots **B1** et **B3a** ✅ livrés le 2026-08-02, **B3b** ✅ livré le 2026-08-03.
+> **Prochain : B2** (vraies vidéos dans les aperçus), puis le reste de B3
+> (contenu). L'ordre a été modifié **par décision du porteur du projet** : B3a est
+> passé devant B2.
 
 | Phase | État |
 |---|---|
@@ -60,7 +521,7 @@ pendant le rush, transitions supplémentaires) vient **après**.
 | 4 · Montage avancé | ✅ 2026-07-31 |
 | 5 · Bibliothèques | ✅ **2026-08-01** |
 | 6 · Extensions moteur | ⬜ — devient le lot **B3** de la roadmap bibliothèques |
-| B · Bibliothèques (design → contenu) | 🟡 **chantier en cours** — B1 à faire |
+| B · Bibliothèques (design → contenu) | 🟡 **chantier en cours** — **B1 ✅**, **B3a ✅**, **B3b ✅** (rollout inclus), **B2 ✅ 2026-08-03**. Reste **B3 — le contenu** : 7 mouvements, mouvements sur vidéo, effets pendant le plan |
 | 7 · Bascule et nettoyage | ✅ **terminée le 2026-08-01** |
 
 ---
@@ -578,6 +1039,212 @@ Les smokes qui lisaient le source du panneau (`smoke-vibecut-export-jobs`, `audi
 
 ---
 
+### Lot B1 — Fondation du design des deux bibliothèques (2026-08-02)
+
+**Ce que le lot devait produire, dans les mots du porteur du projet** : *« les
+meilleures bibliothèques pour tester les animations, avec des aperçus qui
+permettent de juger, pouvoir les mettre en favori, et donc les utiliser dans les
+modes en connaissance de cause »*. **Aucun contenu nouveau** : 38 transitions et
+6 mouvements réels, présentés à fond.
+
+**L'ossature est désormais UNE, pas deux.** `LibraryScreen`, `LibraryFilterBar`,
+`LibraryCard`, `LibraryStage`, `LibraryContextStrip` et `useFavorites` sont
+partagés ; `TransitionLibrary` et `MotionLibrary` ne fournissent plus que leurs
+**données**, leur façon de dessiner une vignette et le contenu de leur panneau.
+Les deux écrans étaient jusqu'ici écrits en parallèle et auraient divergé dès la
+première retouche.
+
+**AUDITIONNER — le hover scrub.** La position **horizontale** du pointeur sur une
+vignette *est* le curseur de temps : on balaye la grille et on a auditionné 38
+transitions en quelques secondes. C'est le motif de DaVinci Resolve et de Final
+Cut Pro. Liseré de progression sous la vignette, la boucle reprend à la sortie, et
+**les flèches gauche/droite font la même chose au clavier** — sans quoi l'écran
+serait inutilisable sans souris. La navigation d'une carte à l'autre reste au Tab :
+détourner les flèches pour ça aurait retiré le seul accès clavier au temps.
+
+**Au repos, la vignette se fige au POINT CULMINANT**, jamais à l'instant 0. Un
+champ `peak` est arrivé dans le catalogue de transitions, parce que le milieu ne
+convient pas à tout : un passage au noir à mi-course est un **cadre noir**, qui ne
+dit rien de la transition — ceux-là s'arrêtent à 30 %. Pour un mouvement, le point
+culminant est la **fin** de la course. Le test le prouve en comparant quatre
+vignettes deux à deux.
+
+**JUGER — le grand aperçu et le bypass.** Maintenir **B** montre le rendu **sans**
+l'effet, en plein cadre : coupe franche pour une transition, photo immobile pour un
+mouvement. C'est l'avant/après **en séquence** plutôt qu'en surface, la forme juste
+pour une différence temporelle. Plus un curseur de temps et une bascule boucle. Le
+séparateur déplaçable reste écarté (roadmap § 3.3) — il est le bon outil pour la
+colorimétrie, pas ici.
+
+**Le temps ne passe jamais par React.** Les contrôleurs de progression vivent dans
+un **registre de module** (`previewController.js`), comme `preview/playheadClock.js`.
+Le survol écrit dans un objet mutable et redessine le canvas directement : aucun
+`setState` à la cadence du pointeur sur une grille de quarante canvas. C'est le
+correctif du bug 3 rejoué. Une seule horloge partagée, un `IntersectionObserver`
+par carte, et **aucun redessin quand rien n'a changé**.
+
+**FAVORIS, et leur retour dans les modes** — c'est la moitié du besoin exprimé.
+Persistés en **IndexedDB** sous `favorites:v1`, dans la même base que les projets
+(pas `localStorage` : deux stockages feraient deux vérités). **Une seule source de
+vérité** : `adapters/useFavorites.js`, cache de module + `useSyncExternalStore`,
+lu par les deux bibliothèques **et** par les deux inspecteurs.
+- **montage avancé** : section « Tes favoris » **en tête** de la liste de
+  transitions de l'inspecteur ;
+- **montage rapide** : les **six raccourcis écrits en dur** deviennent les favoris
+  de l'utilisateur, avec repli sur les six d'origine tant qu'aucun n'est posé.
+  ⚠️ Un favori peut être « aperçu uniquement » : on le rend quand même — c'est le
+  choix de l'utilisateur — mais **avec la mention « Aperçu »**, comme dans le
+  montage avancé. Le retirer en silence aurait été pire que de le montrer.
+
+**Le châssis** : cartes agrandies (248 px au lieu de 196), cascade à l'entrée,
+survol sobre, recherche insensible aux accents, familles en **barre horizontale**
+(jamais un rail latéral, `plan.md` § 4.4) repliée en menu sous 720 px, bande de
+contexte « Scène 4 → [ici] → Scène 5 », et un état « aucun résultat » qui **dit
+quoi faire** avec un bouton qui agit vraiment.
+
+**Ce qui n'a pas bougé** : les canvas restent dessinés par `renderTransition` et
+`applyImageMotionTransform`, l'horloge reste unique, les badges de parité restent
+lus de `getServerRenderCapabilityStatus`, les mouvements `planned` n'exposent
+toujours aucun réglage, et la courbe linéaire reste affichée désactivée.
+
+**Gate** : `smoke-vibecut-library-b1.spec.cjs`, **17 tests qui mesurent les
+pixels** (`getImageData` : moyenne RVB + grille de 16 sondes) et les attributs que
+le rendu écrit dans le DOM, jamais un libellé. Suite navigateur portée à **60**.
+
+#### Seconde passe — ce que la relecture de l'écran a changé (même jour)
+
+Cinq points relevés à l'usage, tous corrigés dans la foulée :
+
+1. **La page Mouvements ouvrait sur ce qui n'existe pas.** Sept des treize
+   entrées sont annoncées et non rendues : mélangées aux six qui marchent, elles
+   occupaient plus de la moitié de la grille et faisaient passer le catalogue pour
+   à moitié vide. Elles sont désormais dans une **section annexe en bas**, trait de
+   séparation, titre en retrait, cartes atténuées. On ne les cache pas — la règle
+   reste de dire ce qui arrive — on arrête de leur donner la même place.
+2. **Les transitions non exportables passaient devant.** Le tri « exportables
+   d'abord dans chaque famille » existait avant le lot et **avait été perdu** au
+   passage à l'ossature commune : les familles ouvraient sur des entrées qui se
+   dégradent en fondu à l'export. Tri rétabli, plus un filtre **« Export Pro »**
+   dans la barre (les 15 qui survivent, sur 38), plus — et c'est le plus utile —
+   **un avertissement au moment où l'on applique** : *« À l'export, le serveur la
+   remplacera par un fondu enchaîné. »* Un badge se regarde une fois ; cette
+   phrase arrive quand la décision est prise.
+3. **Le panneau des mouvements ne respirait pas.** Six curseurs de trajectoire
+   empilés sous l'intensité. Ils sont **repliés par défaut** sous « Cadrage
+   précis » : la précision reste pour qui la cherche, sans encombrer qui veut
+   juste choisir un mouvement et le doser.
+4. **Les images par seconde n'avaient pas été mesurées.** C'était un risque écrit
+   dans la feuille de route et jamais chiffré. Mesuré : **60,2 im/s** sur la grille
+   complète de 38 vignettes, **60,1 im/s** avec un scrub en cours. Aucun
+   effondrement. La mesure est devenue un **test permanent** avec un plancher à
+   24 im/s — assez bas pour ne pas dépendre de la machine, assez haut pour
+   attraper un effondrement.
+5. **Les scènes de repli étaient trop lisses.** Ce sont elles qu'on voit avant
+   d'avoir importé quoi que ce soit, donc la première impression de l'écran — et
+   surtout, **un dégradé lisse zoomé à 116 % reste le même dégradé** : sur un
+   aplat, la moitié des mouvements et des transitions ne montraient littéralement
+   rien. Elles ont maintenant trois plans de relief, un halo, un reflet sur l'eau
+   et un grain fin. Le grain de « Dissolution film » et la désaturation de
+   « Fondu désaturé » se voient enfin. Toujours **dessinées**, aucun asset externe,
+   et déterministes pour que deux sessions donnent la même image.
+
+---
+
+### Lot B3b — Les 15 dernières transitions (2026-08-03)
+
+- **Le catalogue est entièrement exportable : 48 sur 48.** Il n'y a plus une
+  seule entrée « Aperçu uniquement ». C'était 15 sur 38 au lot L1, 33 sur 48 au
+  lot B3a.
+- **Chaque transition est un sous-graphe**, pas une ligne. `buildTransitionSubgraph`
+  (exporté par le renderer) pose des filtres sur la **queue du plan sortant** et
+  la **tête du plan entrant**, puis joint. Douze joignent par un `xfade` natif ;
+  **trois refont la jointure à la main** parce qu'elles doivent *choisir* entre
+  les deux plans plutôt que les mélanger — stroboscope, coupe franche du glitch,
+  révélation par blocs. Les deux flux sont alors alignés par `tpad` et composés
+  par un `overlay` conditionnel.
+- **La table d'effets est PUREMENT DÉCLARATIVE et triplement recopiée**
+  (`exportManifest.js`, `functions/src/videoExport.js`,
+  `render-service/src/server.js`). Les **mêmes nombres** sont lus par le renderer
+  et par l'aperçu canvas : aucune constante d'effet n'est écrite deux fois, donc
+  l'aperçu ne peut pas diverger par recopie fautive.
+  `smoke-vibecut-transition-parity` échoue si les trois copies divergent.
+- **`blur-dissolve` et `cross-blur` sont vraiment séparés**, pas deux noms pour
+  le même réglage : `ramp` (A part net et se floute, B arrive floue et se résout
+  — à aucun instant les deux ne sont flous) contre `bell` (les deux culminent
+  ensemble au milieu, deux fois plus fort — il y a donc un instant où toute
+  l'image est illisible).
+- **Décision produit du porteur du projet** : les ouvertures de séquence
+  (`intro-title-scan`, `intro-grid-reveal`, `intro-neon-doors`, plus
+  `intro-cinematic-bars`) restent des transitions et sont rendues à l'export,
+  mais la bibliothèque **dit** désormais qu'elles sont pensées pour démarrer une
+  séquence — badge, note dans le panneau, et remarque au moment où on les pose
+  ailleurs qu'à la première coupe. Trois `outro-*` portent le pendant « Fin ».
+- **Le badge et le filtre ont changé de rôle.** « Export Pro » aurait été sur les
+  48 cartes et le filtre du même nom ne retirait plus rien : un badge que tout le
+  monde porte ne distingue rien, un contrôle qui ne filtre jamais est un bouton
+  mort (`plan.md` § 4.2). Ils portent maintenant l'usage, et le filtre devient
+  « Entre deux plans » (41 sur 48). **L'avertissement d'export n'est pas
+  supprimé** : il est lu à l'exécution, donc il reviendrait de lui-même si une
+  capacité serveur disparaissait.
+
+**Ce que la mesure a contredit — le vrai contenu du lot** (détail au § 10 du plan) :
+
+1. **`zoompan` sur vidéo : aucune réserve** (l'inconnue n° 1 du plan). `d=1` ne
+   fige rien, ne duplique aucune image, et `on` est exact à l'image près. Les
+   trois zooms étaient les plus sûrs du lot, pas les plus risqués. Fausse alerte
+   au passage : une géométrie qui semblait fausse de 20 % n'était que la **plage
+   limitée** du YUV relue en `gray`.
+2. **`sendcmd` est inutilisable** (voir l'encadré plus haut). Remplacé par des
+   chaînes de douze filtres à valeur constante, chacun ouvert par `enable`.
+3. **Le découpage en segments dérive.** Premier remplacement essayé : douze
+   segments concaténés. `concat` déduit le décalage de chaque segment de la durée
+   du précédent, **et cette déduction dérive** — huit images de trop sur 108. Avec
+   des bornes en *secondes* plutôt qu'en numéros d'image, c'était une image
+   *perdue* sur 102. Le découpage survit **limité à trois morceaux**, pour
+   confiner les quatre effets qui doivent sortir du `yuv420p`.
+4. **La dépense n'est pas l'effet, c'est l'espace colorimétrique.** L'aller-retour
+   `yuv420p → gbrp → yuv420p` posé sur tout le flux coûte **1,1 s** pour une
+   transition de 0,6 s en 1080p — quatre fois l'effet. Une porte `enable` n'y
+   change rien : elle empêche l'effet, pas la conversion. Confiner la fenêtre fait
+   tomber l'aberration chromatique de **2,20 s à 0,83 s** et le glitch de
+   **1,77 s à 0,64 s**.
+5. **Trois faits FFmpeg relevés à la mesure** : `displace` lit
+   `out(x) = in(x + carte − 128)` (une carte > 128 décale vers la gauche) ;
+   `extractplanes=r+g+b` sort le rouge en 0 ; le sous-échantillonnage de chroma du
+   `yuv420p` étale les franges sur deux pixels, ce que l'aperçu en RVB plein ne
+   peut pas reproduire — forcer `gbrp` fait tomber l'écart du glitch de 23 à 4.
+
+**Coût mesuré, plafond 1,2 s** pour une transition de 0,6 s en 1080p (natif :
+0,23 s) : le plus cher est `chromatic` à **0,83 s**. Tous les autres sont entre
+0,15 s et 0,64 s.
+
+⚠️ **LE LOT N'EST PAS FINI. Deux choses restent ouvertes** (détail dans
+*Reste à faire*) : un seuil de parité qui n'est pas calé sur `additive-dissolve`,
+et le rollout Cloud Run.
+
+**Gate du lot :**
+- `smoke-vibecut-xfade-preview-parity` — **44 transitions × 4 instants**, dont les
+  15 nouvelles, avec un seuil justifié par id. Le côté FFmpeg est construit par
+  `buildTransitionSubgraph`, le code du renderer lui-même.
+- `smoke-vibecut-transition-chain-mp4` — **trois plans enchaînés**, en MP4 réel :
+  compte d'images exact, les **deux** coupes portent l'effet, et **hors fenêtre
+  rien ne bouge**.
+- `smoke-vibecut-transition-cost` — plafond de coût, mesuré en 1080p.
+- `smoke-vibecut-transition-sentinels` — **cinq défauts rejoués** sur le code de
+  production, cinq échecs exigés.
+- `smoke-vibecut-library-parity` — 48 exportables, 0 en aperçu seul.
+- **`GET /capabilities` du renderer vérifie désormais les FILTRES**, pas seulement
+  les cibles `xfade`. Les 15 nouvelles ne sont plus des cibles : un build où
+  `displace` ou `zoompan` manquerait passait le contrôle et faisait échouer tous
+  les rendus. La liste est **relevée sur les sous-graphes que le renderer émet**,
+  jamais recopiée. `capabilitiesVersion` passe à **5**, et le pré-vol refuse
+  explicitement une image antérieure au lot (elle ne rapporte aucun bloc
+  `filters`) — c'est ce qui rend la vérification post-rollout utile.
+- Suite navigateur : les tests de la bibliothèque réécrits pour la nouvelle
+  réalité (48/48, badge d'usage, filtre « Entre deux plans »).
+
+---
+
 ## Bugs trouvés et corrigés en route
 
 1. **Reset CSS trop spécifique** — `.vibecut button` (0,1,1) écrasait les CSS Modules (0,1,0) : aucun bouton primaire n'avait son fond accent. Resets passés en `:where()`.
@@ -740,18 +1407,183 @@ Deux tests l'ancrent désormais (l'onglet mène vraiment à `/video`), et
 
 ---
 
+41. **Le curseur de temps du grand aperçu était mort une fois sur deux.** Le
+    premier jet écrivait `slider.value` **directement** pendant la boucle, pour
+    éviter des rendus React. Effet de bord : React garde une trace de la dernière
+    valeur d'un champ, et une écriture directe la met à jour **sans** déclencher
+    `onChange`. Amener ensuite le curseur exactement là où la boucle venait de le
+    laisser ne produisait donc **aucun événement**. Le transport est devenu un
+    champ contrôlé, rafraîchi 8 fois par seconde — assez pour lire un temps, et le
+    dessin des canvas reste entièrement hors de React. **Trouvé par le test, pas
+    par la relecture** : le symptôme était silencieux.
+42. **Le bypass devenait sourd juste après avoir déplacé le curseur.** Le garde
+    « ne pas déclencher B quand on tape » ignorait **tout** `INPUT`. Or le curseur
+    de temps en est un, et il garde le focus : la comparaison avant/après ne
+    répondait plus exactement au moment où l'on veut comparer. Le garde ne porte
+    plus que sur les champs où l'on **tape** vraiment (texte, recherche, nombre…).
+43. **Deux clics rapides sur la bascule boucle retombaient dans la même branche.**
+    Le handler lisait l'état React capturé au rendu, et faisait ses effets de bord
+    **dans un `setState` updater** — que StrictMode invoque deux fois. La bascule
+    lit désormais le **mode du contrôleur**, qui est synchrone, et les effets sont
+    sortis de l'updater.
+44. **Un smoke lisait le catalogue avec une regex positionnelle.**
+    `smoke-vibecut-style-recipes` exigeait `{ id: '…', engineId: '…'` **collés** :
+    ajouter le champ `peak` a cassé le test sans que rien ne soit faux. La regex
+    cherche maintenant l'`engineId` **de cette entrée**, pas une position dans la
+    ligne. Bon réflexe du test (il a bien vu un changement), mauvaise formulation.
+45. **Un point de parité qui ne tombait pas sur une image entière comparait deux
+    instants différents.** En densifiant l'échantillonnage des rognages (lot
+    B3a), `0,05` a été pris comme point de mesure — or `0,05 × 50 images/s = 2,5`,
+    arrondi à l'image 3, soit `t = 0,06` côté FFmpeg contre `0,05` côté canvas.
+    Sur une courbe aussi raide que le rayon de `circlecrop` (dérivée ≈ 5), ce
+    centième suffisait à faire échouer un test **pourtant juste** : une heure
+    perdue à soupçonner la formule. `smoke-vibecut-xfade-preview-parity` **refuse**
+    désormais un point hors grille, avec le message qui explique pourquoi.
+46. **Le test de rendu local interdisait l'effet qu'on venait d'ajouter.** Il
+    exigeait que l'image du milieu du fondu ne soit pas noire — bonne assertion
+    (elle attrape un rendu qui a échoué), sauf que pour `circlecrop` et
+    `rectcrop`, **être noir à mi-parcours est l'effet même**. L'assertion est
+    inversée pour ces deux-là, et **renforcée** : noir au milieu *et* image encore
+    présente au quart, avec un seuil **relatif au fondu de référence** plutôt
+    qu'absolu (la lecture ne retombe pas toujours pile sur l'image du milieu). Un
+    rendu entièrement noir ne passe donc pas.
+
+---
+
+### Bugs du lot B3b (2026-08-03)
+
+45. **La deuxième coupe d'un montage rendait un fondu simple.** `sendcmd` diffuse
+    ses commandes à tous les filtres du graphe portant le nom visé : la commande
+    « sigma 0 » qui clôt la première coupe arrivait au milieu de la rampe de la
+    seconde et l'écrasait. Mesuré : écart-type 52,7 avec les deux coupes contre
+    42,9 avec la seconde seule. **Trouvé par le test à trois plans, et par lui
+    seul** — sur deux plans le défaut n'existe pas. Corrigé en remplaçant
+    `sendcmd` par des chaînes de filtres à valeur constante.
+46. **Le montage perdait des images au recollage.** Bornes de découpe en secondes :
+    une image perdue sur 102. Puis, avec treize segments concaténés : huit images
+    **de trop** sur 108. Corrigé en passant les bornes en numéros d'image et en
+    limitant le recollage à trois morceaux. Le test à trois plans compte les
+    images à chaque exécution.
+47. **`xfade` refusait de joindre un flux recollé à un flux intact** : `concat`
+    sort en base de temps 1/1000000, les autres sont en 1/fps. Un montage mêlant
+    une transition confinée et une transition simple ne se rendait pas du tout.
+    Corrigé par un `settb=1/fps` derrière le recollage.
+48. **Un bloc de `intro-grid-reveal` était révélé dès q = 0**, donc avant le début
+    de la transition : son seuil valait exactement 0 et `gte(0, 0)` est vrai. Les
+    seuils vont maintenant de 1/40 à 1. **Trouvé par l'assertion « hors fenêtre,
+    rien ne bouge »** — elle-même ajoutée parce qu'une **sentinelle** avait montré
+    que le test à trois plans ne portait pas cette garantie.
+49. **Le signe de `displace` était inversé.** `displace` lit
+    `out(x) = in(x + carte − 128)`, donc une carte supérieure à 128 décale l'image
+    vers la **gauche**, alors que l'aperçu dessine à un décalage de *destination*.
+    Écart mesuré avant correction : 39 sur 255.
+50. **Le glitch était plus mou à l'export qu'à l'aperçu.** En `yuv420p`, le
+    sous-échantillonnage de chroma étale les franges de couleur sur deux pixels ;
+    l'aperçu travaille en RVB plein et ne peut pas le reproduire. Forcer `gbrp`
+    autour du sous-graphe fait tomber l'écart de **23 à 4** sur 255.
+51. **La courbe des bandes du glitch était quantifiée d'un côté et continue de
+    l'autre.** La carte de déplacement est une expression `geq` en T (continue),
+    le décalage RVB une rampe par paliers : l'aperçu appliquait les paliers aux
+    deux. Les bandes se décalaient d'un pixel et l'écart mesuré triplait.
+52. **L'outil qui injecte des défauts en avait laissé un dans le code.**
+    `smoke-vibecut-transition-sentinels` patche la production puis la restaure ;
+    l'exécution interrompue du 2026-08-03 a laissé en place la charge de sa
+    4ᵉ sentinelle — `const qStep = clamp(t, 0, 1);` au lieu de
+    `quantizeProgress(t)`. L'aperçu lisait donc la courbe **en continu** quand
+    l'export avance par **douze paliers**. C'est ce qui faisait échouer
+    `additive-dissolve`, et l'écart a été pris pour du bruit de rasterisation
+    Chromium — **le seuil a été monté deux fois** pour l'absorber. Deux exécutions
+    consécutives, sans rien changer entre les deux, ont rendu des mesures
+    **identiques au dixième** sur les quinze transitions : il n'y avait aucun
+    bruit. L'écart se prédisait au dixième à partir de α = 0,30 × sin(π q).
+    Trois signes le disaient avant toute mesure : `quantizeProgress` était
+    **exportée et appelée nulle part**, le motif que la sentinelle *cherche* était
+    absent du fichier et celui qu'elle *écrit* présent, et `additive-dissolve` est
+    la seule des quinze dont l'effet soit une pure intensité rampée — donc le seul
+    **détecteur** possible, les quatorze autres cachant le même défaut sous leur
+    écart géométrique. Corrigé, seuils **resserrés** sur la mesure réelle
+    (`meanFrame` de 8 à 4-6 pour douze des quinze) et la fausse justification
+    remplacée par ce qui s'est réellement passé.
+
+### Bugs du lot B2 (2026-08-03)
+
+53. **Le bypass a cessé de prouver quoi que ce soit dès l'arrivée des vidéos.**
+    « Figer l'aperçu » arrêtait la *progression*, pas la *source*. Tant que les
+    vignettes tournaient sur des images fixes, les deux revenaient au même. Avec
+    un rush qui avance, plus du tout : le scrub comparait deux instants
+    différents du plan, et surtout l'avant/après du bypass différait par l'effet
+    **et** par le contenu. Trouvé par l'assertion « le relâchement rend l'effet »
+    du lot B1, qui s'est mise à échouer. Corrigé par `librarySourceFreeze.js` :
+    hors de la boucle, la vignette dessine une **copie** prise au moment où elle
+    a quitté la boucle.
+54. **Une assertion du lot B1 était fragile par construction, et le lot B2 l'a
+    révélée.** « la progression change toute seule » échantillonnait sur 400 ms
+    alors que la boucle marque une tenue de **700 ms** à chaque bout, dans un
+    cycle de 3 s. Elle ne passait que grâce à un **artefact de cache** : sans
+    redessin pendant la tenue, l'attribut gardait la valeur périmée du scrub et
+    *paraissait* avoir changé. Dès qu'une vidéo force le redessin à chaque image,
+    la vraie valeur — 0 pendant la tenue — s'affiche et l'assertion tombait deux
+    fois sur trois. Remplacée par une attente active de 4 s. Mesuré : 2 échecs
+    sur 3 avant, 3 succès sur 3 après.
+55. **Une assertion de cadence tenait sur cinq unités de marge.** « la lecture
+    avance de façon continue » comptait les écritures du curseur pendant une
+    seconde et exigeait plus de 15 : le store en écrit ~11, l'horloge ~16. Le
+    décodage vidéo concurrent qu'ajoutent les bibliothèques depuis le lot B2 a
+    suffi à la faire passer sous la barre — **14, puis 12** — environ deux fois
+    sur cinq en suite complète, jamais en isolation. **Une première correction
+    a échoué sur une hypothèse fausse** : je pensais que `MutationObserver`
+    regroupait ses appels et que compter les mutations donnerait ~60 au lieu de
+    ~16. Mesuré : aucun changement. Le curseur écrit réellement ~16 fois par
+    seconde ici. Corrigé en mesurant **trois fois et en gardant la meilleure** :
+    l'assertion porte sur une capacité, pas sur l'ordonnancement du pire cas, et
+    un vrai retour aux rendus React resterait rouge aux trois mesures.
+58. **La secousse aurait sauté au lieu de trembler.** Choisie à 7,5 Hz, elle
+    n'est échantillonnée que **4 fois par cycle** à 30 images/s (3,3 pour l'axe
+    vertical à 9,1 Hz) : elle se serait lue comme un saut entre quatre positions,
+    et son aspect aurait changé avec la cadence d'export. Ramenée à 3,7 et
+    4,9 Hz — 8,1 et 6,1 échantillons par cycle, et c'est aussi la plage d'une
+    vraie caméra portée. Trouvé en cherchant pourquoi deux sentinelles restaient
+    muettes.
+59. **Le test de parité était aveugle aux accents.** Un accent ne déplace le
+    cadre que de ±3,8 px sur 320, soit **sous le seuil de 12/255** qu'il faut
+    tolérer pour le rééchantillonnage. Un renderer qui aurait divisé l'amplitude
+    par deux serait donc resté « en parité ». Pire, trois des cinq images
+    échantillonnées tombaient **pile sur les passages à zéro** de l'oscillation.
+    Corrigé sur les deux plans : des points de mesure propres aux accents, et
+    surtout une comparaison de **l'amplitude du mouvement** de chaque côté plutôt
+    que des images seules. Quatre sentinelles vérifiées après correction, dont
+    deux qui ne l'étaient pas avant.
+57. **Le mouvement d'une vidéo était perdu à deux endroits invisibles.** En
+    ouvrant les mouvements aux vidéos, l'interface les proposait et le clic ne
+    prenait pas. Deux gardes `isImageMedia` restants, tous deux dans le store :
+    `motion` était remis à `null` **à l'import** et **à chaque mise à jour**. Le
+    manifeste d'export en avait un troisième, qui aurait perdu le mouvement en
+    route même une fois l'écran corrigé. Trouvé par le test navigateur ajouté
+    exprès — les onze tests de mouvement existants utilisent des photos et
+    n'auraient jamais rien vu.
+56. **L'assertion B2 « le clip avance tout seul » avait la même faiblesse** :
+    un écart de 2,0 pour un seuil de 2. Sous charge, 700 ms de lecture ne
+    faisaient avancer le clip que d'une image ou deux. Fenêtre portée à 2 s.
+    Cinq exécutions complètes de suite après correction : **64/64 à chaque
+    fois**.
+
+
+---
+
 ## Problèmes connus, non résolus
 
 | # | Problème | Nature |
 |---|---|---|
 | ~~A~~ | ~~`npm run test:scope` échoue sur le mot « jardin » dans un texte immobilier.~~ | ✅ **Résolu le 2026-08-01.** Le garde porte désormais sur le **nom complet** du projet source, séparateurs tolérants. Deux assertions périmées de la même famille sont alignées au passage (Node 20 → 22 ; firebase-functions 6 → 7, firebase-admin 13 → 14), et la cohérence des trois déclarations de version de Node (`.nvmrc`, racine, `functions/`) est maintenant vérifiée. **`npm run test:scope` est vert.** |
+| ~~K~~ | ~~`test:vibecut-transition-cost` échoue sur `rgb-split` (1,23 s pour un plafond de 1,2 s).~~ | ✅ **Résolu le 2026-08-04.** Ce n'était pas une régression : le rapport au natif TOMBAIT de ×3,5 à ×2,9 — l'effet était devenu moins cher. Ce qui avait bougé, c'est la machine (référence native 0,43 s contre 0,23 s quand le plafond a été posé, et 0,16 à 0,45 s d'une exécution à l'autre dans la même session). **Le plafond n'a pas été relevé : il a changé d'UNITÉ.** Il s'exprime désormais en multiples du natif (×6), ce qui est exactement ce que « 1,2 s pour un natif de 0,2 s » voulait dire — le chiffre ne change pas. Corrige au passage une incohérence d'origine : le fichier mesurait sa référence à chaque exécution en disant « c'est le RAPPORT qui a un sens », puis assertait en secondes absolues. La voie par expression coûte ~40× le natif : elle reste refusée avec la même marge. Vérifié : deux exécutions vertes, et sur une machine reposée `rgb-split` retombe **exactement** sur sa mesure documentée du 2026-08-03 (0,81 s, ×3,5). |
+| ~~L~~ | ~~`smoke-vibecut-library-b1.spec.cjs` : le test des favoris échoue après le rechargement de page, sur un écran de connexion.~~ | ✅ **Résolu le 2026-08-04.** Cause réelle : `bypassAuth` clique le bouton de contournement **s'il est visible à cet instant**, or `page.reload({ waitUntil: "domcontentloaded" })` rend la main **avant l'hydratation React** — le bouton n'existe pas encore, le contournement ne se fait pas, et le test poursuit sur l'écran de connexion. `open()` ne souffrait pas du défaut parce qu'il attend le réseau **avant** de contourner. Les deux chemins partagent maintenant la même séquence (`settle`), pour que l'oubli ne puisse pas se reproduire. Vérifié : **trois exécutions consécutives, 17/17 à chaque fois**. À noter pour la méthode : l'échec a d'abord été exonéré à tort comme « environnemental » — il se reproduisait à l'identique avec le code du lot d'accents neutralisé, ce qui prouvait seulement qu'il n'était pas **causé** par ce lot, pas qu'il était hors du code. |
 | B | `scripts/smoke-vibecut-media-safety.spec.cjs` : 3 échecs. Les captures Playwright montrent « This page couldn't load » → **crash du moteur de rendu** sur les fixtures WebM de 7 Mo. | Préexistant, fichier non commité (WIP d'une session antérieure). |
 | C | `npm run test:vibecut-export-local-mp4` échoue : ses fixtures pointent `C:\Users\pcpor\…`. | Environnement (machine Windows d'origine). |
 | D | Les `.mp4` de `videotest/` sont des **pointeurs Git LFS de 132 octets**. | Les smokes du nouveau front fabriquent leurs médias avec `ffmpeg-static`. |
 | ~~E~~ | ~~Le renderer Cloud Run doit être redéployé pour que les 15 transitions de L1 et la courbe + l'intensité de L3 apparaissent dans les exports serveur.~~ | ✅ **Résolu le 2026-08-01.** Rollout effectué : révision `00006-6fw`, image `l6-af59e70-20260801`. Vérifié sur la production : 15/15 cibles `xfade`, `errorCount: 0`, `/render` toujours protégé (401 sans signature). L'ancienne révision `00005-vf2` reste disponible pour un retour arrière immédiat. **Ce que l'aperçu montre est désormais ce que l'export produit.** |
 | F | **`zoom-punch` (`xfade=zoomin`) écarté du vocabulaire.** Les images de référence montrent une magnification extrême jusqu'à un aplat uniforme au milieu du fondu : laid sur photo, et disproportionné à reproduire au canvas. | Décision produit du 2026-07-30. 15 transitions au lieu des 16 prévues. Si un accent de zoom est voulu, il viendra du **mouvement (L3)**, pas d'une transition. |
 | ~~H~~ | ~~`titleStyle` et `audioProfile` portés par le modèle mais pas appliqués.~~ | ✅ **Résolu le 2026-08-01 (lot L5).** Trois résolveurs purs les traduisent en propriétés rendues des deux côtés, et changer de preset re-style le titre déjà posé. |
-| I | **`zoompan` borne sa fenêtre à l'image, le canvas non.** *(Depuis la phase 5, l'éditeur de trajectoire de `/video/mouvements` fait respecter la condition au lieu de la documenter : on ne peut plus construire un mouvement inexportable depuis l'interface. La contrainte reste à vérifier pour tout ajout au catalogue en phase 6.)* Un mouvement dont la fenêtre sort du cadre diverge franchement entre aperçu et export (74/255 mesurés sur un cas volontairement débordant). La condition à tenir est `\|x\| ≤ (zoom − 1) / 2`. | Les six mouvements livrés la respectent (le plus tendu : `drift-up`, 0,045 pour une limite de 0,05). À vérifier avant tout ajout au catalogue en **phase 6**. Rien à corriger aujourd'hui. |
+| I | ✅ **Vérifié automatiquement depuis le 2026-08-03 (lot B3)** : `smoke-vibecut-motion-envelope` échantillonne la trajectoire **entière** de chaque preset à quatre intensités et refuse tout dépassement, ainsi que tout zoom passant sous 1. Le contrôle manuel sur les deux extrémités ne suffisait plus dès qu'un trajet cesse d'être une droite. **`zoompan` borne sa fenêtre à l'image, le canvas non.** *(Depuis la phase 5, l'éditeur de trajectoire de `/video/mouvements` fait respecter la condition au lieu de la documenter : on ne peut plus construire un mouvement inexportable depuis l'interface. La contrainte reste à vérifier pour tout ajout au catalogue en phase 6.)* Un mouvement dont la fenêtre sort du cadre diverge franchement entre aperçu et export (74/255 mesurés sur un cas volontairement débordant). La condition à tenir est `\|x\| ≤ (zoom − 1) / 2`. | Les **11 mouvements** et les **2 accents** livrés la respectent : marge la plus tendue relevée le 2026-08-04 — `pan-left`/`pan-right` à 91,7 %, la secousse à 80,0 %. Vérifié automatiquement à chaque exécution, plus rien à faire à la main. |
 | J | **`GET /capabilities` du renderer est sans authentification, sur un service Cloud Run public.** Sa réponse ne porte donc **ni la version de FFmpeg ni le texte des erreurs** — seulement `ok`, la révision, les cibles manquantes et un compteur d'erreurs. | **Choix délibéré du 2026-08-01, pas un oubli.** Une bannière de version renseignerait gratuitement quelqu'un qui cherche les CVE de ce build. Le détail va dans les journaux Cloud Run (`gcloud run services logs read vibecut-render-service --region europe-west9 --project vibefx-v2 \| grep capabilities`). Documenté dans `render-service/src/server.js`, `render-service/README.md`, le runbook et verrouillé par `smoke-vibecut-library-parity.mjs`. Si le service passe en Cloud Run privé, la précaution devient facultative. |
 | G | Trois écarts de parité **structurels** subsistent, bornés par test : le grain de `film-dissolve` (FFmpeg tire un bruit par pixel), le noyau de flou de `blur-cut`, et `desat-fade` (le `grayscale()` du navigateur utilise Rec.709, FFmpeg Rec.601 → un rouge saturé ressort plus clair à l'export). | Assumés et documentés dans `xfadeTransitions.js`. Les seuils du test servent à détecter une **dérive**, pas à prétendre à l'exactitude. |
 
@@ -762,88 +1594,165 @@ Deux tests l'ancrent désormais (l'onglet mène vraiment à `/video`), et
 > **Chantier en cours : les deux bibliothèques.**
 > Feuille de route complète : **[docs/vibecut-bibliotheques-roadmap-2026-08-02.md](docs/vibecut-bibliotheques-roadmap-2026-08-02.md)**
 
-### Lot B1 — Fondation du design des deux bibliothèques · **prioritaire**
+### Lot B1 — Fondation du design · ✅ **livré le 2026-08-02**
 
-Objectif, dans les mots du porteur du projet (2026-08-02) : *« les meilleures
-bibliothèques pour tester les animations, avec des aperçus qui permettent de
-**juger**, pouvoir les mettre en **favori**, et donc les **utiliser dans les modes
-en connaissance de cause** »*.
+Voir la section « Lot B1 » plus haut dans *Fait*. Reste volontairement **hors**
+de ce lot, et c'est assumé :
 
-**Aucun contenu nouveau** : on présente à fond ce qui existe (38 transitions,
-6 mouvements réels + 7 annoncés).
+- [ ] **Thèmes éditoriaux** (`Réseaux sociaux`, `Voyage`, `Produit`, `Récit`,
+      `Souvenirs`, `Musique`) : c'est de la donnée éditoriale à écrire à la main
+      pour 51 entrées, et la roadmap la range **après** B1 (§ 5.5).
+- [ ] **Hover scrub au doigt** : sur pointeur tactile, la vignette continue de
+      boucler et le tap sélectionne. Un scrub au doigt avalerait le tap. Le
+      jugement précis se fait alors dans le grand aperçu, qui a son curseur. Le
+      sous-titre qui décrit le survol est masqué sous 720 px pour ne pas promettre
+      une interaction qui n'existe pas là.
+- [x] ~~**Mesure d'images par seconde**~~ — **fait** : 60,2 im/s au repos et
+      60,1 im/s avec un scrub, sur les 38 vignettes. Test permanent, plancher à
+      24 im/s. **À refaire au lot B2** : c'est l'arrivée de vraies vidéos dans les
+      aperçus qui changera réellement la charge, pas le nombre de canvas.
+- [x] ~~**Le fond du problème des 23 transitions « aperçu uniquement »**~~ —
+      **traité au lot B3a le 2026-08-02**, le porteur du projet ayant tranché la
+      recommandation d'ordre en faveur de cet écart. Il en reste **15**, et pour
+      celles-là aucune cible `xfade` native ne rend l'effet : les faire passer
+      demande de vraies chaînes de filtres FFmpeg, donc du B3 complet.
 
-**Décision de conception, prise après recherche sur DaVinci, Final Cut et CapCut**
-Le premier jet proposait un avant/après avec **séparateur déplaçable**. Écarté :
-un séparateur compare deux états d'un même instant coupés dans l'**espace**, or
-mouvements et transitions sont des différences dans le **temps**. Sur un
-mouvement, les deux moitiés donneraient une image cassée en deux ; sur une
-transition, elles seraient identiques 80 % du temps.
-**Les trois outils font tous la même chose : le hover scrub.** On l'adopte.
-*(Le séparateur reste le bon outil pour la colorimétrie — rangé pour une future
-bibliothèque de looks.)*
+### Lot B3a — Fermeture de l'écart d'export · ✅ **livré le 2026-08-02**
+- [x] Les 31 cibles `xfade` natives inutilisées **rendues et mesurées** une par une.
+- [x] **8 entrées existantes** re-affectées à la cible qui tient leur promesse,
+      **10 entrées nouvelles**. Exportables **15 → 33**, catalogue 38 → **48**,
+      « aperçu uniquement » 23 → **15**.
+- [x] Parité prouvée : 29 cibles comparées image par image, **34 MP4 réels**
+      construits par le `buildFfmpegArgs` du renderer lui-même.
+- [x] ~~Rollout Cloud Run~~ — **fait le 2026-08-02**, révision **`00007-b5c`**.
+      29 cibles `xfade` sur 29 vérifiées sur le service réel, `errorCount: 0`,
+      `/render` toujours protégé. Le badge « Export Pro » ne devance plus la
+      production.
 
-- [ ] **Squelette commun** : `LibraryScreen`, `LibraryFilterBar`, `LibraryCard`,
-      `LibraryStage`, `LibraryContextStrip`, `useFavorites`. Les deux écrans ne
-      fournissent plus que leurs **données**.
-- [ ] **AUDITIONNER — hover scrub sur chaque vignette.** La position
-      **horizontale** du pointeur *est* le temps : on balaye la grille et on a vu
-      38 transitions en quelques secondes. Liseré de progression sous la vignette.
-      Boucle quand la vignette est visible (jamais de grille morte), le survol
-      reprend la main, la sortie relance la boucle.
-      **Équivalent clavier obligatoire** — sinon l'écran est inutilisable sans souris.
-- [ ] **Au repos, la vignette se fige au POINT CULMINANT de l'effet**, jamais à
-      l'instant 0. Détail petit et décisif : un fondu à t=0 ne ressemble à rien, et
-      une grille figée à t=0 serait **38 fois la même image**.
-- [ ] **JUGER — le grand aperçu sur la VRAIE coupe** du projet, pas une démo.
-      **Bypass** : maintenir une touche montre le rendu **sans** l'effet, en plein
-      cadre — c'est la comparaison avant/après, en séquence plutôt qu'en surface.
-      Curseur de temps pour s'arrêter à l'instant exact, bascule boucle, et
-      réglages **live** (l'aperçu suit pendant qu'on tire, sans appliquer).
-- [ ] **Chaque vignette joue la coupe réelle de l'utilisateur.** DaVinci met du
-      générique dans la vignette parce qu'il ne sait pas où on en est ; VibeCut le
-      sait. **Aucun des trois outils ne fait ça.**
-- [ ] **FAVORIS**, persistés en **IndexedDB** (pas `localStorage` : le projet
-      stocke déjà tout le reste là). Étoile, filtre ★, section « Tes favoris ».
-- [ ] **Et leur retour dans les modes** — c'est la moitié du besoin :
-      - **montage avancé** : les favoris remontent en tête de la liste de
-        transitions de l'inspecteur (il n'y a pas la place d'y afficher des
-        aperçus, d'où l'intérêt d'avoir jugé en amont) ;
-      - **montage rapide** : `SceneInspector` propose aujourd'hui **six raccourcis
-        écrits en dur**. Ils deviennent **les favoris de l'utilisateur**, avec
-        repli sur les six actuels tant qu'il n'en a posé aucun.
-- [ ] Cartes agrandies, cascade à l'entrée, survol sobre, recherche + familles,
-      responsive 390 px, `prefers-reduced-motion` (arrête la boucle **sans**
-      retirer les commandes).
+### Lot B3b — Les 15 dernières transitions · ✅ **terminé le 2026-08-03, rollout inclus**
 
-**Ce qui ne bouge pas** — acquis de la phase 5, verrouillés par `audit-scope` :
-canvas dessinés par `renderTransition` et `applyImageMotionTransform` (jamais
-imités en CSS), horloge **unique**, badges de parité **lus** du manifeste,
-mouvements `planned` **sans aucun réglage**.
+> Plan et retour d'expérience : **[docs/vibecut-transitions-b3b-plan-2026-08-02.md](docs/vibecut-transitions-b3b-plan-2026-08-02.md)** (§ 10)
+> Le détail de ce qui a été livré est dans la section « Lot B3b » plus haut, dans *Fait*.
 
-**Gate B1** — sur le **visible**, pas sur l'écrit :
-hover scrub (deux positions de souris → deux images différentes, mesurées) ;
-la sortie relance la boucle, l'entrée la fige ; **deux vignettes au repos montrent
-deux images différentes** (preuve que le point culminant est bien choisi) ;
-le bypass change réellement les pixels et les rend au relâchement ;
-le curseur de temps fige et déplace ; **équivalent clavier** ; un favori se
-retrouve dans le filtre, **dans le montage avancé** et **dans les raccourcis du
-montage rapide** ; il survit au rechargement ; recherche et filtres réduisent la
-grille ; 390 px sans débordement ; zéro erreur console.
+**Fait :**
+- [x] **Étape 0** — `zoompan` sur entrée vidéo : **levé sans réserve**. Pas de gel,
+      pas d'image dupliquée, compteur `on` exact à l'image près.
+- [x] **Étape 1** — `buildTransitionSubgraph` émet un vrai sous-graphe, étiquettes
+      préfixées par l'index de la coupe. Le banc d'essai de parité itère sur les
+      **ids** et construit le côté FFmpeg **avec le code du renderer**.
+- [x] **Étapes 2 à 6** — les 15 transitions, implémentées des deux côtés.
+- [x] **`blur-dissolve` vs `cross-blur`** — tranché : séparés par la **courbe**
+      autant que par l'intensité (`ramp` contre `bell`).
+- [x] **Question produit sur les ouvertures** — tranchée par le porteur du projet :
+      gardées comme transitions, rendues à l'export, **et marquées** dans la
+      bibliothèque. Le lot est resté à 15.
+- [x] **48 exportables sur 48**, 0 en aperçu seul (`smoke-vibecut-library-parity`).
+- [x] **Coût plafonné et mesuré** (`test:vibecut-transition-cost`) : le plus cher
+      est `chromatic` à 0,83 s pour un plafond de 1,2 s (natif : 0,23 s).
+- [x] **MP4 réel sur trois plans enchaînés** (`test:vibecut-transition-chain-mp4`) :
+      compte d'images exact, les deux coupes portent l'effet, hors fenêtre rien ne
+      bouge. C'est ce test qui a trouvé les bugs 45, 46, 47 et 48.
+- [x] `test:vibecut-xfade-local-mp4` (49 rendus), `test:vibecut-export`,
+      `test:scope`, `lint`, `build`, `npm --prefix functions run lint`.
+- [x] Les 26 tests navigateur des deux bibliothèques, réécrits pour la nouvelle
+      réalité (48/48, badge d'usage, filtre « Entre deux plans »).
 
-**Risque à surveiller** : le hover scrub redessine à chaque mouvement de souris.
-La progression doit s'écrire dans une `ref` et redessiner le canvas
-**directement**, jamais via un `setState` — c'est le correctif du bug 3 (playhead
-saccadé) rejoué ici.
+**Fait aussi, et c'est ce qui restait ouvert :**
 
-### Lot B2 — De vraies vidéos dans les aperçus
-- [ ] `useLibraryMedia` : vidéos du projet → photos → clips de démo → repli dessiné.
-- [ ] 3-4 clips de démo (2 s, 720p, ~1,5 Mo au total, chargés paresseusement).
+- [x] **`test:vibecut-xfade-preview-parity` est VERT.** La cause n'était pas
+      `additive-dissolve` : c'était un **défaut de sentinelle laissé dans
+      `xfadeTransitions.js`** par une exécution interrompue (bug 52). Deux mesures
+      consécutives sans rien changer ont rendu des valeurs identiques au dixième,
+      donc pas de bruit, donc un bug. Corrigé, et les seuils **resserrés** sur la
+      mesure réelle au lieu d'être montés : `meanFrame` passe de 8 à **4-6** pour
+      douze des quinze, chaque entrée portant sa pire mesure datée.
+- [x] **`test:vibecut-transition-sentinels` mené au bout** pour la première fois :
+      **5 défauts rejoués, 5 attrapés.**
+- [x] **Rollout Cloud Run fait, une seule fois.** Image
+      `b3b-21b8030-20260803`, révision **`00008-8gr`**. Vérifié sur le service
+      réel : `capabilitiesVersion 5`, **29 cibles `xfade` sur 29**, **20 filtres
+      sur 20**, `missing: []`, `errorCount: 0`, `/render` toujours protégé
+      (401 sans signature). Retour arrière : `00007-b5c`.
+
+**Ce que ce lot laisse comme règle de travail :**
+- Après toute exécution de `smoke-vibecut-transition-sentinels`, **et surtout
+  après une interruption**, faire un `git diff` sur `render-service/src/server.js`
+  et `src/features/vibefx-studio/video/engine/xfadeTransitions.js` avant de
+  conclure quoi que ce soit d'un test.
+- **Ne jamais monter un seuil de parité pour faire passer un test.** Mesurer deux
+  fois d'abord ; si les deux mesures coïncident, l'écart est un bug. Ici le seuil
+  qui échouait avait raison, et le monter revenait à faire taire le seul test qui
+  disait vrai.
+- Une justification de seuil doit citer **une mesure datée**, pas un mécanisme
+  plausible.
+
+### Lot B2 — De vraies vidéos dans les aperçus · ✅ **livré le 2026-08-03**
+- [x] `useLibraryMedia` : vidéos du projet → photos → clips de démo → repli dessiné.
+      Les vidéos passent **devant** les photos, vérifié par 6 règles d'ordre.
+- [x] Clips de démo : **2 clips, 2 s, 720p, 77 Ko au total** (plafond 1,5 Mo),
+      **générés** et non téléchargés — droits déclarés dans
+      `libraryMediaManifest.js`, reproductibles par
+      `npm run build:vibecut-demo-clips`.
+- [x] Copie figée hors boucle (`librarySourceFreeze.js`) — sans elle le bypass
+      ne prouvait plus rien (bug 53).
+- [x] Cadence re-mesurée sur sources vidéo : **60,3 / 60,1 img/s**, plancher 24.
+- [x] Gates : `smoke-vibecut-library-media.mjs` + `smoke-vibecut-library-b2.spec.cjs`
+      (4 tests, vérifiés **en échec** quand on casse la chaîne de repli).
+- [ ] **Décision laissée au porteur du projet** : remplacer les clips générés par
+      du vrai rush (Mixkit / Pexels). C'est un changement de **données** —
+      déposer les fichiers dans `public/assets/vibecut-demo/`, ajouter leur
+      entrée avec licence et URL d'origine. Aucun code ne bouge.
       **Sources décidées : Mixkit ou Pexels**, téléchargés et compressés par
       l'agent, **validés par le porteur du projet**.
 - [ ] ⚠️ **Droits déclarés comme pour la musique** : manifeste versionné avec
       source, licence et URL. Le projet refuse déjà toute piste audio sans
       déclaration ; introduire des médias sans provenance ici serait le laxisme
       qu'on a précisément évité.
+
+### Lot B3 · 1ʳᵉ tranche — Trois mouvements de plus · ✅ **livré le 2026-08-03**
+
+- [x] **Descente**, **orbite**, **rebond** rendus des deux côtés. Catalogue :
+      **9 disponibles, 4 annoncés** (contre 6 et 7).
+- [x] **Deux généralisations du modèle**, reprises à l'identique par le renderer :
+      `arc` (écart perpendiculaire, nul aux bouts) et `curve: 'overshoot'`
+      (dépassement avant de se poser). Les deux restent un polynôme ou un sinus,
+      donc évaluables sans surcoût par `zoompan`.
+- [x] **`smoke-vibecut-motion-envelope`** : problème I sur la trajectoire
+      **entière** (9 presets × 4 intensités × 201 points) + concordance des
+      **quatre** tables de presets. **Trois sentinelles vérifiées** : bosse trop
+      grande, zoom passant sous 1, table serveur divergente.
+- [x] **Parité image par image sur MP4 réel** étendue : 12 cas × 5 images, chaque
+      nouveau mouvement mesuré à **deux intensités** — la bosse et le dépassement
+      sont mis à l'échelle par l'intensité, une des deux écritures pouvait
+      l'oublier.
+- [x] **`/capabilities` version 6** : rapporte les mouvements acceptés. Le
+      pré-vol refuse une image antérieure au lot, **vérifié contre la production
+      avant de déployer**.
+- [x] **Rollout** : image `b3-motions-20260803`, révision **`00009-8b7`**,
+      9 mouvements sur 9 acceptés, `errorCount: 0`, `/render` à 401.
+
+### Lot B3 · 2ᵉ tranche — Les mouvements sur vidéo · ✅ **livré le 2026-08-03**
+
+- [x] Garde `isImageMedia` levé aux **six** endroits (canvas, renderer,
+      manifeste, store ×2, adaptateur, interface).
+- [x] Cas de parité sur **source vidéo rognée à 0,5 s** — prouve aussi que la
+      course se mesure sur le segment. **Sentinelle vérifiée.**
+- [x] Test navigateur sur une vraie vidéo, avec persistance après rechargement.
+- [x] Libellés corrigés (« N plans » et non « N photos »).
+- [x] **Rollout** : `b3-video-motion-20260803`, révision **`00010-trj`**.
+
+**Les 4 mouvements restants, et ce qui les bloque exactement** — aucun n'est « à finir » :
+- [ ] **Rotation** — demande le filtre `rotate` (serveur) et `ctx.rotate`
+      (aperçu). Faisable, mais c'est une capacité nouvelle à mesurer et à
+      déclarer.
+- [ ] **Apparition** — demande l'**opacité**, absente du modèle de mouvement, et
+      un zoom **sous 1** qui laisserait un bord à l'image.
+- [ ] **Parallaxe** — « plans avant et arrière à vitesses différentes » est
+      **impossible sur une photo plate** sans estimation de profondeur. Le livrer
+      en zoom+panoramique renommé serait exactement la promesse non tenue que
+      `plan.md` § 6 interdit. **Décision produit à prendre : renommer ou retirer.**
+- [ ] **Glitch** — ce n'est pas un mouvement de caméra mais un **effet pendant le
+      plan**. Il relève du lot ci-dessous.
 
 ### Lot B3 — Le contenu qui manque (ex-phase 6)
 - [ ] Les 7 mouvements `planned` : descente, orbite, parallaxe, rotation,
@@ -853,9 +1762,18 @@ saccadé) rejoué ici.
       est réel, et le porteur du projet l'a relevé lui-même : secousse, flou
       directionnel animé, fuite de lumière, vignettage animé, grain animé, zoom
       pulsé. **Aucun n'existe aujourd'hui.**
-- [ ] Transitions supplémentaires : `xfade` expose **46** cibles natives, **15**
-      sont employées. Trier les 31 restantes — toutes ne méritent pas d'exister
-      (`zoom-punch` a été écarté après mesure, problème F).
+- [x] ~~Transitions supplémentaires parmi les 46 cibles `xfade` natives~~ —
+      **fait au lot B3a** : **29** cibles employées sur 46. Écartées après
+      mesure : `zoomin` (problème F), `fadefast` et `fadeslow` (leur poids de
+      mélange dépend de la valeur du pixel, pas seulement du temps — aucune table
+      de courbe ne peut les reproduire sans que l'aperçu mente). Non retenues
+      faute d'intérêt suffisant pour leur coût : `distance`, `radial`, les quatre
+      `diag*`, les quatre `wipe*` de coin, les quatre `*slice`.
+- [ ] Les **15 transitions restées « aperçu uniquement »** : c'est le **lot B3b**,
+      cadré et planifié le 2026-08-02 →
+      **[docs/vibecut-transitions-b3b-plan-2026-08-02.md](docs/vibecut-transitions-b3b-plan-2026-08-02.md)**.
+      Aucune cible `xfade` native ne les rend : il faut construire des chaînes de
+      filtres natifs rampés sur la queue de A et la tête de B.
 - [ ] **Thèmes éditoriaux** sur les 51 entrées (`Réseaux sociaux`, `Voyage`,
       `Produit`, `Récit`, `Souvenirs`, `Musique`), en plus des familles techniques.
 - [ ] **Courbe d'accélération libre** : le contrôle existe déjà, désactivé.
@@ -890,12 +1808,15 @@ npm run dev                     # http://localhost:3000 (ou 3001)
 npm run lint
 npm run build
 npm run test:scope              # isolation — VERT depuis le 2026-08-01
-npm run test:vibecut-ui-v2      # recettes + parités + 43 tests navigateur
+npm run test:vibecut-ui-v2      # recettes + parités + chaîne 3 plans + coût + 60 tests navigateur
 npm run test:vibecut-recipes    # moteur de recettes seul, sans navigateur
 npm run test:vibecut-library    # parité catalogue ↔ moteur ↔ capacités serveur
 npm run test:vibecut-export     # chaîne d'export (exit 0 attendu)
 npm run test:vibecut-xfade-preview-parity   # aperçu canvas vs FFmpeg, image par image
 npm run test:vibecut-motion-parity          # mouvement : MP4 réel vs aperçu
+npm run test:vibecut-transition-chain-mp4   # TROIS plans enchaînés : repères de temps, compte d'images
+npm run test:vibecut-transition-cost        # plafond 1,2 s pour 0,6 s en 1080p
+npm run test:vibecut-transition-sentinels   # rejoue 5 défauts, exige 5 échecs (lourd : 7 rendus)
 
 # Pré-vol du lot L6 — aucun déploiement, aucun rendu
 node scripts/check-vibecut-renderer-image-capabilities.mjs                 # FFmpeg local
@@ -904,244 +1825,159 @@ VIBECUT_RENDERER_URL=<url> node scripts/check-vibecut-renderer-image-capabilitie
 
 ---
 
-## Prompt de relance — lot B1 (fondation du design des deux bibliothèques)
+## Prompt de relance — finir le contenu (grain, flou animé, fuite de lumière, glitch)
 
 > À copier tel quel dans un nouveau chat.
-> **Toute la reconstruction est terminée** (phases 0 à 7, rollout Cloud Run
-> inclus, le 2026-08-01). Ce qui suit est le chantier suivant.
 
-```
 Tu reprends le développement de VibeCut dans le projet Vibe_fx V2
-(/Users/matthis/Desktop/mes projets mac/vibe_fxV2).
+(`/Users/matthis/Desktop/mes projets mac/vibe_fxV2`).
 
 AVANT TOUTE CHOSE, lis dans cet ordre :
-1. AGENTS.md   — règles de travail, discipline de déploiement et de coûts
-2. plan.md     — architecture et DIRECTION ARTISTIQUE (§ 4 en entier : interdits
-                 § 4.2, composition § 4.4, mouvement § 4.5, accessibilité § 4.6,
-                 pièges techniques § 4.7) et parité § 8
-3. docs/vibecut-bibliotheques-roadmap-2026-08-02.md — TA FEUILLE DE ROUTE.
-                 Ta mission est le lot B1, décrit en § 6.
-4. todo.md     — état exact, bugs 1 à 40, problèmes connus B, C, D, F, G, I, J
-5. map.md      — carte du projet
+1. `AGENTS.md` — règles de travail, discipline de déploiement et de coûts
+2. `plan.md` — DIRECTION ARTISTIQUE (§ 4 en entier), parité § 8, risques § 10
+3. `todo.md` — le **POINT SITUATIONNEL** en tête, puis les bugs 1 à 59
+4. `docs/vibecut-transitions-b3b-plan-2026-08-02.md` — **§ 10, surtout § 10.9**
+5. `map.md` — carte du projet
 
-CONTEXTE — l'état réel du produit
-Une seule interface VibeCut, sur /video :
-  /video, /video/rapide, /video/guide, /video/avance,
-  /video/transitions, /video/mouvements
-L'ancien front est SUPPRIMÉ ; /studio?workspace=video redirige côté serveur.
-La production tourne sur la révision Cloud Run 00006-6fw : les 15 transitions
-et le mouvement lissé sont rendus à l'export. L'aperçu ne ment plus.
+## CE QUI EST FAIT
 
-Gates au vert au 2026-08-01 : lint (0 erreur), build, test:scope,
-test:vibecut-ui-v2 (43 tests navigateur), test:vibecut-export, test:video-ui,
-lint Functions.
+- **Transitions : terminées.** 48 au catalogue, 48 exportables.
+- **Mouvements : terminés.** 11 rendus sur 12, sur photos **et** vidéos.
+- **Effets pendant le plan : commencés.** Secousse et Respiration livrées.
+- **Bibliothèques** : vraies vidéos dans les aperçus, hover scrub, favoris.
+- **Déployé** : révision **`00012-xht`**, `capabilitiesVersion 7`. Vérifié sur le
+  service réel : 29 cibles `xfade`, 20 filtres, 11 mouvements, 3 accents,
+  `errorCount: 0`, `/render` à 401. **Aucun écart aperçu ↔ production.**
+  Retour arrière : `00011-6nb`.
 
-TA MISSION : lot B1 — LA FONDATION DU DESIGN DES DEUX BIBLIOTHÈQUES.
+Sont verts : `lint`, `build`, `test:scope`, `test:vibecut-export`,
+`test:vibecut-library`, `test:vibecut-motion-parity` (20 cas),
+`test:vibecut-xfade-preview-parity`, `test:vibecut-transition-chain-mp4`,
+`test:vibecut-transition-cost`, `test:vibecut-transition-sentinels` (5/5),
+`npm --prefix functions run lint`, et **66 tests navigateur**.
 
-Demande exacte du porteur du projet (2026-08-02) :
-« Créer la fondation du design des deux bibliothèques avec les avant/après. On
-reste sur le thème OS Apple ultra moderne comme pour les 3 modes, mais cette
-fois il faut BLINDER le design : c'est important que ça claque, pour que
-l'utilisateur passe du temps à apprécier les animations. La page doit vraiment
-donner envie de cliquer et de parcourir. Tu peux les créer avec les animations,
-mouvements et transitions DÉJÀ EN PLACE. »
+## TA MISSION : les derniers effets pendant le plan
 
-⚠️ AUCUN CONTENU NOUVEAU DANS CE LOT. On présente à fond ce qui existe :
-38 transitions (15 exportables, 23 « aperçu uniquement ») et 13 mouvements
-(6 réels, 7 marqués « Bientôt »). Ajouter des mouvements ou des effets est le
-lot B3, explicitement plus tard.
+Il reste **quatre** effets, et c'est tout ce qui reste du produit :
+**grain animé**, **flou animé**, **fuite de lumière**, **glitch**.
 
-CE QUI EXISTE DÉJÀ ET QU'IL FAUT REMANIER, PAS JETER
-src/features/vibecut/library/ contient déjà TransitionLibrary, MotionLibrary,
-TransitionPreview, MotionPreview, previewTicker, useLibraryImages,
-library.module.css. Le lot B1 en extrait un squelette commun (LibraryScreen,
-LibraryFilterBar, LibraryCard, BeforeAfterStage, LibraryContextStrip,
-useFavorites) pour que les deux écrans ne fournissent plus que leurs données.
+⚠️ **Ils ne ressemblent PAS aux deux premiers, et c'est le point à comprendre
+avant d'écrire une ligne.** Secousse et Respiration ont été faciles parce
+qu'elles se ramènent à un **décalage du cadrage** : elles entrent donc dans
+l'expression `zoompan` qui existait déjà et dont la parité était déjà prouvée
+image par image. Les quatre restants n'ont pas cette propriété. Chacun demande
+sa propre mécanique **et sa propre preuve** :
 
-ACQUIS À NE PAS CASSER — audit-scope les verrouille
-- Les vignettes sont DESSINÉES PAR LE MOTEUR : `renderTransition` (exportée de
-  VideoEngine.js) et `mediaModel.applyImageMotionTransform`. JAMAIS une
-  imitation CSS. C'est ce qui interdit à une carte de mentir sur le rendu, et ce
-  qui la fait couvrir gratuitement par les tests de parité L1 et L3.
-- UNE SEULE horloge (library/previewTicker.js) pour toutes les vignettes, plus
-  un IntersectionObserver par carte. N'ouvre pas de requestAnimationFrame par
-  carte : ce serait quarante boucles concurrentes.
-- Les badges de compatibilité sont LUS de getServerRenderCapabilityStatus,
-  jamais écrits en dur.
-- Les mouvements `planned` restent listés, marqués « Bientôt », et n'exposent
-  AUCUN réglage (un curseur mort serait le défaut n° 32 de l'audit de phase 4).
-- La courbe linéaire reste affichée DÉSACTIVÉE tant que le renderer écrit
-  smoothstep en dur.
-- L'éditeur de trajectoire FAIT RESPECTER |x| <= (zoom-1)/2 (problème I).
-- Les bibliothèques passent par sceneActions (applyTransition, setSceneMotion…),
-  jamais par le store, et appellent saveNow() après chaque application
-  (l'autosave est debouncée à 1,2 s et on quitte l'écran aussitôt — bug 33).
+- **Grain animé** — `noise=alls=N:allf=t+u` côté serveur. Le bruit est **tiré au
+  hasard par pixel** : il ne sera JAMAIS reproductible au canvas. Même situation
+  que la transition `film-dissolve` (problème G) : seule la **moyenne** est
+  comparable, la géométrie ne l'est pas. Écris-le dans la tolérance, avec la
+  mesure, et ne prétends pas à l'exactitude.
+- **Flou animé** — `gblur` à sigma variable. `sendcmd` est **inutilisable** (il
+  diffuse à tout le graphe, cf. § 10.2 du doc B3b) : utilise une **chaîne de
+  filtres à valeur constante gatés par `enable`**, comme `steppedChain` dans
+  `render-service/src/server.js`. Et l'aperçu devra **quantifier** sa progression
+  de la même façon (`quantizeProgress`), sinon l'écart se lit comme du bruit.
+- **Fuite de lumière** — un dégradé chaud généré petit puis agrandi, composé en
+  addition. Le code existe déjà pour la **transition** `light-leak` : regarde
+  comment elle est faite avant de repartir de zéro.
+- **Glitch** — même remarque : la transition `glitch` existe et fait déjà des
+  bandes décalées (`displace`) plus un décalage RVB. **Attention** : `displace`
+  lit `out(x) = in(x + carte − 128)`, et le sous-échantillonnage de chroma du
+  `yuv420p` étale les franges sur deux pixels — il faut forcer `gbrp` autour de
+  l'effet (l'écart tombe de 23 à 4).
 
-LE CŒUR DU LOT : DEUX MOMENTS, DEUX OUTILS
+**Le glitch est aussi la dernière carte « Bientôt »** de `/video/mouvements` :
+le livrer ferme le catalogue à 12 sur 12.
 
-Une bibliothèque, ce sont DEUX écrans superposés, et les confondre est l'erreur
-qui a été commise au premier jet de ce plan :
+## COMMENT AJOUTER UN EFFET (le chemin est rodé)
 
-  AUDITIONNER (38 entrées à balayer)  -> il faut de la VITESSE, zéro clic
-  JUGER (une entrée retenue)          -> il faut de la PRÉCISION, en grand
+Un ajout touche **cinq** endroits, et en oublier un fait échouer un test — c'est
+voulu : `mediaModel.js`, `render-service/src/server.js` (table **et** verrou),
+`functions/src/videoExport.js`, `exportManifest.js`, `data/motionCatalog.js`.
+Puis `test:vibecut-motion-envelope`, `test:vibecut-motion-parity`, un test
+navigateur, et **un seul** rollout en fin de lot.
 
-1) AUDITIONNER — le HOVER SCRUB, sur chaque vignette
-La position HORIZONTALE du pointeur sur la vignette EST le curseur de temps. On
-survole, on balaye de gauche à droite, l'animation se déroule. Aucun clic, aucun
-bouton lecture. C'est exactement ce que font DaVinci Resolve (« Hover Scrub
-Preview ») et Final Cut Pro (« skimming »), et c'est ce qui permet de voir
-38 transitions en quelques secondes.
-  - liseré de progression sous la vignette ;
-  - la vignette BOUCLE quand elle est visible (on n'arrive jamais sur une grille
-    morte — décision produit du 2026-07-30, qui tient) ;
-  - le survol prend la main, la sortie relance la boucle ;
-  - ÉQUIVALENT CLAVIER OBLIGATOIRE : le hover scrub n'est pas atteignable sans
-    souris, l'écran serait sinon inutilisable au clavier.
+**Le critère qui a tout décidé jusqu'ici** : si l'effet s'écrit comme un
+polynôme ou un sinus, il entre dans `zoompan` et il est presque gratuit. Sinon,
+c'est une mécanique à part — dis-le, et prévois la preuve qui va avec.
 
-2) AU REPOS, LA VIGNETTE SE FIGE AU POINT CULMINANT DE L'EFFET
-Jamais à l'instant 0. Détail petit et décisif : un fondu enchaîné à t=0 ne
-ressemble à rien, et une grille figée à t=0 serait 38 FOIS LA MÊME IMAGE.
+## RÈGLES NON NÉGOCIABLES
 
-3) JUGER — le grand aperçu, sur LA VRAIE COUPE de l'utilisateur
-  - BYPASS : maintenir une touche montre le rendu SANS l'effet, en PLEIN CADRE.
-    C'est la comparaison avant/après, en séquence plutôt qu'en surface — la
-    bonne forme pour une différence temporelle, et c'est ainsi que travaillent
-    les étalonneurs.
-  - curseur de temps pour s'arrêter à l'instant exact + bascule boucle ;
-  - réglages LIVE : l'aperçu suit pendant qu'on tire, sans avoir à appliquer.
-
-4) CE QUE VIBECUT FAIT MIEUX QUE LES TROIS, ET QUI NE COÛTE RIEN
-Chaque vignette joue LA COUPE RÉELLE du projet. DaVinci met du contenu générique
-dans la vignette et n'affiche le vrai montage qu'après le clic, parce qu'il ne
-sait pas où on en est. VibeCut le sait. Aucun des trois ne fait ça.
-
-CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI — ne le réintroduis pas
-Le premier jet proposait un avant/après avec SÉPARATEUR DÉPLAÇABLE. Écarté après
-recherche : un séparateur compare deux états d'un MÊME INSTANT, coupés dans
-l'ESPACE. Or un mouvement et une transition sont des différences dans le TEMPS.
-Sur un mouvement, les deux moitiés montreraient deux cadrages différents de la
-même photo — une image cassée en deux. Sur une transition, elles seraient
-IDENTIQUES pendant 80 % de la durée.
-Le séparateur reste le bon outil pour la COLORIMÉTRIE (différence spatiale sur
-image figée) : rangé pour une éventuelle bibliothèque de looks, pas jeté.
-
-Interactions en pointer events, `setPointerCapture` via le helper qui n'explose
-pas (bug 31).
-
-FAVORIS — ET LEUR RETOUR DANS LES MODES
-C'est la moitié du besoin exprimé : « pouvoir les mettre en favori et donc les
-utiliser dans les modes EN CONNAISSANCE DE CAUSE ».
-Stockés en IndexedDB via services/projectLibrary.js sous une clé dédiée.
-PAS localStorage : le projet stocke déjà tout le reste en IndexedDB, deux
-stockages feraient deux sources de vérité.
-  - étoile sur chaque vignette, filtre ★, section « Tes favoris » en tête ;
-  - MONTAGE AVANCÉ : les favoris remontent en tête de la liste de transitions de
-    l'inspecteur. Il n'y a pas la place d'y afficher des aperçus — d'où l'intérêt
-    d'avoir jugé en amont dans la bibliothèque ;
-  - MONTAGE RAPIDE : `SceneInspector` propose aujourd'hui SIX RACCOURCIS ÉCRITS
-    EN DUR. Ils deviennent LES FAVORIS DE L'UTILISATEUR, avec repli sur les six
-    actuels tant qu'il n'en a posé aucun.
-
-DESIGN — ce qui doit « claquer », dans l'ordre
-1. La TAILLE et la qualité des aperçus. Une vignette de 196 px ne fait pas rêver.
-2. Le mouvement permanent, DÉCALÉ carte par carte (la grille respire au lieu de
-   battre à l'unisson). Acquis du 2026-07-30, à conserver.
-3. L'entrée en cascade au défilement.
-4. La réponse au survol : élévation subtile, rien de plus — l'animation joue déjà.
-5. Le séparateur : trait fin, poignée ronde, ombre douce. Il doit avoir l'air
-   d'un objet physique qu'on attrape.
-Le châssis reste DISCRET et laisse les aperçus occuper la place : c'est
-exactement la règle de plan.md § 4 (« l'impact visuel est concentré sur le
-contenu, jamais sur le châssis »), et ici elle joue en notre faveur.
-
-DISPOSITION : DEUX colonnes, pas trois. Un rail de familles à gauche ferait un
-second système de navigation à côté du bandeau VibeCut — interdit (§ 4.4). Les
-familles deviennent une barre de filtres horizontale, repliée en menu sous 720 px.
-
-RÈGLES NON NÉGOCIABLES
+- **Problème I** : `|x| ≤ (zoom − 1) / 2` **à tout instant**.
+  `smoke-vibecut-motion-envelope` le vérifie sur 201 points × 4 intensités.
 - Ne propose jamais une fonction que le moteur ne rend pas : « Bientôt », et
   AUCUN réglage dessus.
-- Aucun composant de features/vibecut/ n'importe le store ni IndexedDB
-  directement : tout passe par features/vibecut/adapters/.
-- Zéro Tailwind sur /video. CSS Modules + tokens de styles/vibecut.css.
-- Aucun bouton mort. Aucun texte sous 12 px. Pas de néon, pas de glassmorphism
-  généralisé, pas de dégradé violet décoratif.
-- prefers-reduced-motion arrête la boucle SANS retirer les commandes : le
-  séparateur et le curseur restent utilisables.
-- NE DÉPLOIE PAS. Ce lot ne touche pas au renderer.
+- Les aperçus restent **DESSINÉS PAR LE MOTEUR**. JAMAIS une imitation CSS.
+- Aucun composant de `features/vibecut/` n'importe le store ni IndexedDB.
+- Zéro Tailwind sur `/video`. CSS Modules + tokens de `styles/vibecut.css`.
+- Le temps ne passe **JAMAIS** par un `setState` dans les bibliothèques.
+- **Ne me réponds pas en pavés.** Trois blocs courts : ce qui marche · ce qui
+  reste · ce que j'attends de toi. ~15 lignes. Le détail va dans `todo.md`.
 
-GATE DU LOT — sur le VISIBLE, pas sur l'écrit
-La leçon la plus importante du projet : les 24 tests de la phase 4 passaient tous
-alors que la colorimétrie « ne se voyait pas » et qu'aucune transition n'était
-posable. Ils vérifiaient que l'action ÉCRIT dans le modèle, jamais qu'elle SE
-VOIT. Corollaire trouvé en phase 7 : l'onglet VIBECUT du studio était mort et
-aucun des 42 tests ne cliquait dessus (bug 39).
-Donc, pour B1 :
-1. HOVER SCRUB : deux positions horizontales différentes du pointeur sur la même
-   vignette donnent DEUX IMAGES DIFFÉRENTES (getImageData) ;
-2. sortir de la vignette RELANCE la boucle, y entrer la FIGE ;
-3. AU REPOS, deux vignettes différentes montrent DEUX IMAGES DIFFÉRENTES — c'est
-   ce qui prouve que le point culminant est bien choisi et que la grille n'est
-   pas 38 fois la même image ;
-4. BYPASS : la touche maintenue change réellement les pixels, et les rend au
-   relâchement ;
-5. le curseur de temps du grand aperçu fige et déplace l'animation ;
-6. ÉQUIVALENT CLAVIER : une vignette au focus se scrube aux flèches ;
-7. un favori se retrouve dans le filtre, DANS LE MONTAGE AVANCÉ, et DANS LES
-   RACCOURCIS DU MONTAGE RAPIDE ;
-8. il survit au rechargement de la page ;
-9. recherche et filtres réduisent la grille (comptage), « aucun résultat » dit
-   quoi faire ;
-10. responsive 390 px sans débordement horizontal ; zéro erreur console ;
-    prefers-reduced-motion : boucle arrêtée, commandes TOUJOURS utilisables.
-Plus : lint, build, test:scope, test:vibecut-ui-v2, test:vibecut-library.
+## LEÇONS DÉJÀ PAYÉES — ne les repaie pas
 
-RISQUES À SURVEILLER
-1. Le HOVER SCRUB redessine à chaque mouvement de souris. La progression doit
-   s'écrire dans une `ref` et redessiner le canvas DIRECTEMENT, jamais via un
-   `setState` : c'est le correctif du bug 3 (playhead saccadé) rejoué ici.
-2. Quarante canvas animés plus l'aperçu peuvent faire ramer la page. MESURE les
-   images par seconde avant et après. Si nécessaire : n'animer que les vignettes
-   visibles, la survolée et la sélectionnée. L'horloge unique et
-   l'IntersectionObserver sont déjà là pour ça.
+**Sur les tests, et c'est le plus cher :**
+- **Ne monte JAMAIS un seuil pour faire passer un test.** Mesure deux fois sans
+  rien changer. Si les deux mesures coïncident, c'est un **bug** (bug 52).
+- **`smoke-vibecut-transition-sentinels` patche le code de production** puis le
+  restaure. **Interrompu, il laisse son défaut.** `git diff` après chaque
+  exécution, et n'édite pas `server.js` / `xfadeTransitions.js` pendant.
+- **Un test qui passerait aussi bien si la fonction n'existait pas ne prouve
+  rien** (bugs 53, 54, 59). Vérifie qu'il **échoue** quand tu casses la fonction.
+- **Un effet de faible amplitude passe sous le seuil du test qui le surveille.**
+  Un accent bouge de ±3,8 px sur 320, sous les 12/255 tolérés pour le
+  rééchantillonnage : la comparaison image par image le déclarait « en parité »
+  même quand le renderer en rendait la moitié. Mesure une grandeur
+  **différentielle** (bug 59).
+- **Vérifie le rapport cadence / fréquence** avant de choisir une oscillation :
+  à 7,5 Hz et 30 img/s il n'y a que 4 échantillons par cycle, l'effet saccade et
+  les points de mesure tombent sur ses zéros (bug 58).
 
-APRÈS B1 — ne l'anticipe pas
-B2 : de vraies vidéos dans les aperçus (médias du projet d'abord, puis 3-4 clips
-de démo Mixkit/Pexels, avec droits déclarés comme pour la musique).
-B3 : le contenu qui manque — les 7 mouvements « planned », les mouvements sur
-vidéo, les VRAIS effets pendant le rush (secousse, flou animé, fuite de lumière…
-aucun n'existe aujourd'hui), les transitions supplémentaires parmi les 46 cibles
-xfade natives, et les thèmes éditoriaux.
+**Sur FFmpeg :**
+- **Une variable d'un filtre n'appartient pas au suivant.** `on` n'existe que
+  dans `zoompan` ; donné à `rotate`, il fait échouer le graphe à la
+  configuration sans dire ce qui manque (lot B3, 4ᵉ tranche).
+- **`zoompan` ne laisse rien au-delà de ses bords** : tout ce qui fait sortir du
+  cadre (bascule, déplacement) exige de rendre un cadre **plus grand** puis de
+  recadrer, pas seulement d'agrandir le zoom.
+- **Préfère les NUMÉROS D'IMAGE aux secondes.** `fade` en secondes lit des
+  horodatages qui ne sont pas encore remis à zéro ; `concat` en secondes perdait
+  une image sur 102 (lot B3b).
+- `sendcmd` diffuse à **TOUS** les filtres du graphe. Utilise `steppedChain`.
+  **Un test sur deux plans ne voit rien.**
+- L'aller-retour `yuv420p ↔ gbrp` coûte 1,1 s sur tout un montage : confine la
+  fenêtre (`isolateWindow`).
+- `zoompan` sur vidéo : **sans réserve**. Son expression accepte `pow`, `sin`,
+  `cos`, `PI`, `abs`. Ne le re-teste pas.
 
-ÉCHECS DE TESTS PRÉEXISTANTS, à ne pas confondre avec tes régressions
-- scripts/smoke-vibecut-media-safety.spec.cjs : 3 échecs, crash Chromium sur des
-  fixtures WebM de 7 Mo (problème B).
-- npm run test:vibecut-export-local-mp4 : fixtures pointant une machine Windows
-  (problème C).
-- Les .mp4 de videotest/ sont des pointeurs Git LFS de 132 octets (problème D).
-- La suite navigateur peut être INSTABLE sous charge : deux tests ont échoué une
-  fois puis repassé au vert seuls le 2026-08-01. Relance avant de conclure.
-- test:scope est VERT depuis le 2026-08-01. S'il échoue, c'est une régression.
+## ÉCHECS DE TESTS PRÉEXISTANTS
 
-MÉTHODE
-1. Vérifie l'état de départ : npm run lint && npm run build
-   && npm run test:scope && npm run test:vibecut-ui-v2
-2. Petits incréments testables. La logique pure se vérifie sans navigateur.
-3. Teste RÉELLEMENT dans le navigateur et REGARDE les captures :
-   VIBECUT_SHOT_DIR=/tmp/shots node scripts/run-video-ui-test.mjs <spec>
-   Les captures 720p compressées trompent : quand un doute porte sur un état,
-   MESURE-le (aria-pressed, getComputedStyle, getImageData).
-4. Rituel de fin de lot (plan.md § 9) : todo.md, plan.md, map.md, la roadmap des
-   bibliothèques, puis un nouveau prompt de relance en fin de todo.md.
-5. Rapporte honnêtement : ce qui marche, ce qui est laissé de côté et pourquoi,
-   et les échecs PRÉEXISTANTS.
+- `smoke-vibecut-media-safety.spec.cjs` : 3 échecs, crash Chromium (problème B).
+- `test:vibecut-export-local-mp4` : fixtures Windows (problème C).
+- Les `.mp4` de `videotest/` sont des pointeurs Git LFS (problème D).
+- **N'ouvre pas `npm run dev` avant de lancer la suite** : il occupe le port
+  3000, les tests tapent dessus au lieu du build, et la suite passe de 55 s à
+  17 min avec des échecs fantômes. Mesuré le 2026-08-03.
+- La suite est sensible à la charge : relance en isolation avant de conclure.
 
-COMMANDES
-npm run dev                     # http://localhost:3000/video
+## COMMANDES
+
+```bash
+npm run dev                     # http://localhost:3000/video (à COUPER avant les tests)
 npm run lint && npm run build
 npm run test:scope
-npm run test:vibecut-ui-v2      # recettes + parités + 43 tests navigateur
-npm run test:vibecut-library    # parité catalogue ↔ moteur ↔ capacités serveur
-npm run test:vibecut-export
-npm run test:video-ui           # modèles et store
+npm run test:vibecut-ui-v2      # tout + 66 tests navigateur
+npm run test:vibecut-library    # catalogue + médias/droits + enveloppe des mouvements
+npm run test:vibecut-motion-envelope   # problème I sur toute la trajectoire
+npm run test:vibecut-motion-parity     # MP4 réel vs aperçu, image par image
+npm run test:vibecut-transition-sentinels   # lourd, ne rien éditer pendant
+
+VIBECUT_MOTION_REPORT_ONLY=1 npm run test:vibecut-motion-parity   # mesurer sans échouer
+VIBECUT_MOTION_SHOT_DIR=/tmp/shots npm run test:vibecut-motion-parity  # garder les images
 ```
+
+**Discipline de coûts** : le renderer est déployé (`00012-xht`). Ne redéploie que
+si `render-service/` change, **une seule fois en fin de lot**, après le pré-vol
+`node scripts/check-vibecut-renderer-image-capabilities.mjs`, puis vérifie sur le
+service réel avec `VIBECUT_RENDERER_URL=` et reporte la révision.

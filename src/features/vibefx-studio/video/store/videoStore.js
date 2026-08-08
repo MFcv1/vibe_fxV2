@@ -221,7 +221,12 @@ const useVideoStore = create((set, get) => ({
                 socialFpsNormalized: clipData.socialFpsNormalized === true,
                 speed: 1,
                 volume: isImageMedia(clipData) ? 0 : 100,
-                motion: isImageMedia(clipData) ? normalizeImageMotion(clipData.motion || 'none') : null,
+                /*
+                 * LOT B3 - le mouvement vaut pour TOUT media. Il etait force a
+                 * `null` sur les videos, ce qui suffisait a le perdre a
+                 * l'import meme quand l'interface le proposait.
+                 */
+                motion: normalizeImageMotion(clipData.motion || 'none'),
                 filters: {
                     exposure: 0,
                     brightness: 100,
@@ -669,7 +674,8 @@ const useVideoStore = create((set, get) => ({
 
             if (sequencePlacement) {
                 const duration = Math.max(0.1, Number.isFinite(requestedDuration) ? requestedDuration : previousDuration);
-                const startTime = sequencePlacement === 'intro' ? 0 : Math.max(0, (state.totalDuration || previousDuration) - previousDuration);
+                // La fin recouvre la queue: elle commence SA duree avant la fin.
+                const startTime = sequencePlacement === 'intro' ? 0 : Math.max(0, (state.totalDuration || duration) - duration);
                 return {
                     ...next,
                     start: startTime,
@@ -1120,7 +1126,8 @@ function normalizeClipUpdates(clip = {}, updates = {}) {
         next.volume = clampVolumePercent(updates.volume);
     }
     if (Object.prototype.hasOwnProperty.call(updates, 'motion')) {
-        next.motion = isImageMedia(clip) ? normalizeImageMotion(updates.motion) : null;
+        // LOT B3 - voir plus haut: plus de distinction photo / video.
+        next.motion = normalizeImageMotion(updates.motion);
     }
     return next;
 }
@@ -1469,10 +1476,18 @@ function computeTotalDuration(clips, transitions = {}, transitionItems = []) {
             total -= resolveCutTransitionOverlap(tr, clipDur, getClipPlaybackDuration(clips[i + 1]));
         }
     });
-    const outroDuration = transitionItems
-        .filter(item => getSequencePlacement(item) === 'outro')
-        .reduce((maxDuration, item) => Math.max(maxDuration, Number(item.duration) || 0), 0);
-    total += outroDuration;
+    /*
+     * UNE FIN DE SEQUENCE N'ALLONGE PAS LE MONTAGE, et c'est ce qui la distingue
+     * d'une ouverture (2026-08-04, corrige apres essai du porteur du projet).
+     *
+     * Une OUVERTURE n'a rien avant elle : elle doit donc creer son propre temps,
+     * d'ou `getIntroOffset` en tete. Une FERMETURE, elle, a le dernier plan sous
+     * la main : elle doit le faire disparaitre PENDANT qu'il joue.
+     *
+     * Le premier jet ajoutait sa duree a la fin. Resultat a l'ecran : l'image se
+     * figeait une seconde, PUIS s'eteignait - « elle se met quand tout est
+     * termine, ca n'a pas de logique ». C'etait exact.
+     */
     return Number.isFinite(total) ? Math.min(MAX_CLIP_DURATION_SECONDS, Math.max(0, total)) : 0;
 }
 
@@ -1482,8 +1497,26 @@ function computeStoreTotalDuration(state = {}, transitionItems = state.transitio
         : Math.max(0, normalizeClipDuration(state.totalDuration, 0));
 }
 
+/*
+ * BUG CORRIGE LE 2026-08-04, trouve en jouant une fin de sequence dans l'apercu.
+ *
+ * La fin etait posee a `total - duree`. Or `computeTotalDuration` AJOUTE la
+ * duree de la fin apres les plans : la fin chevauchait donc le dernier plan et
+ * laissait une seconde vide - et noire - a la toute fin du montage. Mesure :
+ * cinq points echantillonnes dans la fin, amplitude 0,0, l'image ne bougeait
+ * pas d'un pixel.
+ *
+ * Une fin de sequence commence exactement OU LES PLANS FINISSENT. C'est ce que
+ * `updateTransitionItem` calculait deja correctement de son cote - les deux
+ * chemins d'ecriture disaient donc deux choses differentes, et seul celui de
+ * l'ajout etait faux.
+ *
+ * `clipsEnd` exclut toute fin DEJA posee, sinon remplacer une fin par une autre
+ * la decalerait un peu plus loin a chaque fois.
+ */
 function resolveTransitionStartTime(transition = {}, sequencePlacement = null, duration = 0.5, maxEnd = 0.1, currentTime = 0) {
     if (sequencePlacement === 'intro') return 0;
+    // La fin RECOUVRE la queue du montage: elle commence une duree avant la fin.
     if (sequencePlacement === 'outro') return Math.max(0, maxEnd - duration);
     return clamp(transition.startTime ?? currentTime ?? 0, 0, Math.max(0, maxEnd - duration));
 }

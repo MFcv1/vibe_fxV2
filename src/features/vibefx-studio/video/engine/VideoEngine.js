@@ -2,6 +2,7 @@ import { resolveActiveTransition } from '../model/timelineModel';
 import {
     applyImageMotionTransform,
     DEFAULT_IMAGE_DURATION_SECONDS,
+    drawImageAccent,
     isImageMedia,
     normalizeImageDuration,
 } from '../model/mediaModel';
@@ -793,6 +794,12 @@ function drawSourceCover(ctx, source, w, h, clip = {}) {
     ctx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
 }
 
+function getClipVisualDuration(clip = {}) {
+    const trimStart = Number(clip.trimStart || 0);
+    const trimEnd = Number(clip.trimEnd ?? clip.duration ?? trimStart);
+    return Math.max(0.001, trimEnd - trimStart);
+}
+
 function getClipVisualProgress(clip = {}, localTime = 0) {
     const trimStart = Number(clip.trimStart || 0);
     const trimEnd = Number(clip.trimEnd ?? clip.duration ?? trimStart);
@@ -808,13 +815,46 @@ function drawFilteredSource(ctx, source, clip, w, h, localTime = 0) {
     ctx.rect(0, 0, w, h);
     ctx.clip();
     ctx.filter = buildFilterString(clip?.filters);
-    if (isImageMedia(clip)) {
-        // Transformation posee par `mediaModel.applyImageMotionTransform`: c'est
-        // elle que `smoke-vibecut-motion-preview-parity` compare au rendu FFmpeg.
-        applyImageMotionTransform(ctx, clip.motion, getClipVisualProgress(clip, localTime), w, h);
-    }
+    /*
+     * Transformation posee par `mediaModel.applyImageMotionTransform`: c'est
+     * elle que `smoke-vibecut-motion-preview-parity` compare au rendu FFmpeg.
+     *
+     * LOT B3 - elle s'applique aussi aux VIDEOS. Elle etait reservee aux photos
+     * par un `isImageMedia` dont rien ne justifiait la presence: la
+     * transformation est un simple recadrage anime, et `getClipVisualProgress`
+     * mesure la course sur le segment rogne, ce qui vaut pour n'importe quel
+     * media. Cote export, `zoompan` sur une entree video a ete mesure au lot
+     * B3b - pas de gel, aucune image dupliquee, compteur `on` exact a l'image
+     * pres. Le verrou n'attendait donc plus que d'etre leve.
+     */
+    /*
+     * La DUREE du plan est passee pour les accents (secousse, respiration):
+     * leur frequence est en hertz, donc ils ont besoin du temps ecoule et pas
+     * seulement de la progression. Sans accent, elle n'a aucun effet.
+     */
+    applyImageMotionTransform(
+        ctx,
+        clip.motion,
+        getClipVisualProgress(clip, localTime),
+        w,
+        h,
+        getClipVisualDuration(clip),
+    );
     drawSourceCover(ctx, source, w, h, clip);
     ctx.restore();
+    /*
+     * Les calques d'accent (halo, grain) sont poses HORS du recadrage et avant
+     * les filtres de plan, exactement comme le renderer les pose apres son
+     * `zoompan`. Les poser a l'interieur les ferait zoomer avec l'image.
+     */
+    drawImageAccent(
+        ctx,
+        clip.motion,
+        getClipVisualProgress(clip, localTime),
+        w,
+        h,
+        getClipVisualDuration(clip),
+    );
     applyPostFilters(ctx, clip?.filters, w, h);
 }
 
@@ -880,10 +920,43 @@ function drawSweepLine(ctx, w, h, position, color = 'rgba(0,229,255,0.85)') {
 }
 
 function getActiveTimelineTransition(transitionItems = [], globalTime) {
+    /*
+     * Les BORDS DE SEQUENCE sont exclus: ils ne joignent pas deux plans, ils
+     * joignent un plan et le NOIR. Les laisser passer ici ferait rendre une
+     * transition du dernier plan vers lui-meme, donc rien du tout.
+     */
     return resolveActiveTransition(
-        transitionItems.filter((transition) => (transition?.params?.placement || 'free') !== 'cut'),
+        transitionItems.filter((transition) => {
+            const placement = transition?.params?.placement || 'free';
+            return placement !== 'cut' && placement !== 'intro' && placement !== 'outro';
+        }),
         globalTime
     );
+}
+
+/* Le calque noir des bords de sequence, fabrique a la demande. */
+function makeBlackFrame(w, h) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    return canvas;
+}
+
+/* Le bord actif a cet instant, ou null. */
+function findSequenceEdgeAt(transitionItems = [], globalTime = 0, slot = null) {
+    for (const item of transitionItems) {
+        const placement = item?.params?.placement;
+        if (placement !== 'intro' && placement !== 'outro') continue;
+        if (slot && placement !== slot) continue;
+        const start = Number(item.start ?? item.startTime ?? 0);
+        const duration = Math.max(0.1, Number(item.duration) || 0.5);
+        if (globalTime < start - 0.001 || globalTime > start + duration + 0.001) continue;
+        return { item, placement, start, duration };
+    }
+    return null;
 }
 
 function getTransitionStart(transition) {
@@ -1005,7 +1078,8 @@ function getResolvedActiveClipAtTime(clips = [], transitions = {}, globalTime = 
  * Exportee depuis la phase 5: la bibliotheque de transitions (`/video/transitions`)
  * dessine ses apercus avec CETTE fonction, pas avec une imitation CSS. Une carte
  * de la bibliotheque montre donc exactement ce que l'apercu du montage jouera -
- * et, pour les 15 transitions minutees, ce que l'export rendra.
+ * et, pour les transitions minutees (15 au lot L1, 33 depuis le lot B3a), ce
+ * que l'export rendra.
  * Aucun changement de comportement: seule la visibilite du symbole change.
  */
 export function renderTransition(ctx, fromPlayer, toPlayer, progress, type, w, h) {
@@ -1934,10 +2008,104 @@ export class PlaybackEngine {
         return null;
     }
 
+    /*
+     * LE BORD DE SEQUENCE: ouverture avant le premier plan, fin apres le
+     * dernier. Rend `null` si l'instant demande n'est pas dans un de ces deux
+     * temps - l'appelant retombe alors sur son noir habituel.
+     *
+     * Le plan de reference est TOUJOURS le premier (ouverture) ou le dernier
+     * (fin), jamais « le plan actif »: par construction il n'y en a pas.
+     */
+    /*
+     * Quel plan et quel instant un bord de sequence montre-t-il ? Extrait pour
+     * que le CALAGE (asynchrone, dans `seekAndDraw`) et le DESSIN (synchrone,
+     * dans `renderSequenceEdge`) lisent la meme reponse - deux calculs separes
+     * auraient diverge a la premiere retouche.
+     */
+    resolveSequenceEdgeClip(clips = [], globalTime = 0, transitionItems = []) {
+        if (!clips.length) return null;
+        for (const item of transitionItems) {
+            const slot = item?.params?.placement;
+            if (slot !== 'intro' && slot !== 'outro') continue;
+            const start = Number(item.start ?? item.startTime ?? 0);
+            const duration = Math.max(0.1, Number(item.duration) || 0.5);
+            if (globalTime < start - 0.001 || globalTime > start + duration + 0.001) continue;
+            const clip = slot === 'intro' ? clips[0] : clips[clips.length - 1];
+            const localTime = slot === 'intro'
+                ? Number(clip.trimStart) || 0
+                : Math.max(0, (Number(clip.trimEnd) || 0) - 0.05);
+            return { slot, clip, localTime, start, duration };
+        }
+        return null;
+    }
+
+    renderSequenceEdge(clips = [], transitions = {}, globalTime = 0, transitionItems = []) {
+        const edge = this.resolveSequenceEdgeClip(clips, globalTime, transitionItems);
+        if (!edge || edge.slot !== 'intro') return null;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        {
+            const { slot, clip, localTime, start, duration } = edge;
+            const item = transitionItems.find((entry) => entry?.params?.placement === slot) || {};
+            const player = this.players.get(clip.id);
+            if (!player) return null;
+            /*
+             * REPOSITIONNER LE LECTEUR, et c'est ce qui manquait au premier jet.
+             * Sans ce calage, une video jamais lue n'a AUCUNE image decodee a
+             * donner et `drawImage` ne peint rien : la fin de sequence sortait
+             * donc noire de bout en bout (mesure du 2026-08-04, cinq points,
+             * luminance 0). L'ouverture, elle, semblait marcher - par accident,
+             * parce que son plan venait d'etre charge et se trouvait deja au
+             * debut.
+             */
+            if (!isImageMedia(clip) && Math.abs(player.currentTime - localTime) > 0.05) {
+                player.currentTime = localTime;
+            }
+            const frame = makeFilteredFrame(player, clip, w, h, localTime);
+
+            const black = document.createElement('canvas');
+            black.width = w;
+            black.height = h;
+            const blackCtx = black.getContext('2d');
+            blackCtx.fillStyle = '#000';
+            blackCtx.fillRect(0, 0, w, h);
+
+            const progress = clamp((globalTime - start) / duration, 0, 1);
+            const from = slot === 'intro' ? black : frame;
+            const to = slot === 'intro' ? frame : black;
+            renderTransition(this.ctx, from, to, progress, item.type, w, h);
+            return {
+                rendered: true,
+                reason: `sequence-${slot}`,
+                clipId: clip.id,
+                time: globalTime,
+                mode: `sequence-${slot}`,
+            };
+        }
+    }
+
     renderFrame(clips, transitions, globalTime, transitionItems = []) {
         configureCanvasQuality(this.ctx);
         const result = this.getActiveClipAtTime(clips, transitions, globalTime, transitionItems);
         if (!result) {
+            /*
+             * OUVERTURE ET FIN DE SEQUENCE (2026-08-04).
+             *
+             * Avant cette branche, tout instant sans plan actif etait peint en
+             * NOIR. Or une ouverture occupe justement un temps ou aucun plan
+             * n'existe encore - elle se joue AVANT le premier, c'est sa
+             * definition. Le montage se decalait donc bien d'une seconde
+             * (`getIntroOffset`), mais cette seconde restait noire: mesure du
+             * 2026-08-04, cinq points echantillonnes dans l'ouverture, amplitude
+             * 0,0.
+             *
+             * Une ouverture est une transition DEPUIS LE NOIR vers le premier
+             * plan; une fin, une transition depuis le dernier plan VERS le noir.
+             * On fabrique donc le cote manquant plutot que de renoncer a
+             * dessiner.
+             */
+            const sequence = this.renderSequenceEdge(clips, transitions, globalTime, transitionItems);
+            if (sequence) return sequence;
             this.ctx.fillStyle = '#000';
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             return { rendered: false, reason: 'no-active-clip', time: globalTime };
@@ -2006,6 +2174,32 @@ export class PlaybackEngine {
             } else {
                 drawFilteredSource(this.ctx, player, clip, w, h, localTime);
             }
+
+            /*
+             * LA FIN DE SEQUENCE SE POSE PAR-DESSUS CE QUI VIENT D'ETRE DESSINE.
+             *
+             * Elle ne remplace pas le plan et n'ajoute pas de temps: elle
+             * l'eteint PENDANT qu'il joue. Le premier jet gelait la derniere
+             * image une seconde puis fondait - « elle se met quand tout est
+             * termine, ca n'a pas de logique » (essai du porteur du projet,
+             * 2026-08-04). C'etait exact: une fermeture ferme ce qui est en
+             * train de se jouer.
+             *
+             * Elle est posee EN DERNIER, apres la transition de coupe eventuelle:
+             * si le montage finit sur un fondu, c'est ce fondu-la qui doit
+             * s'eteindre, pas le plan seul.
+             */
+            const outro = findSequenceEdgeAt(transitionItems, globalTime, 'outro');
+            if (outro) {
+                const current = document.createElement('canvas');
+                current.width = w;
+                current.height = h;
+                current.getContext('2d').drawImage(this.canvas, 0, 0);
+                const outroProgress = clamp((globalTime - outro.start) / outro.duration, 0, 1);
+                renderTransition(this.ctx, current, makeBlackFrame(w, h), outroProgress, outro.item.type, w, h);
+                renderMode = `${renderMode}+outro`;
+            }
+
             return {
                 rendered: true,
                 reason: null,
@@ -2052,6 +2246,14 @@ export class PlaybackEngine {
     async seekAndDraw(clips, transitions, globalTime, transitionItems = []) {
         const result = this.getActiveClipAtTime(clips, transitions, globalTime, transitionItems);
         if (!result) {
+            /*
+             * BORD DE SEQUENCE. On ATTEND le calage du lecteur avant de
+             * dessiner: un `currentTime =` pose sans attente ne fournit pas
+             * l'image tout de suite, et le scrub rendrait une image en retard -
+             * ou rien du tout sur un plan jamais lu.
+             */
+            const edge = this.resolveSequenceEdgeClip(clips, globalTime, transitionItems);
+            if (edge) await this.waitForSeek(this.players.get(edge.clip.id), edge.localTime);
             return this.renderFrame(clips, transitions, globalTime, transitionItems);
         }
 

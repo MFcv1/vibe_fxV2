@@ -92,7 +92,167 @@ export const SERVER_XFADE_TRANSITION_MAP = Object.freeze({
     'iris-close': 'circleclose',
     'pixel-cut': 'pixelize',
     'blur-cut': 'hblur',
+
+    /*
+     * Lot B3a (2026-08-02) - fermeture de l'ecart d'export.
+     *
+     * Huit entrees du catalogue jouaient dans l'apercu et repartaient en simple
+     * fondu a l'export; elles pointent desormais sur la cible `xfade` NATIVE qui
+     * tient vraiment leur promesse. Neuf entrees nouvelles ouvrent les sens
+     * manquants (volets et balayages dans les quatre directions) et deux formes
+     * que le catalogue n'avait pas du tout (rognage par le noir, compression).
+     *
+     * Chaque cible ajoutee ici est reimplementee au canvas dans
+     * engine/xfadeTransitions.js et comparee image par image au rendu FFmpeg par
+     * scripts/smoke-vibecut-xfade-preview-parity.mjs. Aucune n'est declaree sur
+     * la foi d'une ressemblance de nom.
+     */
+    'smooth-cut': 'fade',
+    'non-additive-dissolve': 'fade',
+    'whip-pan': 'slideleft',
+    flash: 'fadewhite',
+    'intro-cinematic-bars': 'horzopen',
+    'outro-cinematic-fade': 'fadeblack',
+    'outro-neon-close': 'vertclose',
+    'outro-signal-collapse': 'squeezev',
+
+    'wipe-right': 'wiperight',
+    'wipe-up': 'wipeup',
+    'wipe-down': 'wipedown',
+    'push-right': 'slideright',
+    'swipe-up': 'smoothup',
+    'swipe-down': 'smoothdown',
+    'bars-close': 'horzclose',
+    'iris-black': 'circlecrop',
+    'frame-black': 'rectcrop',
+    'squeeze-h': 'squeezeh',
+
+    /*
+     * Lot B3b (2026-08-03). Ces entrees-la n'ont PAS de cible native qui rende
+     * leur effet : la cible nommee ici n'est que la JOINTURE, l'effet lui-meme
+     * vient du sous-graphe declare dans SERVER_TRANSITION_EFFECTS.
+     */
+    'blur-dissolve': 'fade',
+    'cross-blur': 'fade',
+    'motion-blur': 'fade',
+    'cross-zoom': 'fade',
+    'snap-zoom': 'fade',
+    'parallax-zoom': 'fade',
+    'additive-dissolve': 'fade',
+    'rgb-split': 'fade',
+    'chromatic': 'fade',
+    'intro-title-scan': 'wiperight',
+    'intro-neon-doors': 'vertopen',
+    'strobe-cut': 'fade',
+    'intro-grid-reveal': 'fade',
+    'glitch': 'fade',
+    'light-leak': 'fade',
 });
+
+/*
+ * Lot B3b (2026-08-03) - les 15 dernieres transitions.
+ *
+ * Aucune cible `xfade` native ne rend ces effets-la. La voie
+ * `xfade=transition=custom:expr=` les rendrait toutes, mais elle a ete MESUREE
+ * le 2026-08-02 a 8,6 s pour une transition de 0,6 s en 1080p contre 0,2 s en
+ * natif - un facteur ~40 inherent a l'evaluateur d'expressions de FFmpeg. Sur un
+ * service facture a la seconde, elle est ecartee.
+ *
+ * La voie retenue applique de VRAIS FILTRES NATIFS, rampes dans le temps, sur la
+ * QUEUE du plan sortant et la TETE du plan entrant, puis joint par un `xfade`
+ * natif. Un « fondu floute », c'est exactement ca : un flou qui monte, un fondu,
+ * un flou qui redescend.
+ *
+ * Cette table est PUREMENT DECLARATIVE, et c'est volontaire : les memes nombres
+ * sont lus par le renderer (buildTransitionSubgraph) ET par l'apercu canvas
+ * (engine/xfadeTransitions.js). Aucune constante d'effet n'est ecrite deux fois,
+ * donc l'apercu ne peut pas deriver de l'export par recopie fautive. Comme
+ * SERVER_XFADE_TRANSITION_MAP, elle est TRIPLIQUEE a l'identique dans
+ * render-service/src/server.js et functions/src/videoExport.js :
+ * scripts/smoke-vibecut-transition-parity.mjs echoue si les trois divergent.
+ *
+ * Les longueurs sont des FRACTIONS de la largeur du cadre, jamais des pixels :
+ * l'apercu tourne a 320 px et l'export a 1920 px, un nombre de pixels en dur
+ * donnerait deux effets differents.
+ */
+export const SERVER_TRANSITION_EFFECTS = Object.freeze({
+    /*
+     * Groupe 1 - flous. `blur-dissolve` et `cross-blur` sont DELIBEREMENT separes
+     * par leur COURBE autant que par leur intensite, et pas seulement par un nom :
+     *  - `ramp` : A part net et se floute, B arrive floue et se resout. A aucun
+     *    instant les deux ne sont flous en meme temps.
+     *  - `bell` : les deux culminent ENSEMBLE au milieu, deux fois plus fort. Il y
+     *    a donc un instant ou toute l'image est illisible, ce que `ramp` ne fait
+     *    jamais. C'est la difference qu'on voit a l'ecran, pas une nuance de reglage.
+     */
+    'blur-dissolve': Object.freeze({ effect: 'blur', amount: 0.013, curve: 'ramp' }),
+    'cross-blur': Object.freeze({ effect: 'blur', amount: 0.026, curve: 'bell' }),
+    'motion-blur': Object.freeze({ effect: 'motion-blur', amount: 0.030, curve: 'bell' }),
+
+    /*
+     * Groupe 2 - zooms. `zoompan` a ete verifie sur une entree VIDEO le 2026-08-03
+     * (etape 0 du plan) : il ne fige pas le contenu, il ne duplique pas d'image,
+     * et son compteur `on` est exact a l'image pres. Il rampe par EXPRESSION, pas
+     * par `sendcmd` : la courbe est donc continue, pas en escalier.
+     *
+     * `pan` est une FRACTION de la course maximale autorisee, jamais un decalage
+     * absolu : le decalage vaut pan x (zoom - 1) / 2, ce qui satisfait le probleme I
+     * (|x| <= (zoom - 1) / 2) PAR CONSTRUCTION et pas par surveillance.
+     */
+    'cross-zoom': Object.freeze({ effect: 'zoom', amount: 0.50, curve: 'ramp', pan: 0 }),
+    'snap-zoom': Object.freeze({ effect: 'zoom', amount: 1.10, curve: 'cubic', pan: 0 }),
+    'parallax-zoom': Object.freeze({ effect: 'zoom', amount: 0.34, curve: 'ramp', pan: 0.8 }),
+
+    /*
+     * Groupe 3 - lumiere, et groupe 4 - numerique. Tous POSES APRES LA JOINTURE :
+     * une aberration d'objectif ou une fuite de lumiere s'applique a l'image finie,
+     * pas separement aux deux plans. Consequence heureuse, le cout est divise par
+     * deux (une passe au lieu de deux) et l'apercu n'a qu'un seul calque a poser.
+     */
+    'additive-dissolve': Object.freeze({ effect: 'lift', amount: 0.30, curve: 'bell' }),
+    'rgb-split': Object.freeze({ effect: 'rgb-split', amount: 0.018, curve: 'bell' }),
+    'chromatic': Object.freeze({ effect: 'chromatic', amount: 0.022, curve: 'bell' }),
+
+    /*
+     * Groupe 5 - ouvertures de sequence. Decision du porteur du projet du
+     * 2026-08-03 : elles restent des transitions et sont rendues a l'export comme
+     * les autres, mais la bibliotheque dit desormais qu'elles sont pensees pour le
+     * DEBUT d'une sequence. Les barres lumineuses ont perdu leurs couleurs neon :
+     * la direction artistique (plan.md § 4.2) les interdit.
+     */
+    'intro-title-scan': Object.freeze({ effect: 'edge-bar', axis: 'x', edges: 1, amount: 0.55, width: 0.055 }),
+    'intro-neon-doors': Object.freeze({ effect: 'edge-bar', axis: 'x', edges: 2, amount: 0.5, width: 0.05 }),
+
+    /*
+     * Les trois qui REMPLACENT la jointure : elles doivent CHOISIR entre les deux
+     * plans image par image (stroboscope, coupe franche du glitch) ou composer B
+     * sur A par un masque (revelation par blocs). `xfade` melange, il ne choisit
+     * pas. La cible nommee dans SERVER_XFADE_TRANSITION_MAP n'est alors qu'un
+     * repli et n'est jamais employee.
+     *
+     * `cycles` est un NOMBRE de battements sur la fenetre, pas une frequence :
+     * la formule ne depend alors que de q, et l'apercu tombe juste sans connaitre
+     * la duree ni la cadence.
+     */
+    'strobe-cut': Object.freeze({ effect: 'strobe', cycles: 7 }),
+    'intro-grid-reveal': Object.freeze({ effect: 'grid-reveal', cols: 8, rows: 5 }),
+    'glitch': Object.freeze({ effect: 'glitch', bands: 16, amount: 0.035, curve: 'bell', shift: 0.010 }),
+
+    /*
+     * `light-leak` reste une jointure normale : un halo chaud pose APRES le fondu.
+     * Le degrade est genere une seule fois en 256x256 puis reboucle, donc `geq`
+     * ne tourne pas par image ; seule son opacite est rampee.
+     */
+    'light-leak': Object.freeze({ effect: 'light-leak', amount: 0.62, radius: 0.85, tint: '0xffb432' }),
+});
+
+/*
+ * `sendcmd` change une option A DES INSTANTS DONNES : la rampe est un escalier,
+ * pas une droite. Douze paliers sur la fenetre suffisent (un palier toutes les
+ * 50 ms sur une transition de 0,6 s). L'apercu canvas applique EXACTEMENT LA
+ * MEME QUANTIFICATION.
+ */
+export const TRANSITION_EFFECT_STEPS = 12;
 
 const SERVER_TIMED_TRANSITION_IDS = Object.freeze(Object.keys(SERVER_XFADE_TRANSITION_MAP));
 
@@ -103,7 +263,9 @@ export const SERVER_RENDER_CAPABILITIES = Object.freeze({
     // un MP4 reel a l'apercu image par image.
     version: 4,
     mediaTypes: Object.freeze(['video', 'image']),
-    imageMotions: Object.freeze(['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'drift-up']),
+    imageMotions: Object.freeze(['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'drift-up', 'drift-down', 'orbit', 'bounce', 'rotate', 'appear', 'glitch']),
+    // Accents (effets pendant le plan) rendus par le serveur.
+    motionAccents: Object.freeze(['none', 'shake', 'pulse', 'leak', 'grain', 'softness']),
     imageMotionEasing: Object.freeze(['ease-in-out']),
     imageMotionIntensity: true,
     transitions: Object.freeze(['cut', ...SERVER_TIMED_TRANSITION_IDS]),
@@ -166,12 +328,19 @@ function normalizeImageMotion(motion = 'none') {
         'pan-left': [{ scale: 1.12, x: 0.055, y: 0 }, { scale: 1.12, x: -0.055, y: 0 }],
         'pan-right': [{ scale: 1.12, x: -0.055, y: 0 }, { scale: 1.12, x: 0.055, y: 0 }],
         'drift-up': [{ scale: 1.1, x: 0, y: 0.045 }, { scale: 1.14, x: 0, y: -0.045 }],
+        'drift-down': [{ scale: 1.14, x: 0, y: -0.045 }, { scale: 1.1, x: 0, y: 0.045 }],
+        orbit: [{ scale: 1.16, x: -0.05, y: 0 }, { scale: 1.16, x: 0.05, y: 0 }],
+        bounce: [{ scale: 1.18, x: 0, y: 0.05 }, { scale: 1.04, x: 0, y: 0 }],
+        rotate: [{ scale: 1, x: 0, y: 0, rotate: -3 }, { scale: 1, x: 0, y: 0, rotate: 3 }],
+        appear: [{ scale: 1.06, x: 0, y: 0 }, { scale: 1, x: 0, y: 0 }],
+        glitch: [{ scale: 1.08, x: 0, y: 0 }, { scale: 1.08, x: 0, y: 0 }],
     }[preset];
     const custom = typeof motion === 'object' && motion ? motion : {};
     const normalizeFrame = (frame, fallback) => ({
         scale: clamp(finiteNumber(frame?.scale, fallback.scale), 1, 2),
         x: clamp(finiteNumber(frame?.x, fallback.x), -0.35, 0.35),
         y: clamp(finiteNumber(frame?.y, fallback.y), -0.35, 0.35),
+        rotate: clamp(finiteNumber(frame?.rotate, fallback.rotate || 0), -8, 8),
     });
     return {
         preset,
@@ -185,6 +354,12 @@ function normalizeImageMotion(motion = 'none') {
         intensity: clamp(finiteNumber(custom.intensity, 1), 0, 1),
         start: normalizeFrame(custom.start, presetFrames[0]),
         end: normalizeFrame(custom.end, presetFrames[1]),
+        /*
+         * L'accent voyage dans le manifeste: c'est un reglage qui se compose
+         * avec n'importe quel mouvement, pas une propriete du preset.
+         */
+        accent: SERVER_RENDER_CAPABILITIES.motionAccents.includes(custom.accent) ? custom.accent : 'none',
+        accentIntensity: clamp(finiteNumber(custom.accentIntensity, 1), 0, 1),
     };
 }
 
@@ -360,7 +535,12 @@ export function buildExportManifest({
         crop: clip.crop || clip.params?.crop || null,
         fitMode: clip.fitMode || fitMode,
         filters: normalizeFilters(clip.filters || clip.params?.filters),
-        motion: normalizeMediaType(clip) === 'image' ? normalizeImageMotion(clip.motion) : null,
+        /*
+         * LOT B3 - le mouvement est transporte pour TOUT media. Il etait mis a
+         * `null` pour les videos, ce qui suffisait a le perdre en route meme
+         * quand l'interface l'affichait.
+         */
+        motion: normalizeImageMotion(clip.motion),
         metadata: compactObject({
             width: clip.width,
             height: clip.height,

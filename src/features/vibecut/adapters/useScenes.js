@@ -56,12 +56,29 @@ export function useScenes() {
             name: clip.name || `Scène ${index + 1}`,
             isImage: isImageMedia(clip),
             thumbnail: clip.thumbnails?.[0] || null,
+            /*
+             * Lot B2: l'URL de la source, pas seulement sa miniature. Les
+             * bibliotheques en ont besoin pour faire tourner de VRAIES vidoes
+             * dans leurs vignettes au lieu d'images fixes. Elle sort d'ici et
+             * pas du store, comme tout le reste (regle 5.3 de plan.md).
+             */
+            mediaUrl: clip.url || null,
             duration: resolveSceneDuration(clip),
             sourceDuration: Number(clip.duration) || 0,
             trimStart: Number(clip.trimStart) || 0,
             trimEnd: Number.isFinite(Number(clip.trimEnd)) ? Number(clip.trimEnd) : Number(clip.duration) || 0,
             volume: Number.isFinite(Number(clip.volume)) ? Number(clip.volume) : 100,
-            motionPreset: clip.motion?.preset || (isImageMedia(clip) ? 'none' : null),
+            /*
+             * LOT B3 - « aucun mouvement » se dit `none` pour TOUT media. La
+             * valeur `null` reservee aux videos venait de l'epoque ou elles n'en
+             * recevaient pas: elle laissait l'interface sans carte active.
+             */
+            motionPreset: clip.motion?.preset || 'none',
+            // Accent (effet pendant le plan): secousse, respiration.
+            motionAccent: clip.motion?.accent || 'none',
+            motionAccentIntensity: Number.isFinite(Number(clip.motion?.accentIntensity))
+                ? Number(clip.motion.accentIntensity)
+                : 1,
             timelineStart: Number(planClip?.start ?? planClip?.startTime ?? 0),
             selected: clip.id === selectedClipId,
             nextSceneId: nextClip?.id || null,
@@ -114,8 +131,29 @@ export function useSceneActions() {
         updateClip(scene.id, { trimEnd }, { history: true });
     }, [updateClip]);
 
-    const setSceneMotion = useCallback((sceneId, motionPreset) => {
-        updateClip(sceneId, { motion: motionPreset }, { history: true });
+    /*
+     * Le mouvement est envoye comme un OBJET et non comme une chaine: une chaine
+     * repasse par le preset par defaut et EFFACE l'accent pose a cote. Le bug
+     * n'aurait ete visible qu'apres avoir choisi un accent puis change de
+     * mouvement.
+     */
+    const setSceneMotion = useCallback((scene, motionPreset) => {
+        const id = typeof scene === 'string' ? scene : scene.id;
+        const accent = typeof scene === 'string' ? undefined : scene.motionAccent;
+        const accentIntensity = typeof scene === 'string' ? undefined : scene.motionAccentIntensity;
+        updateClip(id, {
+            motion: { preset: motionPreset, accent: accent || 'none', accentIntensity: accentIntensity ?? 1 },
+        }, { history: true });
+    }, [updateClip]);
+
+    const setSceneAccent = useCallback((scene, accentId) => {
+        updateClip(scene.id, {
+            motion: {
+                preset: scene.motionPreset || 'none',
+                accent: accentId,
+                accentIntensity: scene.motionAccentIntensity ?? 1,
+            },
+        }, { history: true });
     }, [updateClip]);
 
     const setSceneVolume = useCallback((sceneId, volume) => {
@@ -154,8 +192,14 @@ export function useSceneActions() {
         });
     }, [removeTransition, setTransition]);
 
+    /*
+     * LOT B3 - s'applique a TOUTES les scenes, videos comprises. Le filtre
+     * `isImage` datait de l'epoque ou le moteur ne posait le mouvement que sur
+     * les photos; le nom est conserve pour ne pas casser les appelants, mais il
+     * ne decrit plus la portee.
+     */
     const applyMotionToAllImages = useCallback((scenes, motionPreset) => {
-        scenes.filter((scene) => scene.isImage).forEach((scene) => {
+        scenes.forEach((scene) => {
             updateClip(scene.id, { motion: motionPreset }, { history: true });
         });
     }, [updateClip]);
@@ -280,6 +324,7 @@ export function useSceneActions() {
         setSceneVolume,
         applyTransition,
         applyTransitionToAll,
+        setSceneAccent,
         applyMotionToAllImages,
         addSceneTitle,
         addMusic,

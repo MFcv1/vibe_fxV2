@@ -4,8 +4,11 @@ import React, { useMemo } from 'react';
 import { Blend, Check, Columns2, Grid2x2, Moon, MoveHorizontal, Scissors, Shuffle, Sun, Trash2, Type, Waves, Zap, ZoomIn } from 'lucide-react';
 import { Button, Collapsible } from '../primitives';
 import SceneIllustration, { getSceneVariantForKey } from '../media/SceneIllustration';
+import { getServerRenderCapabilityStatus } from '@/features/vibefx-studio/video/export/exportManifest';
 import { getAvailableMotions } from '../data/motionCatalog';
+import { IMAGE_MOTION_ACCENTS } from '@/features/vibefx-studio/video/model/mediaModel';
 import { TRANSITION_CATALOG } from '../data/transitionCatalog';
+import useFavorites from '../adapters/useFavorites';
 import { MAX_SCENE_DURATION, MIN_SCENE_DURATION } from '../adapters/useScenes';
 import styles from './quick.module.css';
 
@@ -37,6 +40,21 @@ const PREVIEW_ICONS = {
  * « Apercu uniquement » par le badge de capacite.
  */
 const QUICK_TRANSITION_IDS = ['crossfade', 'dip-black', 'film-dissolve', 'swipe-left', 'push-up', 'blur-cut'];
+
+/*
+ * LOT B1 - ces six raccourcis deviennent LES FAVORIS DE L'UTILISATEUR.
+ *
+ * C'est la seconde moitie du besoin exprime: « pouvoir les mettre en favori, et
+ * donc les utiliser dans les modes EN CONNAISSANCE DE CAUSE ». On juge une fois,
+ * en grand, dans la bibliotheque; on retrouve ensuite ses preferes ici, ou il n'y
+ * a pas la place d'afficher des apercus.
+ *
+ * Repli sur les six d'origine tant qu'aucun favori n'est pose: un utilisateur qui
+ * n'est jamais alle dans la bibliotheque ne doit pas tomber sur une liste vide.
+ * Plafond a huit pour que le montage rapide reste lisible - la bibliotheque
+ * complete est a un clic.
+ */
+const QUICK_TRANSITION_LIMIT = 8;
 
 function MotionCard({ motion, active, onSelect, sceneKey }) {
     const from = motion.motionPreview?.from || {};
@@ -76,11 +94,29 @@ function MotionCard({ motion, active, onSelect, sceneKey }) {
 
 export default function SceneInspector({ scene, scenes, actions, canSplit = false }) {
     const motions = useMemo(() => getAvailableMotions(), []);
+    const { favorites } = useFavorites('transitions');
     const quickTransitions = useMemo(() => (
-        QUICK_TRANSITION_IDS
+        (favorites.length > 0 ? favorites : QUICK_TRANSITION_IDS)
             .map((id) => TRANSITION_CATALOG.find((transition) => transition.id === id))
             .filter(Boolean)
-    ), []);
+            .slice(0, QUICK_TRANSITION_LIMIT)
+            .map((transition) => ({
+                /*
+                 * Les six raccourcis d'origine sont tous exportables. Un favori,
+                 * lui, peut ne pas l'etre: l'utilisateur a le droit de mettre en
+                 * favori une transition « apercu uniquement ». On la lui rend
+                 * donc - c'est son choix - mais on le DIT, avec la meme mention
+                 * que l'inspecteur du montage avance. La regle du projet est de
+                 * ne jamais proposer ce que l'export ne rend pas SANS mention
+                 * explicite; la retirer en silence serait pire.
+                 */
+                ...transition,
+                exportable: getServerRenderCapabilityStatus(
+                    'timedTransition',
+                    transition.engineId || transition.id,
+                ).supported,
+            }))
+    ), [favorites]);
 
     if (!scene) {
         return (
@@ -133,7 +169,7 @@ export default function SceneInspector({ scene, scenes, actions, canSplit = fals
                 title="Mouvement"
                 defaultOpen
                 testId="vibecut-section-motion"
-                value={scene.isImage && scenes.filter((item) => item.isImage).length > 1 ? (
+                value={scenes.length > 1 ? (
                     <button
                         type="button"
                         className={styles.linkAction}
@@ -147,23 +183,44 @@ export default function SceneInspector({ scene, scenes, actions, canSplit = fals
                     </button>
                 ) : null}
             >
-                {scene.isImage ? (
-                    <div className={styles.motionGrid}>
-                        {motions.map((motion) => (
-                            <MotionCard
-                                key={motion.id}
-                                motion={motion}
-                                sceneKey={scene.id}
-                                active={(scene.motionPreset || 'none') === motion.id}
-                                onSelect={(id) => actions.setSceneMotion(scene.id, id)}
-                            />
+                <div className={styles.motionGrid}>
+                    {motions.map((motion) => (
+                        <MotionCard
+                            key={motion.id}
+                            motion={motion}
+                            sceneKey={scene.id}
+                            active={(scene.motionPreset || 'none') === motion.id}
+                            onSelect={(id) => actions.setSceneMotion(scene, id)}
+                        />
+                    ))}
+                </div>
+
+                {/*
+                  * L'ACCENT se COMPOSE avec le mouvement, il ne le remplace pas:
+                  * une secousse sur un zoom avant est un cas courant. D'ou une
+                  * rangee separee et non une carte de plus dans la grille.
+                  */}
+                <div className={styles.accentRow} data-testid="vibecut-accent-row">
+                    <span className={styles.accentLabel}>Effet pendant le plan</span>
+                    <div className={styles.accentChoices}>
+                        {IMAGE_MOTION_ACCENTS.map((accent) => (
+                            <button
+                                key={accent.id}
+                                type="button"
+                                className={[
+                                    styles.accentChip,
+                                    (scene.motionAccent || 'none') === accent.id ? styles.accentChipActive : '',
+                                ].filter(Boolean).join(' ')}
+                                aria-pressed={(scene.motionAccent || 'none') === accent.id}
+                                title={accent.description}
+                                data-testid={`vibecut-accent-${accent.id}`}
+                                onClick={() => actions.setSceneAccent(scene, accent.id)}
+                            >
+                                {accent.name}
+                            </button>
                         ))}
                     </div>
-                ) : (
-                    <p className={styles.groupNote}>
-                        Les mouvements s’appliquent aux photos. Cette scène est une vidéo : son propre mouvement est conservé.
-                    </p>
-                )}
+                </div>
             </Collapsible>
 
             {scene.nextSceneId ? (
@@ -173,6 +230,11 @@ export default function SceneInspector({ scene, scenes, actions, canSplit = fals
                     testId="vibecut-inspector-transition"
                     value={scene.transitionToNext ? (scene.transitionToNext.name || 'Active') : 'Coupe franche'}
                 >
+                    <p className={styles.groupNote} data-testid="vibecut-quick-transition-source">
+                        {favorites.length > 0
+                            ? 'Tes favoris de la bibliothèque de transitions.'
+                            : 'Une sélection courte. Mets des favoris dans la bibliothèque pour les retrouver ici.'}
+                    </p>
                     <div className={styles.transitionList}>
                         <button
                             type="button"
@@ -204,7 +266,12 @@ export default function SceneInspector({ scene, scenes, actions, canSplit = fals
                                 >
                                     <span className={styles.transitionIcon}><Icon size={14} /></span>
                                     <span className={styles.transitionText}>
-                                        <span className={styles.transitionName}>{transition.name}</span>
+                                        <span className={styles.transitionName}>
+                                            {transition.name}
+                                            {transition.exportable ? null : (
+                                                <span className={styles.transitionFlag}>Aperçu</span>
+                                            )}
+                                        </span>
                                         <span className={styles.transitionHint}>{transition.description}</span>
                                     </span>
                                 </button>

@@ -1,24 +1,26 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowRight, Check, ImagePlus, RotateCcw } from 'lucide-react';
+import { ImagePlus, RotateCcw } from 'lucide-react';
 import {
     IMAGE_MOTION_PRESETS,
     MAX_IMAGE_DURATION_SECONDS,
     MIN_IMAGE_DURATION_SECONDS,
 } from '@/features/vibefx-studio/video/model/mediaModel';
 import { getServerRenderCapabilityStatus } from '@/features/vibefx-studio/video/export/exportManifest';
-import { Badge, Button, EmptyState } from '../primitives';
+import { Badge, Button, Collapsible, EmptyState } from '../primitives';
 import { useSceneActions, useScenes } from '../adapters/useScenes';
 import useVibeCutProject from '../adapters/useVibeCutProject';
 import { MOTION_CATALOG, MOTION_GROUPS } from '../data/motionCatalog';
+import LibraryScreen from './LibraryScreen';
+import LibraryStage from './LibraryStage';
+import LibraryContextStrip from './LibraryContextStrip';
 import MotionPreview from './MotionPreview';
-import useLibraryImages from './useLibraryImages';
+import useLibraryMedia from './useLibraryMedia';
 import styles from './library.module.css';
 
 /*
- * Bibliotheque de mouvements (phase 5).
+ * Bibliotheque de mouvements.
  *
  * Comme la bibliotheque de transitions, chaque vignette est dessinee par la
  * transformation de PRODUCTION (`applyImageMotionTransform`), sur une photo
@@ -44,9 +46,19 @@ import styles from './library.module.css';
  *    lieu de la documenter: on ne peut pas construire ici un mouvement
  *    inexportable.
  * -------------------------------------------------------------------------
+ *
+ * Lot B1: l'ossature part dans `LibraryScreen`, partagee avec les transitions.
+ * Ce fichier ne fournit plus que ses donnees, sa vignette et son panneau.
  */
 
 const MOTION_PRESET_FRAMES = new Map(IMAGE_MOTION_PRESETS.map((preset) => [preset.id, preset]));
+
+/*
+ * LE POINT CULMINANT d'un mouvement est la FIN de sa course, pas son milieu:
+ * c'est la que le zoom est le plus marque et le panoramique le plus loin. Une
+ * grille figee au depart montrerait treize fois la photo non recadree.
+ */
+const MOTION_PEAK = 1;
 
 /*
  * Probleme I, applique. Le decalage maximal admissible pour un zoom donne est
@@ -77,12 +89,12 @@ export default function MotionLibrary() {
     /*
      * Voir `TransitionLibrary`: la sauvegarde automatique est debouncee a 1,2 s,
      * et on applique ici pour repartir aussitot vers le montage. Sans flush, le
-     * mouvement applique etait perdu au retour.
+     * mouvement applique etait perdu au retour (bug 33).
      */
     const { projectId, saveNow } = useVibeCutProject();
     const { scenes } = useScenes();
     const sceneActions = useSceneActions();
-    const images = useLibraryImages(scenes);
+    const images = useLibraryMedia(scenes);
 
     const [selectedId, setSelectedId] = useState('zoom-in');
     const [intensity, setIntensity] = useState(1);
@@ -90,23 +102,50 @@ export default function MotionLibrary() {
     const [sceneIndex, setSceneIndex] = useState(0);
     const [notice, setNotice] = useState(null);
 
-    const catalog = useMemo(() => MOTION_CATALOG.map((entry) => ({
-        ...entry,
+    const catalog = useMemo(() => MOTION_CATALOG.map((entry) => {
         /*
          * Double condition, et c'est voulu: une entree doit exister dans le
          * MOTEUR (`availability`) ET dans les capacites serveur. Une entree qui
          * ne passerait qu'un des deux tests promettrait quelque chose.
          */
-        status: entry.engineId
+        const status = entry.engineId
             ? getServerRenderCapabilityStatus('imageMotion', entry.engineId)
-            : { supported: false, status: 'planned', label: 'Bientôt' },
-    })), []);
+            : { supported: false, status: 'planned', label: 'Bientôt' };
+        const available = entry.availability === 'available' && status.supported;
+        return {
+            ...entry,
+            status,
+            available,
+            peak: MOTION_PEAK,
+            dimmed: !available,
+            /*
+             * Les sept mouvements annonces sortent des familles et vont dans une
+             * section a part, en bas. Melanges aux six qui marchent, ils
+             * occupaient plus de la moitie de la grille: la bibliotheque donnait
+             * l'impression d'un catalogue a moitie vide alors que ce qui est
+             * disponible tient debout. On ne les cache pas - la regle est de dire
+             * ce qui arrive - on arrete juste de leur donner la meme place.
+             */
+            deferred: !available,
+            badge: {
+                tone: available ? 'accent' : 'warning',
+                label: available ? 'Export Pro' : 'Bientôt',
+            },
+            dataAttributes: { 'data-available': available ? 'true' : 'false' },
+        };
+    }), []);
 
     const selected = catalog.find((entry) => entry.id === selectedId) || catalog[0];
-    const isApplicable = selected.availability === 'available' && selected.status.supported;
+    const isApplicable = selected.available;
 
     // Seules les PHOTOS sont concernees: le moteur n'anime pas encore les videos.
-    const photos = useMemo(() => scenes.filter((scene) => scene.isImage), [scenes]);
+    /*
+     * LOT B3 - TOUTES les scenes, videos comprises. Le nom `photos` est garde
+     * pour ne pas reecrire quarante references dans ce fichier, mais la
+     * bibliotheque ne distingue plus les deux: le moteur pose le meme recadrage
+     * anime sur l'un comme sur l'autre.
+     */
+    const photos = useMemo(() => scenes, [scenes]);
     const activeScene = photos[Math.min(sceneIndex, Math.max(0, photos.length - 1))] || null;
 
     /*
@@ -153,7 +192,7 @@ export default function MotionLibrary() {
     const applyToAll = useCallback(() => {
         if (photos.length === 0 || !isApplicable) return;
         sceneActions.applyMotionToAllImages(scenes, motion);
-        setNotice(`${selected.name} appliqué aux ${photos.length} photos du montage.`);
+        setNotice(`${selected.name} appliqué aux ${photos.length} plans du montage.`);
         saveNow();
     }, [isApplicable, motion, photos.length, saveNow, scenes, sceneActions, selected.name]);
 
@@ -235,251 +274,262 @@ export default function MotionLibrary() {
         </div>
     );
 
-    return (
-        <div className={styles.screen} data-testid="vibecut-motion-library">
-            <header className={styles.screenHead}>
-                <div className={styles.screenTitles}>
-                    <h1 className={styles.screenTitle}>Mouvements</h1>
-                    <p className={styles.screenSubtitle}>
-                        {images.real
-                            ? 'Chaque vignette anime une photo de ton projet, avec la transformation du moteur.'
-                            : 'Importe des photos pour régler les mouvements sur tes propres images.'}
-                    </p>
+    /*
+     * Reglages LIVE: l'intensite et les cadrages tires ci-dessous changent
+     * immediatement ce que le grand apercu montre, sans avoir a appliquer.
+     */
+    const stage = (
+        <LibraryStage
+            peak={MOTION_PEAK}
+            durationSeconds={activeScene?.duration || 3}
+            bypassHint="Maintiens B : l’aperçu montre la photo sans aucun mouvement."
+            testId="vibecut-motion-stage"
+            renderPreview={(controlKey) => (
+                <MotionPreview
+                    motion={motion}
+                    image={images.from}
+                    mediaVersion={images.version}
+                    cycleSeconds={activeScene?.duration || 3}
+                    peak={MOTION_PEAK}
+                    controlKey={controlKey}
+                    width={640}
+                    height={400}
+                    className={styles.stageCanvas}
+                    testId="vibecut-motion-panel-canvas"
+                />
+            )}
+        />
+    );
+
+    const panel = (
+        <>
+            <div className={styles.panelHead}>
+                <div className={styles.panelTitles}>
+                    <span className={styles.panelKind}>Mouvement</span>
+                    <h2 className={styles.panelTitle} data-testid="vibecut-motion-selected">{selected.name}</h2>
                 </div>
-                <Link href={`/video/rapide${projectQuery}`} className={styles.screenAction} data-testid="vibecut-library-to-quick">
-                    Retour au montage <ArrowRight size={15} />
-                </Link>
-            </header>
+                <Badge tone={isApplicable ? 'accent' : 'warning'}>
+                    {isApplicable ? 'Export Pro' : 'Bientôt'}
+                </Badge>
+            </div>
 
-            <div className={styles.body}>
-                <div className={styles.catalog} data-testid="vibecut-motion-catalog">
-                    {MOTION_GROUPS.map((group) => {
-                        const entries = catalog.filter((entry) => entry.group === group.id);
-                        if (entries.length === 0) return null;
-                        return (
-                            <section key={group.id} className={styles.group} aria-labelledby={`vibecut-motion-group-${group.id}`}>
-                                <div className={styles.groupHead}>
-                                    <h2 className={styles.groupTitle} id={`vibecut-motion-group-${group.id}`}>
-                                        {group.label}
-                                    </h2>
-                                </div>
-                                <div className={styles.cardGrid}>
-                                    {entries.map((entry) => {
-                                        const available = entry.availability === 'available' && entry.status.supported;
-                                        return (
-                                            <button
-                                                key={entry.id}
-                                                type="button"
-                                                className={[
-                                                    styles.card,
-                                                    entry.id === selectedId ? styles.cardActive : '',
-                                                    available ? '' : styles.cardPlanned,
-                                                ].filter(Boolean).join(' ')}
-                                                aria-pressed={entry.id === selectedId}
-                                                onClick={() => handleSelect(entry)}
-                                                data-testid={`vibecut-motion-card-${entry.id}`}
-                                                data-available={available ? 'true' : 'false'}
-                                            >
-                                                {/*
-                                                  * Un mouvement « planned » n'a pas d'`engineId`: sa
-                                                  * vignette montre donc un cadre FIXE, et le badge dit
-                                                  * pourquoi. Lui inventer une animation CSS serait la
-                                                  * promesse exacte que la regle interdit.
-                                                  */}
-                                                <MotionPreview
-                                                    motion={{ preset: entry.engineId || 'none', intensity: 1 }}
-                                                    image={images.from}
-                                                    testId={`vibecut-motion-canvas-${entry.id}`}
-                                                />
-                                                <span className={styles.cardBody}>
-                                                    <span className={styles.cardName}>{entry.name}</span>
-                                                    <span className={styles.cardDescription}>{entry.description}</span>
-                                                    <Badge tone={available ? 'accent' : 'warning'}>
-                                                        {available ? 'Export Pro' : 'Bientôt'}
-                                                    </Badge>
-                                                </span>
-                                                {entry.id === selectedId ? (
-                                                    <span className={styles.cardCheck} aria-hidden="true"><Check size={13} /></span>
-                                                ) : null}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </section>
-                        );
-                    })}
-                </div>
+            {!isApplicable ? (
+                <p className={styles.warning} data-testid="vibecut-motion-warning">
+                    Ce mouvement demande une extension du moteur : il n’est ni joué dans l’aperçu ni
+                    rendu à l’export. Il reste listé pour dire ce qui arrive, pas pour être appliqué.
+                </p>
+            ) : null}
 
-                <aside className={styles.panel} aria-label="Régler et appliquer un mouvement">
-                    <div className={styles.panelHead}>
-                        <span className={styles.panelKind}>Mouvement</span>
-                        <h2 className={styles.panelTitle} data-testid="vibecut-motion-selected">{selected.name}</h2>
-                        <Badge tone={isApplicable ? 'accent' : 'warning'}>
-                            {isApplicable ? 'Export Pro' : 'Bientôt'}
-                        </Badge>
-                    </div>
-
-                    <MotionPreview
-                        motion={motion}
-                        image={images.from}
-                        width={300}
-                        height={188}
-                        cycleSeconds={activeScene?.duration || 3}
-                        testId="vibecut-motion-panel-canvas"
-                    />
-
-                    {!isApplicable ? (
-                        <p className={styles.warning} data-testid="vibecut-motion-warning">
-                            Ce mouvement demande une extension du moteur : il n’est ni joué dans l’aperçu ni
-                            rendu à l’export. Il reste listé pour dire ce qui arrive, pas pour être appliqué.
-                        </p>
-                    ) : null}
-
-                    {photos.length === 0 ? (
-                        <EmptyState icon={<ImagePlus size={20} />} title="Aucune photo dans ce projet">
-                            Les mouvements de caméra s’appliquent aux photos. Le moteur ne les applique pas
-                            encore aux vidéos.
-                        </EmptyState>
-                    ) : (
+            {photos.length === 0 ? (
+                <EmptyState icon={<ImagePlus size={20} />} title="Aucun plan dans ce projet">
+                    Importe une photo ou une vidéo : les mouvements de caméra s’appliquent
+                    maintenant aux deux.
+                </EmptyState>
+            ) : (
+                <>
+                    {isApplicable ? (
                         <>
-                            {isApplicable ? (
-                                <>
-                                    <label className={styles.field}>
-                                        <span className={styles.fieldLabel}>
-                                            Intensité
-                                            <span className={styles.fieldValue} data-numeric="true">
-                                                {Math.round(intensity * 100)} %
-                                            </span>
-                                        </span>
-                                        <input
-                                            type="range"
-                                            min={0}
-                                            max={100}
-                                            step={5}
-                                            value={Math.round(intensity * 100)}
-                                            onChange={(event) => setIntensity(Number(event.target.value) / 100)}
-                                            aria-label="Intensité du mouvement"
-                                            data-testid="vibecut-motion-intensity"
-                                        />
-                                    </label>
-                                    <p className={styles.note}>
-                                        L’intensité raccourcit la course sans recadrer la photo. L’export applique
-                                        exactement le même facteur.
-                                    </p>
-
-                                    {renderTrajectoryRow('start', 'Cadrage de départ', startLimit)}
-                                    {renderTrajectoryRow('end', 'Cadrage d’arrivée', endLimit)}
-
-                                    <div className={styles.field}>
-                                        <span className={styles.fieldLabel}>Courbe d’accélération</span>
-                                        <div className={styles.chipRow}>
-                                            <button
-                                                type="button"
-                                                className={`${styles.chip} ${styles.chipActive}`}
-                                                aria-pressed="true"
-                                                data-testid="vibecut-motion-curve-smooth"
-                                            >
-                                                Douce
-                                            </button>
-                                            {/*
-                                              * Desactivee, pas cachee. Le renderer ecrit `smoothstep`
-                                              * en dur: une courbe lineaire ne survivrait pas a
-                                              * l'export. On dit ce qui manque au lieu de le masquer.
-                                              */}
-                                            <button
-                                                type="button"
-                                                className={styles.chip}
-                                                aria-pressed="false"
-                                                disabled
-                                                title="Le renderer serveur lisse toujours la progression"
-                                                data-testid="vibecut-motion-curve-linear"
-                                            >
-                                                Linéaire — Bientôt
-                                            </button>
-                                        </div>
-                                        <p className={styles.note}>
-                                            L’aperçu et l’export lissent tous les deux la progression
-                                            (démarrage et arrivée adoucis). Une courbe libre demande une
-                                            extension du renderer.
-                                        </p>
-                                    </div>
-
-                                    <label className={styles.field}>
-                                        <span className={styles.fieldLabel}>Vitesse
-                                            <span className={styles.fieldValue} data-numeric="true">
-                                                {(activeScene?.duration || 0).toFixed(2)} s
-                                            </span>
-                                        </span>
-                                        <input
-                                            type="range"
-                                            min={MIN_IMAGE_DURATION_SECONDS}
-                                            max={Math.min(12, MAX_IMAGE_DURATION_SECONDS)}
-                                            step={0.1}
-                                            value={activeScene?.duration || 4}
-                                            onChange={(event) => setSceneSpeed(event.target.value)}
-                                            aria-label="Vitesse du mouvement"
-                                            data-testid="vibecut-motion-speed"
-                                        />
-                                    </label>
-                                    <p className={styles.note}>
-                                        La vitesse d’un mouvement est la durée du plan : la même course sur
-                                        2 s se lit vive, sur 8 s elle se lit posée.
-                                    </p>
-                                </>
-                            ) : null}
-
                             <label className={styles.field}>
-                                <span className={styles.fieldLabel}>Photo</span>
-                                <select
-                                    className={styles.select}
-                                    value={sceneIndex}
-                                    onChange={(event) => setSceneIndex(Number(event.target.value))}
-                                    data-testid="vibecut-motion-scene"
-                                >
-                                    {photos.map((scene, index) => (
-                                        <option key={scene.id} value={index}>
-                                            {index + 1}. {scene.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <span className={styles.fieldLabel}>
+                                    Intensité
+                                    <span className={styles.fieldValue} data-numeric="true">
+                                        {Math.round(intensity * 100)} %
+                                    </span>
+                                </span>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    value={Math.round(intensity * 100)}
+                                    onChange={(event) => setIntensity(Number(event.target.value) / 100)}
+                                    aria-label="Intensité du mouvement"
+                                    data-testid="vibecut-motion-intensity"
+                                />
                             </label>
+                            <p className={styles.note}>
+                                L’intensité raccourcit la course sans recadrer la photo. L’export applique
+                                exactement le même facteur.
+                            </p>
 
-                            <div className={styles.actions}>
-                                <Button
-                                    variant="primary"
-                                    onClick={applyToScene}
-                                    disabled={!isApplicable}
-                                    data-testid="vibecut-motion-apply"
-                                >
-                                    Appliquer à cette photo
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={applyToAll}
-                                    disabled={!isApplicable}
-                                    data-testid="vibecut-motion-apply-all"
-                                >
-                                    Appliquer aux {photos.length} photos
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    icon={<RotateCcw size={14} />}
-                                    onClick={resetFrames}
-                                    data-testid="vibecut-motion-reset"
-                                >
-                                    Revenir au mouvement d’origine
-                                </Button>
+                            {/*
+                              * Six curseurs de trajectoire, replies par defaut.
+                              * C'etait le seul endroit de l'ecran qui ne
+                              * respirait pas: la precision est la pour qui la
+                              * cherche, elle n'a pas a encombrer le panneau de
+                              * quelqu'un qui veut juste choisir un mouvement et
+                              * doser son intensite.
+                              */}
+                            <Collapsible
+                                title="Cadrage précis"
+                                defaultOpen={false}
+                                testId="vibecut-motion-trajectory"
+                            >
+                                <p className={styles.note}>
+                                    Le cadrage de départ et d’arrivée du mouvement. Les valeurs par défaut
+                                    sont celles du preset ; les déplacer construit une trajectoire sur mesure,
+                                    toujours bornée pour rester identique à l’export.
+                                </p>
+                                {renderTrajectoryRow('start', 'Cadrage de départ', startLimit)}
+                                {renderTrajectoryRow('end', 'Cadrage d’arrivée', endLimit)}
+                            </Collapsible>
+
+                            <div className={styles.field}>
+                                <span className={styles.fieldLabel}>Courbe d’accélération</span>
+                                <div className={styles.chipRow}>
+                                    <button
+                                        type="button"
+                                        className={`${styles.chip} ${styles.chipActive}`}
+                                        aria-pressed="true"
+                                        data-testid="vibecut-motion-curve-smooth"
+                                    >
+                                        Douce
+                                    </button>
+                                    {/*
+                                      * Desactivee, pas cachee. Le renderer ecrit `smoothstep`
+                                      * en dur: une courbe lineaire ne survivrait pas a
+                                      * l'export. On dit ce qui manque au lieu de le masquer.
+                                      */}
+                                    <button
+                                        type="button"
+                                        className={styles.chip}
+                                        aria-pressed="false"
+                                        disabled
+                                        title="Le renderer serveur lisse toujours la progression"
+                                        data-testid="vibecut-motion-curve-linear"
+                                    >
+                                        Linéaire — Bientôt
+                                    </button>
+                                </div>
+                                <p className={styles.note}>
+                                    L’aperçu et l’export lissent tous les deux la progression
+                                    (démarrage et arrivée adoucis). Une courbe libre demande une
+                                    extension du renderer.
+                                </p>
                             </div>
 
-                            {notice ? (
-                                <p className={styles.notice} role="status" data-testid="vibecut-motion-notice">
-                                    {notice}
-                                </p>
-                            ) : null}
+                            <label className={styles.field}>
+                                <span className={styles.fieldLabel}>Vitesse
+                                    <span className={styles.fieldValue} data-numeric="true">
+                                        {(activeScene?.duration || 0).toFixed(2)} s
+                                    </span>
+                                </span>
+                                <input
+                                    type="range"
+                                    min={MIN_IMAGE_DURATION_SECONDS}
+                                    max={Math.min(12, MAX_IMAGE_DURATION_SECONDS)}
+                                    step={0.1}
+                                    value={activeScene?.duration || 4}
+                                    onChange={(event) => setSceneSpeed(event.target.value)}
+                                    aria-label="Vitesse du mouvement"
+                                    data-testid="vibecut-motion-speed"
+                                />
+                            </label>
+                            <p className={styles.note}>
+                                La vitesse d’un mouvement est la durée du plan : la même course sur
+                                2 s se lit vive, sur 8 s elle se lit posée.
+                            </p>
                         </>
-                    )}
-                </aside>
-            </div>
-        </div>
+                    ) : null}
+
+                    <label className={styles.field}>
+                        <span className={styles.fieldLabel}>Photo</span>
+                        <select
+                            className={styles.select}
+                            value={sceneIndex}
+                            onChange={(event) => setSceneIndex(Number(event.target.value))}
+                            data-testid="vibecut-motion-scene"
+                        >
+                            {photos.map((scene, index) => (
+                                <option key={scene.id} value={index}>
+                                    {index + 1}. {scene.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <div className={styles.actions}>
+                        <Button
+                            variant="primary"
+                            onClick={applyToScene}
+                            disabled={!isApplicable}
+                            data-testid="vibecut-motion-apply"
+                        >
+                            Appliquer à cette photo
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={applyToAll}
+                            disabled={!isApplicable}
+                            data-testid="vibecut-motion-apply-all"
+                        >
+                            Appliquer aux {photos.length} plans
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            icon={<RotateCcw size={14} />}
+                            onClick={resetFrames}
+                            data-testid="vibecut-motion-reset"
+                        >
+                            Revenir au mouvement d’origine
+                        </Button>
+                    </div>
+
+                    {notice ? (
+                        <p className={styles.notice} role="status" data-testid="vibecut-motion-notice">
+                            {notice}
+                        </p>
+                    ) : null}
+                </>
+            )}
+        </>
+    );
+
+    return (
+        <LibraryScreen
+            testId="vibecut-motion-library"
+            mediaKind={images.kind}
+            kind="motions"
+            title="Mouvements"
+            subtitle={images.real
+                ? 'Survole une vignette et balaye : le pointeur déroule le mouvement sur ta propre photo.'
+                : 'Importe des médias pour régler les mouvements sur tes propres plans.'}
+            backHref={`/video/rapide${projectQuery}`}
+            groups={MOTION_GROUPS}
+            entries={catalog}
+            selectedId={selected.id}
+            onSelect={handleSelect}
+            cardTestId={(entry) => `vibecut-motion-card-${entry.id}`}
+            panelLabel="Régler et appliquer un mouvement"
+            deferredLabel="Bientôt"
+            deferredHint="Annoncés, pas encore rendus par le moteur : ni dans l’aperçu, ni à l’export."
+
+            renderCardPreview={(entry, controlKey) => (
+                /*
+                 * Un mouvement « planned » n'a pas d'`engineId`: sa vignette
+                 * montre donc un cadre FIXE, et le badge dit pourquoi. Lui
+                 * inventer une animation CSS serait la promesse exacte que la
+                 * regle interdit.
+                 */
+                <MotionPreview
+                    motion={{ preset: entry.engineId || 'none', intensity: 1 }}
+                    image={images.from}
+                    mediaVersion={images.version}
+                    peak={MOTION_PEAK}
+                    controlKey={controlKey}
+                    testId={`vibecut-motion-canvas-${entry.id}`}
+                />
+            )}
+            stage={stage}
+            panel={panel}
+            contextStrip={activeScene ? (
+                <LibraryContextStrip
+                    label="Ce mouvement s’applique ici"
+                    left={{ name: activeScene.name, thumbnail: activeScene.thumbnail }}
+                    center={selected.name}
+                    testId="vibecut-motion-context"
+                />
+            ) : null}
+        />
     );
 }

@@ -56,12 +56,80 @@ const SERVER_XFADE_TRANSITIONS = new Set([
   "iris-close",
   "pixel-cut",
   "blur-cut",
+  // Lot B3a (2026-08-02) : voir exportManifest.js. Huit re-affectations et dix
+  // cibles xfade natives nouvelles. La validation serveur doit les accepter,
+  // sinon un montage legitime serait refuse au pre-vol.
+  "smooth-cut",
+  "non-additive-dissolve",
+  "whip-pan",
+  "flash",
+  "intro-cinematic-bars",
+  "outro-cinematic-fade",
+  "outro-neon-close",
+  "outro-signal-collapse",
+  "wipe-right",
+  "wipe-up",
+  "wipe-down",
+  "push-right",
+  "swipe-up",
+  "swipe-down",
+  "bars-close",
+  "iris-black",
+  "frame-black",
+  "squeeze-h",
+  // Lot B3b (2026-08-03) : voir exportManifest.js. Ces transitions-la n'ont pas
+  // de cible xfade native qui rende leur effet - il vient d'un sous-graphe de
+  // filtres natifs rampes, declare dans SERVER_TRANSITION_EFFECTS.
+  "blur-dissolve",
+  "cross-blur",
+  "motion-blur",
+  "cross-zoom",
+  "snap-zoom",
+  "parallax-zoom",
+  "additive-dissolve",
+  "rgb-split",
+  "chromatic",
+  "intro-title-scan",
+  "intro-neon-doors",
+  "strobe-cut",
+  "intro-grid-reveal",
+  "glitch",
+  "light-leak",
 ]);
+/*
+ * Effets du lot B3b. Table TRIPLIQUEE a l'identique avec exportManifest.js et
+ * render-service/src/server.js ; scripts/smoke-vibecut-transition-parity.mjs
+ * echoue si les trois divergent. La validation Functions n'a pas besoin des
+ * valeurs pour accepter un manifeste, mais les porter ici est ce qui garantit
+ * qu'un id ajoute d'un seul cote soit attrape.
+ */
+const SERVER_TRANSITION_EFFECTS = Object.freeze({
+  "blur-dissolve": Object.freeze({effect: "blur", amount: 0.013, curve: "ramp"}),
+  "cross-blur": Object.freeze({effect: "blur", amount: 0.026, curve: "bell"}),
+  "motion-blur": Object.freeze({effect: "motion-blur", amount: 0.030, curve: "bell"}),
+  "cross-zoom": Object.freeze({effect: "zoom", amount: 0.50, curve: "ramp", pan: 0}),
+  "snap-zoom": Object.freeze({effect: "zoom", amount: 1.10, curve: "cubic", pan: 0}),
+  "parallax-zoom": Object.freeze({effect: "zoom", amount: 0.34, curve: "ramp", pan: 0.8}),
+  "additive-dissolve": Object.freeze({effect: "lift", amount: 0.30, curve: "bell"}),
+  "rgb-split": Object.freeze({effect: "rgb-split", amount: 0.018, curve: "bell"}),
+  "chromatic": Object.freeze({effect: "chromatic", amount: 0.022, curve: "bell"}),
+  "intro-title-scan": Object.freeze({effect: "edge-bar", axis: "x", edges: 1, amount: 0.55, width: 0.055}),
+  "intro-neon-doors": Object.freeze({effect: "edge-bar", axis: "x", edges: 2, amount: 0.5, width: 0.05}),
+  "strobe-cut": Object.freeze({effect: "strobe", cycles: 7}),
+  "intro-grid-reveal": Object.freeze({effect: "grid-reveal", cols: 8, rows: 5}),
+  "glitch": Object.freeze({effect: "glitch", bands: 16, amount: 0.035, curve: "bell", shift: 0.010}),
+  "light-leak": Object.freeze({effect: "light-leak", amount: 0.62, radius: 0.85, tint: "0xffb432"}),
+});
+const TRANSITION_EFFECT_STEPS = 12;
 const SUPPORTED_SERVER_TRANSITIONS = new Set(["cut", ...SERVER_XFADE_TRANSITIONS]);
 const SUPPORTED_SERVER_FIT_MODES = new Set(["cover", "contain"]);
 const SUPPORTED_SERVER_TEXT_ANIMATIONS = new Set(["none", "fade"]);
 const SUPPORTED_SERVER_MEDIA_TYPES = new Set(["video", "image"]);
-const SUPPORTED_SERVER_IMAGE_MOTIONS = new Set(["none", "zoom-in", "zoom-out", "pan-left", "pan-right", "drift-up"]);
+const SUPPORTED_SERVER_MOTION_ACCENTS = new Set(["none", "shake", "pulse", "leak", "grain", "softness"]);
+const SUPPORTED_SERVER_IMAGE_MOTIONS = new Set([
+  "none", "zoom-in", "zoom-out", "pan-left", "pan-right", "drift-up",
+  "drift-down", "orbit", "bounce", "rotate", "appear", "glitch",
+]);
 const DEFAULT_FILTERS = Object.freeze({
   exposure: 0,
   brightness: 100,
@@ -448,6 +516,9 @@ function validateExportRenderCoverage(manifest, errors) {
     }
     if (mediaType === "image" && !SUPPORTED_SERVER_IMAGE_MOTIONS.has(clip.motion?.preset || "none")) {
       errors.push(`mouvement photo non rendu serveur: ${label}.${clip.motion?.preset || "none"}`);
+    }
+    if (!SUPPORTED_SERVER_MOTION_ACCENTS.has(clip.motion?.accent || "none")) {
+      errors.push(`accent de mouvement non rendu serveur: ${label}.${clip.motion?.accent}`);
     }
     const speed = finiteNumber(clip.speed, 1);
     if (Math.abs(speed - 1) > 0.001) {
@@ -1816,4 +1887,9 @@ module.exports = {
   processStoredVideoExportJob,
   buildProxyDownloadToken,
   verifyProxyDownloadToken,
+  // Exportees pour que smoke-vibecut-transition-parity puisse comparer les trois
+  // copies des tables au lieu de croire un commentaire.
+  SERVER_XFADE_TRANSITIONS,
+  SERVER_TRANSITION_EFFECTS,
+  TRANSITION_EFFECT_STEPS,
 };

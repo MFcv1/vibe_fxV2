@@ -28,13 +28,16 @@ try {
   // que l'apercu. Prouve par scripts/smoke-vibecut-motion-preview-parity.mjs.
   assert.equal(SERVER_RENDER_CAPABILITIES.version, 4);
   assert.equal(SERVER_RENDER_CAPABILITIES.imageMotionIntensity, true);
-  assert.ok(SERVER_RENDER_CAPABILITIES.timedTransitions.length >= 15, "au moins 15 transitions minutees attendues");
+  assert.ok(SERVER_RENDER_CAPABILITIES.timedTransitions.length >= 48, "les 48 transitions du catalogue sont minutees depuis le lot B3b");
   assert.equal(isServerRenderCapabilitySupported("timedTransition", "iris-open"), true);
   assert.equal(isServerRenderCapabilitySupported("timedTransition", "blur-cut"), true);
   assert.equal(isServerRenderCapabilitySupported("mediaType", "image"), true);
   assert.equal(isServerRenderCapabilitySupported("imageMotion", "zoom-in"), true);
   assert.equal(isServerRenderCapabilitySupported("timedTransition", "crossfade"), true);
-  assert.equal(isServerRenderCapabilitySupported("timedTransition", "cross-zoom"), false);
+  // Lot B3b (2026-08-03): `cross-zoom` est rendu par un sous-graphe de filtres
+  // natifs. Le temoin negatif porte donc sur un id qui n'existe nulle part.
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "cross-zoom"), true);
+  assert.equal(isServerRenderCapabilitySupported("timedTransition", "transition-inexistante"), false);
   assert.equal(isServerRenderCapabilitySupported("textAnimation", "fade"), true);
   assert.equal(isServerRenderCapabilitySupported("textAnimation", "neon-scan"), false);
   assert.deepEqual(getServerRenderCapabilityStatus("transition", "crossfade"), {
@@ -42,7 +45,10 @@ try {
     status: "ready",
     label: "Export Pro",
   });
-  assert.equal(getServerRenderCapabilityStatus("transition", "glitch").status, "preview-only");
+  // `glitch` est rendu depuis le lot B3b; le temoin « preview-only » porte
+  // desormais sur la VITESSE de clip, la derniere capacite que le serveur n'a pas.
+  assert.equal(getServerRenderCapabilityStatus("transition", "glitch").status, "ready");
+  assert.equal(getServerRenderCapabilityStatus("clipSpeed", 2).status, "preview-only");
 
   const manifest = buildExportManifest({
     projectId: "project-1",

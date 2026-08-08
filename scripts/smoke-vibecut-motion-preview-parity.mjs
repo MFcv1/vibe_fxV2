@@ -47,6 +47,21 @@ const FRAME_COUNT = DURATION * FPS;
 // Debut, montee, milieu, fin de course. Le milieu est le point ou le smoothstep
 // s'ecarte le plus d'une droite: c'est la que la correction de courbe se voit.
 const SAMPLE_FRAMES = [3, 12, 30, 48, 59];
+/*
+ * POINTS DE MESURE DES ACCENTS, et ils ne sont pas ceux des mouvements.
+ *
+ * Un accent oscille: si les images echantillonnees tombent sur ses passages a
+ * ZERO, il est invisible et le test ne prouve rien. C'est exactement ce qui
+ * s'est produit au premier jet - la secousse etait a 7,5 Hz, soit 4 images par
+ * cycle a 30 images/s, et trois des cinq points tombaient pile sur un zero.
+ * Deux sentinelles sont passees inapercues avant que ce ne soit vu.
+ * Ces images-ci sont rapprochees et couvrent plusieurs phases.
+ */
+const ACCENT_FRAMES = [1, 5, 9, 13, 17, 21];
+// Fondu d'entree: 30 % de 60 images. Les points doivent tomber DEDANS.
+const FADE_FRAMES = [0, 3, 6, 9, 12, 15, 18, 30];
+// Rognage du cas video: la course doit se mesurer sur le segment, pas la source.
+const VIDEO_TRIM_START = 0.5;
 
 const shotDir = process.env.VIBECUT_MOTION_SHOT_DIR || null;
 const reportOnly = process.env.VIBECUT_MOTION_REPORT_ONLY === "1";
@@ -96,6 +111,112 @@ const CASES = [
   { motion: "pan-right", intensity: 1, label: "pan-right · Marque 100 %" },
   { motion: "pan-right", intensity: 0.4, label: "pan-right · Discret 40 %" },
   { motion: "drift-up", intensity: 0.7, label: "drift-up · Naturel 70 %" },
+  /*
+   * LOT B3. Les trois nouveaux, et chacun couvre une chose que les six
+   * precedents ne couvraient pas :
+   *  - `drift-down` est une DROITE, comme les six d'avant: il verifie qu'ajouter
+   *    un preset ne casse rien;
+   *  - `orbit` a un BOMBEMENT - une trajectoire courbe. Une droite cote export
+   *    passerait par le milieu au lieu de contourner, et se verrait ici;
+   *  - `bounce` DEPASSE sa cible avant de se poser. Un `smoothstep` cote export
+   *    accosterait sans depasser: c'est l'image a mi-course qui le dit.
+   * Chacun est mesure a deux intensites, parce que le bombement et le
+   * depassement sont mis a l'echelle par l'intensite - une des deux ecritures
+   * pourrait l'oublier.
+   */
+  { motion: "drift-down", intensity: 1, label: "drift-down · Marque 100 %" },
+  { motion: "orbit", intensity: 1, label: "orbit · Marque 100 % (bombement plein)" },
+  { motion: "orbit", intensity: 0.4, label: "orbit · Discret 40 % (bombement reduit)" },
+  { motion: "bounce", intensity: 1, label: "bounce · Marque 100 % (depassement plein)" },
+  { motion: "bounce", intensity: 0.7, label: "bounce · Naturel 70 %" },
+  /*
+   * ROTATION. Le premier mouvement qui n'est pas un recadrage: il passe par un
+   * filtre DIFFERENT de chaque cote (`rotate` contre `ctx.rotate`), et c'est
+   * justement pour ca qu'il doit etre mesure. Deux choses peuvent diverger:
+   * l'ORDRE des operations (recadrer puis tourner, et non l'inverse) et le zoom
+   * de COUVERTURE qui remplit les coins - lequel depend du format.
+   */
+  { motion: "rotate", intensity: 1, label: "rotation · Marque 100 %" },
+  { motion: "rotate", intensity: 0.4, label: "rotation · Discret 40 %" },
+  /*
+   * APPARITION. Le seul mouvement qui touche a l'OPACITE. Les images
+   * echantillonnees par defaut (3, 12, 30, 48, 59) sont presque toutes APRES la
+   * fin du fondu (30 % de 60 images = image 18): sans points rapproches, le
+   * test ne verrait que la partie deja opaque et ne prouverait rien du fondu.
+   */
+  { motion: "appear", intensity: 1, label: "apparition · Marque 100 %" },
+  /*
+   * LOT B3 - LE MOUVEMENT SUR UNE VIDEO.
+   *
+   * Le recadrage anime etait reserve aux photos par un garde dont rien ne
+   * justifiait la presence. Ce cas prouve qu'il est bien pose sur un clip
+   * `mediaType: 'video'`, et surtout que la course se mesure sur le segment
+   * ROGNE et non sur la source entiere: `trimStart` vaut 0,5 s ici, donc un
+   * calcul reste sur `duration` decalerait tout le mouvement d'un quart de sa
+   * course.
+   *
+   * La source est une video dont TOUTES les images sont identiques. Ce n'est pas
+   * un contournement: ce qui est mesure ici est la GEOMETRIE du recadrage, et
+   * un contenu constant est le seul moyen de la comparer au pixel pres sans
+   * demander a l'apercu de decoder la meme image que FFmpeg au meme instant -
+   * ce qui mesurerait la synchronisation du decodeur, pas le mouvement.
+   */
+  /*
+   * LES ACCENTS (effets pendant le plan). Ils n'ont pas de trajet: ils
+   * OSCILLENT pendant tout le plan, a une frequence en HERTZ. Trois choses a
+   * prouver, et chacune a son cas:
+   *  - une secousse posee sur un plan FIXE (le cas le plus courant): elle doit
+   *    exister alors que le mouvement, lui, ne demande aucun zoompan;
+   *  - une secousse COMPOSEE avec un mouvement: les deux s'additionnent;
+   *  - la respiration, dont le zoom ne doit jamais repasser sous son cadrage.
+   * L'intensite reduite verifie que l'amplitude suit bien le reglage.
+   */
+  /*
+   * GLITCH (2026-08-04). Le premier mouvement dont la valeur est un ESCALIER et
+   * non une courbe, et c'est exactement ce qui le rend fragile: sur une courbe
+   * lisse, lire l'instant un poil trop tot coute une fraction de pixel; sur un
+   * escalier, ca coute UN SAUT ENTIER. Le decrochage est donc calcule en
+   * SECONDES des deux cotes (`on/fps` au rendu, `progression x duree` a
+   * l'apercu), les deux seules ecritures qui coincident.
+   *
+   * Les cinq images echantillonnees tombent, a 30 im/s sur 2 s, sur les paliers
+   * 1, 4, 11, 18 et 22 - soit les trois valeurs non nulles du motif (-0,7 a
+   * l'image 12, +1 a la 48, +0,45 a la 59) ET deux paliers a zero (images 3 et
+   * 30). Ces deux-la portent autant que les autres: ils prouvent qu'entre deux
+   * decrochages le cadre ne bouge PAS. Aucun de ces cinq points ne tombe a moins
+   * de 0,13 palier d'une frontiere.
+   */
+  { motion: "glitch", intensity: 1, label: "glitch · Marque 100 %" },
+  { motion: "glitch", intensity: 0.4, label: "glitch · Discret 40 %" },
+  { motion: "none", intensity: 1, accent: "shake", label: "secousse sur plan FIXE" },
+  { motion: "none", intensity: 1, accent: "shake", accentIntensity: 0.4, label: "secousse a 40 %" },
+  { motion: "zoom-in", intensity: 1, accent: "shake", label: "secousse COMPOSEE avec un zoom avant" },
+  { motion: "none", intensity: 1, accent: "pulse", label: "respiration sur plan FIXE" },
+  /*
+   * LES ACCENTS D'IMAGE (2026-08-04). Ils ne passent PAS par `zoompan` : ils
+   * modifient l'image apres le recadrage, par une chaine de filtres a l'export
+   * et par un filtre de contexte + des calques a l'apercu. Chacun couvre une
+   * mecanique que les deux precedents ne couvraient pas :
+   *  - `leak` est une expression CONTINUE des deux cotes (halo qui traverse et
+   *    respire) : c'est le seul des trois dont la parite peut etre exacte ;
+   *  - `softness` est un ESCALIER cote export (`gblur` n'accepte pas
+   *    d'expression pour son sigma, et `sendcmd` est proscrit) contre un flou
+   *    continu cote apercu - l'ecart de quantification est ce qui est mesure ;
+   *  - `grain` est le seul effet du produit dont la parite ne PEUT PAS etre
+   *    exacte : FFmpeg tire son bruit par pixel avec son propre generateur.
+   *    Il est donc juge sur la QUANTITE de bruit et non sur les pixels.
+   */
+  { motion: "none", intensity: 1, accent: "leak", label: "fuite de lumiere sur plan FIXE" },
+  { motion: "none", intensity: 1, accent: "leak", accentIntensity: 0.4, label: "fuite de lumiere a 40 %" },
+  { motion: "none", intensity: 1, accent: "softness", label: "flou anime sur plan FIXE" },
+  { motion: "none", intensity: 1, accent: "grain", label: "grain sur plan FIXE" },
+  { motion: "zoom-in", intensity: 1, accent: "leak", label: "fuite de lumiere COMPOSEE avec un zoom" },
+  {
+    motion: "pan-right",
+    intensity: 1,
+    video: true,
+    label: "pan-right sur VIDEO (rognee a 0,5 s)",
+  },
   {
     motion: "pan-right",
     intensity: 1,
@@ -134,15 +255,35 @@ try {
   ]);
   const sourcePng = await readFile(sourceImage);
 
+  /*
+   * La meme image, encodee en video. Contenu constant: seule la geometrie du
+   * recadrage differencie deux instants, ce qui est exactement ce qu'on mesure.
+   * Plus longue que la fenetre utile, pour que le rognage ait un sens.
+   */
+  const sourceVideo = path.join(workDir, "source.mp4");
+  await runFfmpeg([
+    "-loop", "1", "-framerate", String(FPS), "-i", sourceImage,
+    "-t", String(VIDEO_TRIM_START + DURATION + 0.5),
+    "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", "-an",
+    sourceVideo,
+  ]);
+
   const page = await browser.newPage();
   await page.goto("about:blank");
   await page.addScriptTag({
     type: "module",
-    content: `${mediaModelSource}\nwindow.__vibecutMotion = applyImageMotionTransform;\n`,
+    /*
+     * LES TROIS FONCTIONS DE PRODUCTION, et pas seulement la transformation de
+     * cadrage. Depuis les accents d'image (halo, grain, flou anime), l'apercu
+     * n'est plus « une transformation puis un dessin » : il pose aussi un
+     * FILTRE avant le dessin et des CALQUES apres. Un banc d'essai qui n'en
+     * appellerait qu'une comparerait un apercu que personne ne voit.
+     */
+    content: `${mediaModelSource}\nwindow.__vibecutMotion = applyImageMotionTransform;\nwindow.__vibecutAccentDraw = drawImageAccent;\n`,
   });
   await page.waitForFunction(() => Boolean(window.__vibecutMotion));
   await page.evaluate(
-    async ([data, size]) => {
+    async ([data, size, duration]) => {
       window.__source = await new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
@@ -154,11 +295,14 @@ try {
       canvas.height = size;
       document.body.appendChild(canvas);
       window.__ctx = canvas.getContext("2d", { willReadFrequently: true });
+      window.__duration = duration;
     },
-    [`data:image/png;base64,${sourcePng.toString("base64")}`, SIZE],
+    [`data:image/png;base64,${sourcePng.toString("base64")}`, SIZE, DURATION],
   );
 
   const report = [];
+  const accentReport = [];
+  const grainReport = [];
   const exportedByCase = new Map();
 
   for (const testCase of CASES) {
@@ -166,7 +310,7 @@ try {
     const outputFile = path.join(workDir, `${key}.mp4`);
     const args = buildFfmpegArgs({
       manifest: makeManifest(testCase),
-      videoInputs: [{ clip: makeClip(testCase), file: sourceImage }],
+      videoInputs: [{ clip: makeClip(testCase), file: testCase.video ? sourceVideo : sourceImage }],
       audioInputs: [],
       outputFile,
       warnings: [],
@@ -177,12 +321,112 @@ try {
      * zoompan quelconque. On lit sa commande avant de la lancer.
      */
     const filterComplex = readFilterComplex(args);
-    assert.match(filterComplex, /zoompan=/, `${testCase.label}: aucun zoompan demande`);
+    /*
+     * UN ACCENT D'IMAGE NE DOIT PAS DEMANDER DE ZOOMPAN, et c'est une exigence
+     * et non une tolerance: sur un plan fixe, un recadrage a l'identique coute
+     * un reechantillonnage complet pour ne rien changer. On verifie donc son
+     * ABSENCE, et a la place la presence du filtre propre a l'accent.
+     */
+    const IMAGE_ACCENT_FILTER = {
+      leak: /geq=/,
+      grain: /noise=alls=/,
+      softness: /gblur=sigma=/,
+    };
+    const imageAccentPattern = IMAGE_ACCENT_FILTER[testCase.accent];
+    if (imageAccentPattern) {
+      assert.match(
+        filterComplex,
+        imageAccentPattern,
+        `${testCase.label}: le filtre de l'accent est absent de la commande`,
+      );
+      if (testCase.motion === "none") {
+        assert.doesNotMatch(
+          filterComplex,
+          /zoompan=/,
+          `${testCase.label}: un accent d'image sur un plan fixe ne doit pas construire de zoompan`,
+        );
+      }
+    } else {
+      assert.match(filterComplex, /zoompan=/, `${testCase.label}: aucun zoompan demande`);
+    }
+    /*
+     * LOT B3 - la courbe attendue depend du preset. `bounce` DEPASSE sa cible
+     * (back-out), les autres accostent (smoothstep). Exiger le smoothstep
+     * partout reviendrait a interdire le rebond; ne rien exiger du tout
+     * laisserait passer une interpolation lineaire, qui est exactement le defaut
+     * que cette assertion existe pour attraper depuis le lot L3.
+     */
+    if (testCase.accent && !imageAccentPattern) {
+      // L'accent doit etre DEMANDE, pas seulement tolere: sans ce controle, un
+      // renderer qui l'ignorerait rendrait un plan fixe et l'ecart passerait
+      // sous les seuils sur les images ou l'oscillation repasse par zero.
+      /*
+       * Les accents d'IMAGE sont exclus: leur oscillation n'est pas toujours
+       * dans une expression. `softness` la resout a l'avance, un palier a la
+       * fois - il n'y a donc aucun sinus a trouver dans sa commande, et
+       * l'exiger interdirait la seule ecriture qui marche. Leur presence est
+       * verifiee juste au-dessus, par le filtre qui leur est propre.
+       */
+      const wanted = testCase.accent === "pulse" ? /cos\(2\*PI\*/ : /sin\(2\*PI\*/;
+      assert.match(
+        filterComplex,
+        wanted,
+        `${testCase.label}: aucune oscillation dans l'expression: l'accent n'est pas rendu`,
+      );
+    }
+    if (testCase.motion === "none") {
+      // Pas de trajet: il n'y a pas de courbe a verifier, seulement l'accent.
+    } else {
+    if (testCase.motion === "appear") {
+      assert.match(
+        filterComplex,
+        /fade=t=in:start_frame=0:nb_frames=\d+/,
+        `${testCase.label}: aucun fondu d'entree demande: l'apparition serait rendue opaque`,
+      );
+    }
+    if (testCase.motion === "rotate") {
+      assert.match(
+        filterComplex,
+        /rotate=angle=/,
+        `${testCase.label}: aucune bascule demandee: le mouvement serait rendu fixe`,
+      );
+      // Le zoom de couverture doit etre applique, sinon coins noirs a l'export.
+      assert.match(
+        filterComplex,
+        /abs\(cos\(/,
+        `${testCase.label}: aucun zoom de couverture: la bascule laisserait des coins vides`,
+      );
+    }
+    const expectedCurve = testCase.motion === "bounce"
+      ? { pattern: /pow\(\(min\(on\/\d+,1\)\)-1,3\)/, label: "le depassement (back-out)" }
+      : { pattern: /\(3-2\*\(min\(on\//, label: "le smoothstep" };
     assert.match(
       filterComplex,
-      /\(3-2\*\(min\(on\//,
-      `${testCase.label}: la commande doit porter le smoothstep, pas une interpolation lineaire`,
+      expectedCurve.pattern,
+      `${testCase.label}: la commande doit porter ${expectedCurve.label}, pas une interpolation lineaire`,
     );
+    }
+    // Le bombement de l'orbite doit etre DEMANDE, pas seulement tolere.
+    if (testCase.motion === "orbit") {
+      assert.match(
+        filterComplex,
+        /sin\(PI\*/,
+        `${testCase.label}: aucun bombement dans l'expression: l'orbite serait rendue en ligne droite`,
+      );
+    }
+    /*
+     * LE DECROCHAGE doit etre DEMANDE. Sans ce controle, un `glitch` que le
+     * renderer aurait oublie de poser resterait invisible: ses deux cadrages
+     * etant identiques, la commande construirait quand meme un `zoompan` valide
+     * et le test ne verrait qu'un plan fixe des deux cotes.
+     */
+    if (testCase.motion === "glitch") {
+      assert.match(
+        filterComplex,
+        /mod\(floor\(/,
+        `${testCase.label}: aucun palier dans l'expression: le decrochage ne serait pas rendu du tout`,
+      );
+    }
     if (testCase.intensity < 1) {
       assert.ok(
         filterComplex.includes(`${testCase.intensity}*`),
@@ -191,10 +435,150 @@ try {
     }
 
     await runFfmpeg(args);
-    const exported = await extractFrames(outputFile);
+    const exported = await extractFrames(
+      outputFile,
+      testCase.accent ? ACCENT_FRAMES : (testCase.motion === "appear" ? FADE_FRAMES : SAMPLE_FRAMES),
+    );
     exportedByCase.set(key, exported);
 
-    for (const [index, frame] of SAMPLE_FRAMES.entries()) {
+    let frames = SAMPLE_FRAMES;
+    if (testCase.accent) frames = ACCENT_FRAMES;
+    else if (testCase.motion === "appear") frames = FADE_FRAMES;
+
+    /*
+     * L'ACCENT: ON COMPARE L'AMPLITUDE DU MOUVEMENT, pas seulement les images.
+     *
+     * Un accent ne deplace le cadre que de +-3,8 px sur 320. C'est SOUS le
+     * seuil de geometrie (12/255) qu'il faut tolerer pour le reechantillonnage:
+     * un renderer qui diviserait l'amplitude par deux resterait donc « en
+     * parite » image par image. Mesure du 2026-08-04: la sentinelle qui halve
+     * l'amplitude n'a effectivement pas ete vue.
+     *
+     * On mesure donc, de chaque cote, de COMBIEN l'image bouge entre ses
+     * propres echantillons - l'ecart maximal entre deux d'entre eux - et on
+     * compare ces deux amplitudes. Un accent absent, plus faible, plus fort ou
+     * a la mauvaise frequence les fait diverger, la ou la comparaison image par
+     * image reste aveugle.
+     */
+    /*
+     * LE GLITCH PASSE PAR LA MEME MESURE, et pour la meme raison. Ses deux
+     * cadrages etant identiques, TOUT ce qui bouge dans ce plan vient du
+     * decrochage: si le renderer le divisait par deux ou l'oubliait, la
+     * comparaison image par image resterait dans ses tolerances - un cadre fixe
+     * des deux cotes est parfaitement « en parite ». C'est l'AMPLITUDE entre les
+     * echantillons qui le dit, pas leur ressemblance.
+     */
+    /*
+     * LE GRAIN NE PASSE PAS PAR LA COMPARAISON D'IMAGES, et ce n'est pas une
+     * facilite : FFmpeg (`noise`) tire un nombre aleatoire par pixel et par
+     * image avec SON generateur. Aucun canvas ne reproduira cette suite, et
+     * comparer les pixels reviendrait a comparer deux tirages de des.
+     *
+     * Ce qui est prouvable, et ce qui compte pour l'utilisateur, c'est que les
+     * deux cotes ajoutent la MEME QUANTITE de grain. On mesure donc l'ECART-TYPE
+     * des pixels de chaque cote et on compare l'AUGMENTATION par rapport a la
+     * meme image sans grain. Une des deux ecritures qui oublierait le grain, le
+     * doublerait ou le diviserait par deux se verrait immediatement.
+     */
+    if (testCase.accent === "grain") {
+      const stddev = (buffer) => {
+        let sum = 0;
+        let sumSquares = 0;
+        for (let i = 0; i < buffer.length; i += 1) {
+          sum += buffer[i];
+          sumSquares += buffer[i] * buffer[i];
+        }
+        const mean = sum / buffer.length;
+        return Math.sqrt(Math.max(0, sumSquares / buffer.length - mean * mean));
+      };
+      const at = frames[0] / FPS / DURATION;
+      const plain = await renderPreview(page, { ...testCase, accent: null }, at, "ease-in-out");
+      const base = stddev(plain);
+      const exportGain = stddev(exported[0]) - base;
+      const previewGain = stddev(await renderPreview(page, testCase, at, "ease-in-out")) - base;
+      grainReport.push({
+        case: testCase.label,
+        grainExport: round3(exportGain),
+        grainApercu: round3(previewGain),
+      });
+      assert.ok(
+        reportOnly || exportGain > 1,
+        `${testCase.label}: l'export n'ajoute aucun grain (ecart-type +${exportGain.toFixed(2)}).`,
+      );
+      const grainRatio = exportGain / Math.max(0.001, previewGain);
+      assert.ok(
+        reportOnly || (grainRatio > 0.5 && grainRatio < 2),
+        `${testCase.label}: les deux cotes n'ajoutent pas la meme quantite de grain - `
+        + `export +${exportGain.toFixed(2)}, apercu +${previewGain.toFixed(2)} `
+        + `(rapport ${grainRatio.toFixed(2)}).`,
+      );
+    } else if (testCase.accent || testCase.motion === "glitch") {
+      const spread = (list) => {
+        let widest = 0;
+        for (let a = 0; a < list.length; a += 1) {
+          for (let b = a + 1; b < list.length; b += 1) {
+            widest = Math.max(widest, compare(list[a], list[b]).meanPixel);
+          }
+        }
+        return widest;
+      };
+      const previews = [];
+      for (const frame of frames) {
+        previews.push(await renderPreview(page, testCase, frame / FPS / DURATION, "ease-in-out"));
+      }
+      const exportSpread = spread(exported);
+      const previewSpread = spread(previews);
+      accentReport.push({
+        case: testCase.label,
+        amplitudeExport: round3(exportSpread),
+        amplitudeApercu: round3(previewSpread),
+      });
+
+      /*
+       * PLANCHER D'EXISTENCE par accent. Le halo est un effet DOUX : son
+       * amplitude vaut ~3 la ou une secousse en fait 12. Exiger 4 pour tout le
+       * monde reviendrait a refuser un effet correct parce qu'il est discret.
+       * Ce qui compte est qu'il BOUGE de facon mesurable, pas qu'il crie.
+       */
+      const FLOOR = { leak: 1, softness: 1.5 };
+      const floor = FLOOR[testCase.accent] ?? 4;
+      assert.ok(
+        reportOnly || exportSpread > floor,
+        `${testCase.label}: l'export ne bouge pas (amplitude ${exportSpread.toFixed(1)} <= ${floor}). `
+        + "L'accent n'est pas rendu du tout.",
+      );
+      const ratio = exportSpread / Math.max(0.001, previewSpread);
+      /*
+       * BANDE ELARGIE POUR LE FLOU ANIME, et c'est un ECART STRUCTUREL mesure,
+       * pas un seuil monte pour faire passer le test.
+       *
+       * Le sigma est le MEME des deux cotes (aucun facteur correctif n'a ete
+       * introduit) ; ce qui differe est le NOYAU. Chromium approxime la
+       * gaussienne du `blur()` CSS par une suite de flous de boite, et cette
+       * approximation s'ecarte le plus aux PETITS sigmas - or celui-ci culmine a
+       * 1,9 px sur le banc d'essai. C'est le meme ecart, deja documente et
+       * borne, que le noyau de `blur-cut` (probleme G de todo.md).
+       *
+       * Deux corrections ont ete faites AVANT d'elargir quoi que ce soit, et
+       * chacune a ete mesuree :
+       *   - bords rabattus comme FFmpeg (etirement du bord) : 0,59 -> 0,74 ;
+       *   - apercu quantifie sur les memes 24 paliers que l'export : sans effet
+       *     mesurable, ce qui a ecarte la quantification comme cause.
+       * Mesure du 2026-08-04 : rapport 0,74. La bande est posee a 0,65-1,45.
+       */
+      const BAND = testCase.accent === "softness"
+        ? { low: 0.65, high: 1.45 }
+        : { low: 0.75, high: 1.33 };
+      assert.ok(
+        reportOnly || (ratio > BAND.low && ratio < BAND.high),
+        `${testCase.label}: l'accent n'a pas la meme AMPLITUDE des deux cotes - `
+        + `export ${exportSpread.toFixed(1)}, apercu ${previewSpread.toFixed(1)} (rapport ${ratio.toFixed(2)}, `
+        + `bande ${BAND.low}-${BAND.high}). `
+        + "Amplitude, frequence ou intensite divergent entre le renderer et l'apercu.",
+      );
+    }
+
+    for (const [index, frame] of frames.entries()) {
       // Instant reel de l'image n dans la timeline: c'est ce que l'apercu
       // afficherait au meme moment de la lecture.
       const progress = frame / FPS / DURATION;
@@ -211,12 +595,21 @@ try {
         console.log(`${testCase.label.padEnd(26)} n=${String(frame).padStart(2)}  meanFrame=${measure.meanFrame.toFixed(1).padStart(5)}  meanPixel=${measure.meanPixel.toFixed(1).padStart(5)}`);
         continue;
       }
+      /*
+       * LE GRAIN EST EXCLU DE LA COMPARAISON PIXEL A PIXEL, et seulement de
+       * celle-la. Les deux cotes tirent des suites aleatoires DIFFERENTES : sur
+       * une image bruitee des deux cotes mais differemment, `meanPixel` mesure
+       * la difference de deux tirages, pas une erreur. `meanFrame` reste exige -
+       * il porte sur la couleur MOYENNE, que le grain ne doit pas deplacer, et
+       * c'est exactement ce qu'un grain mal centre casserait.
+       */
+      const skipPixel = testCase.accent === "grain";
       assert.ok(
         measure.meanFrame <= TOLERANCE.meanFrame,
         `${testCase.label} @ image ${frame}: cadrage global hors tolerance (${measure.meanFrame.toFixed(1)} > ${TOLERANCE.meanFrame})`,
       );
       assert.ok(
-        measure.meanPixel <= TOLERANCE.meanPixel,
+        skipPixel || measure.meanPixel <= TOLERANCE.meanPixel,
         `${testCase.label} @ image ${frame}: geometrie hors tolerance (${measure.meanPixel.toFixed(1)} > ${TOLERANCE.meanPixel})`,
       );
     }
@@ -262,7 +655,8 @@ try {
     .filter((entry) => typeof entry.meanPixel === "number")
     .sort((a, b) => b.meanPixel - a.meanPixel)
     .slice(0, 5);
-  console.log(JSON.stringify({ samples: report.length, worstPixelGaps: worst, sentinelRejectedAt: round3(sentinel.meanPixel) }, null, 2));
+  console.log(JSON.stringify({
+    accents: accentReport, grain: grainReport, samples: report.length, worstPixelGaps: worst, sentinelRejectedAt: round3(sentinel.meanPixel) }, null, 2));
   if (shotDir) console.log(`MP4 et images conserves dans ${workDir}`);
   console.log(`smoke-vibecut-motion-preview-parity: ok (${CASES.length} cas x ${SAMPLE_FRAMES.length} images)`);
 } finally {
@@ -287,9 +681,13 @@ function renderPreview(page, testCase, progress, easing) {
       ctx.beginPath();
       ctx.rect(0, 0, size, size);
       ctx.clip();
-      window.__vibecutMotion(ctx, { ...motion, easing: easingMode }, t, size, size);
+      // La DUREE est indispensable aux accents: leur frequence est en hertz.
+      const withEasing = { ...motion, easing: easingMode };
+      window.__vibecutMotion(ctx, withEasing, t, size, size, window.__duration);
       ctx.drawImage(window.__source, 0, 0, size, size);
       ctx.restore();
+      // Flou, halo et grain sont poses APRES le dessin, hors du recadrage.
+      window.__vibecutAccentDraw(ctx, withEasing, t, size, size, window.__duration);
       const data = ctx.getImageData(0, 0, size, size).data;
       const rgb = new Array((data.length / 4) * 3);
       for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
@@ -309,12 +707,18 @@ function motionOf(testCase) {
   const motion = { preset: testCase.motion, easing: "ease-in-out", intensity: testCase.intensity };
   if (testCase.start) motion.start = testCase.start;
   if (testCase.end) motion.end = testCase.end;
+  if (testCase.accent) {
+    motion.accent = testCase.accent;
+    motion.accentIntensity = testCase.accentIntensity ?? 1;
+  }
   return motion;
 }
 
 function caseKey(testCase) {
   const amplified = testCase.start || testCase.end ? "-amplifie" : "";
-  return `${testCase.motion}-${Math.round(testCase.intensity * 100)}${amplified}`;
+  const accent = testCase.accent ? `-${testCase.accent}${Math.round((testCase.accentIntensity ?? 1) * 100)}` : "";
+  const media = testCase.video ? "-video" : "";
+  return `${testCase.motion}-${Math.round(testCase.intensity * 100)}${amplified}${accent}${media}`;
 }
 
 function compare(expected, actual) {
@@ -334,8 +738,8 @@ function compare(expected, actual) {
   return { meanPixel: totalDiff / expected.length, meanFrame };
 }
 
-function extractFrames(file) {
-  const selects = SAMPLE_FRAMES.map((frame) => `eq(n\\,${frame})`).join("+");
+function extractFrames(file, wanted = SAMPLE_FRAMES) {
+  const selects = wanted.map((frame) => `eq(n\\,${frame})`).join("+");
   return runFfmpegRaw([
     "-i", file,
     "-vf", `select='${selects}'`,
@@ -344,10 +748,10 @@ function extractFrames(file) {
     const frameBytes = SIZE * SIZE * 3;
     assert.equal(
       buffer.length,
-      frameBytes * SAMPLE_FRAMES.length,
-      `${buffer.length / frameBytes} images extraites, ${SAMPLE_FRAMES.length} attendues`,
+      frameBytes * wanted.length,
+      `${buffer.length / frameBytes} images extraites, ${wanted.length} attendues`,
     );
-    return SAMPLE_FRAMES.map((_, index) => buffer.subarray(index * frameBytes, (index + 1) * frameBytes));
+    return wanted.map((_, index) => buffer.subarray(index * frameBytes, (index + 1) * frameBytes));
   });
 }
 
@@ -384,6 +788,22 @@ function makeManifest(testCase) {
 }
 
 function makeClip(testCase) {
+  if (testCase.video) {
+    return {
+      id: "clip-a",
+      name: "clip-a",
+      mediaType: "video",
+      sourceStoragePath: "sources/clip-a.mp4",
+      duration: VIDEO_TRIM_START + DURATION,
+      trimStart: VIDEO_TRIM_START,
+      trimEnd: VIDEO_TRIM_START + DURATION,
+      speed: 1,
+      volume: 0,
+      fitMode: "cover",
+      filters: {},
+      motion: motionOf(testCase),
+    };
+  }
   return {
     id: "photo-a",
     name: "photo-a",

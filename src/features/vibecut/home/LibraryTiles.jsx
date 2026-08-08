@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import {
     ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Blend, ChevronsUp, Columns2, Grid2x2,
-    Layers, Moon, MoveHorizontal, RefreshCw, RotateCw, Shuffle, Square, Sun, Waves,
+    Moon, MoveHorizontal, RefreshCw, RotateCw, Shuffle, Square, Sun, Waves,
     Zap, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import styles from './home.module.css';
@@ -20,7 +20,6 @@ const MOTION_GLYPHS = {
     'drift-up': ArrowUp,
     'drift-down': ArrowDown,
     orbit: RotateCw,
-    parallax: Layers,
     rotate: RefreshCw,
     appear: Blend,
     bounce: ChevronsUp,

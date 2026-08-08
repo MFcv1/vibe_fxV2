@@ -42,7 +42,7 @@
  * savent faire.
  *   - mouvements: sous-ensemble de SERVER_RENDER_CAPABILITIES.imageMotions
  *   - transitions: sous-ensemble de SERVER_RENDER_CAPABILITIES.timedTransitions,
- *     les 15 transitions livrees au lot L1 et rendues a l'identique par
+ *     les transitions minutees (15 au lot L1, 33 depuis B3a) rendues a l'identique par
  *     `engine/xfadeTransitions.js`. Les 27 transitions « maison » du moteur
  *     (glitch, rgb-split, light-leak, intros/outros) n'ont pas d'equivalent
  *     exportable et ne sont JAMAIS employees par un preset guide.

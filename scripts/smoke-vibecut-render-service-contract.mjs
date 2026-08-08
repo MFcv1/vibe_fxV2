@@ -76,14 +76,16 @@ assert.match(readme, /EXPORT_RENDERER_VERIFY_MODE=platform-iam/, "render service
 assert.match(readme, /anti-replay/, "render service README must document the signature anti-replay window");
 /*
  * Cette assertion figeait « adjacent fade/crossfade transitions », la description
- * d'AVANT le lot L1 (2026-07-30) - le renderer rend desormais les 15 transitions
+ * d'AVANT le lot L1 (2026-07-30) - le renderer rend desormais les transitions
  * minutees, pas seulement le fondu. Elle verifie donc maintenant les deux faits
  * qui font vraiment le contrat:
  *   1. l'ADJACENCE reste la contrainte (une transition non adjacente est rejetee);
- *   2. les 15 transitions du lot L1 sont bien annoncees comme rendues.
+ *   2. les transitions minutees sont bien annoncees comme rendues, AU BON NOMBRE
+ *      - 15 au lot L1, 33 depuis le lot B3a (2026-08-02).
  */
 assert.match(readme, /ADJACENT transitions are rendered/, "render service README must document the adjacency constraint");
-assert.match(readme, /15 timed transitions/, "render service README must document the 15 timed transitions delivered by lot L1");
+assert.match(readme, /all 48 timed transitions/, "render service README must document that the whole catalogue is rendered since lot B3b");
+assert.match(readme, /do not use `sendcmd`/, "render service README must carry the sendcmd broadcast warning: without it the trap is reintroduced silently");
 
 /*
  * Le point de controle du lot L6 et la raison pour laquelle sa reponse ne porte

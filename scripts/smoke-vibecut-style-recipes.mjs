@@ -137,7 +137,9 @@ try {
     .matchAll(/'([^']+)'/g)].map((match) => match[1]);
   assert.ok(quickIds.length >= 4, "raccourcis de transition introuvables dans SceneInspector");
   for (const id of quickIds) {
-    const entry = new RegExp(`\\{ id: '${id}', engineId: '([^']+)'`).exec(catalogSource);
+    // Tolerant aux champs intercales (`peak` est arrive au lot B1): on cherche
+    // l'`engineId` DE CETTE ENTREE, pas une position dans la ligne.
+    const entry = new RegExp(`\\{ id: '${id}',[^}]*?engineId: '([^']+)'`).exec(catalogSource);
     assert.ok(entry, `raccourci ${id} absent du catalogue de transitions`);
     assert.ok(
       serverTimedTransitions.includes(entry[1]),

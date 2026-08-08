@@ -582,6 +582,42 @@ for (const file of [
 
 assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-library-parity\.mjs/);
 assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-library-v2\.spec\.cjs/);
+/*
+ * Lot B1: le gate du hover scrub, du point culminant, du bypass et des favoris.
+ * Il mesure les PIXELS des apercus; le laisser sortir de la suite reviendrait a
+ * ne plus verifier que l'ecran BOUGE - le defaut exact de l'audit de la phase 4.
+ */
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-library-b1\.spec\.cjs/);
+
+/*
+ * Lot B3b: les deux gardes qu'une transition isolee ne peut pas assurer.
+ *
+ *  - `smoke-vibecut-transition-chain-mp4` rend TROIS plans enchaines. C'est lui,
+ *    et lui seul, qui a attrape la diffusion des commandes `sendcmd` a tous les
+ *    filtres du graphe (la deuxieme coupe rendait un fondu simple) et le bloc
+ *    revele avant le debut de la revelation par blocs.
+ *  - `smoke-vibecut-transition-cost` plafonne le temps de rendu a 1,2 s pour une
+ *    transition de 0,6 s en 1080p. Ce plafond est ce qui empeche de retomber par
+ *    glissement dans la voie `xfade=transition=custom:expr=`, ecartee apres
+ *    mesure (8,6 s contre 0,2 s en natif).
+ *
+ * Les faire sortir de la suite reviendrait a rouvrir les deux portes d'un coup.
+ */
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-transition-chain-mp4\.mjs/);
+assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-transition-cost\.mjs/);
+/*
+ * Les sentinelles rejouent volontairement cinq defauts sur le code de production
+ * et verifient que les tests ECHOUENT. Elles restent hors de la suite courante -
+ * sept rendus complets - mais leur script doit exister et rester appelable.
+ */
+assert.ok(
+  packageJson.scripts["test:vibecut-transition-sentinels"],
+  "le script des sentinelles doit rester appelable: sans lui, plus rien ne prouve que les tests de parite attrapent quoi que ce soit",
+);
+assert.ok(
+  existsSync(join(root, "scripts", "smoke-vibecut-transition-sentinels.mjs")),
+  "scripts/smoke-vibecut-transition-sentinels.mjs doit exister",
+);
 
 /* ---------- Lots L4 et L5 ---------- */
 

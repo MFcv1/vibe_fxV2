@@ -196,9 +196,9 @@ export default function StepRhythm({
                 </div>
 
                 <p className={styles.note}>
-                    Ces six mouvements et leur intensité sont rendus à l’identique dans l’aperçu
-                    et dans l’export serveur. Les mouvements sur vidéo (orbite, parallaxe,
-                    rotation) arrivent plus tard : « Bientôt ».
+                    Ces mouvements et leur intensité sont rendus à l’identique dans l’aperçu
+                    et dans l’export serveur, sur les photos comme sur les vidéos. La rotation
+                    et l’apparition arrivent plus tard : « Bientôt ».
                 </p>
             </section>
         </>

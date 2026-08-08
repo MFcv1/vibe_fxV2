@@ -1255,3 +1255,17 @@
     border: 1px solid var(--vc-line);
     background: var(--vc-surface-2);
 }
+
+/*
+ * Rangee des effets pendant le plan (2026-08-04). Separee de la grille des
+ * mouvements par un filet: un accent se compose avec un mouvement, il n'est pas
+ * un mouvement de plus - et l'oeil doit le lire ainsi sans avoir a le deviner.
+ */
+.accentRow {
+    margin-top: var(--vc-space-4, 16px);
+    padding-top: var(--vc-space-4, 16px);
+    border-top: 1px solid var(--vc-line, rgba(255, 255, 255, 0.08));
+    display: flex;
+    flex-direction: column;
+    gap: var(--vc-space-2, 8px);
+}
