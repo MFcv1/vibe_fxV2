@@ -634,9 +634,14 @@
 }
 
 /* ---------- Toast ---------- */
+/*
+ * `--vo-toast-offset` permet a un ecran qui possede une barre basse (le lecteur
+ * de Soundtrack) de remonter les toasts au-dessus, au lieu de les faire tomber
+ * pile sur les commandes de lecture.
+ */
 .toastViewport {
     position: fixed;
-    bottom: calc(var(--vo-space-6) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--vo-toast-offset, 0px) + var(--vo-space-6) + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 80;

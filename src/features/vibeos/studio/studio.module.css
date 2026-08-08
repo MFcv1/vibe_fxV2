@@ -1,0 +1,439 @@
+/* Ecran Studio VibeOS - photo a gauche, ambiances a droite.
+   Meme squelette responsive que Layout et Vision (plan §5): la page ne scrolle
+   jamais sur desktop, seul le panneau droit scrolle. */
+
+.screen {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* ---------- Apercu ---------- */
+.stage {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: var(--vo-space-6);
+    background: var(--vo-bg-sunken);
+    overflow: hidden;
+}
+
+.canvasWrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.canvas,
+.compareImage {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: var(--vo-radius-sm);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.canvasCropping {
+    cursor: grab;
+    touch-action: none;
+}
+
+.canvasHidden {
+    display: none;
+}
+
+.stageActions {
+    position: absolute;
+    top: var(--vo-space-4);
+    right: var(--vo-space-4);
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--vo-space-2);
+}
+
+.emptyStage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-4);
+    max-width: 380px;
+    text-align: center;
+}
+
+.emptyStageTitle {
+    font-size: var(--vo-text-lg);
+}
+
+.emptyStageBody {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Panneau ---------- */
+.panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-6);
+    width: 380px;
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vo-space-5);
+    border-left: 1px solid var(--vo-line);
+    background: var(--vo-bg);
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+}
+
+.blockHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.blockTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+.blockHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    line-height: 1.5;
+}
+
+.message {
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-accent-quiet);
+    border: 1px solid var(--vo-accent-line);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+    line-height: 1.5;
+}
+
+.hiddenInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ---------- Ambiances ---------- */
+.ambianceGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vo-space-3);
+}
+
+.ambianceCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    text-align: left;
+    transition: border-color var(--vo-dur-2) var(--vo-ease),
+        transform var(--vo-dur-2) var(--vo-ease-out),
+        box-shadow var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.ambianceCard:hover {
+    border-color: var(--vo-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.ambianceCard:active {
+    transform: translateY(0) scale(0.99);
+}
+
+.ambianceCardActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+}
+
+.ambianceThumb {
+    display: block;
+    aspect-ratio: 96 / 58;
+    border-radius: var(--vo-radius-sm);
+    overflow: hidden;
+    background: var(--vo-bg-sunken);
+}
+
+.ambianceThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ambianceThumbEmpty {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(120deg, var(--vo-surface-2), var(--vo-surface-3));
+}
+
+.ambianceLabel {
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+    color: var(--vo-text);
+}
+
+.ambianceHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+}
+
+.ambianceBadge {
+    position: absolute;
+    top: calc(var(--vo-space-2) + 4px);
+    right: calc(var(--vo-space-2) + 4px);
+    padding: 1px 6px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ambianceBadgeCustom {
+    background: var(--vo-surface-3);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Variantes ---------- */
+.variantRow {
+    display: flex;
+    gap: var(--vo-space-2);
+    overflow-x: auto;
+    padding-bottom: var(--vo-space-1);
+}
+
+.variantCard {
+    flex: 0 0 auto;
+    width: 86px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    text-align: left;
+    transition: border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.variantCard:hover {
+    border-color: var(--vo-line-strong);
+}
+
+.variantThumb {
+    display: block;
+    aspect-ratio: 96 / 58;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--vo-bg-sunken);
+}
+
+.variantThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.variantLabel {
+    font-size: 11px;
+    color: var(--vo-text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------- Fond genere ---------- */
+.generatedChoices {
+    display: flex;
+    gap: var(--vo-space-2);
+}
+
+.meshCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+}
+
+.meshSwatch {
+    width: 100%;
+    height: 64px;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    filter: saturate(1.15) blur(0.5px);
+}
+
+.matchRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+}
+
+.matchSwatches {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.matchSwatches span {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Divers panneau ---------- */
+.rowSplit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.rowLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.textInput {
+    width: 100%;
+    height: 36px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+}
+
+.textInput:focus {
+    outline: none;
+    border-color: var(--vo-accent-line);
+}
+
+.colorInput {
+    width: 40px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    cursor: pointer;
+}
+
+.styleList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.styleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.saveStyleRow {
+    display: flex;
+    gap: var(--vo-space-2);
+    align-items: center;
+}
+
+/* ---------- Export ---------- */
+.exportRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.exportEstimate {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+    .screen {
+        flex-direction: column;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    .stage {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        flex: 0 0 auto;
+        height: 46dvh;
+        min-height: 240px;
+        padding: var(--vo-space-4);
+        border-bottom: 1px solid var(--vo-line);
+    }
+
+    .panel {
+        width: 100%;
+        border-left: 0;
+        flex: 1 1 auto;
+        overflow-y: visible;
+    }
+}

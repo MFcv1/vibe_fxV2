@@ -14,9 +14,9 @@ import {
 import useLayoutEditor from './useLayoutEditor';
 import TemplateSheet from './TemplateSheet';
 import TemplatePreviewSvg from './TemplatePreviewSvg';
-import MeshSheet from './MeshSheet';
-import LumenSheet from './LumenSheet';
-import SmoothBlurSheet from './SmoothBlurSheet';
+import MeshSheet from '../shared/MeshSheet';
+import LumenSheet from '../shared/LumenSheet';
+import SmoothBlurSheet from '../shared/SmoothBlurSheet';
 import ZoneOverlay from './ZoneOverlay';
 import InstaPreviewSheet from './InstaPreviewSheet';
 import styles from './layout.module.css';

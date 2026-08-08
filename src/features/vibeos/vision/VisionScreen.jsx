@@ -7,6 +7,7 @@ import {
 import {
     Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider,
 } from '../primitives';
+import PipelineSourceNote from '../project/PipelineSourceNote';
 import useVisionEditor from './useVisionEditor';
 import { describeSignals } from './autoEnhance';
 import { VISION_BRAND_LIBRARY } from './visionLooks';
@@ -56,7 +57,7 @@ const ADVANCED_GROUPS = [
 export default function VisionScreen() {
     const editor = useVisionEditor();
     const {
-        image, metrics, signals,
+        image, metrics, signals, sourceKind,
         filters, setFilters,
         intensity, setIntensity,
         looks, previews, activeLookId,
@@ -156,6 +157,11 @@ export default function VisionScreen() {
                 />
 
                 <section className={styles.block}>
+                    <PipelineSourceNote
+                        kind={sourceKind}
+                        stage="vision"
+                        testId="vibeos-vision-source"
+                    />
                     <Button
                         variant="primary"
                         size="lg"

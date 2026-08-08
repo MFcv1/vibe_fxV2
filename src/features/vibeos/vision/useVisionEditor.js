@@ -12,6 +12,7 @@ import {
     scoreProfileForImage,
 } from '../../vibefx-studio/utils/visionRecommendation';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
+import { resolveProjectSource } from '../project/pipeline';
 import { srcToBlob } from '../layout/layoutPersistence';
 import { VISION_LOOKS } from './visionLooks';
 import { buildAutoEnhancement, guardLookForImage } from './autoEnhance';
@@ -54,26 +55,14 @@ function measureSourceImage(image) {
     }
 }
 
-function loadImageFromBlob(blob, name) {
-    return new Promise((resolve) => {
-        if (!blob) {
-            resolve(null);
-            return;
-        }
-        const img = new window.Image();
-        img.onload = () => {
-            img.name = name || '';
-            resolve(img);
-        };
-        img.onerror = () => resolve(null);
-        img.src = URL.createObjectURL(blob);
-    });
-}
-
 export default function useVisionEditor() {
     const { project, status, updateProject, ensureProject } = useVibeOsProject();
 
     const [image, setImage] = useState(null);
+    /* D'ou vient l'image de travail: 'composition' (le visuel compose dans Mise
+       en page - premier etage du pipeline), 'photo' (la photo du projet) ou
+       'import' (une photo deposee ici meme). */
+    const [sourceKind, setSourceKind] = useState(null);
     const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
     const [intensity, setIntensity] = useState(80);
     const [activeLookId, setActiveLookId] = useState(null);
@@ -136,9 +125,13 @@ export default function useVisionEditor() {
         Promise.resolve().then(async () => {
             setIsLoadingImage(true);
             try {
-                const record = (project.images || [])[0];
-                const loaded = record?.blob ? await loadImageFromBlob(record.blob, record.name) : null;
-                if (loaded) setImage(loaded);
+                /* Entree du pipeline: la composition du Layout si elle existe,
+                   sinon la photo du projet (plan §4.3). */
+                const { image: loaded, kind } = await resolveProjectSource(project);
+                if (loaded) {
+                    setImage(loaded);
+                    setSourceKind(kind);
+                }
                 const storedVision = project.vision || {};
                 if (storedVision.filters) setFilters(storedVision.filters);
                 if (typeof storedVision.intensity === 'number') setIntensity(storedVision.intensity);
@@ -159,6 +152,7 @@ export default function useVisionEditor() {
         img.onload = () => {
             img.name = file.name;
             setImage(img);
+            setSourceKind('import');
             setIsLoadingImage(false);
         };
         img.onerror = () => setIsLoadingImage(false);
@@ -308,8 +302,10 @@ export default function useVisionEditor() {
                     vision: { profileId: activeLookId, intensity, filters },
                 };
                 /* Photo importee directement depuis Vision: elle rejoint le
-                   projet (Blob), pour que Layout et l'accueil la retrouvent. */
-                if (!(project.images || []).length) {
+                   projet (Blob), pour que Layout et l'accueil la retrouvent.
+                   Une composition, elle, appartient au Layout: on ne la
+                   reinjecte jamais comme photo source. */
+                if (sourceKind === 'import' && !(project.images || []).length) {
                     const blob = await srcToBlob(image.src, blobCacheRef.current);
                     if (blob) {
                         patch.images = [{ id: `vision-${Date.now()}`, name: image.name || '', slotId: null, blob }];
@@ -327,7 +323,7 @@ export default function useVisionEditor() {
     }, [filters, intensity, activeLookId, image]);
 
     return {
-        image, images, metrics, signals,
+        image, images, metrics, signals, sourceKind,
         filters, appliedFilters, setFilters: updateFilter,
         intensity, setIntensity,
         looks, previews, activeLookId,

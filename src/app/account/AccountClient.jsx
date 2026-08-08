@@ -407,7 +407,7 @@ export default function AccountClient({ initialView = "overview" }) {
           <span className="vf-brand-mark" aria-hidden="true" />
           Vibe_fx
         </Link>
-        <Link href="/studio" className="vf-account-topbar__cta">Studio</Link>
+        <Link href="/creer" className="vf-account-topbar__cta">Studio</Link>
       </nav>
 
       <div className="vf-account-layout">

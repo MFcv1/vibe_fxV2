@@ -19,7 +19,7 @@ export default function HomeNav() {
       </div>
       <div className="vf-nav-actions">
         <AuthButton />
-        <Link href="/studio?workspace=layout" className="vf-nav-cta">
+        <Link href="/creer/layout-visuel" className="vf-nav-cta">
           Launch app
         </Link>
       </div>

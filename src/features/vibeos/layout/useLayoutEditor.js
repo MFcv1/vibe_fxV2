@@ -12,6 +12,7 @@ import {
     createCustomZone, normalizeCustomZones, updateCustomTemplateZones,
 } from '../../vibefx-studio/utils/customLayout';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
+import { canvasToBlob } from '../project/pipeline';
 import { hasStoredComposition, restoreComposition, snapshotComposition } from './layoutPersistence';
 
 /*
@@ -680,15 +681,32 @@ export default function useLayoutEditor() {
 
                 const { width, height } = getCanvasDimensions();
                 if (width && height) {
-                    const thumbCanvas = document.createElement('canvas');
-                    thumbCanvas.width = THUMBNAIL_WIDTH;
-                    thumbCanvas.height = Math.max(1, Math.round((THUMBNAIL_WIDTH * height) / width));
+                    /* Un seul rendu pleine resolution sert deux usages: la
+                       vignette de l'accueil ET la composition publiee dans le
+                       projet - premier etage du pipeline (plan §4.3), que
+                       Vision et Studio prennent en entree. */
                     const fullCanvas = document.createElement('canvas');
                     fullCanvas.width = width;
                     fullCanvas.height = height;
-                    renderPipeline(fullCanvas, width, height, false, 'low');
+                    renderPipeline(fullCanvas, width, height, false, 'high');
+
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = THUMBNAIL_WIDTH;
+                    thumbCanvas.height = Math.max(1, Math.round((THUMBNAIL_WIDTH * height) / width));
                     thumbCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
                     patch.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
+
+                    /* PNG: la composition traverse le reste du pipeline sans
+                       perte de qualite (plan §7, parite d'export). */
+                    const compositionBlob = await canvasToBlob(fullCanvas, 'image/png');
+                    if (compositionBlob) {
+                        patch.composition = {
+                            blob: compositionBlob,
+                            width,
+                            height,
+                            updatedAt: Date.now(),
+                        };
+                    }
                 }
                 updateProject(patch);
             } catch {

@@ -6,7 +6,9 @@ export default function robots() {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/studio", "/account", "/api", "/admin", "/backoffice"],
+        /* Surfaces app privees: /creer (VibeOS) et /publier ont remplace /studio,
+           qui reste liste tant que des liens externes y mènent. */
+        disallow: ["/creer", "/publier", "/studio", "/account", "/api", "/admin", "/backoffice"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

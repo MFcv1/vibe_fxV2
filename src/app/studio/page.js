@@ -1,40 +1,37 @@
 import { redirect } from "next/navigation";
-import StudioClient from "./StudioClient";
 
 export const metadata = {
   title: "Studio",
-  description: "Studio Vibe_fx V2 pour composer une image, preparer une publication et lancer la publication reseaux.",
   robots: {
     index: false,
     follow: false,
   },
 };
 
+/*
+ * PHASE F (2026-08-08) - bascule vers VibeOS.
+ *
+ * L'interface de creation vit desormais sur `/creer/*` (plan §4.4). `/studio`
+ * ne rend plus rien: il redirige cote SERVEUR, en conservant l'espace demande
+ * par l'ancien parametre `?workspace=`. Les liens, favoris et pages publiques
+ * qui pointent encore vers `/studio` continuent donc de tomber au bon endroit.
+ *
+ * La publication, elle, a sa propre route: `/publier`.
+ */
+const WORKSPACE_ROUTES = {
+  layout: "/creer/layout-visuel",
+  studio: "/creer/studio",
+  "vision-pro": "/creer/vision",
+  soundtrack: "/creer/son",
+  /* L'onglet « library » de l'ancien studio n'a pas d'equivalent: la
+     bibliotheque musicale est dans Soundtrack. */
+  library: "/creer/son",
+  /* Phase 7: la surface video a ses propres routes. */
+  video: "/video",
+};
+
 export default async function StudioPage({ searchParams }) {
   const params = await searchParams;
   const requestedWorkspace = typeof params?.workspace === "string" ? params.workspace : "";
-
-  /*
-   * PHASE 7 (2026-08-01) - bascule vers le nouveau front VibeCut.
-   *
-   * `?workspace=video` ouvrait l'ancien editeur video, monte dans le shell du
-   * studio. Cet editeur est supprime: la surface video vit desormais sur ses
-   * propres routes, sous `/video`.
-   *
-   * La redirection est cote SERVEUR et permanente: les liens et favoris
-   * existants continuent de fonctionner, et l'ancienne adresse ne rend jamais
-   * une page vide le temps qu'un composant client decide de naviguer.
-   */
-  if (requestedWorkspace === "video") {
-    redirect("/video");
-  }
-
-  const studioWorkspaces = new Set(["studio", "layout", "library", "soundtrack", "vision-pro"]);
-  const initialWorkspace = studioWorkspaces.has(requestedWorkspace) ? requestedWorkspace : "layout";
-  return (
-    <StudioClient
-      initialMode="layout"
-      initialWorkspace={initialWorkspace}
-    />
-  );
+  redirect(WORKSPACE_ROUTES[requestedWorkspace] || "/creer");
 }

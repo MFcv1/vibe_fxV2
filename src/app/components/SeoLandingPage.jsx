@@ -20,7 +20,7 @@ export function SeoLandingPage({ page }) {
           <Link href="/pricing" className="vf-nav-cta">
             Tarification
           </Link>
-          <Link href="/studio" className="vf-nav-cta">
+          <Link href="/creer" className="vf-nav-cta">
             Launch app
           </Link>
         </div>
@@ -31,7 +31,7 @@ export function SeoLandingPage({ page }) {
           <h1 id="seo-page-title">{page.h1}</h1>
           <p>{page.intro}</p>
           <div className="vf-actions" aria-label="Actions principales">
-            <Link href="/studio" className="vf-primary">
+            <Link href="/creer" className="vf-primary">
               Ouvrir le studio
             </Link>
             <Link href="/outil-publication-reseaux-sociaux" className="vf-nav-cta">

@@ -1,0 +1,35 @@
+/* Bandeau « d'ou vient l'image » — partage par Vision et Studio. */
+
+.note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    line-height: 1.5;
+}
+
+.note svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--vo-text-3);
+}
+
+.note span svg {
+    margin-top: 0;
+    vertical-align: -1px;
+}
+
+.link {
+    color: var(--vo-accent);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.link:hover {
+    text-decoration: underline;
+}

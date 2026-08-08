@@ -23,8 +23,8 @@ const makeMockUser = () => ({
 // URL vers laquelle Firebase redirige après verification mail
 const getActionCodeSettings = () => ({
   url: typeof window !== "undefined"
-    ? `${window.location.origin}/studio?workspace=layout`
-    : "https://vibefx-v2-web--vibefx-v2.europe-west4.hosted.app/studio?workspace=layout",
+    ? `${window.location.origin}/creer/layout-visuel`
+    : "https://vibefx-v2-web--vibefx-v2.europe-west4.hosted.app/creer/layout-visuel",
   handleCodeInApp: false,
 });
 

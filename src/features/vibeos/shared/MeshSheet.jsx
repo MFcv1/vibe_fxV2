@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Shuffle, Check, Trash2 } from 'lucide-react';
 import { Button, Sheet } from '../primitives';
-import styles from './layout.module.css';
+import styles from './generators.module.css';
 
 /*
  * Fond Mesh gradient. Le rendu FINAL est fait par le moteur canvas existant
@@ -20,7 +20,8 @@ const PRESET_PALETTES = [
     { name: 'Menthe fraîche', colors: ['#3ecf8e', '#7ce7c4', '#1c7a56', '#0b0f0d'] },
 ];
 
-function meshPreviewStyle(colors) {
+/* Exporte: l'ecran Studio affiche le meme apercu CSS du fond assorti. */
+export function meshPreviewStyle(colors) {
     return {
         background: `radial-gradient(65% 80% at 22% 25%, ${colors[1]} 0%, transparent 70%),`
             + `radial-gradient(60% 75% at 80% 30%, ${colors[2]} 0%, transparent 70%),`

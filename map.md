@@ -192,7 +192,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
 |   |   |   |-- studio/page.js          # Espace Studio — placeholder jusqu'a la phase D
 |   |   |   |-- vision/page.js          # Espace Vision — placeholder jusqu'a la phase C
-|   |   |   `-- son/page.js             # Espace Soundtrack — placeholder jusqu'a la phase E
+|   |   |   `-- son/page.js             # Espace Soundtrack : monte `features/vibeos/soundtrack/SoundtrackScreen`
 |   |   |-- studio/
 |   |   |   |-- layout.js               # CSS lourds du studio scopes a /studio, incluant le rail IA
 |   |   |   |-- page.js                 # Page studio noindex + deep-link `?workspace=layout`
@@ -287,7 +287,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- components/               # ProjectLibraryPanel popup avec import fichier, suppression/playlists/classement local/projet, AiMusicImportAssistant en pleine page Soundtrack, Search provider-specifique conserve pour composants legacy, results/rows/player et SoundtrackHeaderMiniPlayer global
 |   |   |   |-- data/                     # Providers/filtres/defaults Soundtrack reutilisant musicCatalog
 |   |   |   |-- hooks/                    # Recherche API, player preview, controller global Soundtrack, bibliotheque projet Firebase et bibliotheque locale IndexedDB/dossier
-|   |   |   |-- services/                 # Modele/client Firestore/Storage projet (tracks + playlists), cache/search provider, IndexedDB, manifest, File System Access, import dev public/music/local-imports, downloads locaux et audit droits
+|   |   |   |-- services/                 # Modele/client Firestore/Storage projet (tracks + playlists), cache/search provider, IndexedDB, manifest, File System Access, import dev public/music/local-imports, downloads locaux, audit droits, et `soundtrackImportFlows.js` (flux d'import Aitra/Pixabay/URL/fichier extraits des assistants, partages entre l'ancien /studio et l'ecran Soundtrack VibeOS)
 |   |   |   |-- SoundtrackPage.jsx        # Experience full page Soundtrack dans le studio, sans canvas/sidebar, import IA gratuit par defaut sans pistes starter injectees, consomme le controller audio global
 |   |   |   `-- soundtrack.css          # CSS dark-ui/technical-ui scope Soundtrack charge par /studio/layout, incluant le player bas et le mini-player header
 |   |   |-- utils/                      # Utilitaires canvas/image + color science Vision (`visionColorScience.js`, `visionMetrics.js`, `visionRecommendation.js` — signaux image, scoring profil<->photo et rendu des vignettes, partages entre l'ancien VisionPanel et l'ecran Vision VibeOS)
@@ -374,7 +374,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |       `-- vibecut.css             # Tokens + base du design system, scopes `.vibecut` (sombre, theme clair pret)
 |   |-- vibeos/                          # Nouveau front VibeOS (redesign Studio/Layout/Soundtrack/Vision, plan docs/plan-vibeos-redesign-2026-08-08.md). CSS Modules uniquement, zero Tailwind, zero import de l'ancienne UI
 |   |   |-- audio/
-|   |   |   `-- AudioProvider.jsx       # Audio global : l'element <audio> vit dans le layout /creer et survit aux navigations (mini-lecteur du header)
+|   |   |   `-- AudioProvider.jsx       # Audio global ET moteur de lecture de VibeOS (phase E) : l'element <audio> vit dans le layout /creer et survit aux navigations, plus la file, l'aleatoire, le volume, l'enchainement automatique en fin de piste et un resolveur de source qui redemande le Blob et fabrique sa PROPRE URL d'objet (celles de useLocalSoundtrackLibrary sont revoquees au demontage)
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
@@ -386,9 +386,6 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- InstaPreviewSheet.jsx   # Apercu Instagram du visuel exporte : post, story, carrousel panorama (maquette CSS Modules, aucune donnee reelle)
 |   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
 |   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
-|   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS ; rendu final par renderLayoutMeshBackground (moteur existant)
-|   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
-|   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
 |   |   |   `-- layout.module.css
 |   |   |-- primitives/
 |   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
@@ -400,8 +397,26 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- shell/
 |   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier vers /studio jusqu'a la phase F) + tab bar basse mobile safe-area
 |   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
-|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (phases D et E)
+|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (plus monte par aucune route /creer depuis la phase E ; conserve pour la phase F)
 |   |   |   `-- shell.module.css
+|   |   |-- shared/                     # Sheets de fonds generes partages entre Layout et Studio (sortis de layout/ a la phase D)
+|   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS (meshPreviewStyle exporte) ; rendu final par renderLayoutMeshBackground (moteur existant)
+|   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
+|   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
+|   |   |   `-- generators.module.css
+|   |   |-- soundtrack/                 # Ecran Soundtrack reel (phase E) - hooks, services et APIs musique existants importes, jamais reecrits
+|   |   |   |-- useVibeOsSoundtrack.js  # Assemblage : useLocalSoundtrackLibrary + useProjectSoundLibrary + useSoundtrackSearch (intacts) branches sur le provider audio global ; index des pistes, file de lecture, resolveur de source (Blob local prioritaire), « + bibliotheque » et « Utiliser dans VibeCut » (store video partage puis /video)
+|   |   |   |-- SoundtrackScreen.jsx    # Colonne gauche 260px (Rechercher/Accueil, Bibliotheque projet/locale/imports recents, 4 Sources) ou tab bar interne + bouton « + » sur mobile ; vues Accueil (rangees de cartes), Recherche et bibliotheque/playlist
+|   |   |   |-- TrackList.jsx           # Pochettes generees (teinte deterministe par piste), mosaique d'en-tete, lignes de piste (badge de licence traduit en francais, duree [data-numeric], actions au survol, egaliseur sur la piste en cours) et cartes de rangee
+|   |   |   |-- PlayerBar.jsx           # Lecteur fixe 72px desktop (pochette, transport, progression, volume, « Utiliser dans VibeCut ») et mini-barre mobile ouvrant le lecteur plein ecran
+|   |   |   |-- ImportSheet.jsx         # Les 4 sources en Sheet : Import IA (Aitra Free / Pixabay par theme), Pixabay (fichier telecharge + licence pre-remplie), Fichier local (fichiers ou dossier), URL directe - toute la mecanique vient de services/soundtrackImportFlows.js
+|   |   |   `-- soundtrack.module.css
+|   |   |-- studio/                     # Ecran Studio reel (phase D) - moteur de rendu renderStudio importe, jamais reecrit
+|   |   |   |-- ambianceCatalog.js      # Les 10 ambiances « en un clic » : 6 curees depuis PRESET_CATEGORIES (Portra, Gold, Superia, CineStill, Tri-X, Blade Runner) + 4 combinaisons nouvelles (Polaroid delave, VHS chaud, Eclat doux, Brume matin). Meme format que PRESET_CATEGORIES.profiles + famille/force (tri) et palette mesh assortie
+|   |   |   |-- customStyles.js         # Styles perso en localStorage `vibeos.studio.customStyles` (sans vignette : elle se re-rend sur la photo)
+|   |   |   |-- useStudioEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue studio), recadrage (useCanvasEvents), export, mesure (visionMetrics), tirage pondere de « Surprends-moi » (scoreProfileForImage + jitter ±10% sur 3 parametres), 6 variantes visuelles, historique 30 etats, fond genere ecrit dans le projet commun
+|   |   |   |-- StudioScreen.jsx        # Tuiles d'ambiances rendues sur la vraie image, intensite, Surprends-moi, variantes, fond genere (Mesh/Lumen en Sheet partage), avances (garde-fous, recadrage, filtres manuels, teinte, styles perso), sheet d'export
+|   |   |   `-- studio.module.css
 |   |   |-- vision/                     # Ecran Vision reel (phase C) - science des couleurs existante importee, jamais reecrite
 |   |   |   |-- useVisionEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue vision-pro), export, mesure de l'image (visionMetrics), tri des looks (scoreProfileForImage), vignettes en file d'attente, historique 30 etats, lien avec le projet commun
 |   |   |   |-- visionLooks.js          # Les 12 looks du premier niveau : pointeurs vers de vrais profils CAMERA_BRANDS, resolus par buildVisionProfileModel, renommes en francais + bibliotheque complete par marque pour les avances
@@ -562,6 +577,137 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (VibeOS phase E — l'ecran Soundtrack reel)
+
+- **`/creer/son` n'est plus un placeholder** : l'espace Soundtrack tourne, monte
+  sur `src/features/vibeos/soundtrack/`, et c'est un vrai lecteur de musique et
+  non un panneau d'import. Colonne gauche 260px (Rechercher, Accueil, puis
+  Bibliotheque projet / bibliotheque locale / imports recents, et en bas les
+  quatre Sources), vue Accueil en rangees horizontales de cartes-pochettes, vue
+  Recherche en lignes avec badge de licence et actions au survol, vues
+  bibliotheque a pochette-mosaique et liste numerotee, lecteur fixe de 72px en
+  bas. Sur mobile la colonne devient une barre d'onglets interne avec un bouton
+  « + », et le lecteur devient une mini-barre au-dessus de la tab bar du shell,
+  qui ouvre un lecteur plein ecran.
+- **Aucune logique metier reecrite.** `useLocalSoundtrackLibrary`,
+  `useProjectSoundLibrary`, `useSoundtrackSearch`, les services de droits et de
+  telechargement et les APIs `src/app/api/music/*` sont importes tels quels.
+  `useVibeOsSoundtrack.js` ne fait que les assembler.
+- **Le provider audio global devient le moteur de lecture.**
+  `vibeos/audio/AudioProvider.jsx` porte desormais la file, l'aleatoire, le
+  volume, l'enchainement automatique en fin de piste et un resolveur de source.
+  Deux raisons structurelles, toutes deux verifiees a l'usage :
+  `useSoundtrackPlayer` possede son propre `<audio>`, qui mourrait a chaque
+  changement de page ; et `useLocalSoundtrackLibrary` **revoque ses URLs
+  d'objet quand il est demonte**, donc le provider redemande le Blob et
+  fabrique sa propre URL, dont il garde la propriete jusqu'a la piste suivante.
+  Consequence assumee : `useSoundtrackPlayer` et `useSoundtrackController` ne
+  sont pas utilises par VibeOS, et restent intacts pour l'ancien `/studio`.
+- **Extraction sans changement de comportement** : les flux d'import etaient
+  enfermes dans `AiMusicImportAssistant.jsx` (553 lignes) et
+  `PixabayImportAssistant.jsx`. Ils vivent maintenant dans
+  `soundtrack/services/soundtrackImportFlows.js` — import Aitra Free par theme,
+  import Pixabay par theme, import de fichiers Pixabay telecharges, import
+  d'URL audio, constructeurs de metadonnees et exclusions Pixabay. Les deux
+  anciens composants appellent ce module et gardent leurs messages au caractere
+  pres ; les Sheets VibeOS l'appellent aussi. Mesure : `smoke-soundtrack-ui`
+  donne exactement les memes 11 echecs avant et apres (test refait en revenant
+  aux fichiers d'origine, serveur de dev actif).
+- **Nouveau smoke `npm run test:vibeos-soundtrack`**
+  (`scripts/smoke-vibeos-soundtrack.spec.cjs`, 3 tests) : parcours reel (colonne
+  complete, Sheet « Fichier local », import d'un vrai WAV fabrique par
+  `ffmpeg-static`, la piste apparait dans Imports recents et en bibliotheque
+  avec sa duree lue du fichier, lecture, le temps du lecteur avance vraiment,
+  la ligne est teintee) ; **le critere de la phase E** — lancer une piste,
+  partir sur `/creer/studio`, verifier que le mini-lecteur du bandeau montre la
+  meme piste toujours en lecture, revenir et retrouver le lecteur intact — plus
+  le lecteur mobile et l'absence de debordement horizontal en 390x844 ; et la
+  vue Recherche, qui doit toujours dire quelque chose plutot que rester muette.
+  Le WAV est un PCM : le Chromium de Playwright n'embarque pas les codecs
+  proprietaires, un MP3 ne serait ni decode ni mesurable.
+- **Nettoyage impose par ce test** : le serveur de dev recopie tout import local
+  dans `public/music/local-imports` ET l'inscrit dans son manifeste. Sans
+  nettoyage, la piste de test revenait dans la bibliotheque de tous les
+  lancements suivants — le smoke retire donc le fichier et l'entree du
+  manifeste, et il est verifie rejouable deux fois de suite.
+- **Deux corrections trouvees en route** : les toasts du shell tombaient pile
+  sur les commandes du lecteur (les primitives acceptent maintenant
+  `--vo-toast-offset`, pose sur le shell par l'ecran Soundtrack le temps de sa
+  visite) ; et beaucoup de manifests recopient le titre dans `attribution`, ce
+  qui affichait la meme phrase deux fois par ligne — on retombe desormais sur
+  la source.
+- **Limite assumee** : « Utiliser dans VibeCut » pousse la piste dans le store
+  video partage (`vibefx-studio/video/store/videoStore.js`) puis navigue vers
+  `/video`. Ce store est un singleton de module : le passage ne survit qu'a une
+  navigation client, pas a un rechargement complet. C'est deja le comportement
+  de l'ancien ecran ; le pont durable est un sujet de la phase F.
+- Gates : `npm run lint` 0 erreur (12 warnings preexistants), `npm run build`
+  vert, `test:vibeos-soundtrack` 3/3, `test:vibeos-layout` 2/2,
+  `test:vibeos-vision` 2/2, `test:vibeos-studio` 2/2,
+  `test:vibeos-layout-parity` vert, `test:scope` vert.
+- **`todo.md` allege dans la foulee** (563 -> 222 lignes) : il ne garde qu'un
+  resume court de ce qui est livre, les points d'architecture a connaitre, la
+  phase F detaillee, les regles, les gates et le prompt de reprise. Le detail
+  par phase n'y est plus duplique — il vit ici, dans ces journaux dates, qu'on
+  ne lit que pour la zone qu'on touche. C'est un choix de **contexte** : un
+  agent qui reprend le chantier ne doit pas avaler 350 lignes d'historique
+  avant d'ecrire sa premiere ligne de code.
+
+## Journal — 2026-08-08 (VibeOS phase D — l'ecran Studio reel)
+
+- **`/creer/studio` n'est plus un placeholder** : l'ecran Studio tourne, monte
+  sur `src/features/vibeos/studio/`. Comme Layout et Vision, **aucun moteur
+  n'a ete reecrit** : le rendu passe par `useCanvasRenderer` en vue `studio`
+  (donc `engine/studioRenderer.renderStudio`), le recadrage par
+  `useCanvasEvents`, l'export par `useExport`, la mesure d'image par
+  `visionMetrics`, le tri et les vignettes par `utils/visionRecommendation`.
+- **10 ambiances en un clic** (`studio/ambianceCatalog.js`) : six curees depuis
+  `PRESET_CATEGORIES` (Portra 400, Gold 200, Fuji Superia, CineStill 800T,
+  Tri-X 400, Blade Runner) et quatre combinaisons nouvelles (Polaroid delave,
+  VHS chaud, Eclat doux, Brume matin). Chaque ambiance est un bundle complet :
+  filtres + grain + vignettage + une palette de fond mesh assortie. Le format
+  est celui de `PRESET_CATEGORIES.profiles`, plus la famille et la force que
+  `scoreProfileForImage` sait deja lire.
+- **Les tuiles sont rendues sur la VRAIE image**, en file d'attente (plan §7),
+  a l'intensite recommandee de l'ambiance : la tuile montre ce que fera le clic.
+- **« Surprends-moi »** tire une ambiance ponderee par les signaux de la photo
+  (`getImageRecommendationSignals`, deja partage avec Vision) puis decale 3
+  parametres au maximum de ±10 %.
+- **Variantes** : les 6 derniers etats appliques en vignettes cliquables,
+  historique VISUEL complementaire de l'undo/redo (30 etats, meme forme que
+  Layout et Vision).
+- **Sheets de fonds generes sortis dans `vibeos/shared/`** : `MeshSheet`,
+  `LumenSheet` et `SmoothBlurSheet` quittent `vibeos/layout/` et sont
+  desormais partages avec Studio (CSS deplace dans `generators.module.css`,
+  imports de `LayoutScreen` mis a jour, classes devenues mortes retirees de
+  `layout.module.css`). Aucun changement de comportement pour Layout — la
+  parite pixel reste verte.
+- **`renderVisionProfilePreview` accepte un 3e argument optionnel**
+  (`{ safeSmartphone, filterIntensity }`), avec des valeurs par defaut
+  identiques a l'existant : les appelants Vision ne bougent pas d'un pixel,
+  et le Studio peut afficher une vignette a l'intensite reelle et, en mode
+  creatif, sans le bornage smartphone.
+- **Reglages avances** : garde-fous smartphone / mode creatif, recadrage
+  (proportions, zoom, deplacement a la souris via le moteur d'evenements
+  existant), filtres manuels, teinte, et **styles perso** en localStorage
+  `vibeos.studio.customStyles` qui remontent en tete des ambiances.
+- **Nouveau smoke `npm run test:vibeos-studio`**
+  (`scripts/smoke-vibeos-studio.spec.cjs`) : parcours reel (import, tuiles
+  rendues, application, intensite 0 = original, Surprends-moi, variantes,
+  comparaison, fond Mesh, avances, style perso ecrit en localStorage) plus le
+  critere de la phase D — sur 3 photos types, les 10 ambiances donnent 10
+  rendus REELLEMENT distincts deux a deux, et aucune ne produit d'image grise,
+  noire ou cramee.
+- **Limite assumee** : le fond genere habille la composition (il est ecrit dans
+  le projet commun et rendu par Mise en page) ; le Studio l'affiche en apercu
+  mais ne le compose pas sous la photo — la vue `studio` du moteur ne rend que
+  l'image. Le chainage complet composition -> Vision -> Studio reste prevu en
+  phase F (plan §4.3).
+- Verifie : lint 0 erreur (12 warnings preexistants), build vert,
+  `test:vibeos-studio` 2/2, `test:vibeos-layout` 2/2, `test:vibeos-vision` 2/2,
+  `test:vibeos-layout-parity` vert, `test:scope` vert, `test:vision-ui` 7/9
+  (les 2 memes echecs preexistants).
 
 ## Journal — 2026-08-08 (VibeOS phase C — l'ecran Vision reel)
 

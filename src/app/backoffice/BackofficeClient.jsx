@@ -193,7 +193,7 @@ export default function BackofficeClient() {
           Vibe_fx
         </Link>
         <div className="vf-nav-links">
-          <Link href="/studio">
+          <Link href="/creer">
             <span className="vf-nav-link-dot" aria-hidden="true" />
             Studio
           </Link>

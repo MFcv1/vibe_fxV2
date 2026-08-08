@@ -63,7 +63,7 @@ export default function VibeCutShell({ children }) {
 
                     <div className={styles.trailing}>
                         <Link
-                            href="/studio"
+                            href="/creer"
                             className={styles.backLink}
                             data-testid="vibecut-back-studio"
                             title="Revenir au studio Vibe_fx"

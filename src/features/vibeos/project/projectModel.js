@@ -46,6 +46,10 @@ export function createEmptyProject(overrides = {}) {
             lumen: null,
             smoothBlur: null,
         },
+        /* Rendu de la composition Layout, publie par l'ecran Mise en page:
+           { blob (PNG pleine resolution), width, height, updatedAt }. C'est
+           l'entree du pipeline pour Vision et Studio (plan §4.3). */
+        composition: null,
         vision: { profileId: null, intensity: 80, filters: null },
         studio: { presetRef: null, filters: null, variants: [] },
         soundtrackTrackId: null,
@@ -69,6 +73,7 @@ export function normalizeProject(raw) {
         version: PROJECT_VERSION,
         geometry: { ...base.geometry, ...(raw.geometry || {}) },
         background: { ...base.background, ...(raw.background || {}) },
+        composition: raw.composition?.blob ? raw.composition : null,
         vision: { ...base.vision, ...(raw.vision || {}) },
         studio: { ...base.studio, ...(raw.studio || {}) },
         images: Array.isArray(raw.images) ? raw.images : [],

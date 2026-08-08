@@ -422,20 +422,49 @@ assert.match(packageJson.scripts["test:vibecut-ui-v2"], /smoke-vibecut-advanced-
 /* ---------- Phase 7: l'ancien front video n'existe plus ---------- */
 
 /*
- * La bascule est faite: `/studio?workspace=video` redirige, et l'ancien editeur
- * est supprime. On verifie les DEUX, parce que l'un sans l'autre laisserait soit
- * un lien mort, soit du code mort.
+ * La bascule est faite: `/studio` ne rend plus rien, il redirige. Phase 7 pour
+ * la video, phase F (VibeOS) pour tout le reste. On verifie le mapping COMPLET,
+ * parce qu'un espace oublie enverrait un favori existant sur l'accueil au lieu
+ * de son ecran.
  */
 const studioRoute = read("src/app/studio/page.js");
-assert.match(
-  studioRoute,
-  /redirect\("\/video"\)/,
-  "/studio?workspace=video doit rediriger vers /video (phase 7)",
-);
+assert.match(studioRoute, /redirect\(/, "/studio doit rediriger cote serveur");
+for (const [workspace, target] of [
+  ["layout", "/creer/layout-visuel"],
+  ["studio", "/creer/studio"],
+  ["vision-pro", "/creer/vision"],
+  ["soundtrack", "/creer/son"],
+  ["video", "/video"],
+]) {
+  assert.match(
+    studioRoute,
+    new RegExp(`"?${workspace}"?:\\s*"${target.replace(/\//g, "\\/")}"`),
+    `/studio?workspace=${workspace} doit rediriger vers ${target}`,
+  );
+}
 assert.doesNotMatch(
   studioRoute,
-  /"video"\s*,?\s*\]\)/,
-  "'video' ne doit plus faire partie des workspaces du studio",
+  /StudioClient|PublicationsManager/,
+  "/studio ne doit plus monter d'interface: la creation est sur /creer, la publication sur /publier",
+);
+
+/* La publication garde sa surface, avec les memes feuilles qu'avant. */
+const publierLayout = read("src/app/publier/layout.js");
+assert.match(publierLayout, /features\/vibefx-layout\/vibefx-tailwind\.css/);
+assert.match(publierLayout, /features\/publications\/publications\.css/);
+/* On cherche un IMPORT, pas une mention: le fichier explique en commentaire
+   pourquoi il ne charge pas vibeos.css, et un garde sur le mot interdirait
+   surtout de le documenter. */
+assert.doesNotMatch(
+  publierLayout,
+  /import ".*vibeos\.css"/,
+  "/publier ne doit pas charger le design system VibeOS (surfaces isolees, plan §2.2)",
+);
+const creerLayout = read("src/app/creer/layout.js");
+assert.doesNotMatch(
+  creerLayout,
+  /import ".*(?:vibefx-tailwind|publications)\.css"/,
+  "/creer ne doit jamais charger le bundle Tailwind statique de l'ancien studio",
 );
 
 for (const gone of [

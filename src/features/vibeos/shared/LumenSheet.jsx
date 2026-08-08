@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Button, Sheet, Spinner } from '../primitives';
-import styles from './layout.module.css';
+import styles from './generators.module.css';
 
 const LUMEN_EMBED_SRC = '/vendor/lumen/index.html?embed=vibefx';
 

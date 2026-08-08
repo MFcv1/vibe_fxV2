@@ -130,7 +130,7 @@ process.on("SIGTERM", () => {
 });
 
 try {
-  await waitForServer(`${baseUrl}/studio`, server);
+  await waitForServer(`${baseUrl}/creer`, server);
 
   const test = runPlaywright(baseUrl);
 

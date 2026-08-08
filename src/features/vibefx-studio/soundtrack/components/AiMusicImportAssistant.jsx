@@ -1,18 +1,23 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, UploadCloud } from 'lucide-react';
 import { AI_AUDIO_PROVIDERS } from '../services/soundtrackDownloads';
 import {
     AITRA_FREE_TRACKS_URL,
-    PIXABAY_CONTENT_LICENSE_URL,
     SOUNDTRACK_PROVIDERS,
     getSoundtrackProviderQuickTagGroups,
     getSoundtrackProviderQuickTags,
 } from '../data/soundtrackDefaults';
-
-const PIXABAY_AI_MANIFEST_URL = '/music/pixabay-ai/vibefx-pixabay-ai-manifest.json';
-const PIXABAY_CLIENT_TIMEOUT_BASE_MS = 70000;
-const PIXABAY_CLIENT_TIMEOUT_PER_EXTRA_TRACK_MS = 12000;
-const PIXABAY_CLIENT_TIMEOUT_MAX_MS = 125000;
+/*
+ * Les flux d'import vivent dans `services/soundtrackImportFlows.js` depuis la
+ * phase E VibeOS: ce composant et le nouvel ecran /creer/son appellent le meme
+ * code, il n'existe donc qu'une seule verite sur les metadonnees et licences.
+ */
+import {
+    cleanHttpsUrl,
+    importAiAudioUrl,
+    importAiThemeBatch,
+    normalizeImportUrlDraft,
+} from '../services/soundtrackImportFlows';
 
 const FREE_AI_SOURCE_LINKS = [
     {
@@ -31,111 +36,6 @@ const FREE_AI_SOURCE_LINKS = [
     },
 ];
 
-const cleanHttpsUrl = (value = '') => {
-    const trimmed = String(value || '').trim();
-    try {
-        const url = new URL(trimmed);
-        return url.protocol === 'https:' ? url.toString() : '';
-    } catch {
-        return '';
-    }
-};
-
-const buildManualTrackId = (providerId = 'ai', audioUrl = '') => (
-    `${providerId}-${String(audioUrl || 'manual-audio')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 72) || 'manual-audio'}`
-);
-
-const extractAitraTrackId = (value = '') => {
-    const trimmed = String(value || '').trim();
-    if (/^\d{1,8}$/.test(trimmed)) return trimmed;
-    const match = trimmed.match(/^https:\/\/aitrafree\.com\/(?:en\/|ja\/)?tracks\/(\d+)/i);
-    return match?.[1] || '';
-};
-
-const normalizeImportUrlDraft = (providerId, value = '') => {
-    const cleaned = cleanHttpsUrl(value);
-    if (cleaned) return cleaned;
-    const aitraTrackId = providerId === 'aitra-free' ? extractAitraTrackId(value) : '';
-    return aitraTrackId ? `https://aitrafree.com/en/tracks/${aitraTrackId}` : '';
-};
-
-const buildMetadata = ({ file, provider, selectedTag, proofUrl, licenseUrl, commercialUse = true }) => ({
-    title: file?.name?.replace(/\.[a-z0-9]+$/i, '') || '',
-    provider: provider.id,
-    sourceProvider: provider.id,
-    sourceName: provider.label,
-    sourceUrl: proofUrl || provider.officialDocsUrl || '',
-    sourcePageUrl: proofUrl || provider.officialDocsUrl || '',
-    license: provider.id === 'pixabay' ? 'Pixabay Content License' : provider.licenseLabel || `${provider.label} generated audio license`,
-    licenseUrl: provider.id === 'pixabay' ? PIXABAY_CONTENT_LICENSE_URL : licenseUrl || provider.licenseUrl || provider.officialDocsUrl || '',
-    attribution: '',
-    rightsStatus: provider.id === 'pixabay' ? 'needs-review' : 'ai-generated',
-    socialUse: true,
-    commercialUse,
-    category: selectedTag?.label || selectedTag?.id || 'AI music',
-    genre: selectedTag?.label || '',
-    mood: selectedTag?.label || '',
-    tags: provider.id === 'pixabay'
-        ? ['pixabay', selectedTag?.group, selectedTag?.id].filter(Boolean)
-        : ['ai-generated', provider.id, selectedTag?.id].filter(Boolean),
-    licenseSnapshotVersion: `${provider.id}-manual-current`,
-    contentIdWarning: provider.id === 'pixabay'
-        ? 'Pixabay signale des droits tiers possibles et des risques Content ID. Conserver la page source et verifier avant publication.'
-        : provider.id === 'aitra-free'
-        ? 'Aitra Free interdit la revente du son brut, la fausse attribution, la distribution streaming comme morceau et Content ID.'
-        : `Musique IA ${provider.label}: verifier les conditions du provider avant publication si necessaire.`,
-    importEvent: `Import IA termine: ${provider.label}.`,
-});
-
-const pixabayClientTimeoutMs = (count) => Math.min(
-    PIXABAY_CLIENT_TIMEOUT_MAX_MS,
-    PIXABAY_CLIENT_TIMEOUT_BASE_MS + Math.max(0, count - 1) * PIXABAY_CLIENT_TIMEOUT_PER_EXTRA_TRACK_MS,
-);
-
-const normalizePixabayTrackId = (value = '') => {
-    const match = String(value || '').toLowerCase().match(/(?:pixabay-ai-)?pixabay-(\d+)/);
-    return match?.[1] ? `pixabay-${match[1]}` : '';
-};
-
-const collectPixabayExclusions = (...trackGroups) => {
-    const excludeIds = new Set();
-    const excludeUrls = new Set();
-    trackGroups.flat().filter(Boolean).forEach((track) => {
-        const provider = String(track.provider || track.sourceProvider || '').toLowerCase();
-        const looksPixabay = provider.includes('pixabay')
-            || String(track.id || '').includes('pixabay')
-            || String(track.sourceUrl || track.sourcePageUrl || '').includes('pixabay.com/music/');
-        if (!looksPixabay) return;
-        [
-            track.providerTrackId,
-            track.id,
-            track.sourceTrackId,
-        ].forEach((value) => {
-            const id = normalizePixabayTrackId(value);
-            if (id) excludeIds.add(id);
-        });
-        [
-            track.sourcePageUrl,
-            track.sourceUrl,
-        ].forEach((value) => {
-            const url = cleanHttpsUrl(value);
-            if (url && url.includes('pixabay.com/music/')) excludeUrls.add(url.replace(/\/$/, ''));
-        });
-    });
-    return {
-        excludeIds: Array.from(excludeIds),
-        excludeUrls: Array.from(excludeUrls),
-    };
-};
-
-const mergePixabayExclusions = (current = {}, ignored = {}) => ({
-    excludeIds: Array.from(new Set([...(current.excludeIds || []), ...(ignored.ids || [])].map(normalizePixabayTrackId).filter(Boolean))),
-    excludeUrls: Array.from(new Set([...(current.excludeUrls || []), ...(ignored.urls || [])].map((url) => String(url || '').replace(/\/$/, '')).filter(Boolean))),
-});
 
 export default function AiMusicImportAssistant({
     search = null,
@@ -147,7 +47,6 @@ export default function AiMusicImportAssistant({
     defaultProviderId = 'aitra-free',
     compact = false,
 }) {
-    const importCounterRef = useRef(0);
     const availableProviders = useMemo(() => {
         const definitions = providerDefinitions || search?.providerDefinitions || SOUNDTRACK_PROVIDERS;
         const providerMap = new Map();
@@ -197,130 +96,32 @@ export default function AiMusicImportAssistant({
     if (!provider || (!AI_AUDIO_PROVIDERS.includes(provider.id) && provider.id !== 'pixabay')) return null;
 
     const generateAndImport = async () => {
-        if (provider.id === 'pixabay') {
-            const count = Math.max(1, Math.min(5, Number(batchCount) || 1));
-            setStatus('loading');
-            setMessage(`Recherche Pixabay ${selectedTag?.label || 'AI generated'}...`);
-            const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), pixabayClientTimeoutMs(count));
-            try {
-                const pixabayExclusions = collectPixabayExclusions(
-                    localLibrary?.tracks || [],
-                    projectLibrary?.tracks || [],
-                );
-                const mergedExclusions = mergePixabayExclusions(pixabayExclusions, localLibrary?.ignoredPixabayTracks);
-                const response = await fetch('/api/music/pixabay-local-import', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: controller.signal,
-                    body: JSON.stringify({
-                        query: selectedTag?.query || 'ai-generated',
-                        category: selectedTag?.id || 'ai-generated',
-                        limit: count,
-                        pages: count > 4 ? 2 : 1,
-                        scanLimit: Math.min(30, count + Math.max(10, mergedExclusions.excludeIds.length + 4)),
-                        excludeIds: mergedExclusions.excludeIds,
-                        excludeUrls: mergedExclusions.excludeUrls,
-                    }),
-                });
-                const payload = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(payload.error || 'Import local Pixabay impossible.');
-                }
-                const manifestTracks = Array.isArray(payload?.tracks)
-                    ? payload.tracks.filter((track) => track.importStatus === 'importable' && (track.downloadUrl || track.previewUrl))
-                    : [];
-                if (!manifestTracks.length) throw new Error('Aucune piste Pixabay importable trouvee pour ce theme.');
-                const imported = [];
-                for (const track of manifestTracks.slice(0, count)) {
-                    const metadata = {
-                        ...buildMetadata({
-                            provider,
-                            selectedTag,
-                            proofUrl: track.sourceUrl || proofUrl,
-                            licenseUrl: track.licenseUrl || PIXABAY_CONTENT_LICENSE_URL,
-                            commercialUse: true,
-                        }),
-                        ...track,
-                        id: `pixabay-ai-${track.id}`,
-                        provider: 'pixabay',
-                        sourceProvider: 'pixabay',
-                        sourceName: 'Pixabay Music',
-                        sourceUrl: track.sourceUrl || track.sourcePageUrl || provider.officialDocsUrl,
-                        sourcePageUrl: track.sourcePageUrl || track.sourceUrl || provider.officialDocsUrl,
-                        license: 'Pixabay Content License',
-                        licenseUrl: track.licenseUrl || PIXABAY_CONTENT_LICENSE_URL,
-                        rightsStatus: 'needs-review',
-                        socialUse: true,
-                        commercialUse: true,
-                        tags: Array.from(new Set([...(track.tags || []), 'pixabay', selectedTag?.group, selectedTag?.id].filter(Boolean))),
-                    };
-                    const importedTrack = projectLibrary.capability?.ready
-                        ? await projectLibrary.importTrackToProject(metadata)
-                        : await localLibrary.importRemoteTrack({ audioUrl: track.downloadUrl || track.previewUrl, metadata });
-                    if (importedTrack) imported.push(importedTrack);
-                }
-                if (!imported.length) throw new Error('Import Pixabay refuse par la bibliotheque.');
-                onSelectTrack?.(imported[0]);
-                onImportComplete?.(imported[0], imported);
-                setStatus('ready');
-                setMessage(`${imported.length} piste${imported.length > 1 ? 's' : ''} Pixabay ajoutee${imported.length > 1 ? 's' : ''}.`);
-            } catch (error) {
-                setStatus('error');
-                setMessage(error?.name === 'AbortError'
-                    ? 'Pixabay met trop longtemps a repondre. Relance le theme ou choisis un autre tag.'
-                    : error.message || 'Import Pixabay impossible.');
-            } finally {
-                window.clearTimeout(timeoutId);
-            }
-            return;
-        }
-        if (provider.id !== 'aitra-free') {
-            setStatus('error');
-            setMessage('Generation gratuite automatique disponible sur Aitra Free.');
-            return;
-        }
         const count = Math.max(1, Math.min(5, Number(batchCount) || 1));
         setStatus('loading');
-        setMessage(`Recherche Aitra ${selectedTag?.label || 'theme'}...`);
+        setMessage(provider.id === 'pixabay'
+            ? `Recherche Pixabay ${selectedTag?.label || 'AI generated'}...`
+            : `Recherche Aitra ${selectedTag?.label || 'theme'}...`);
         try {
-            const imported = [];
-            const excludeTrackIds = [];
-            for (let index = 0; index < count; index += 1) {
-                importCounterRef.current += 1;
-                const draftTrack = {
-                    ...buildMetadata({
-                        provider,
-                        selectedTag,
-                        proofUrl,
-                        licenseUrl,
-                        commercialUse: true,
-                    }),
-                    id: buildManualTrackId(provider.id, `${selectedTag?.id || 'theme'}-${importCounterRef.current}-${index}`),
-                    title: `Aitra Free - ${selectedTag?.label || 'selection'}`,
-                    downloadUrl: AITRA_FREE_TRACKS_URL,
-                    previewUrl: AITRA_FREE_TRACKS_URL,
-                    audioUrl: AITRA_FREE_TRACKS_URL,
-                    themeId: selectedTag?.id || '',
-                    query: selectedTag?.query || selectedTag?.label || '',
-                    excludeTrackIds: [...excludeTrackIds],
-                    importStatus: 'importable',
-                };
-                const track = await localLibrary.importRemoteTrack({ audioUrl: AITRA_FREE_TRACKS_URL, metadata: draftTrack });
-                if (track) {
-                    imported.push(track);
-                    if (track.providerTrackId) excludeTrackIds.push(track.providerTrackId);
-                    await new Promise((resolve) => window.setTimeout(resolve, 650));
-                }
-            }
-            if (!imported.length) throw new Error('Aucune piste Aitra Free importee.');
+            const imported = await importAiThemeBatch({
+                provider,
+                selectedTag,
+                count,
+                proofUrl,
+                licenseUrl,
+                localLibrary,
+                projectLibrary,
+            });
             onSelectTrack?.(imported[0]);
             onImportComplete?.(imported[0], imported);
             setStatus('ready');
-            setMessage(`${imported.length} piste${imported.length > 1 ? 's' : ''} Aitra ajoutee${imported.length > 1 ? 's' : ''}.`);
+            setMessage(provider.id === 'pixabay'
+                ? `${imported.length} piste${imported.length > 1 ? 's' : ''} Pixabay ajoutee${imported.length > 1 ? 's' : ''}.`
+                : `${imported.length} piste${imported.length > 1 ? 's' : ''} Aitra ajoutee${imported.length > 1 ? 's' : ''}.`);
         } catch (error) {
             setStatus('error');
-            setMessage(error.message || 'Generation/import Aitra impossible.');
+            setMessage(error.message || (provider.id === 'pixabay'
+                ? 'Import Pixabay impossible.'
+                : 'Generation/import Aitra impossible.'));
         }
     };
 
@@ -333,26 +134,16 @@ export default function AiMusicImportAssistant({
         setStatus('loading');
         setMessage('');
         try {
-            const aitraTrackId = provider.id === 'aitra-free' ? extractAitraTrackId(audioUrlDraft || audioUrl) : '';
-            const draftTrack = {
-                ...buildMetadata({
-                    provider,
-                    selectedTag,
-                    proofUrl,
-                    licenseUrl,
-                    commercialUse: true,
-                }),
-                id: buildManualTrackId(provider.id, audioUrl),
-                title: aitraTrackId ? `Aitra Free track ${aitraTrackId}` : `${provider.label} import`,
-                downloadUrl: audioUrl,
-                previewUrl: audioUrl,
+            const imported = await importAiAudioUrl({
+                provider,
+                selectedTag,
                 audioUrl,
-                importStatus: 'importable',
-            };
-            const imported = projectLibrary.capability?.ready
-                ? await projectLibrary.importTrackToProject(draftTrack)
-                : await localLibrary.importRemoteTrack({ audioUrl, metadata: draftTrack });
-            if (!imported) throw new Error('Import URL IA refuse.');
+                audioUrlDraft,
+                proofUrl,
+                licenseUrl,
+                localLibrary,
+                projectLibrary,
+            });
             onSelectTrack?.(imported);
             onImportComplete?.(imported, [imported]);
             setStatus('ready');

@@ -8,6 +8,7 @@ import { VibeOsAudioProvider } from '../audio/AudioProvider';
 import { VibeOsProjectProvider } from '../project/VibeOsProjectProvider';
 import { ToastProvider } from '../primitives';
 import MiniPlayer from './MiniPlayer';
+import PublishButton from './PublishButton';
 import styles from './shell.module.css';
 
 /*
@@ -80,15 +81,7 @@ export default function VibeOsShell({ children }) {
 
                             <div className={styles.trailing}>
                                 <MiniPlayer />
-                                {/*
-                                 * Le flux publication vit encore dans l'ancien /studio
-                                 * (PublicationsManager). Ce lien sera rebranche sur le
-                                 * nouveau parcours a la phase F - plan §4.3.
-                                 */}
-                                <Link href="/studio" className={styles.navItem} title="Ouvrir la publication (flux actuel)">
-                                    <Send size={13} />
-                                    <span className={styles.publishLabel}>Publier</span>
-                                </Link>
+                                <PublishButton />
                             </div>
                         </header>
 

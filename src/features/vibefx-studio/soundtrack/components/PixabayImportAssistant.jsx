@@ -1,38 +1,15 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, UploadCloud } from 'lucide-react';
 import {
-    PIXABAY_CONTENT_LICENSE_URL,
     PIXABAY_MUSIC_URL,
     buildPixabayMusicSearchUrl,
     getSoundtrackProviderQuickTags,
 } from '../data/soundtrackDefaults';
-
-const cleanSourceUrl = (value = '') => {
-    const trimmed = String(value || '').trim();
-    return trimmed.startsWith('https://pixabay.com/music/') ? trimmed : '';
-};
-
-const buildMetadata = ({ file, selectedTag, sourceUrl }) => ({
-    title: file?.name?.replace(/\.[a-z0-9]+$/i, '') || '',
-    provider: 'pixabay',
-    sourceProvider: 'pixabay',
-    sourceName: 'Pixabay Music',
-    sourceUrl,
-    sourcePageUrl: sourceUrl,
-    license: 'Pixabay Content License',
-    licenseUrl: PIXABAY_CONTENT_LICENSE_URL,
-    attribution: '',
-    rightsStatus: 'review',
-    socialUse: true,
-    commercialUse: true,
-    category: selectedTag?.label || selectedTag?.id || 'Pixabay Music',
-    genre: selectedTag?.label || '',
-    mood: selectedTag?.label || '',
-    tags: ['pixabay', selectedTag?.id, selectedTag?.query].filter(Boolean),
-    licenseSnapshotVersion: 'pixabay-content-license-manual',
-    contentIdWarning: 'Import manuel Pixabay: conserver la page source et verifier les risques Content ID avant publication sociale.',
-    importEvent: `Import Pixabay termine: ${selectedTag?.label || 'musique'}.`,
-});
+/* Flux partage avec l'ecran Soundtrack VibeOS (phase E) - voir le module. */
+import {
+    cleanPixabaySourceUrl as cleanSourceUrl,
+    importPixabayLocalFiles,
+} from '../services/soundtrackImportFlows';
 
 export default function PixabayImportAssistant({
     search,
@@ -64,16 +41,13 @@ export default function PixabayImportAssistant({
         setStatus('loading');
         setMessage('');
         try {
-            const imported = [];
-            if (projectLibrary.capability?.ready) {
-                for (const file of files) {
-                    const track = await projectLibrary.importFileToProject(file, buildMetadata({ file, selectedTag, sourceUrl }));
-                    if (track) imported.push(track);
-                }
-            } else {
-                imported.push(...(await localLibrary.importFiles(files, buildMetadata({ file: files[0], selectedTag, sourceUrl })) || []));
-            }
-            if (!imported.length) throw new Error('Aucun fichier audio importe.');
+            const imported = await importPixabayLocalFiles({
+                files,
+                selectedTag,
+                sourceUrl,
+                localLibrary,
+                projectLibrary,
+            });
             onSelectTrack?.(imported[0]);
             onImportComplete?.(imported[0], imported);
             setStatus('ready');

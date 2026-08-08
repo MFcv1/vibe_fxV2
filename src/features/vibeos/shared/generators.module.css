@@ -1,0 +1,140 @@
+/* Sheets de fonds generes (Mesh, Lumen, Flou pro).
+   Ces trois panneaux vivaient dans `layout/`; ils sont partages depuis la phase
+   D entre l'ecran Mise en page et l'ecran Studio, d'ou ce module dedie. */
+
+.rowSplit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.rowLabel {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.colorInput {
+    width: 40px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    cursor: pointer;
+}
+
+.sheetIntro {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.blockHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.blockTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+/* ---------- Mesh ---------- */
+.meshPreview {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    filter: saturate(1.15) blur(0.5px);
+}
+
+.paletteList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-1);
+}
+
+.paletteRow {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease),
+        color var(--vo-dur-1) var(--vo-ease);
+}
+
+.paletteRow:hover {
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+}
+
+.paletteSwatches {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.paletteSwatches span {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Lumen ---------- */
+.lumenFrame {
+    flex: 1 1 auto;
+    min-height: 60dvh;
+    border-radius: var(--vo-radius-md);
+    overflow: hidden;
+    border: 1px solid var(--vo-line);
+    background: var(--vo-bg-sunken);
+}
+
+.lumenFrame iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 60dvh;
+    border: 0;
+    display: block;
+}
+
+/* ---------- Flou pro ---------- */
+.lookList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-1);
+}
+
+.lookRow {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.lookRow:hover {
+    background: var(--vo-surface-2);
+}
+
+.lookLabel {
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+    color: var(--vo-text);
+}
+
+.lookDesc {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}

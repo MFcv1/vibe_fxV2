@@ -117,7 +117,7 @@ export default function Home() {
             indexable et ultra-rapide.
           </p>
           <div className="vf-actions" aria-label="Actions principales">
-            <Link href="/studio?workspace=layout" className="vf-primary">
+            <Link href="/creer/layout-visuel" className="vf-primary">
               Launch app
             </Link>
             <Link href="/pricing" className="vf-secondary">

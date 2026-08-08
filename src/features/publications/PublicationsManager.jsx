@@ -21,13 +21,19 @@ import PublicationComposer from "./components/PublicationComposer";
 import { normalizeVibeFxDraft } from "./helpers/publicationHelpers";
 import VibeFxStudio from "../vibefx-studio";
 
-export default function PublicationsManager({ initialMode = "dashboard", initialWorkspace = "studio" }) {
+/*
+ * `initialDraft` et `layoutHref` (phase F, bascule VibeOS): la page /publier
+ * monte ce composant avec un rendu deja pret et renvoie « Modifier le visuel »
+ * vers le nouvel ecran Mise en page. Sans ces props, le comportement est
+ * exactement celui d'avant.
+ */
+export default function PublicationsManager({ initialMode = "dashboard", initialWorkspace = "studio", initialDraft = null, layoutHref = null }) {
   const { aiInterfacesEnabled } = useAiLaunchSettings();
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState(initialMode);
   const [layoutInitialView, setLayoutInitialView] = useState(initialWorkspace);
-  const [draft, setDraft] = useState(null);
+  const [draft, setDraft] = useState(() => (initialDraft ? normalizeVibeFxDraft(initialDraft) : null));
   const [selectedPublication, setSelectedPublication] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [accountData, setAccountData] = useState({ profile: null, payments: [], checkouts: [], jobs: [] });
@@ -141,6 +147,10 @@ export default function PublicationsManager({ initialMode = "dashboard", initial
   };
 
   const openLayoutFromPublications = () => {
+    if (layoutHref) {
+      window.location.href = layoutHref;
+      return;
+    }
     setLayoutInitialView("layout");
     setMode("layout");
   };

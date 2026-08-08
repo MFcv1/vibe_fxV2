@@ -48,7 +48,7 @@ export default function PublicationDashboard({ stats, publications, loading, sel
           <p>Finaliser, organiser et publier les contenus issus de Mise en page vers le site, Instagram et Facebook.</p>
         </div>
         <a
-          href="/studio?workspace=layout"
+          href="/creer/layout-visuel"
           role="button"
           className="pub-hub-primary"
           style={{ visibility: hydrated ? "visible" : "hidden" }}
@@ -131,7 +131,7 @@ export default function PublicationDashboard({ stats, publications, loading, sel
             <span><b>03</b> Verifier la preview mobile</span>
           </div>
           <a
-            href="/studio?workspace=layout"
+            href="/creer/layout-visuel"
             role="button"
             className="pub-hub-secondary"
             style={{ visibility: hydrated ? "visible" : "hidden" }}

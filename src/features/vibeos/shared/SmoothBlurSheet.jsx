@@ -9,7 +9,7 @@ import {
     normalizeSmoothBlurConfig,
 } from '../../vibefx-shared/utils/smoothBlur';
 import { Button, Segmented, Sheet, Slider } from '../primitives';
-import styles from './layout.module.css';
+import styles from './generators.module.css';
 
 /*
  * Flou lisse pro. Toute la science (limites, courbes, random safe) vit dans le

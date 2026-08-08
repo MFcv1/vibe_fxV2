@@ -14,7 +14,12 @@
 
 import { DEFAULT_FILTERS } from '../hooks/useStudioFilters';
 import { normalizeVisionFilters } from './visionColorScience';
-import { applyFusedPixelOps, applySafeGlobalTint, applySmartphoneOutputGuards } from './canvasUtils';
+import {
+    applyFusedPixelOps,
+    applyPerceptualIntensityBlend,
+    applySafeGlobalTint,
+    applySmartphoneOutputGuards,
+} from './canvasUtils';
 
 export const PREVIEW_ASPECT_WIDTH = 96;
 export const PREVIEW_ASPECT_HEIGHT = 58;
@@ -95,7 +100,17 @@ export function scoreProfileForImage(profile, signals) {
     };
 }
 
-export function renderVisionProfilePreview(sourceImage, profile) {
+/*
+ * Vignette d'un profil rendue sur la vraie photo.
+ *
+ * `options` a ete ajoute a la phase D pour l'ecran Studio, qui doit pouvoir
+ * afficher une ambiance a son intensite reelle et, si l'utilisateur coupe les
+ * garde-fous, sans le bornage smartphone. Les valeurs par defaut reproduisent
+ * exactement le comportement d'origine (garde-fous actifs, intensite 100), donc
+ * les appelants existants ne changent pas d'un pixel.
+ */
+export function renderVisionProfilePreview(sourceImage, profile, options = {}) {
+    const { safeSmartphone = true, filterIntensity = 100 } = options;
     if (!sourceImage || typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = PREVIEW_RENDER_WIDTH;
@@ -106,7 +121,7 @@ export function renderVisionProfilePreview(sourceImage, profile) {
     ctx.imageSmoothingQuality = 'high';
 
     const profileParameters = profile?.vision?.parameters || profile?.parameters || profile?.filters || {};
-    const filters = normalizeVisionFilters({ ...DEFAULT_FILTERS, ...profileParameters, safeSmartphone: true, filterIntensity: 100 });
+    const filters = normalizeVisionFilters({ ...DEFAULT_FILTERS, ...profileParameters, safeSmartphone, filterIntensity: 100 });
     const sourceW = sourceImage.naturalWidth || sourceImage.width;
     const sourceH = sourceImage.naturalHeight || sourceImage.height;
     if (!sourceW || !sourceH) return null;
@@ -123,6 +138,17 @@ export function renderVisionProfilePreview(sourceImage, profile) {
     } else {
         sh = sourceW / targetRatio;
         sy = (sourceH - sh) / 2;
+    }
+
+    /* Copie non filtree, uniquement quand l'intensite demandee est partielle:
+       c'est le meme melange lineaire que le pipeline de rendu. */
+    let originalCanvas = null;
+    if (filterIntensity < 100) {
+        originalCanvas = document.createElement('canvas');
+        originalCanvas.width = PREVIEW_RENDER_WIDTH;
+        originalCanvas.height = PREVIEW_RENDER_HEIGHT;
+        originalCanvas.getContext('2d')
+            .drawImage(sourceImage, sx, sy, sw, sh, 0, 0, PREVIEW_RENDER_WIDTH, PREVIEW_RENDER_HEIGHT);
     }
 
     const hueRotate = filters.hueRotate || 0;
@@ -154,5 +180,10 @@ export function renderVisionProfilePreview(sourceImage, profile) {
     }
 
     applySmartphoneOutputGuards(ctx, PREVIEW_RENDER_WIDTH, PREVIEW_RENDER_HEIGHT, filters);
+
+    if (originalCanvas) {
+        applyPerceptualIntensityBlend(ctx, PREVIEW_RENDER_WIDTH, PREVIEW_RENDER_HEIGHT, originalCanvas, filterIntensity);
+    }
+
     return canvas.toDataURL('image/jpeg', 0.9);
 }

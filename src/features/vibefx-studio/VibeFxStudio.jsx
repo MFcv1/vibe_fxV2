@@ -37,6 +37,7 @@ import useCanvasRenderer from './hooks/useCanvasRenderer';
 import { DEFAULT_FILTERS } from './hooks/useStudioFilters';
 import { compareVisionMetrics, measureVisionImageData } from './utils/visionMetrics';
 import { createCustomZone, normalizeCustomZones, updateCustomTemplateZones } from './utils/customLayout';
+import { buildSocialImages, canvasToBlob } from './utils/socialExport';
 
 const VISION_DIAGNOSTIC_SAMPLE_MAX_SIDE = 420;
 const VISION_DIAGNOSTIC_WARN_MS = 650;
@@ -45,11 +46,6 @@ const DEFAULT_LAYOUT_MESH_COLORS = ['#6366f1', '#a855f7', '#ec4899', '#050505'];
 
 const getPerfNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
-const canvasToBlob = (canvas, mimeType = 'image/png', quality = 0.92) =>
-    new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), mimeType, quality);
-    });
-
 const serializeSlotConfigs = (configs) => Object.fromEntries(
     Object.entries(configs || {}).map(([slotId, config]) => {
         const serializableConfig = { ...(config || {}) };
@@ -57,37 +53,6 @@ const serializeSlotConfigs = (configs) => Object.fromEntries(
         return [slotId, serializableConfig];
     })
 );
-
-const buildSocialImages = async (exportCanvas, activeFormat) => {
-    const slices = activeFormat?.id === 'pano-2' ? 2 : activeFormat?.id === 'pano-3' ? 3 : 1;
-    if (slices <= 1) {
-        return [{
-            url: exportCanvas.toDataURL('image/png'),
-            blob: await canvasToBlob(exportCanvas, 'image/png'),
-            width: exportCanvas.width,
-            height: exportCanvas.height,
-            index: 0,
-        }];
-    }
-
-    const sliceWidth = exportCanvas.width / slices;
-    const slides = [];
-    for (let index = 0; index < slices; index += 1) {
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = sliceWidth;
-        sliceCanvas.height = exportCanvas.height;
-        const sliceCtx = sliceCanvas.getContext('2d');
-        sliceCtx.drawImage(exportCanvas, index * sliceWidth, 0, sliceWidth, exportCanvas.height, 0, 0, sliceWidth, exportCanvas.height);
-        slides.push({
-            url: sliceCanvas.toDataURL('image/png'),
-            blob: await canvasToBlob(sliceCanvas, 'image/png'),
-            width: sliceCanvas.width,
-            height: sliceCanvas.height,
-            index,
-        });
-    }
-    return slides;
-};
 
 const measureCanvasVisionSnapshot = (canvas) => {
     if (!canvas?.width || !canvas?.height) return null;

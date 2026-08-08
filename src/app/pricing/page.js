@@ -53,7 +53,7 @@ export default function PricingPage() {
             <span className="vf-nav-link-dot" aria-hidden="true" />
             Compte
           </Link>
-          <Link href="/studio">
+          <Link href="/creer">
             <span className="vf-nav-link-dot" aria-hidden="true" />
             Studio
           </Link>
@@ -75,7 +75,7 @@ export default function PricingPage() {
             <Link href={`/account/billing?product=${lifetimeOffer.productKey}`} className="vf-primary">
               Acheter l&apos;acces lifetime
             </Link>
-            <Link href="/studio" className="vf-secondary">
+            <Link href="/creer" className="vf-secondary">
               Voir le studio
             </Link>
           </div>

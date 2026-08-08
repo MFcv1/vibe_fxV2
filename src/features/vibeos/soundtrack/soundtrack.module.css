@@ -1,0 +1,936 @@
+/*
+ * Ecran Soundtrack VibeOS (plan §5.5).
+ * Trois zones fixes: colonne de navigation, zone centrale scrollable, lecteur
+ * en bas. Comme partout dans VibeOS, seule la zone centrale scrolle - la page
+ * elle-meme ne bouge jamais.
+ */
+
+.screen {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "sidebar main"
+        "player player";
+    height: 100%;
+    min-height: 0;
+    background: var(--vo-bg);
+}
+
+/* ---------- Colonne gauche ---------- */
+
+.sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-6);
+    min-height: 0;
+    padding: var(--vo-space-5) var(--vo-space-4);
+    overflow-y: auto;
+    background: var(--vo-bg-sunken);
+    border-right: 1px solid var(--vo-line);
+}
+
+.navGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.navGroupBottom {
+    margin-top: auto;
+}
+
+.navLabel {
+    padding: 0 var(--vo-space-3) var(--vo-space-2);
+    font-size: var(--vo-text-xs);
+    font-weight: 600;
+    color: var(--vo-text-3);
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    width: 100%;
+    min-height: 38px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    font-size: var(--vo-text-sm);
+    font-weight: 500;
+    color: var(--vo-text-2);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease), color var(--vo-dur-1) var(--vo-ease);
+}
+
+.navItem:hover {
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+}
+
+.navItemActive {
+    background: var(--vo-surface-3);
+    color: var(--vo-text);
+}
+
+/* ---------- Barre d'onglets mobile ---------- */
+
+.mobileTabs {
+    display: none;
+    grid-area: sidebar;
+    align-items: center;
+    gap: var(--vo-space-1);
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border-bottom: 1px solid var(--vo-line);
+    background: var(--vo-bg-sunken);
+}
+
+.mobileTab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 1 1 0;
+    min-height: 40px;
+    padding: 0 var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    font-size: var(--vo-text-xs);
+    font-weight: 500;
+    color: var(--vo-text-2);
+}
+
+.mobileTabActive {
+    background: var(--vo-surface-3);
+    color: var(--vo-text);
+}
+
+.mobileAdd {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+/* ---------- Zone centrale ---------- */
+
+.main {
+    grid-area: main;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vo-space-6) var(--vo-space-6) var(--vo-space-10);
+}
+
+.mainHead {
+    margin-bottom: var(--vo-space-6);
+}
+
+.mainTitle {
+    font-size: var(--vo-text-xl);
+}
+
+.mainSubtitle {
+    margin-top: var(--vo-space-1);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Recherche ---------- */
+
+.searchBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-4);
+}
+
+.searchField {
+    max-width: 620px;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vo-space-2);
+}
+
+.chip {
+    min-height: 32px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    transition: background var(--vo-dur-1) var(--vo-ease), color var(--vo-dur-1) var(--vo-ease);
+}
+
+.chip:hover {
+    color: var(--vo-text);
+    border-color: var(--vo-line-strong);
+}
+
+.chip[data-active="true"] {
+    background: var(--vo-accent-quiet);
+    border-color: var(--vo-accent-line);
+    color: var(--vo-text);
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-6);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Accueil: rangees de cartes ---------- */
+
+.home {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-8);
+}
+
+.rowBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+    min-width: 0;
+}
+
+.rowBlockTitle {
+    font-size: var(--vo-text-md);
+}
+
+/* Les rangees defilent DANS elles-memes: la page ne deborde jamais en largeur. */
+.rail {
+    display: flex;
+    gap: var(--vo-space-4);
+    overflow-x: auto;
+    padding-bottom: var(--vo-space-2);
+    scroll-snap-type: x proximity;
+}
+
+.card {
+    flex: 0 0 auto;
+    width: 160px;
+    scroll-snap-align: start;
+}
+
+.cardButton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    width: 100%;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-lg);
+    border: 1px solid transparent;
+    text-align: left;
+    transition: transform var(--vo-dur-2) var(--vo-ease-out),
+        background var(--vo-dur-2) var(--vo-ease),
+        border-color var(--vo-dur-2) var(--vo-ease);
+}
+
+.cardButton:hover {
+    transform: translateY(-2px);
+    background: var(--vo-surface);
+    border-color: var(--vo-line);
+}
+
+.cardButton:active {
+    transform: translateY(0) scale(0.99);
+}
+
+.cardArt {
+    position: relative;
+    display: block;
+}
+
+.cardArtInner {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1;
+}
+
+.cardPlay {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+    box-shadow: var(--vo-shadow-2);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity var(--vo-dur-2) var(--vo-ease-out), transform var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.cardButton:hover .cardPlay,
+.cardButton:focus-visible .cardPlay {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.cardTitle {
+    font-size: var(--vo-text-sm);
+    font-weight: 500;
+    color: var(--vo-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cardArtist {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.themeCard {
+    flex: 0 0 auto;
+    width: 160px;
+    height: 92px;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    text-align: left;
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg,
+        hsl(var(--vo-art-hue) 58% 42%),
+        hsl(calc(var(--vo-art-hue) + 40) 62% 26%));
+    transition: transform var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.themeCard:hover {
+    transform: translateY(-2px);
+}
+
+/* ---------- Pochettes ---------- */
+
+.artwork {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-md);
+    color: rgba(255, 255, 255, 0.72);
+    background: linear-gradient(135deg,
+        hsl(var(--vo-art-hue) 46% 38%),
+        hsl(calc(var(--vo-art-hue) + 46) 42% 20%));
+}
+
+.mosaic {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 1fr;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border-radius: var(--vo-radius-lg);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.mosaic > span {
+    background: linear-gradient(135deg,
+        hsl(var(--vo-art-hue) 46% 38%),
+        hsl(calc(var(--vo-art-hue) + 46) 42% 20%));
+}
+
+.mosaic > span:only-child {
+    grid-column: span 2;
+    grid-row: span 2;
+}
+
+/* ---------- Listes de pistes ---------- */
+
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 28px auto minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-height: 56px;
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.row:hover {
+    background: var(--vo-surface-2);
+}
+
+.rowPlaying {
+    background: var(--vo-accent-quiet);
+}
+
+.rowPlaying .rowTitle {
+    color: var(--vo-accent-hover);
+}
+
+.rowIndex {
+    display: grid;
+    place-items: center;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+.rowPlay {
+    position: relative;
+    display: block;
+    border-radius: var(--vo-radius-md);
+}
+
+.rowPlayIcon {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--vo-radius-md);
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    opacity: 0;
+    transition: opacity var(--vo-dur-1) var(--vo-ease);
+}
+
+.row:hover .rowPlayIcon,
+.rowPlay:focus-visible .rowPlayIcon {
+    opacity: 1;
+}
+
+.rowMain {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.rowTitle {
+    font-size: var(--vo-text-sm);
+    font-weight: 500;
+    color: var(--vo-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowArtist {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowRights {
+    padding: 3px var(--vo-space-2);
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid var(--vo-line);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    white-space: nowrap;
+}
+
+.rowDuration {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.rowActions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-1);
+    min-width: 34px;
+    justify-content: flex-end;
+}
+
+/* Egaliseur de la piste en cours: 3 barres, discret, coupe par
+   prefers-reduced-motion (regle globale de vibeos.css). */
+.equalizer {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+}
+
+.equalizer i {
+    width: 2px;
+    background: var(--vo-accent);
+    border-radius: 1px;
+    animation: vo-eq 900ms var(--vo-ease) infinite alternate;
+}
+
+.equalizer i:nth-child(1) { height: 60%; animation-delay: 0ms; }
+.equalizer i:nth-child(2) { height: 100%; animation-delay: 140ms; }
+.equalizer i:nth-child(3) { height: 40%; animation-delay: 280ms; }
+
+@keyframes vo-eq {
+    from { transform: scaleY(0.4); }
+    to { transform: scaleY(1); }
+}
+
+/* ---------- Vue bibliotheque / playlist ---------- */
+
+.playlist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-5);
+}
+
+.playlistHead {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--vo-space-5);
+}
+
+.playlistMeta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-1);
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.playlistKicker {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+.playlistTitle {
+    font-size: var(--vo-text-2xl);
+}
+
+.playlistCount {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.playlistPlay {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+    box-shadow: var(--vo-shadow-2);
+    transition: background var(--vo-dur-1) var(--vo-ease), transform var(--vo-dur-1) var(--vo-ease);
+}
+
+.playlistPlay:hover:not(:disabled) {
+    background: var(--vo-accent-hover);
+}
+
+.playlistPlay:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.playlistPlay:disabled {
+    opacity: 0.45;
+}
+
+/* ---------- Lecteur ---------- */
+
+.player {
+    grid-area: player;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--vo-space-4);
+    height: 72px;
+    padding: 0 var(--vo-space-5);
+    border-top: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+}
+
+.playerTrack {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-width: 0;
+}
+
+.playerMeta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.playerTitle {
+    font-size: var(--vo-text-sm);
+    font-weight: 500;
+    color: var(--vo-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playerArtist {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playerCenter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.transport {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+}
+
+.playButton {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+    transition: background var(--vo-dur-1) var(--vo-ease), transform var(--vo-dur-1) var(--vo-ease);
+}
+
+.playButton:hover {
+    background: var(--vo-accent-hover);
+}
+
+.playButton:active {
+    transform: scale(0.97);
+}
+
+.playButton[data-size="lg"] {
+    width: 56px;
+    height: 56px;
+}
+
+.seek {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    width: 100%;
+    max-width: 520px;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.seekInput,
+.volumeInput {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 4px;
+    appearance: none;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-3);
+    cursor: pointer;
+}
+
+.seekInput::-webkit-slider-thumb,
+.volumeInput::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-text);
+}
+
+.seekInput::-moz-range-thumb,
+.volumeInput::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-text);
+}
+
+.playerTrailing {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--vo-space-3);
+    min-width: 0;
+}
+
+.volume {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    width: 116px;
+    color: var(--vo-text-2);
+}
+
+.useInVideo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    min-height: 36px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    font-size: var(--vo-text-xs);
+    font-weight: 500;
+    color: var(--vo-text);
+    white-space: nowrap;
+}
+
+.useInVideo:hover {
+    border-color: var(--vo-line-strong);
+}
+
+.playerMobile {
+    display: none;
+    align-items: center;
+    gap: var(--vo-space-3);
+    width: 100%;
+    text-align: left;
+}
+
+.playerMobilePlay {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+.fullPlayer {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-5);
+    background: var(--vo-bg);
+    animation: vo-rise var(--vo-dur-3) var(--vo-ease-out) both;
+}
+
+@keyframes vo-rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fullPlayerHead {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.fullPlayerArt {
+    margin-top: var(--vo-space-6);
+    border-radius: var(--vo-radius-xl);
+}
+
+.fullPlayerTitle {
+    font-size: var(--vo-text-lg);
+    font-weight: 600;
+    text-align: center;
+}
+
+.fullPlayerArtist {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Sheets d'import ---------- */
+
+.importBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-4);
+}
+
+.importIntro {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.importRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--vo-space-3);
+}
+
+.importField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 220px;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+/* Sur une ligne d'action, un champ ne doit pas manger toute la largeur. */
+.importRow .importField {
+    flex: 0 1 220px;
+}
+
+.importField input {
+    min-height: 38px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+    font-size: var(--vo-text-sm);
+}
+
+.importLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-accent-hover);
+}
+
+.importNote {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    flex-wrap: wrap;
+}
+
+.importStatus {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.importStatus[data-state="error"] {
+    color: var(--vo-danger);
+}
+
+.importStatus[data-state="ready"] {
+    color: var(--vo-success);
+}
+
+.hiddenInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spin {
+    animation: vo-spin 900ms linear infinite;
+}
+
+@keyframes vo-spin {
+    to { transform: rotate(360deg); }
+}
+
+.sourceList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.sourceItem {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-height: 48px;
+    padding: 0 var(--vo-space-4);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+    text-align: left;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1023px) {
+    .screen {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "sidebar"
+            "main"
+            "player";
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .mobileTabs {
+        display: flex;
+    }
+
+    .main {
+        padding: var(--vo-space-4) var(--vo-space-4) var(--vo-space-8);
+    }
+
+    .playlistTitle {
+        font-size: var(--vo-text-xl);
+    }
+
+    .player {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        padding: var(--vo-space-2) var(--vo-space-4);
+    }
+
+    .playerTrack,
+    .playerCenter,
+    .playerTrailing {
+        display: none;
+    }
+
+    .playerMobile {
+        display: flex;
+    }
+
+    .row {
+        grid-template-columns: 24px auto minmax(0, 1fr) auto;
+        gap: var(--vo-space-2);
+    }
+
+    .rowRights {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .playlistHead {
+        align-items: flex-start;
+        gap: var(--vo-space-4);
+    }
+
+    .card,
+    .themeCard {
+        width: 132px;
+    }
+}
