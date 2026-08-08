@@ -33,11 +33,7 @@ export default function PublierClient() {
 
   return (
     <StudioAuthGate>
-      <PublicationsManager
-        initialMode="publish"
-        initialDraft={draft}
-        layoutHref="/creer/layout-visuel"
-      />
+      <PublicationsManager initialDraft={draft} layoutHref="/creer/layout-visuel" />
     </StudioAuthGate>
   );
 }

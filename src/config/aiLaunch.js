@@ -34,19 +34,26 @@ export const AI_FRONT_SURFACES = [
     surface: "Packs credits IA",
     disabledState: "Masque les packs credits IA.",
   },
+  /*
+   * PHASE F (2026-08-08): l'ancienne interface /studio a ete supprimee avec la
+   * bascule vers VibeOS. Le rail agents IA et l'onglet bibliotheque Midjourney
+   * vivaient DEDANS: ces deux surfaces front n'existent plus tant qu'elles ne
+   * sont pas portees dans /creer. Les routes API et le ledger IA, eux, sont
+   * intacts (voir les entrees "API Next" plus bas).
+   */
   {
     id: "studio-ai-rail",
-    zone: "Studio",
-    route: "/studio",
-    surface: "Rail agents IA contextuel",
-    disabledState: "Bouton AI et panneau agent non montes.",
+    zone: "Creation",
+    route: "/creer",
+    surface: "Rail agents IA contextuel (a porter dans VibeOS)",
+    disabledState: "Surface absente depuis la bascule VibeOS.",
   },
   {
     id: "midjourney-asset-library",
-    zone: "Studio",
-    route: "/studio?workspace=library",
-    surface: "Bibliotheque assets Midjourney/scraper",
-    disabledState: "Onglet Library et selectors bibliotheque masques.",
+    zone: "Creation",
+    route: "/creer",
+    surface: "Bibliotheque assets Midjourney/scraper (a porter dans VibeOS)",
+    disabledState: "Surface absente depuis la bascule VibeOS.",
   },
   {
     id: "video-ai-clip",
@@ -59,7 +66,7 @@ export const AI_FRONT_SURFACES = [
   {
     id: "soundtrack-ai-providers",
     zone: "Soundtrack",
-    route: "/studio?workspace=soundtrack",
+    route: "/creer/son",
     surface: "Providers de generation musicale IA",
     disabledState: "Catalogue limite aux sources non IA.",
   },

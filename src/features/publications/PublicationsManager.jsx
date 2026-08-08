@@ -19,20 +19,19 @@ import { auth, db } from "../../lib/firebase.js";
 import { useAiLaunchSettings } from "../../hooks/useAiLaunchSettings.js";
 import PublicationComposer from "./components/PublicationComposer";
 import { normalizeVibeFxDraft } from "./helpers/publicationHelpers";
-import VibeFxStudio from "../vibefx-studio";
 
 /*
- * `initialDraft` et `layoutHref` (phase F, bascule VibeOS): la page /publier
- * monte ce composant avec un rendu deja pret et renvoie « Modifier le visuel »
- * vers le nouvel ecran Mise en page. Sans ces props, le comportement est
- * exactement celui d'avant.
+ * Le composeur de publication (phase F, bascule VibeOS).
+ *
+ * Ce composant ne monte plus d'editeur: la creation vit sur /creer, il recoit
+ * un rendu deja pret (`initialDraft`, depose par le bouton « Publier » de
+ * VibeOS) et renvoie « Modifier le visuel » vers l'ecran Mise en page
+ * (`layoutHref`).
  */
-export default function PublicationsManager({ initialMode = "dashboard", initialWorkspace = "studio", initialDraft = null, layoutHref = null }) {
+export default function PublicationsManager({ initialDraft = null, layoutHref = "/creer/layout-visuel" }) {
   const { aiInterfacesEnabled } = useAiLaunchSettings();
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState(initialMode);
-  const [layoutInitialView, setLayoutInitialView] = useState(initialWorkspace);
   const [draft, setDraft] = useState(() => (initialDraft ? normalizeVibeFxDraft(initialDraft) : null));
   const [selectedPublication, setSelectedPublication] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -140,19 +139,10 @@ export default function PublicationsManager({ initialMode = "dashboard", initial
     return () => window.clearTimeout(timer);
   }, [authLoading, loadAccountData, loadPublications]);
 
-  const handleImport = (payload) => {
-    setDraft(normalizeVibeFxDraft(payload));
-    setSelectedPublication(null);
-    setMode("publish");
-  };
-
+  /* « Modifier le visuel » quitte la publication pour l'ecran Mise en page:
+     navigation reelle, le projet est relu depuis IndexedDB a l'arrivee. */
   const openLayoutFromPublications = () => {
-    if (layoutHref) {
-      window.location.href = layoutHref;
-      return;
-    }
-    setLayoutInitialView("layout");
-    setMode("layout");
+    window.location.href = layoutHref;
   };
 
   const handleSelectPublication = (publication) => {
@@ -193,36 +183,22 @@ export default function PublicationsManager({ initialMode = "dashboard", initial
   };
 
   return (
-    <div className={`pub-manager vfx-mode ${mode === "layout" ? "is-layout" : "is-publish"}`}>
-      {mode === "layout" ? (
-        <div className="pub-layout-fullscreen">
-          <VibeFxStudio
-            initialView={layoutInitialView}
-            publicationsCount={publications.length}
-            onOpenPublications={() => {
-              setLayoutInitialView("studio");
-              setMode("dashboard");
-            }}
-            onImportToPublication={handleImport}
-          />
-        </div>
-      ) : (
-        <PublicationComposer
-          draft={draft}
-          publication={selectedPublication}
-          publications={publications}
-          loading={loading || authLoading}
-          authError={authError}
-          currentUser={currentUser}
-          accountData={accountData}
-          aiInterfacesEnabled={aiInterfacesEnabled}
-          onBackToLayout={openLayoutFromPublications}
-          onSelectPublication={handleSelectPublication}
-          onDeletePublication={handleDelete}
-          onSetHomeFeature={handleSetHomeFeature}
-          onSaved={handleSavedPublication}
-        />
-      )}
+    <div className="pub-manager vfx-mode is-publish">
+      <PublicationComposer
+        draft={draft}
+        publication={selectedPublication}
+        publications={publications}
+        loading={loading || authLoading}
+        authError={authError}
+        currentUser={currentUser}
+        accountData={accountData}
+        aiInterfacesEnabled={aiInterfacesEnabled}
+        onBackToLayout={openLayoutFromPublications}
+        onSelectPublication={handleSelectPublication}
+        onDeletePublication={handleDelete}
+        onSetHomeFeature={handleSetHomeFeature}
+        onSaved={handleSavedPublication}
+      />
     </div>
   );
 }

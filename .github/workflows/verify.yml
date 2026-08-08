@@ -60,8 +60,13 @@ jobs:
       - name: Verify routes
         run: npm run verify:routes
 
-      - name: Verify studio UI smoke
-        run: npm run test:studio-ui
-
-      - name: Verify studio save with Firebase emulators
-        run: npm run test:studio-emulators
+      # PHASE F (bascule VibeOS): l'ancienne interface /studio n'existe plus.
+      # Les smokes qui la pilotaient ont ete retires; la creation est couverte
+      # par les suites VibeOS ci-dessous, qui demarrent leur propre serveur.
+      - name: Verify VibeOS screens
+        run: |
+          npm run test:vibeos-layout
+          npm run test:vibeos-vision
+          npm run test:vibeos-studio
+          npm run test:vibeos-soundtrack
+          npm run test:vibeos-pipeline

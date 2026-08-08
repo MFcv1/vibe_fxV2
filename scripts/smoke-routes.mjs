@@ -12,8 +12,9 @@ const publicRoutes = [
   "/ressources/formats-instagram",
 ];
 
-const utilityRoutes = ["/studio", "/robots.txt", "/sitemap.xml"];
-const privateRoutes = ["/account", "/account/billing", "/account/usage"];
+const utilityRoutes = ["/robots.txt", "/sitemap.xml"];
+/* Surfaces app privees: /creer (VibeOS) et /publier ont remplace /studio. */
+const privateRoutes = ["/creer", "/publier", "/account", "/account/billing", "/account/usage"];
 
 async function fetchText(path) {
   const response = await fetch(`${baseUrl}${path}`);
@@ -41,8 +42,23 @@ for (const route of publicRoutes) {
   assert.doesNotMatch(chunks, /src_app_studio|src_features_publications|src_features_vibefx/i, `${route} should not load studio chunks`);
 }
 
-const studioHtml = await fetchText("/studio");
-assert.match(studioHtml, /noindex/, "/studio should be noindex");
+/* Phase F: /studio ne rend plus rien, il redirige vers la surface VibeOS. */
+const studioRedirect = await fetch(`${baseUrl}/studio`, { redirect: "manual" });
+assert.ok(
+  [301, 302, 307, 308].includes(studioRedirect.status),
+  `/studio should redirect, got ${studioRedirect.status}`,
+);
+assert.match(
+  studioRedirect.headers.get("location") || "",
+  /\/creer$/,
+  "/studio should redirect to /creer",
+);
+const studioWorkspace = await fetch(`${baseUrl}/studio?workspace=vision-pro`, { redirect: "manual" });
+assert.match(
+  studioWorkspace.headers.get("location") || "",
+  /\/creer\/vision$/,
+  "/studio?workspace=vision-pro should redirect to /creer/vision",
+);
 
 for (const route of privateRoutes) {
   const html = await fetchText(route);
@@ -50,7 +66,8 @@ for (const route of privateRoutes) {
 }
 
 const robots = await fetchText("/robots.txt");
-assert.match(robots, /Disallow: \/studio/, "robots.txt should disallow /studio");
+assert.match(robots, /Disallow: \/creer/, "robots.txt should disallow /creer");
+assert.match(robots, /Disallow: \/publier/, "robots.txt should disallow /publier");
 assert.match(robots, /Sitemap:/, "robots.txt should expose sitemap");
 
 const sitemap = await fetchText("/sitemap.xml");

@@ -1,6 +1,6 @@
 # map.md - Carte vivante Vibe_fx V2
 
-Derniere mise a jour : 2026-07-29
+Derniere mise a jour : 2026-08-08
 
 ## Regle
 
@@ -190,13 +190,15 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- layout.js               # Charge vibeos.css (seule feuille de style), monte StudioAuthGate + VibeOsShell (providers projet/audio/toasts)
 |   |   |   |-- page.js                 # Accueil incubateur (HomeScreen)
 |   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
-|   |   |   |-- studio/page.js          # Espace Studio — placeholder jusqu'a la phase D
-|   |   |   |-- vision/page.js          # Espace Vision — placeholder jusqu'a la phase C
+|   |   |   |-- studio/page.js          # Espace Studio : monte `features/vibeos/studio/StudioScreen`
+|   |   |   |-- vision/page.js          # Espace Vision : monte `features/vibeos/vision/VisionScreen`
 |   |   |   `-- son/page.js             # Espace Soundtrack : monte `features/vibeos/soundtrack/SoundtrackScreen`
+|   |   |-- publier/                    # Surface publication (phase F) : elle a repris les feuilles Tailwind/publications que /studio chargeait, sans jamais charger vibeos.css
+|   |   |   |-- layout.js               # vibefx-tailwind.css + vibefx-layout.css + publications.css, scopees a /publier
+|   |   |   |-- page.js                 # Page noindex
+|   |   |   `-- PublierClient.jsx       # Reprend le rendu depose par « Publier » (publishHandoff) et monte PublicationsManager avec ce brouillon
 |   |   |-- studio/
-|   |   |   |-- layout.js               # CSS lourds du studio scopes a /studio, incluant le rail IA
-|   |   |   |-- page.js                 # Page studio noindex + deep-link `?workspace=layout`
-|   |   |   `-- StudioClient.jsx        # Client wrapper du studio
+|   |   |   `-- page.js                 # PLUS AUCUNE INTERFACE depuis la phase F : redirection serveur vers /creer, avec le mapping des anciens `?workspace=` (layout -> /creer/layout-visuel, studio -> /creer/studio, vision-pro -> /creer/vision, soundtrack et library -> /creer/son, video -> /video)
 |   |   |-- video/                      # Module Vibe_CUT. Depuis la PHASE 7 il ne contient plus AUCUNE interface : seulement les modeles, moteurs et services dont le nouveau front depend. `model/timelineModel.js` (modele canonique tracks/items), `model/mediaModel.js` (SANS AUCUN IMPORT : mouvements photo, intensite, `applyImageMotionTransform` que le test de parite charge tel quel), `engine/VideoEngine.js` (dont `renderTransition`, EXPORTEE en phase 5 pour que les vignettes de bibliotheque montrent la vraie transition), `engine/xfadeTransitions.js` (contrepartie canvas exacte des transitions natives `xfade`, courbes relevees sur des rendus reels), `engine/textOverlayRenderer.js`, `export/useExportController.js` (logique d'export), `export/exportDownload.js` (nom de fichier horodate, regeneration d'URL signee, enregistrement dans un dossier du PC — deplaces du panneau supprime en phase 7), `export/exportManifest.js`, `store/videoStore.js` (dont l'action additive `applyMontageScore`, lot L2), `data/musicCatalog.js` et `data/musicRights.js` (la bande-son du studio s'en sert), `services/videoProjectPersistence.js`, `utils/audioWaveform.js`
 |   |   |   |-- avance/
 |   |   |   |   `-- page.js             # Montage avance : bibliotheque, apercu, inspecteur, timeline multipiste (phase 4)
@@ -276,25 +278,16 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- VibeFxLayout.jsx
 |   |   |   |-- vibefx-layout.css
 |   |   |   `-- vibefx-tailwind.css
-|   |-- vibefx-studio/                 # Dossier reel : src/features/vibefx-studio/
-|   |   |-- ai/                         # Catalogue/actions/payload/client/hook du rail IA studio, gateway Functions uniquement
-|   |   |-- components/                 # Header, tabs Studio/Layout/Library/Soundtrack/Vision/Video et panneaux source Vibe_fx ; le header embarque le mini-player Soundtrack global
-|   |   |   `-- ai/                     # Rail IA contextuel : actions, prompt, credits, trace job, outputs
+|   |-- vibefx-studio/                 # Dossier reel : src/features/vibefx-studio/. Depuis la PHASE F il ne contient plus AUCUNE interface : seulement les moteurs, hooks, donnees et services que `vibeos/` importe. `ai/`, `components/` (dont le rail IA et l'onglet bibliotheque Midjourney), `soundtrack/components/`, `SoundtrackPage.jsx` et `VibeFxStudio.jsx` ont ete supprimes avec l'ancienne UI
 |   |   |-- data/                       # Constantes, presets et donnees UI importees
 |   |   |-- engine/                     # Rendu canvas/physics importes depuis Vibe_fx
 |   |   |-- hooks/                      # Hooks interaction, renderer, bibliotheque et assets
-|   |   |-- soundtrack/                 # Onglet Soundtrack full page V2 : page Import IA gratuit par defaut + bibliotheque Vibe_fx en popup desktop/fullscreen mobile, Firebase projet ou local-first
-|   |   |   |-- components/               # ProjectLibraryPanel popup avec import fichier, suppression/playlists/classement local/projet, AiMusicImportAssistant en pleine page Soundtrack, Search provider-specifique conserve pour composants legacy, results/rows/player et SoundtrackHeaderMiniPlayer global
+|   |   |-- soundtrack/                 # Logique Soundtrack (l'UI vit dans vibeos/soundtrack/ depuis la phase E, les composants de l'ancien onglet ont ete supprimes en phase F)
 |   |   |   |-- data/                     # Providers/filtres/defaults Soundtrack reutilisant musicCatalog
 |   |   |   |-- hooks/                    # Recherche API, player preview, controller global Soundtrack, bibliotheque projet Firebase et bibliotheque locale IndexedDB/dossier
 |   |   |   |-- services/                 # Modele/client Firestore/Storage projet (tracks + playlists), cache/search provider, IndexedDB, manifest, File System Access, import dev public/music/local-imports, downloads locaux, audit droits, et `soundtrackImportFlows.js` (flux d'import Aitra/Pixabay/URL/fichier extraits des assistants, partages entre l'ancien /studio et l'ecran Soundtrack VibeOS)
-|   |   |   |-- SoundtrackPage.jsx        # Experience full page Soundtrack dans le studio, sans canvas/sidebar, import IA gratuit par defaut sans pistes starter injectees, consomme le controller audio global
-|   |   |   `-- soundtrack.css          # CSS dark-ui/technical-ui scope Soundtrack charge par /studio/layout, incluant le player bas et le mini-player header
-|   |   |-- utils/                      # Utilitaires canvas/image + color science Vision (`visionColorScience.js`, `visionMetrics.js`, `visionRecommendation.js` — signaux image, scoring profil<->photo et rendu des vignettes, partages entre l'ancien VisionPanel et l'ecran Vision VibeOS)
+|   |   |-- utils/                      # Utilitaires canvas/image + `socialExport.js` (decoupage carrousel panorama + PNG de publication, extrait de VibeFxStudio.jsx en phase F et partage avec le bouton « Publier » de VibeOS) + color science Vision (`visionColorScience.js`, `visionMetrics.js`, `visionRecommendation.js` — signaux image, scoring profil<->photo et rendu des vignettes, partages entre l'ancien VisionPanel et l'ecran Vision VibeOS)
 |   |   |-- video/                      # Module Vibe_CUT importe, dont `export/useExportController.js` (logique d'export extraite du panneau), `engine/textOverlayRenderer.js` (rendu canvas des textes extrait de VideoPreview) et `engine/xfadeTransitions.js` (contrepartie canvas exacte des transitions natives `xfade` de FFmpeg, courbes relevees sur des rendus reels), `export/` pour ExportManifest + services localMock/Firebase future, `store/videoStore.js` dont l'action additive `applyMontageScore` (partition de montage, lot L2), `data/musicCatalog.js` pour catalogue/sources/licences, `data/musicRights.js` pour audit/manifeste droits musique, `services/exportRightsManifestClient.js` pour persistance Firestore owner-scoped, `model/timelineModel.js` pour le modele canonique tracks/items, `model/mediaModel.js` (SANS AUCUN IMPORT) pour les mouvements photo, leur intensite et `applyImageMotionTransform` — la transformation d'apercu que le test de parite charge telle quelle, `utils/audioWaveform.js` pour l'extraction waveform client, `utils/quickTools.js` pour la palette rapide drag/drop, et `panels/VibeCutQuickPanel.jsx` pour le panneau droit VibeCut
-|   |   |-- index.js
-|   |   |-- components/modals/LumenShaderModal.jsx # Modal iframe Lumen Shader Studio + pont postMessage pour appliquer le shader comme fond Layout
-|   |   |-- VibeFxStudio.jsx            # Shell studio Vibe_fx + import publication V2 + vue Soundtrack full page + controller audio global persistant entre onglets studio
 |   |-- vibecut/                        # Nouveau front VibeCut (reconstruction UI). Aucun import de l'ancienne interface, aucune classe Tailwind.
 |   |   |-- adapters/                   # Seule couche qui connait le store video et IndexedDB
 |   |   |   |-- useMediaImport.js       # Import photos/videos : duree, orientation, miniatures, waveform, etat d'avancement
@@ -390,14 +383,19 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- primitives/
 |   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
 |   |   |   `-- primitives.module.css
-|   |   |-- project/
-|   |   |   |-- projectModel.js         # Modele projet v1 (format, template, images, vision, studio, soundtrackTrackId, thumbnail) + normalisation defensive
+|   |   |-- project/                    # Le projet commun ET le pipeline de rendu (plan §4.3)
+|   |   |   |-- pipeline.js             # PHASE F : l'ordre composition Layout -> filtres Vision -> effets Studio -> export, ecrit une fois pour tout le produit. Chaque etage passe par `renderStudio` (le moteur des ecrans), un etage neutre est saute, et `resolveProjectSource` donne l'entree (composition si le Layout en a publie une, sinon la photo)
+|   |   |   |-- publishProject.js       # Projet -> charge utile de publication : rendu final + `buildSocialImages` (tranches panorama), au format exact qu'attend `normalizeVibeFxDraft`
+|   |   |   |-- publishHandoff.js       # Relais du bouton « Publier » vers /publier (singleton de module : des Blobs, donc pas de sessionStorage ; survit a une navigation client, pas a un rechargement)
+|   |   |   |-- PipelineSourceNote.jsx  # La ligne « sur quoi tu travailles » affichee par Vision et Studio (composition / photo du projet / import), + le rappel « ton reglage Vision est deja applique »
+|   |   |   |-- pipelineSourceNote.module.css
+|   |   |   |-- projectModel.js         # Modele projet v1 (format, template, images, `composition` (Blob PNG publie par le Layout), vision, studio, soundtrackTrackId, thumbnail) + normalisation defensive
 |   |   |   |-- projectDb.js            # IndexedDB `vibeos` (stores projects + meta), degrade en no-op si indisponible, recents limites a 8
 |   |   |   `-- VibeOsProjectProvider.jsx # Contexte du projet qui circule : autosauvegarde debouncee 800ms, flush sur pagehide, create/open/duplicate/remove/ensureProject
 |   |   |-- shell/
-|   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier vers /studio jusqu'a la phase F) + tab bar basse mobile safe-area
+|   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier) + tab bar basse mobile safe-area
 |   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
-|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (plus monte par aucune route /creer depuis la phase E ; conserve pour la phase F)
+|   |   |   |-- PublishButton.jsx       # « Publier » (phase F) : rend le projet via le pipeline, depose le resultat dans publishHandoff, ouvre /publier ; desactive tant qu'il n'y a ni composition ni photo
 |   |   |   `-- shell.module.css
 |   |   |-- shared/                     # Sheets de fonds generes partages entre Layout et Studio (sortis de layout/ a la phase D)
 |   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS (meshPreviewStyle exporte) ; rendu final par renderLayoutMeshBackground (moteur existant)
@@ -495,10 +493,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- check-vision-corpus.mjs         # Verifie les 12 fixtures smartphone locales ignorees par Git
 |   |-- audit-vision-filters.mjs        # Audit statique des profils Vision et du branchement safe smartphone, incluant temperature/halation/tint global masques
 |   |-- firebase-deploy.mjs             # Wrapper cross-platform deploy backend/functions avec cible controlee, firebase-tools local et timeout discovery 60s
-|   |-- run-vision-corpus-test.mjs      # Lance Next local puis Playwright sur le corpus smartphone Vision local
-|   |-- run-vision-ui-test.mjs          # Lance un serveur Next local dedie puis Playwright Vision avec SMOKE_BASE_URL controle
 |   |-- run-video-ui-test.mjs           # Lance un serveur Next local dedie puis les smokes Playwright Vibe_CUT fonctionnel + securite media/capacites avec SMOKE_BASE_URL controle
-|   |-- smoke-smooth-blur-ui.mjs        # Smoke Playwright Flou lisse pro : bypass dev, sliders, directions, presets, reverse et appliquer
 |   |-- run-firebase-emulators-test.mjs # Wrapper test:emulators : exige Java 21+ via VIBECUT_JAVA_HOME/JAVA_HOME/PATH/chemins Windows puis lance firebase emulators:exec
 |   |-- smoke-firebase-emulators.mjs    # Smoke test Auth/Firestore/Storage rules sous emulateurs, incluant credits/jobs/payments
 |   |-- smoke-export-professional-settings.mjs # Smoke pur du module Export Pro : presets sociaux/custom, PNG/JPEG/WebP, filename, estimation, queue, echec et comparaison canvas
@@ -510,13 +505,9 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-app-check.mjs             # Smoke test de la politique App Check enforce par defaut hors emulateurs
 |   |-- smoke-publication-flow.mjs      # Smoke test rejouable du parcours publication sans Firebase reel
 |   |-- smoke-routes.mjs                # Smoke test HTTP des routes SEO/studio + noindex compte
-|   |-- smoke-studio-emulator-ui.mjs    # Smoke test navigateur studio + sauvegarde Firestore/Storage emulateurs
-|   |-- smoke-studio-ai-rail.spec.cjs   # Smoke Playwright du rail IA studio : ouverture, actions par onglet, prompt, cout, gateway/error, mobile
 |   |-- fixtures/
 |   |   `-- pixabay-music-search.html   # Fixture HTML locale pour parsing provider Pixabay Music importable + metadata-only
 |   |-- smoke-soundtrack-core.mjs       # Smoke pur Soundtrack V2 : mapping ProviderTrack -> ProjectSoundTrack, droits, cache key provider, parsing historique Pixabay, manifest sans Blob/File
-|   |-- smoke-soundtrack-ui.spec.cjs    # Smoke Playwright onglet Soundtrack V2 : provider-first Pixabay manuel + Openverse social-first, Archive/Wikimedia retires, aucun fallback Vibe_CUT dans le scan, popup bibliotheque, import fichier local, playlists/suppression locaux, manifest, providers/API, responsive
-|   |-- smoke-studio-ui.spec.cjs        # Smoke test Playwright du flux studio -> import publication
 |   |-- smoke-video-timeline-model.mjs  # Smoke test pur du modele timeline/export Vibe_CUT : tracks/items, render plan, trous/overlaps, fps/codec, plan de frames, durees non finies et grille snap bornee
 |   |-- smoke-video-store.mjs           # Smoke test pur du store Vibe_CUT : mutations, overlaps, rejet Infinity/NaN et preservation d'une duree media valide
 |   |-- smoke-vibecut-export-manifest.mjs # Smoke test pur ExportManifest : MP4/H.264/AAC, modes qualite, sources, couts, couverture renderer et registre central des capacites publiees
@@ -531,13 +522,17 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-vibecut-slowmo-samples.spec.cjs # Smoke Playwright HDR/SDR MKV : import des samples Windows, presets ralentis timeline 50%/Normal et duree projet
 |   |-- smoke-vibecut-desktop-video-orientation.spec.cjs # Smoke Playwright MVI_0016 Bureau : preset 9:16, detection 60 FPS metadata, rotation header, forçage export 30 FPS et ralenti 50%
 |   |-- smoke-vibecut-media-safety.spec.cjs # Smoke Playwright Phase 0 : les WebM a metadata instable ne crashent plus la timeline et les outils preview-only restent desactives
+|   |-- smoke-vibeos-layout-b1.spec.cjs # Smoke Playwright Layout VibeOS : import, canvas, formats, modeles, template thematique, export
+|   |-- smoke-vibeos-layout-b3.spec.cjs # Smoke Playwright Layout VibeOS : textures, zones custom, stickers, comparaison, apercu Insta, reprise du projet
+|   |-- smoke-vibeos-vision.spec.cjs   # Smoke Playwright Vision VibeOS : analyse, « Ameliorer ma photo », intensite, 12 looks surs sur 5 photos types
+|   |-- smoke-vibeos-studio.spec.cjs   # Smoke Playwright Studio VibeOS : ambiances rendues sur la vraie image, intensite, « Surprends-moi », variantes, avances, 10 ambiances distinctes
+|   |-- smoke-vibeos-soundtrack.spec.cjs # Smoke Playwright Soundtrack VibeOS : import, lecture qui survit au changement de page, recherche, mobile
+|   |-- smoke-vibeos-pipeline.spec.cjs # PHASE F : le pipeline bout en bout, pixels mesures a chaque etage (composition -> Vision -> Studio) puis publication, desktop et mobile
 |   |-- smoke-vibecut-ui-v2.spec.cjs   # Smoke Playwright nouveau front : accueil, isolation CSS, regle typographique, cycle projet, noindex des six routes
 |   |-- smoke-vibecut-quick-v2.spec.cjs # Smoke Playwright montage rapide : import reel, storyboard, duree, mouvement, transition, texte, musique, export
 |   |-- smoke-vibecut-style-recipes.mjs # Smoke pur du moteur de recettes phase 3 : generation sur 5 jeux de scenes x 4 styles x 3 rythmes, et parite mouvements/transitions moteur <-> SERVER_RENDER_CAPABILITIES
 |   |-- smoke-vibecut-advanced-v2.spec.cjs # Smoke Playwright montage avance : ordre des sept pistes, bascules de piste, rognage/reorder/deplacement au pointeur, annuler-retablir, tete de lecture, decoupe, zoom, magnetisme, inspecteur, bibliotheque, export 60 fps, responsive 390 px et preuve du moteur d'apercu unique
 |   |-- smoke-vibecut-guided-v2.spec.cjs # Smoke Playwright creation guidee : parcours 5 etapes, generation verifiee dans l'apercu, reouverture du meme projet en montage rapide, zero erreur console
-|   |-- smoke-vision-corpus.spec.cjs    # Smoke test Playwright optionnel sur les fixtures smartphone Vision locales, avec gates metriques par profil
-|   |-- smoke-vision-ui.spec.cjs        # Smoke test Playwright Vision : miniatures image courante, mode simple/expert, recherche/familles/favoris, recettes correctives diagnostic, import demo + fixture synthetique, profils a risque, halation/tint global safe sur blancs/neons/neutres, avant/apres maintenu, intensity 0/100, metriques clipping/saturation/voile, mobile, reset
 |   `-- midjourney-scraper/
 |       |-- data/                       # Dossier de travail vide au depart, rempli par scraping local
 |       |-- config.mjs                  # Configuration scraper importee depuis Vibe_fx
@@ -577,6 +572,92 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (VibeOS phase F — bascule : le pipeline, /studio, la suppression)
+
+- **Le trou fonctionnel est bouche : la composition circule.** Jusqu'ici Vision
+  et Studio travaillaient sur LA PHOTO du projet, jamais sur le visuel compose
+  dans Mise en page — le pipeline du plan §4.3 n'existait que sur le papier. Il
+  est maintenant ecrit une fois, dans
+  `src/features/vibeos/project/pipeline.js`, dans l'ordre fixe **composition
+  Layout -> filtres Vision -> effets Studio -> export**.
+- **Comment il circule, concretement.** L'ecran Layout rendait deja sa
+  composition en pleine resolution pour fabriquer la vignette de l'accueil : ce
+  meme rendu est desormais enregistre dans le projet
+  (`project.composition`, un **Blob PNG**, jamais une dataURL). Vision et Studio
+  prennent cette composition en entree quand elle existe, et retombent sur la
+  photo sinon. Le Studio, lui, recoit la composition **deja passee par l'etage
+  Vision** : son image de travail est cuite par `applyVisionStage`, donc ses
+  effets s'empilent au lieu de se substituer.
+- **Aucun moteur reecrit, meme ici.** Chaque etage passe par `renderStudio`,
+  exactement le moteur que les deux ecrans utilisent pour leur apercu — c'est
+  ce qui garantit que le rendu final est ce que l'utilisateur a vu. Un etage
+  dont les filtres valent les valeurs par defaut, ou dont l'intensite est
+  nulle, est **saute** : la source traverse sans etre recopiee, donc sans
+  perte.
+- **L'utilisateur sait sur quoi il travaille.** `PipelineSourceNote` affiche une
+  ligne, au meme endroit dans Vision et dans Studio : « Tu travailles sur ta
+  composition Mise en page » (avec un lien pour y retourner), ou « sur la photo
+  de ton projet », ou « sur la photo importee ici ». Le Studio ajoute « Ton
+  reglage Vision est deja applique dessus ». Sans cette ligne, le chainage
+  serait invisible, donc impossible a comprendre quand il surprend.
+- **`/studio` ne rend plus rien : il redirige, cote serveur.** Mapping complet
+  des anciens deep-links : `layout` -> `/creer/layout-visuel`, `studio` ->
+  `/creer/studio`, `vision-pro` -> `/creer/vision`, `soundtrack` et `library`
+  -> `/creer/son`, `video` -> `/video`, tout le reste -> `/creer`. Les liens
+  des pages publiques, du compte, du backoffice et de VibeCut ont ete
+  **repointes a la source** plutot que laisses vivre sur la redirection.
+- **La publication a sa propre route : `/publier`.** C'est le meme
+  `PublicationsManager`, avec les memes feuilles Tailwind/publications que
+  `/studio` chargeait — deplacees dans `src/app/publier/layout.js`. Le bouton
+  « Publier » du bandeau rend le projet complet via le pipeline, depose la
+  charge utile dans `publishHandoff` (un singleton de module : elle contient
+  des Blobs, sessionStorage ne sait pas les stocker) et navigue. Limite
+  assumee et documentee : le relais survit a une navigation client, pas a un
+  rechargement complet — meme mecanique que le pont « Utiliser dans VibeCut ».
+- **Une extraction de plus, jamais une copie** : `buildSocialImages` (decoupage
+  des panoramas en slides de carrousel) est sorti de `VibeFxStudio.jsx` vers
+  `src/features/vibefx-studio/utils/socialExport.js` AVANT la suppression, pour
+  que la charge utile de publication reste identique au bit pres.
+- **Suppression de l'ancienne interface (commit separe et reversible).** Sont
+  partis : `VibeFxStudio.jsx` et son `index.js`, tout `components/` (header,
+  sidebars, panneaux Layout/Style/Vision, modales, onglet bibliotheque
+  Midjourney, rail IA, HeroSidebar/HeroToolbar), tout `ai/`,
+  `soundtrack/SoundtrackPage.jsx` + `soundtrack/components/` + `soundtrack.css`,
+  `src/app/studio/StudioClient.jsx` et `src/app/studio/layout.js`. Sont restes,
+  et c'est le point important : **tous les moteurs, hooks, donnees et services**
+  que `vibeos/` importe. Un garde neuf dans `scripts/audit-scope.mjs` verifie
+  les deux sens — la liste des fichiers qui doivent avoir disparu, et la liste
+  de ceux qui doivent rester.
+- **Ce que la suppression emporte vraiment** (dit franchement, ce n'est pas que
+  du menage) : le **rail agents IA** et l'**onglet bibliotheque Midjourney**
+  vivaient dans l'ancienne interface et ne sont pas portes dans VibeOS. Les
+  routes API et le ledger IA sont intacts ; `src/config/aiLaunch.js` marque ces
+  deux surfaces « a porter dans VibeOS » au lieu de pointer vers une page
+  morte.
+- **Tests retires avec ce qu'ils testaient** : `smoke-studio-ui`,
+  `smoke-studio-ai-rail`, `smoke-soundtrack-ui`, `smoke-vision-ui`,
+  `run-vision-ui-test`, `smoke-vision-corpus`, `run-vision-corpus-test`,
+  `smoke-smooth-blur-ui`, `smoke-studio-emulator-ui` et
+  `smoke-vibeos-layout-parity` (sa reference — l'ancien Layout — n'existe
+  plus ; derniere mesure : 0 pixel d'ecart). Les audits purs qu'ils
+  encadraient survivent : `test:vision-filters`, `test:smooth-blur`,
+  `test:soundtrack-core`, `check:vision-corpus`.
+- **Un smoke neuf, `test:vibeos-pipeline`** : il compose reellement dans Mise en
+  page, passe a Vision, applique un look, passe au Studio et **mesure les
+  pixels** pour verifier que l'image de travail du Studio est bien la
+  composition filtree par Vision (et pas la composition nue), applique une
+  ambiance, puis publie et verifie que `/publier` s'ouvre avec le visuel. Le
+  meme parcours est rejoue en 390px.
+- **Deux tests d'infrastructure mis a jour** : `smoke-routes` verifie desormais
+  la redirection `/studio` (307 vers `/creer`, et `?workspace=vision-pro` vers
+  `/creer/vision`) et le noindex de `/creer` et `/publier` ; le workflow CI ne
+  lance plus les smokes de l'ancienne UI mais les cinq suites VibeOS.
+- **Gates** : `npm run lint` (0 erreur, 5 warnings preexistants — 7 warnings
+  sont partis avec les fichiers supprimes), `npm run build`, `test:scope`,
+  `test:vibeos-layout`, `test:vibeos-vision`, `test:vibeos-studio`,
+  `test:vibeos-soundtrack`, `test:vibeos-pipeline`, `test:routes` (serveur de
+  production local) et `test:publication-flow` : tous verts.
 
 ## Journal — 2026-08-08 (VibeOS phase E — l'ecran Soundtrack reel)
 

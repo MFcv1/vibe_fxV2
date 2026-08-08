@@ -21,6 +21,10 @@ import { hasStoredComposition, restoreComposition, snapshotComposition } from '.
  * contient que de l'orchestration: le pipeline de rendu, les evenements canvas,
  * l'upload et l'export sont exactement ceux de l'ancien onglet Layout - c'est
  * ce qui garantit la parite d'export au pixel pres.
+ *
+ * Les commentaires ci-dessous citent `VibeFxStudio.jsx`: c'etait l'ancienne
+ * interface, supprimee a la phase F (bascule VibeOS). Elle reste consultable
+ * dans l'historique git, et ces renvois disent d'ou vient chaque sequence.
  */
 
 const THUMBNAIL_WIDTH = 256;

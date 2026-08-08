@@ -262,7 +262,6 @@ for (const path of [
   "src/features/publications/components/MetaOAuthPanel.jsx",
   "src/features/publications/components/PublicationList.jsx",
   "src/features/publications/helpers/publicationHelpers.js",
-  "scripts/smoke-studio-emulator-ui.mjs",
 ]) {
   assert.ok(existsSync(join(root, path)), `${path} should exist`);
 }
@@ -288,7 +287,6 @@ assert.equal(firebaseJson.hosting, undefined, "firebase.json should not configur
 
 const packageJson = JSON.parse(read("package.json"));
 assert.equal(packageJson.scripts["firebase:deploy"], undefined, "package.json should not expose a broad firebase deploy script");
-assert.match(packageJson.scripts["test:studio-emulators"], /smoke-studio-emulator-ui\.mjs/);
 assert.match(packageJson.scripts["test:account-deletion"], /smoke-account-deletion\.mjs/);
 assert.match(packageJson.scripts["test:app-check"], /smoke-app-check\.mjs/);
 assert.match(packageJson.scripts["test:ai-gateway"], /smoke-ai-gateway\.mjs/);
@@ -344,10 +342,8 @@ assert.match(publicationsManager, /setPublications\(\(current\) =>/);
 const rootLayout = read("src/app/layout.js");
 assert.doesNotMatch(rootLayout, /features\/(?:vibefx-layout|publications)/);
 
-const studioLayout = read("src/app/studio/layout.js");
-assert.match(studioLayout, /features\/vibefx-layout\/vibefx-tailwind\.css/);
-assert.match(studioLayout, /features\/vibefx-layout\/vibefx-layout\.css/);
-assert.match(studioLayout, /features\/publications\/publications\.css/);
+/* Phase F: /studio n'a plus de layout - il ne rend plus rien, il redirige.
+   Les feuilles de l'ancien bundle sont portees par /publier (voir plus bas). */
 
 // --- VibeCut v2 (route /video): surface isolee ---
 const vibeCutLayout = read("src/app/video/layout.js");
@@ -475,11 +471,66 @@ for (const gone of [
   "src/features/vibefx-studio/video/timeline",
   "src/features/vibefx-studio/video/preview",
   "scripts/smoke-video-ui.spec.cjs",
+  /* Phase F (bascule VibeOS): l'ancienne interface de creation. */
+  "src/features/vibefx-studio/VibeFxStudio.jsx",
+  "src/features/vibefx-studio/index.js",
+  "src/features/vibefx-studio/components",
+  "src/features/vibefx-studio/ai",
+  "src/features/vibefx-studio/soundtrack/SoundtrackPage.jsx",
+  "src/features/vibefx-studio/soundtrack/components",
+  "src/app/studio/StudioClient.jsx",
+  "src/app/studio/layout.js",
 ]) {
   assert.equal(
     existsSync(join(root, gone)),
     false,
     `${gone} devait etre supprime en phase 7`,
+  );
+}
+
+/* ---------- Phase F: la bascule VibeOS n'a pas emporte les moteurs ---------- */
+
+/*
+ * Supprimer l'UI ne doit JAMAIS supprimer la logique: tout ce que `vibeos/`
+ * importe de l'ancien studio doit rester sur le disque. Sans ce garde, un
+ * nettoyage un peu large casserait Layout, Vision et Studio d'un coup.
+ */
+for (const kept of [
+  "src/features/vibefx-studio/engine/layoutRenderer.js",
+  "src/features/vibefx-studio/engine/studioRenderer.js",
+  "src/features/vibefx-studio/engine/textRenderer.js",
+  "src/features/vibefx-studio/engine/assetRenderer.js",
+  "src/features/vibefx-studio/hooks/useCanvasRenderer.js",
+  "src/features/vibefx-studio/hooks/useCanvasEvents.js",
+  "src/features/vibefx-studio/hooks/useExport.js",
+  "src/features/vibefx-studio/hooks/useImageUpload.js",
+  "src/features/vibefx-studio/hooks/useLayoutHelpers.js",
+  "src/features/vibefx-studio/hooks/useLayoutState.js",
+  "src/features/vibefx-studio/hooks/useStudioFilters.js",
+  "src/features/vibefx-studio/utils/visionColorScience.js",
+  "src/features/vibefx-studio/utils/visionMetrics.js",
+  "src/features/vibefx-studio/utils/visionRecommendation.js",
+  "src/features/vibefx-studio/utils/canvasUtils.js",
+  "src/features/vibefx-studio/utils/customLayout.js",
+  "src/features/vibefx-studio/utils/socialExport.js",
+  "src/features/vibefx-studio/data/constants.jsx",
+  /* Les ~80 habillages thematiques vivent, eux, dans vibefx-layout. */
+  "src/features/vibefx-layout/data/themedTemplates.jsx",
+  "src/features/vibefx-studio/soundtrack/services/soundtrackImportFlows.js",
+]) {
+  assert.equal(
+    existsSync(join(root, kept)),
+    true,
+    `${kept} est importe par vibeos/: il ne doit pas partir avec l'ancienne UI`,
+  );
+}
+
+/* Et le nouveau front ne remonte jamais vers l'ancienne interface. */
+for (const file of listFiles("src/features/vibeos")) {
+  assert.doesNotMatch(
+    read(file),
+    /from '[^']*vibefx-studio\/(?:VibeFxStudio|components|ai)/,
+    `${file} importe l'ancienne interface studio`,
   );
 }
 
@@ -496,37 +547,13 @@ for (const gone of [
  *
  * Ces deux assertions existent pour que la regression ne revienne pas.
  */
-const studioHeader = read("src/features/vibefx-studio/components/Header.jsx");
-assert.match(
-  studioHeader,
-  /label: 'VibeCut', href: '\/video'/,
-  "l'onglet VibeCut de l'en-tete studio doit etre un LIEN vers /video, pas un setView",
-);
 /*
- * On cherche une CONDITION DE RENDU, pas une mention: le fichier explique en
- * commentaire pourquoi cette condition a disparu, et un garde qui interdirait
- * d'en parler interdirait surtout de le documenter (meme piege que le garde
- * `requestAnimationFrame` de la phase 5).
+ * PHASE F (2026-08-08): l'en-tete, le shell et tous les panneaux de l'ancien
+ * studio ont ete supprimes avec l'interface. Les assertions qui les
+ * surveillaient sont devenues des assertions d'ABSENCE (plus bas, liste
+ * `gone`): le meilleur garde contre leur reapparition.
  */
-assert.doesNotMatch(
-  studioHeader,
-  /\{\s*view === 'video'/,
-  "plus rien dans l'en-tete studio ne doit dependre d'une vue 'video' qui n'existe plus",
-);
 
-const studioShell = read("src/features/vibefx-studio/VibeFxStudio.jsx");
-assert.doesNotMatch(studioShell, /VideoApp/, "le shell studio ne doit plus monter l'ancien editeur video");
-assert.match(
-  studioShell,
-  /router\.push\('\/video\/rapide'\)/,
-  "le passage bande-son -> video doit naviguer vers le nouveau front",
-);
-
-/*
- * Ce que le panneau supprime portait et que le nouveau front doit conserver:
- * destination PC, nom de fichier horodate, regeneration d'URL signee. Deplace
- * dans la couche export plutot que perdu.
- */
 const exportDownload = read("src/features/vibefx-studio/video/export/exportDownload.js");
 for (const symbol of [
   "showDirectoryPicker",
