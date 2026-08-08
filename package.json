@@ -64,6 +64,7 @@
     "test:vibecut-image-render": "node scripts/smoke-vibecut-image-render.mjs",
     "test:vibecut-export-local-mp4": "npm run test:vibecut-k1-local-mp4 && npm run test:vibecut-pro-fixtures-local-mp4 && npm run test:vibecut-renderer-local-contract && npm run test:vibecut-xfade-local-mp4",
     "test:vibecut-ui-v2": "node scripts/smoke-vibecut-style-recipes.mjs && node scripts/smoke-vibecut-library-parity.mjs && node scripts/smoke-vibecut-library-media.mjs && node scripts/smoke-vibecut-motion-envelope.mjs && node scripts/smoke-vibecut-xfade-preview-parity.mjs && node scripts/smoke-vibecut-transition-chain-mp4.mjs && node scripts/smoke-vibecut-transition-cost.mjs && node scripts/smoke-vibecut-motion-preview-parity.mjs && node scripts/smoke-vibecut-sequence-edges.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibecut-ui-v2.spec.cjs scripts/smoke-vibecut-quick-v2.spec.cjs scripts/smoke-vibecut-guided-v2.spec.cjs scripts/smoke-vibecut-advanced-v2.spec.cjs scripts/smoke-vibecut-library-v2.spec.cjs scripts/smoke-vibecut-library-b1.spec.cjs scripts/smoke-vibecut-library-b2.spec.cjs",
+    "test:vibeos-layout": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-layout-b1.spec.cjs",
     "test:vibecut-slowmo": "playwright test scripts/smoke-vibecut-slowmo-samples.spec.cjs --reporter=line --workers=1",
     "test:vibecut-orientation": "playwright test scripts/smoke-vibecut-desktop-video-orientation.spec.cjs --reporter=line --workers=1",
     "functions:lint": "npm --prefix functions run lint",

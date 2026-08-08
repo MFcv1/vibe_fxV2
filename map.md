@@ -188,7 +188,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- creer/                      # Surface VibeOS (redesign en side-build, phase A). Toutes les pages noindex, derriere StudioAuthGate
 |   |   |   |-- layout.js               # Charge vibeos.css (seule feuille de style), monte StudioAuthGate + VibeOsShell (providers projet/audio/toasts)
 |   |   |   |-- page.js                 # Accueil incubateur (HomeScreen)
-|   |   |   |-- layout-visuel/page.js   # Espace Layout — placeholder jusqu'a la phase B
+|   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
 |   |   |   |-- studio/page.js          # Espace Studio — placeholder jusqu'a la phase D
 |   |   |   |-- vision/page.js          # Espace Vision — placeholder jusqu'a la phase C
 |   |   |   `-- son/page.js             # Espace Soundtrack — placeholder jusqu'a la phase E
@@ -377,6 +377,12 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
+|   |   |-- layout/                     # Ecran Layout reel (phase B tranche 1) - moteurs vibefx-studio importes, jamais reecrits
+|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + import par slot, templates thematiques, vignette 256px vers le projet VibeOS
+|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran) + panneau 4 blocs (Format, Modele, Images, Habillage) + reglages avances (textes, geometrie) + sheet d'export (JPG/PNG/WebP, estimation poids, panorama)
+|   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
+|   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
+|   |   |   `-- layout.module.css
 |   |   |-- primitives/
 |   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
 |   |   |   `-- primitives.module.css
@@ -543,6 +549,41 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (VibeOS phase B tranche 1 — l'ecran Layout reel)
+
+- **`/creer/layout-visuel` n'est plus un placeholder.** L'ecran Layout VibeOS
+  est branche sur les moteurs EXISTANTS de vibefx-studio (pipeline de rendu,
+  evenements canvas, upload, export importes tels quels) : la parite d'export
+  avec l'ancien onglet est garantie par le partage du code, pas par une copie.
+- Mode simple en 4 blocs dans l'ordre de creation : Format (silhouettes
+  proportionnelles), Modele (8 + Personnalise avec ses 3 prereglages de
+  zones), Images (import par slot, ajout global, drag & drop), Habillage
+  (marge, arrondi, fond couleur/flou, grain, acces aux templates).
+- Le sheet « Templates prets a poster » donne enfin une vraie surface aux ~80
+  habillages thematiques : apercus SVG dessines depuis les vraies zones et
+  textes, application complete format+zones+textes+fond.
+- Reglages avances en Collapsible : textes complets (dont drag + snap sur le
+  canvas via le moteur existant), geometrie fine, orientation pellicule.
+- Export reel JPG/PNG/WebP avec estimation du poids et decoupe panorama
+  (useExport inchange). Vignette 256px ecrite dans le projet VibeOS.
+- Nouveau smoke navigateur `npm run test:vibeos-layout`
+  (`scripts/smoke-vibeos-layout-b1.spec.cjs`) : parcours reel import → canvas
+  1080x1080 → modele Double → template applique → export telecharge. Vert.
+- Reste en tranche B2 (liste ordonnee dans todo.md) : Mesh/Lumen/Flou pro en
+  Sheet, textures, editeur de zones custom, stickers, undo/redo, persistance
+  images IndexedDB, pixel-diff automatise.
+- Correctif post-test utilisateur (meme jour, 2 passes) : la page entiere
+  scrollait et le bandeau disparaissait. Cause racine : `overflow-x: hidden`
+  sur html/body dans globals.css casse `position: sticky` pour tout descendant.
+  Solution structurelle : le shell VibeOS devient une coquille d'application —
+  `.root` fait exactement `100dvh` avec `overflow: hidden`, le bandeau vit HORS
+  du scroll (il ne peut plus bouger), et `.content` est la SEULE zone
+  scrollable. L'ecran Layout remplit ce conteneur et bloque son scroll : apercu
+  fixe, seul le panneau droit scrolle ; le canvas garde son ratio et tient
+  entier quel que soit le format (Story 9:16 comprise). Gardes anti-regression
+  au smoke : wheel 800px puis `pageScrollable === false`, shell a `top: 0` et
+  hauteur <= fenetre, canvas dans la fenetre.
 
 ## Journal — 2026-08-08 (VibeOS phase A — fondations livrees)
 

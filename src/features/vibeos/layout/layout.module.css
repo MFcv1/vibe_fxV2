@@ -1,0 +1,523 @@
+/* Ecran Layout VibeOS - apercu a gauche, panneau de creation a droite. */
+
+/*
+ * Desktop: l'ecran remplit exactement la zone de contenu du shell (qui est la
+ * seule zone scrollable de VibeOS) et bloque ce scroll. L'apercu reste donc
+ * fixe a gauche, seul le panneau droit scrolle (retour utilisateur 2026-08-08).
+ */
+.screen {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* ---------- Zone d'apercu ---------- */
+.stage {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: var(--vo-space-6);
+    background: var(--vo-bg-sunken);
+    overflow: hidden;
+}
+
+.canvasWrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+/*
+ * `width/height: auto` + doubles maximums: le canvas garde son ratio quel que
+ * soit le format (portrait 4:5, story 9:16, panoramas larges) et tient TOUJOURS
+ * entier dans la zone d'apercu, sans jamais la faire deborder.
+ */
+.canvas {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: var(--vo-radius-sm);
+    box-shadow: var(--vo-shadow-2);
+    touch-action: none;
+}
+
+.stageActions {
+    position: absolute;
+    top: var(--vo-space-4);
+    right: var(--vo-space-4);
+    z-index: 5;
+    display: flex;
+    gap: var(--vo-space-2);
+}
+
+.stageDrop {
+    outline: 2px dashed var(--vo-accent-line);
+    outline-offset: -8px;
+}
+
+.emptyStage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-4);
+    max-width: 380px;
+    text-align: center;
+}
+
+.emptyStageTitle {
+    font-size: var(--vo-text-lg);
+}
+
+.emptyStageBody {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.progressWrap {
+    position: absolute;
+    left: 50%;
+    bottom: var(--vo-space-6);
+    transform: translateX(-50%);
+    width: min(280px, 70%);
+}
+
+/* ---------- Panneau ---------- */
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-6);
+    width: 380px;
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vo-space-5);
+    border-left: 1px solid var(--vo-line);
+    background: var(--vo-bg);
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+}
+
+.blockHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.blockTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+.blockStep {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    font-size: 11px;
+    color: var(--vo-text-2);
+}
+
+.blockHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+/* Silhouette proportionnelle d'un format */
+.formatShape {
+    display: block;
+    background: var(--vo-surface-3);
+    border: 1px solid var(--vo-line-strong);
+    border-radius: 3px;
+}
+
+/* ---------- Bloc Images ---------- */
+.slotList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.slotItem {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    transition: border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.slotItem:hover {
+    border-color: var(--vo-line-strong);
+}
+
+.slotItemActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+}
+
+.slotThumb {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 40px;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-bg-sunken);
+    border: 1px solid var(--vo-line);
+    color: var(--vo-text-3);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.slotThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.slotLabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+}
+
+.slotImport {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-1);
+    font-size: var(--vo-text-xs);
+    font-weight: 550;
+    color: var(--vo-accent);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.slotImport:hover {
+    color: var(--vo-accent-hover);
+}
+
+.hiddenInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.importedStrip {
+    display: flex;
+    gap: var(--vo-space-2);
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.importedThumb {
+    position: relative;
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    overflow: hidden;
+}
+
+.importedThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.importedRemove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+}
+
+/* ---------- Habillage ---------- */
+.rowSplit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.rowLabel {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.colorInput {
+    width: 40px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    cursor: pointer;
+}
+
+/* ---------- Textes (avance) ---------- */
+.textList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-1);
+}
+
+.textRow {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid transparent;
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.textRow:hover {
+    background: var(--vo-surface-2);
+}
+
+.textRowActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-text);
+}
+
+.textRowContent {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.textEditor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+}
+
+.textInput,
+.select {
+    width: 100%;
+    height: 36px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+}
+
+.textInput:focus,
+.select:focus {
+    outline: none;
+    border-color: var(--vo-accent-line);
+}
+
+/* ---------- Sheet templates ---------- */
+.sheetIntro {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.templateBrowser {
+    display: flex;
+    gap: var(--vo-space-4);
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.templateCategories {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 0 0 148px;
+    overflow-y: auto;
+}
+
+.templateCategory {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease),
+        color var(--vo-dur-1) var(--vo-ease);
+}
+
+.templateCategory:hover {
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+}
+
+.templateCategoryActive,
+.templateCategoryActive:hover {
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+}
+
+.templateGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--vo-space-3);
+    align-content: start;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.templateCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    text-align: left;
+    transition: border-color var(--vo-dur-2) var(--vo-ease),
+        transform var(--vo-dur-2) var(--vo-ease-out),
+        box-shadow var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.templateCard:hover {
+    border-color: var(--vo-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.templateCardActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+}
+
+.templateCardStage {
+    display: block;
+    border-radius: var(--vo-radius-sm);
+    overflow: hidden;
+    background: var(--vo-bg-sunken);
+}
+
+.templateCardLabel {
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+}
+
+.templateCardSub {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+/* ---------- Export ---------- */
+.exportRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.exportEstimate {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+    /* Tablette/mobile: l'ecran redevient un flux vertical qui scrolle dans la
+       zone de contenu du shell, avec l'apercu sticky en haut de ce scroll. */
+    .screen {
+        flex-direction: column;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    /* Le scroller est .content du shell (qui demarre sous le bandeau): le
+       sticky se cale donc a 0 de CE conteneur, pas de la fenetre. */
+    .stage {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        flex: 0 0 auto;
+        height: 48dvh;
+        min-height: 260px;
+        padding: var(--vo-space-4);
+        border-bottom: 1px solid var(--vo-line);
+    }
+
+    .canvas {
+        max-height: 100%;
+    }
+
+    .panel {
+        width: 100%;
+        border-left: 0;
+        flex: 1 1 auto;
+        overflow-y: visible;
+    }
+
+    .templateBrowser {
+        flex-direction: column;
+    }
+
+    .templateCategories {
+        flex-direction: row;
+        flex: 0 0 auto;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: var(--vo-space-1);
+    }
+
+    .templateCategory {
+        white-space: nowrap;
+    }
+}

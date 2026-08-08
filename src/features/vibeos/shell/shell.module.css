@@ -1,17 +1,23 @@
 /* Shell VibeOS: un seul bandeau superieur, tab bar basse sur mobile. */
 
+/*
+ * Coquille d'application: le shell fait EXACTEMENT la hauteur de la fenetre et
+ * possede son propre scroll (.content). Le body ne scrolle jamais sous VibeOS.
+ * Indispensable: globals.css pose `overflow-x: hidden` sur html/body, ce qui
+ * casse `position: sticky` — le bandeau vit donc HORS du conteneur de scroll,
+ * il ne peut physiquement pas disparaitre.
+ */
 .root {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
+    height: 100dvh;
     min-height: 0;
-    min-height: 100dvh;
+    overflow: hidden;
     background: var(--vo-bg);
 }
 
 .topbar {
-    position: sticky;
-    top: 0;
     z-index: 20;
     display: flex;
     align-items: center;
@@ -101,11 +107,14 @@
     flex: 0 0 auto;
 }
 
+/* Seule zone scrollable de VibeOS. Les ecrans qui veulent un apercu fixe
+   (Layout) neutralisent ce scroll en occupant exactement 100% de la zone. */
 .content {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
+    overflow-y: auto;
 }
 
 /* ---------- Mini-lecteur ---------- */

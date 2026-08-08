@@ -40,8 +40,46 @@ Laissé de côté (assumé) : le bouton « Publier » du shell pointe vers /stud
 (phase B) n'écrit pas `project.thumbnail` ; pas de tests navigateur dédiés
 vibeos (les placeholders n'ont pas de logique).
 
-**Prochaine étape : phase B (Layout)** — voir le prompt de relance VibeOS en
-fin de fichier.
+**Phase B (Layout), tranche 1 : ✅ livrée le 2026-08-08.**
+
+Livré (`src/features/vibeos/layout/`, monté sur `/creer/layout-visuel`) :
+- `useLayoutEditor.js` — composition des moteurs EXISTANTS de vibefx-studio
+  (useLayoutState, useCanvasRenderer, useCanvasEvents, useLayoutHelpers,
+  useImageUpload, useExport) : le pipeline de rendu et l'export sont
+  exactement ceux de l'ancien onglet Layout — parité par construction.
+- Écran simple en 4 blocs : Format (6 tuiles silhouettes proportionnelles),
+  Modèle (8 modèles + Personnalisé avec les 3 préréglages de zones), Images
+  (slots avec import par zone, ajout global, bande des importées avec retrait,
+  drag & drop sur l'aperçu), Habillage (marge, arrondi, fond couleur/flou,
+  grain).
+- Sheet « Templates prêts à poster » : 17 catégories, aperçus SVG dessinés
+  depuis les VRAIES zones et textes des templates, application complète
+  (format + zones + textes + fond), toast de confirmation.
+- Réglages avancés (Collapsible) : textes (ajout, contenu, police parmi les
+  15, gras/italique, couleur, taille, suppression — drag + snap sur le canvas
+  via le moteur existant), géométrie fine (écarts, orientation pellicule).
+- Export réel (JPG/PNG/WebP, qualité, estimation du poids, découpe panorama)
+  via useExport inchangé. Vignette 256px + métadonnées écrites dans le projet
+  VibeOS (debounce 1,5s).
+- Smoke navigateur `npm run test:vibeos-layout`
+  (`scripts/smoke-vibeos-layout-b1.spec.cjs`) : bypass dev → import 2 images →
+  canvas 1080×1080 → modèle Double → template thématique appliqué → export JPG
+  téléchargé. **Vert (2,7s).** Lint 0 erreur, build vert.
+
+Reste pour la tranche B2 (assumé, dans l'ordre) :
+1. Mesh gradient, Lumen et Flou pro re-skinés en Sheet (les états sont déjà
+   câblés dans le renderer, figés aux valeurs neutres pour l'instant).
+2. Textures multiples du fond + opacité.
+3. Éditeur de zones custom (ajout/déplacement/redimension,
+   CUSTOM_SHAPE_LIBRARY) et réglages par slot (zoom/pan/bordure/flou).
+4. Stickers/assets, undo/redo, comparaison avant/après, aperçu Insta.
+5. Persistance des images du projet en Blobs IndexedDB (aujourd'hui seuls
+   format/template/géométrie/vignette sont synchronisés au store).
+6. Vérif pixel-diff automatisée ancien vs nouveau (aujourd'hui la parité est
+   garantie par le partage du code de rendu, pas mesurée).
+
+**Prochaine étape : tranche B2 ci-dessus, puis phase C (Vision)** — voir le
+prompt de relance VibeOS en fin de fichier.
 
 ---
 
@@ -2024,19 +2062,19 @@ service réel avec `VIBECUT_RENDERER_URL=` et reporte la révision.
 
 ---
 
-## PROMPT DE RELANCE — CHANTIER VIBEOS (phase B, Layout)
+## PROMPT DE RELANCE — CHANTIER VIBEOS (phase B tranche 2, puis phase C)
 
 > Lis `AGENTS.md`, puis `docs/plan-vibeos-redesign-2026-08-08.md` en entier
-> (surtout §5.2 Layout et §4.2/4.3). La phase A est livrée : design system
-> `.vibeos`, primitives, shell, store projet et accueil sur `/creer`. Exécute la
-> phase B : remplace le placeholder de `/creer/layout-visuel` par le vrai écran
-> Layout — mode simple en 4 blocs (Format, Modèle, Images, Habillage), canvas
-> branché sur les moteurs EXISTANTS (`vibefx-layout/engine`,
-> `vibefx-studio/hooks/useCanvasRenderer` & co, importés, jamais réécrits),
-> sheet des templates thématiques avec vrais aperçus, réglages avancés en
-> Collapsible, écriture de `project.thumbnail`, mobile sérieux. Interdits :
-> Tailwind dans le nouveau code, toute modification de `/studio` et de
-> `src/features/vibefx-studio` (hors extraction de logique partagée). Critère
-> bloquant : export identique au pixel près à l'ancien onglet Layout. Termine
-> par le rituel de fin de phase (lint, build, smokes, todo.md, map.md, prompt
-> de relance phase C).
+> (surtout §5.2 Layout et §5.3 Vision), puis la section « CHANTIER VIBEOS » de
+> ce fichier. Les phases A et B tranche 1 sont livrées : l'écran Layout réel
+> tourne sur `/creer/layout-visuel` (moteurs vibefx-studio importés,
+> `src/features/vibeos/layout/`), smoke vert via `npm run test:vibeos-layout`.
+> Exécute la tranche B2 dans l'ordre listé plus haut (Mesh/Lumen/Flou pro en
+> Sheet, textures, éditeur de zones custom + réglages par slot, stickers,
+> undo/redo, persistance images IndexedDB, pixel-diff ancien vs nouveau), puis
+> enchaîne sur la phase C (Vision) : bouton « Améliorer ma photo » construit
+> sur `visionMetrics`/`visionColorScience` existants, slider d'intensité,
+> 12 looks max triés par `scoreProfileForImage`, avant/après, avancé complet.
+> Interdits : Tailwind dans le nouveau code, réécrire un moteur existant,
+> modifier `/studio`. Termine chaque tranche par le rituel (lint, build,
+> `npm run test:vibeos-layout`, todo.md, map.md, prompt de relance).
