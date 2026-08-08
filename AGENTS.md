@@ -46,6 +46,35 @@ A la fin de chaque grande phase et de chaque module livre, avant de passer a la 
 - Ecrire un prompt de relance en fin de `todo.md` pour repartir dans un chat neuf sans rien relire.
 - Rapporter honnetement ce qui marche, ce qui est laisse de cote et pourquoi, et les echecs de tests preexistants.
 
+### Cloture de phase dans le chat (obligatoire, automatique)
+
+A la fin de CHAQUE phase ou tranche livree, sans que l'utilisateur ait besoin de
+le demander, le dernier message du chat doit contenir, dans cet ordre :
+
+1. **Un recap en langage simple** : ce qui marche et se teste tout de suite (avec
+   l'URL locale et la commande), ce qui a ete laisse de cote et pourquoi, les
+   bugs trouves et corriges en route, les echecs de tests preexistants.
+2. **Le prompt de reprise, ecrit en entier dans le chat**, dans un bloc de code
+   pour qu'il se copie d'un geste. Pas un renvoi vers `todo.md` : le texte
+   complet, dans le message.
+
+Ce prompt de reprise est destine a un chat NEUF, contexte a zero. Il doit donc
+se suffire a lui-meme et contenir :
+
+- le chemin absolu du projet ;
+- l'ordre de lecture des documents (`AGENTS.md`, le plan maitre du chantier,
+  `todo.md`, `map.md`), et ce qu'il ne faut PAS lire (archives) ;
+- l'etat exact du livre : phases terminees, ce qui tourne, sur quelles routes,
+  dans quels fichiers ;
+- l'etat des gates au moment ou on s'arrete (lint, build, smokes) ;
+- la mission suivante, decoupee et ordonnee ;
+- les interdits du chantier ;
+- le rituel de fin de phase a rejouer.
+
+Le meme texte est recopie en fin de `todo.md`, mais le chat fait foi : un lot
+n'est pas termine tant que le prompt de reprise n'a pas ete affiche dans la
+conversation.
+
 ## Discipline de deploiement et couts
 
 Les deploiements Firebase App Hosting, Cloud Run et Functions peuvent declencher Cloud Build, Artifact Registry et des couts de build/deploiement. Les agents doivent donc eviter les rollouts excessifs.

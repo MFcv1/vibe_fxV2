@@ -43,6 +43,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       `-- vibrant-accents/
 |-- docs/
 |   |-- plan-vibeos-redesign-2026-08-08.md # Plan maitre du redesign VibeOS « incubateur de creation » : decisions validees, inventaire des features a preserver, design system .vibeos (tokens copies de VibeCut), routes /creer/*, store projet commun, specs page par page (accueil, layout, vision, studio, soundtrack Spotify-like), phases A-F et bascule /studio -> /creer
+|   |-- archive-vibecut-2026-08-04.md   # ARCHIVE du chantier VibeCut clos le 2026-08-04, sortie de todo.md le 2026-08-08 : point situationnel, lots B1/B2/B3a/B3b, effets pendant le plan, glitch, bugs 1 a 59 avec causes reelles, problemes connus non resolus, lecons FFmpeg payees, commandes test:vibecut-*. Reference a relire avant toute reprise de /video ou render-service/
 |   |-- studio-ai-agents-megaprompt.md  # Prompt d'integration de la colonne d'agents IA contextualisee par onglet studio
 |   |-- vibecut-bibliotheques-roadmap-2026-08-02.md # Feuille de route des deux bibliotheques : inventaire verifie du contenu existant, ce qu'on prend et ce qu'on jette de la reference, direction artistique, architecture cible (squelette commun, BeforeAfterStage, favoris IndexedDB), lots B1 design (hover scrub + bypass + favoris rappeles dans les modes) / B2 vraies videos / B3 contenu manquant, risques et ce qu'on ne fait pas
 |   |-- vibecut-audit-mvp-ux-roadmap-2026-07-29.md # Audit code + test reel de l'editeur : crash WebM, ecarts preview/export, absence photo/Ken Burns, simplification Storyboard, modele media cible, roadmap vertical slice et gates MVP/cloud
@@ -377,11 +378,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
-|   |   |-- layout/                     # Ecran Layout reel (phase B tranche 1) - moteurs vibefx-studio importes, jamais reecrits
-|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + import par slot, templates thematiques, vignette 256px vers le projet VibeOS
-|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran) + panneau 4 blocs (Format, Modele, Images, Habillage) + reglages avances (textes, geometrie) + sheet d'export (JPG/PNG/WebP, estimation poids, panorama)
+|   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2) - moteurs vibefx-studio importes, jamais reecrits
+|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, vignette 256px vers le projet VibeOS
+|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran, undo/redo) + panneau 4 blocs (Format, Modele, Images, Habillage avec fond Couleur/Flou/Genere + Flou pro) + reglages avances (textes, zone selectionnee zoom/pan/bordure/flou, geometrie) + sheet d'export
 |   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
 |   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
+|   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS ; rendu final par renderLayoutMeshBackground (moteur existant)
+|   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
+|   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
 |   |   |   `-- layout.module.css
 |   |   |-- primitives/
 |   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
@@ -549,6 +553,53 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (menage documentaire — todo.md recentre sur VibeOS)
+
+- **`todo.md` passe de 2133 a ~290 lignes.** Il ne portait plus seulement le
+  chantier actif : les 1989 lignes de la reconstruction VibeCut (close le
+  2026-08-04) occupaient 93 % du fichier et noyaient le redesign VibeOS.
+- **Rien n'est perdu, tout est deplace** : le contenu VibeCut part dans
+  `docs/archive-vibecut-2026-08-04.md` (point situationnel, tous les lots,
+  bugs 1 a 59, problemes connus non resolus, commandes `test:vibecut-*`,
+  lecons FFmpeg payees). L'archive porte un en-tete qui dit explicitement que
+  ce n'est plus une liste de taches, et le prompt de relance VibeCut qu'elle
+  contient est marque **PERIME** pour qu'aucun agent ne le rejoue.
+- **`todo.md` devient un document de travail VibeOS** : ordre de lecture,
+  tableau des phases A-F, regles non negociables, ce qui est livre (A, B1, B2),
+  reste a faire (B3 ordonne, puis C avec ses criteres d'acceptation, D, E, F),
+  points d'attention du plan §7, commandes utiles, prompt de relance.
+- **Ce qui a ete garde dans `todo.md` bien que venant de VibeCut** : les trois
+  echecs de tests preexistants (fixtures WebM 7 Mo, chemins Windows
+  `C:\Users\pcpor\`, pointeurs Git LFS de `videotest/`), parce qu'un agent
+  VibeOS peut les rencontrer et doit savoir qu'ils sont anterieurs au chantier
+  et ne bloquent pas ses gates.
+- Aucun code touche. `plan.md` (direction artistique VibeCut) reste en place,
+  l'archive y renvoie.
+
+## Journal — 2026-08-08 (VibeOS phase B tranche 2 — fonds generes, undo/redo, zones)
+
+- **Les trois generateurs de fond sont revenus, en VibeOS.** Mesh gradient
+  (sheet compact : 4 couleurs, 6 palettes, melange — le rendu final reste
+  celui du moteur canvas existant), Lumen (meme app embarquee
+  `/vendor/lumen` et meme protocole postMessage que l'ancien modal) et Flou
+  pro (pilote du moteur partage `vibefx-shared/smoothBlur` : looks rapides,
+  aleatoire toujours propre, direction/hauteur/intensite/finesse). Les
+  sequences d'application sont copiees de VibeFxStudio : appliquer un mesh
+  coupe lumen et le flou d'image, etc.
+- Le bloc Habillage propose desormais trois modes de fond : Couleur / Flou /
+  Genere (Mesh ou Lumen), plus un bouton Flou pro dont l'etat est visible.
+- **Undo/redo complet** : historique 30 etats, miroir exact de l'ancien studio
+  (capture/restauration/egalite, debounce 400ms), boutons sur l'apercu et
+  raccourcis Cmd+Z / Shift+Cmd+Z (desactives pendant une saisie).
+- Reglages par zone selectionnee (avance) : zoom, decalages, bordure, flou —
+  brancher sur `updateSlotConfig` existant, rien de reecrit.
+- Smoke etendu et vert (5,5s) : application du mesh via le sheet puis
+  annuler/retablir verifies, gardes anti-scroll conservees. Lint 0 erreur
+  (2 erreurs react-hooks corrigees en cours de route), build vert.
+- Reste en tranche B3 : textures multiples, editeur de zones custom,
+  stickers, avant/apres, apercu Insta, persistance images IndexedDB,
+  pixel-diff automatise (liste ordonnee dans todo.md).
 
 ## Journal — 2026-08-08 (VibeOS phase B tranche 1 — l'ecran Layout reel)
 

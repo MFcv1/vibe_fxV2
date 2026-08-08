@@ -98,6 +98,23 @@ test("layout VibeOS: import, composition, template, export", async ({ page }) =>
   await page.getByRole("button", { name: /Vitrine Collection/ }).click();
   await expect(page.getByText(/Template « Vitrine Collection » appliqué/)).toBeVisible();
 
+  // Fond genere Mesh: segmented "Généré" -> sheet -> appliquer.
+  await page.getByRole("tab", { name: "Généré" }).click();
+  await expect(page.getByRole("dialog", { name: "Fond Mesh gradient" })).toBeVisible();
+  await page.getByRole("button", { name: "Utiliser comme fond" }).click();
+  const meshButton = page.getByRole("button", { name: "Mesh", exact: true });
+  await expect(meshButton).toBeVisible();
+
+  // Undo: l'application du mesh se defait (le choix Mesh/Lumen disparait).
+  await page.waitForTimeout(600); // debounce historique 400ms
+  await page.getByRole("button", { name: /Annuler \(Cmd\+Z\)/ }).click();
+  await expect(meshButton).toBeHidden();
+  await page.getByRole("button", { name: /Rétablir/ }).click();
+  await expect(meshButton).toBeVisible();
+  await page.waitForTimeout(600);
+  await page.getByRole("button", { name: /Annuler \(Cmd\+Z\)/ }).click();
+  await expect(meshButton).toBeHidden();
+
   // Export JPG reel: le telechargement part.
   await page.getByRole("button", { name: "Exporter" }).click();
   await expect(page.getByRole("dialog", { name: "Exporter le visuel" })).toBeVisible();

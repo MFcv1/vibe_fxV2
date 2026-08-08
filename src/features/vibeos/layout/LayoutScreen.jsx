@@ -2,7 +2,8 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import {
-    Bold, Download, ImagePlus, Italic, LayoutTemplate, Maximize2, Plus, Trash2, Type, Upload, X,
+    Bold, Download, ImagePlus, Italic, LayoutTemplate, Layers, Maximize2, Plus, Redo2,
+    Sparkles, Trash2, Type, Undo2, Upload, Waves, X,
 } from 'lucide-react';
 import {
     CUSTOM_LAYOUT_PRESETS, FONT_OPTIONS, FORMATS, TEMPLATES,
@@ -13,6 +14,9 @@ import {
 import useLayoutEditor from './useLayoutEditor';
 import TemplateSheet from './TemplateSheet';
 import TemplatePreviewSvg from './TemplatePreviewSvg';
+import MeshSheet from './MeshSheet';
+import LumenSheet from './LumenSheet';
+import SmoothBlurSheet from './SmoothBlurSheet';
 import styles from './layout.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
@@ -46,10 +50,18 @@ export default function LayoutScreen() {
         handleImageUpload, handleSlotImageUpload, handleRemoveImage,
         addText, updateActiveText, deleteActiveText, currentText,
         applyCustomPreset, applyThemedTemplate,
+        layoutBgGradient, layoutBgMeshColors, applyLayoutMesh,
+        layoutLumenBackground, applyLumenBackground, clearGeneratedBackground,
+        layoutSmoothBlur, setLayoutSmoothBlur,
+        updateSlotConfig, slotConfigs,
+        undo, redo, canUndo, canRedo,
         exportController,
     } = editor;
 
     const [isTemplateSheetOpen, setIsTemplateSheetOpen] = useState(false);
+    const [isMeshSheetOpen, setIsMeshSheetOpen] = useState(false);
+    const [isLumenSheetOpen, setIsLumenSheetOpen] = useState(false);
+    const [isSmoothBlurSheetOpen, setIsSmoothBlurSheetOpen] = useState(false);
     const [isDropTarget, setIsDropTarget] = useState(false);
     const globalImportRef = useRef(null);
 
@@ -61,12 +73,31 @@ export default function LayoutScreen() {
 
     const isCustomTemplate = activeTemplate.id === 'custom';
     const appliedThemedId = activeTemplate.customLayout?.presetId;
-    const backgroundMode = layoutBgBlur ? 'blur' : 'color';
+    const hasGeneratedBackground = layoutBgGradient || Boolean(layoutLumenBackground);
+    const backgroundMode = hasGeneratedBackground ? 'generated' : (layoutBgBlur ? 'blur' : 'color');
+    const smoothBlurOn = Boolean(layoutSmoothBlur?.enabled);
+    const selectedSlotConfig = selectedSlotIndex !== null
+        ? (slotConfigs[selectedSlotIndex] || { zoom: 1, x: 0, y: 0, border: 0, blur: 0 })
+        : null;
 
     const bgOptions = useMemo(() => ([
         { value: 'color', label: 'Couleur' },
-        { value: 'blur', label: "Flou de l'image" },
+        { value: 'blur', label: 'Flou' },
+        { value: 'generated', label: 'Généré' },
     ]), []);
+
+    const handleBackgroundMode = (value) => {
+        if (value === 'color') {
+            clearGeneratedBackground();
+            setLayoutBgBlur(false);
+        } else if (value === 'blur') {
+            clearGeneratedBackground();
+            setLayoutBgBlur(true);
+        } else {
+            /* « Généré » : on ouvre Mesh par défaut si rien n'est actif. */
+            if (!hasGeneratedBackground) setIsMeshSheetOpen(true);
+        }
+    };
 
     const handleDrop = (event) => {
         event.preventDefault();
@@ -92,6 +123,12 @@ export default function LayoutScreen() {
                 {hasRenderableOutput ? (
                     <>
                         <div className={styles.stageActions}>
+                            <IconButton label="Annuler (Cmd+Z)" disabled={!canUndo} onClick={undo}>
+                                <Undo2 size={15} />
+                            </IconButton>
+                            <IconButton label="Rétablir (Shift+Cmd+Z)" disabled={!canRedo} onClick={redo}>
+                                <Redo2 size={15} />
+                            </IconButton>
                             <IconButton label="Plein écran" onClick={handleFullscreen}>
                                 <Maximize2 size={15} />
                             </IconButton>
@@ -271,7 +308,7 @@ export default function LayoutScreen() {
                         <Segmented
                             label="Type de fond"
                             value={backgroundMode}
-                            onChange={(value) => setLayoutBgBlur(value === 'blur')}
+                            onChange={handleBackgroundMode}
                             options={bgOptions}
                         />
                     </div>
@@ -287,6 +324,34 @@ export default function LayoutScreen() {
                             />
                         </div>
                     ) : null}
+                    {backgroundMode === 'generated' || hasGeneratedBackground ? (
+                        <div className={styles.generatedChoices}>
+                            <Button
+                                variant={layoutBgGradient ? 'primary' : 'secondary'}
+                                size="sm"
+                                icon={<Layers size={13} />}
+                                onClick={() => setIsMeshSheetOpen(true)}
+                            >
+                                Mesh
+                            </Button>
+                            <Button
+                                variant={layoutLumenBackground ? 'primary' : 'secondary'}
+                                size="sm"
+                                icon={<Sparkles size={13} />}
+                                onClick={() => setIsLumenSheetOpen(true)}
+                            >
+                                Lumen
+                            </Button>
+                        </div>
+                    ) : null}
+                    <Button
+                        variant={smoothBlurOn ? 'primary' : 'secondary'}
+                        block
+                        icon={<Waves size={14} />}
+                        onClick={() => setIsSmoothBlurSheetOpen(true)}
+                    >
+                        {smoothBlurOn ? 'Flou pro activé — ajuster' : 'Flou pro'}
+                    </Button>
                     <Slider label="Grain du fond" value={layoutBgTexture} onChange={setLayoutBgTexture} min={0} max={100} defaultValue={15} formatValue={(v) => `${v}%`} />
                 </section>
 
@@ -375,6 +440,46 @@ export default function LayoutScreen() {
                         ) : null}
                     </section>
 
+                    {selectedSlotConfig ? (
+                        <section className={styles.block}>
+                            <h3 className={styles.blockTitle}>Zone sélectionnée</h3>
+                            <p className={styles.blockHint}>Ajuste l&apos;image dans sa zone (clique une zone sur l&apos;aperçu pour en changer).</p>
+                            <Slider
+                                label="Zoom"
+                                value={Math.round((selectedSlotConfig.zoom ?? 1) * 100)}
+                                onChange={(v) => updateSlotConfig('zoom', v / 100)}
+                                min={100} max={300} defaultValue={100}
+                                formatValue={(v) => `${v}%`}
+                            />
+                            <Slider
+                                label="Décalage horizontal"
+                                value={selectedSlotConfig.x ?? 0}
+                                onChange={(v) => updateSlotConfig('x', v)}
+                                min={-100} max={100} defaultValue={0}
+                            />
+                            <Slider
+                                label="Décalage vertical"
+                                value={selectedSlotConfig.y ?? 0}
+                                onChange={(v) => updateSlotConfig('y', v)}
+                                min={-100} max={100} defaultValue={0}
+                            />
+                            <Slider
+                                label="Bordure"
+                                value={selectedSlotConfig.border ?? 0}
+                                onChange={(v) => updateSlotConfig('border', v)}
+                                min={0} max={40} defaultValue={0}
+                                formatValue={(v) => `${v}px`}
+                            />
+                            <Slider
+                                label="Flou de la zone"
+                                value={selectedSlotConfig.blur ?? 0}
+                                onChange={(v) => updateSlotConfig('blur', v)}
+                                min={0} max={20} defaultValue={0}
+                                formatValue={(v) => `${v}px`}
+                            />
+                        </section>
+                    ) : null}
+
                     <section className={styles.block}>
                         <h3 className={styles.blockTitle}>Géométrie fine</h3>
                         <Slider label="Écart entre zones" value={gap} onChange={setGap} min={0} max={100} defaultValue={20} formatValue={(v) => `${v}px`} />
@@ -405,6 +510,28 @@ export default function LayoutScreen() {
                 onClose={() => setIsTemplateSheetOpen(false)}
                 onApply={applyThemedTemplate}
                 appliedTemplateId={appliedThemedId}
+            />
+
+            <MeshSheet
+                open={isMeshSheetOpen}
+                onClose={() => setIsMeshSheetOpen(false)}
+                initialColors={layoutBgMeshColors}
+                isActive={layoutBgGradient}
+                onApply={applyLayoutMesh}
+                onRemove={clearGeneratedBackground}
+            />
+
+            <LumenSheet
+                open={isLumenSheetOpen}
+                onClose={() => setIsLumenSheetOpen(false)}
+                onUseBackground={applyLumenBackground}
+            />
+
+            <SmoothBlurSheet
+                open={isSmoothBlurSheetOpen}
+                onClose={() => setIsSmoothBlurSheetOpen(false)}
+                config={layoutSmoothBlur}
+                onChange={setLayoutSmoothBlur}
             />
 
             <Sheet
