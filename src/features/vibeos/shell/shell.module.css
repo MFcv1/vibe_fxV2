@@ -1,0 +1,220 @@
+/* Shell VibeOS: un seul bandeau superieur, tab bar basse sur mobile. */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-height: 100dvh;
+    background: var(--vo-bg);
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-4);
+    height: var(--vo-topbar-height);
+    flex: 0 0 auto;
+    padding: 0 var(--vo-space-5);
+    background: color-mix(in srgb, var(--vo-bg) 88%, transparent);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-bottom: 1px solid var(--vo-line);
+}
+
+.leading {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-md);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--vo-text);
+}
+
+.brandMark {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+.center {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+
+.nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+}
+
+.navItem {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    height: 30px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-xs);
+    font-weight: 550;
+    color: var(--vo-text-2);
+    transition: background var(--vo-dur-1) var(--vo-ease),
+        color var(--vo-dur-1) var(--vo-ease);
+}
+
+.navItem:hover {
+    color: var(--vo-text);
+}
+
+.navItemActive {
+    background: var(--vo-surface-3);
+    color: var(--vo-text);
+    box-shadow: var(--vo-shadow-1);
+}
+
+.trailing {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    flex: 0 0 auto;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* ---------- Mini-lecteur ---------- */
+.miniPlayer {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    height: 36px;
+    padding: 0 var(--vo-space-2) 0 var(--vo-space-1);
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    max-width: 220px;
+    transition: border-color var(--vo-dur-1) var(--vo-ease),
+        background var(--vo-dur-1) var(--vo-ease);
+}
+
+.miniPlayer:hover {
+    border-color: var(--vo-line-strong);
+    background: var(--vo-surface-3);
+}
+
+.miniPlayerArt {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-3);
+    color: var(--vo-text-3);
+    overflow: hidden;
+}
+
+.miniPlayerArt img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.miniPlayerTitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--vo-text-xs);
+    font-weight: 550;
+    color: var(--vo-text);
+}
+
+/* ---------- Tab bar mobile ---------- */
+.tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: none;
+    align-items: stretch;
+    height: calc(var(--vo-tabbar-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--vo-bg) 90%, transparent);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-top: 1px solid var(--vo-line);
+}
+
+.tabbarItem {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    font-size: 11px;
+    font-weight: 550;
+    color: var(--vo-text-3);
+    transition: color var(--vo-dur-1) var(--vo-ease);
+}
+
+.tabbarItem:hover {
+    color: var(--vo-text-2);
+}
+
+.tabbarItemActive,
+.tabbarItemActive:hover {
+    color: var(--vo-accent);
+}
+
+@media (max-width: 767px) {
+    .topbar {
+        padding: 0 var(--vo-space-3);
+        gap: var(--vo-space-2);
+    }
+
+    .center {
+        display: none;
+    }
+
+    .tabbar {
+        display: flex;
+    }
+
+    /* Laisse la place a la tab bar fixe. */
+    .content {
+        padding-bottom: calc(var(--vo-tabbar-height) + env(safe-area-inset-bottom, 0px));
+    }
+
+    .publishLabel {
+        display: none;
+    }
+}

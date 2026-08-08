@@ -42,6 +42,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       |-- utilitarian/
 |       `-- vibrant-accents/
 |-- docs/
+|   |-- plan-vibeos-redesign-2026-08-08.md # Plan maitre du redesign VibeOS « incubateur de creation » : decisions validees, inventaire des features a preserver, design system .vibeos (tokens copies de VibeCut), routes /creer/*, store projet commun, specs page par page (accueil, layout, vision, studio, soundtrack Spotify-like), phases A-F et bascule /studio -> /creer
 |   |-- studio-ai-agents-megaprompt.md  # Prompt d'integration de la colonne d'agents IA contextualisee par onglet studio
 |   |-- vibecut-bibliotheques-roadmap-2026-08-02.md # Feuille de route des deux bibliotheques : inventaire verifie du contenu existant, ce qu'on prend et ce qu'on jette de la reference, direction artistique, architecture cible (squelette commun, BeforeAfterStage, favoris IndexedDB), lots B1 design (hover scrub + bypass + favoris rappeles dans les modes) / B2 vraies videos / B3 contenu manquant, risques et ce qu'on ne fait pas
 |   |-- vibecut-audit-mvp-ux-roadmap-2026-07-29.md # Audit code + test reel de l'editeur : crash WebM, ecarts preview/export, absence photo/Ken Burns, simplification Storyboard, modele media cible, roadmap vertical slice et gates MVP/cloud
@@ -184,6 +185,13 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |   `-- page.js               # Guide SEO formats Instagram
 |   |   |   `-- meta-oauth-publication-instagram-facebook/
 |   |   |       `-- page.js             # Guide SEO Meta OAuth publication
+|   |   |-- creer/                      # Surface VibeOS (redesign en side-build, phase A). Toutes les pages noindex, derriere StudioAuthGate
+|   |   |   |-- layout.js               # Charge vibeos.css (seule feuille de style), monte StudioAuthGate + VibeOsShell (providers projet/audio/toasts)
+|   |   |   |-- page.js                 # Accueil incubateur (HomeScreen)
+|   |   |   |-- layout-visuel/page.js   # Espace Layout — placeholder jusqu'a la phase B
+|   |   |   |-- studio/page.js          # Espace Studio — placeholder jusqu'a la phase D
+|   |   |   |-- vision/page.js          # Espace Vision — placeholder jusqu'a la phase C
+|   |   |   `-- son/page.js             # Espace Soundtrack — placeholder jusqu'a la phase E
 |   |   |-- studio/
 |   |   |   |-- layout.js               # CSS lourds du studio scopes a /studio, incluant le rail IA
 |   |   |   |-- page.js                 # Page studio noindex + deep-link `?workspace=layout`
@@ -363,6 +371,26 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   `-- VibeCutShell.jsx        # Bandeau superieur unique + racine `.vibecut`
 |   |   `-- styles/
 |   |       `-- vibecut.css             # Tokens + base du design system, scopes `.vibecut` (sombre, theme clair pret)
+|   |-- vibeos/                          # Nouveau front VibeOS (redesign Studio/Layout/Soundtrack/Vision, plan docs/plan-vibeos-redesign-2026-08-08.md). CSS Modules uniquement, zero Tailwind, zero import de l'ancienne UI
+|   |   |-- audio/
+|   |   |   `-- AudioProvider.jsx       # Audio global : l'element <audio> vit dans le layout /creer et survit aux navigations (mini-lecteur du header)
+|   |   |-- home/
+|   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
+|   |   |   `-- home.module.css
+|   |   |-- primitives/
+|   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
+|   |   |   `-- primitives.module.css
+|   |   |-- project/
+|   |   |   |-- projectModel.js         # Modele projet v1 (format, template, images, vision, studio, soundtrackTrackId, thumbnail) + normalisation defensive
+|   |   |   |-- projectDb.js            # IndexedDB `vibeos` (stores projects + meta), degrade en no-op si indisponible, recents limites a 8
+|   |   |   `-- VibeOsProjectProvider.jsx # Contexte du projet qui circule : autosauvegarde debouncee 800ms, flush sur pagehide, create/open/duplicate/remove/ensureProject
+|   |   |-- shell/
+|   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier vers /studio jusqu'a la phase F) + tab bar basse mobile safe-area
+|   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
+|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (phases B a E)
+|   |   |   `-- shell.module.css
+|   |   `-- styles/
+|   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
 |   |-- vibefx-shared/
 |   |   `-- utils/
 |   |       `-- smoothBlur.js           # Moteur partage du Flou lisse pro : normalisation, looks rapides, random safe, reset clean, courbes, masques preview et rendu canvas
@@ -515,6 +543,45 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (VibeOS phase A — fondations livrees)
+
+- **Le hall d'accueil de VibeOS existe.** `src/features/vibeos/` est cree :
+  design system `.vibeos` (tokens `--vo-*` copies a l'identique de VibeCut),
+  primitives completes (dont Slider avec double-clic reset, Sheet qui devient
+  bottom sheet sous 768px, toasts), shell a bandeau unique avec navigation
+  d'espaces, mini-lecteur audio global et tab bar basse mobile.
+- **Le projet qui circule est en place** : modele v1 + IndexedDB (`vibeos`,
+  stores `projects`/`meta`), autosauvegarde debouncee 800ms avec flush sur
+  `pagehide`, recents (8 max), dupliquer/supprimer/ouvrir. Toute erreur
+  IndexedDB degrade en memoire seule sans bloquer la creation.
+- **Routes** : `/creer` (accueil incubateur complet : reprise, 5 cartes
+  d'espaces dessinees en CSS, recents avec menu), plus `layout-visuel`,
+  `studio`, `vision`, `son` en placeholders honnetes annoncant leur phase.
+  Noindex partout, StudioAuthGate comme /video.
+- **Rien d'ancien n'est touche** : `/studio`, `vibefx-studio/`, `vibefx-layout/`
+  et `/video` sont inchanges. Le bouton « Publier » du shell renvoie au flux
+  actuel de /studio jusqu'a la phase F.
+- Verifie : lint 0 erreur (12 warnings preexistants hors vibeos), build vert
+  avec les 5 routes, smoke HTTP 200 + meta noindex. Prompt de relance phase B
+  (Layout) ecrit en fin de `todo.md`.
+
+## Journal — 2026-08-08 (cadrage du redesign VibeOS)
+
+- **Nouveau document** : `docs/plan-vibeos-redesign-2026-08-08.md` — plan maitre
+  du redesign complet des surfaces Studio / Layout / Soundtrack / Vision.
+  Decisions validees avec l'utilisateur : vraies pages separees sous `/creer/*`
+  avec accueil incubateur (VibeCut inclus comme 5e espace), mode simple + expert
+  partout, Vision auto-magique + 12 looks tries par pertinence photo, Studio
+  redesign + 4 features (ambiances, surprends-moi, variantes, styles perso),
+  Soundtrack refait en Spotify-like sans nouvelle feature, mini-lecteur global,
+  desktop + mobile serieux, side-build puis bascule (redirections `/studio` ->
+  `/creer` et suppression de l'ancien UI en phase F).
+- Design system cible : `.vibeos` (tokens `--vo-*` copies de
+  `src/features/vibecut/styles/vibecut.css`), CSS Modules uniquement — le
+  bundle Tailwind statique de `/studio` n'est pas utilise par le nouveau code.
+- Aucune modification de code applicatif dans ce lot : uniquement le plan,
+  cette entree de journal et l'arbre docs/.
 
 ## Journal — 2026-08-04 (lot B3, 7e tranche — ouverture et fin de sequence, montage avance)
 

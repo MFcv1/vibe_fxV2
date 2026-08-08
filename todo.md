@@ -1,7 +1,47 @@
 # TODO — Reconstruction de l'interface VibeCut
 
 > État d'avancement. Plan complet et direction artistique : [plan.md](plan.md).
-> **Dernière mise à jour : 2026-08-03.**
+> **Dernière mise à jour : 2026-08-08.**
+
+---
+
+## CHANTIER VIBEOS — redesign Studio/Layout/Soundtrack/Vision (2026-08-08)
+
+Plan maître : `docs/plan-vibeos-redesign-2026-08-08.md` (décisions validées,
+inventaire, design system, specs page par page, phases A-F).
+
+**Phase A (Fondations) : ✅ terminée le 2026-08-08.**
+
+Livré :
+- `src/features/vibeos/styles/vibeos.css` — tokens `--vo-*` copiés de VibeCut,
+  scope strict `.vibeos`, zéro Tailwind (le bundle de /studio est statique).
+- `src/features/vibeos/primitives/` — Button, IconButton, Segmented, Card,
+  Badge, Spinner, Progress, EmptyState, Collapsible, Slider, TileGrid/Tile,
+  Sheet (panneau latéral desktop / bottom sheet mobile), SearchField,
+  ToastProvider/useToast.
+- `src/features/vibeos/shell/` — VibeOsShell (topbar 56px unique, nav espaces,
+  tab bar basse mobile avec safe-area), MiniPlayer (visible si piste chargée),
+  SpacePlaceholder.
+- `src/features/vibeos/audio/AudioProvider.jsx` — audio global : l'élément
+  `<audio>` vit dans le layout /creer et survit aux navigations.
+- `src/features/vibeos/project/` — modèle projet v1, IndexedDB (`vibeos` db,
+  stores `projects` + `meta`), provider avec autosauvegarde débouncée 800ms,
+  récents (8 max), dupliquer/supprimer/ouvrir/ensureProject.
+- Routes : `/creer` (accueil incubateur complet : reprise, 5 cartes d'espaces,
+  récents avec menu), `/creer/layout-visuel`, `/creer/studio`, `/creer/vision`,
+  `/creer/son` (placeholders phase B-E). Toutes noindex, derrière StudioAuthGate.
+
+Vérifié : `npm run lint` 0 erreur (12 warnings préexistants hors vibeos),
+`npm run build` vert avec les 5 routes, smoke HTTP 200 + noindex sur /creer.
+`/studio` intact, `/video` intact.
+
+Laissé de côté (assumé) : le bouton « Publier » du shell pointe vers /studio
+(flux actuel) jusqu'à la phase F ; pas de vignette projet tant que Layout
+(phase B) n'écrit pas `project.thumbnail` ; pas de tests navigateur dédiés
+vibeos (les placeholders n'ont pas de logique).
+
+**Prochaine étape : phase B (Layout)** — voir le prompt de relance VibeOS en
+fin de fichier.
 
 ---
 
@@ -1981,3 +2021,22 @@ VIBECUT_MOTION_SHOT_DIR=/tmp/shots npm run test:vibecut-motion-parity  # garder 
 si `render-service/` change, **une seule fois en fin de lot**, après le pré-vol
 `node scripts/check-vibecut-renderer-image-capabilities.mjs`, puis vérifie sur le
 service réel avec `VIBECUT_RENDERER_URL=` et reporte la révision.
+
+---
+
+## PROMPT DE RELANCE — CHANTIER VIBEOS (phase B, Layout)
+
+> Lis `AGENTS.md`, puis `docs/plan-vibeos-redesign-2026-08-08.md` en entier
+> (surtout §5.2 Layout et §4.2/4.3). La phase A est livrée : design system
+> `.vibeos`, primitives, shell, store projet et accueil sur `/creer`. Exécute la
+> phase B : remplace le placeholder de `/creer/layout-visuel` par le vrai écran
+> Layout — mode simple en 4 blocs (Format, Modèle, Images, Habillage), canvas
+> branché sur les moteurs EXISTANTS (`vibefx-layout/engine`,
+> `vibefx-studio/hooks/useCanvasRenderer` & co, importés, jamais réécrits),
+> sheet des templates thématiques avec vrais aperçus, réglages avancés en
+> Collapsible, écriture de `project.thumbnail`, mobile sérieux. Interdits :
+> Tailwind dans le nouveau code, toute modification de `/studio` et de
+> `src/features/vibefx-studio` (hors extraction de logique partagée). Critère
+> bloquant : export identique au pixel près à l'ancien onglet Layout. Termine
+> par le rituel de fin de phase (lint, build, smokes, todo.md, map.md, prompt
+> de relance phase C).

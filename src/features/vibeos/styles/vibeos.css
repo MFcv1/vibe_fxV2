@@ -1,0 +1,215 @@
+/*
+ * VibeOS design system - tokens + base.
+ * Scope strict: tout vit sous `.vibeos`. Aucune regle globale, aucun debordement
+ * possible vers /studio (Tailwind statique), /video (.vibecut) ou les pages publiques.
+ * Valeurs copiees de src/features/vibecut/styles/vibecut.css (meme atmosphere,
+ * decision plan-vibeos-redesign-2026-08-08.md §3.1) - seul le prefixe change.
+ */
+
+.vibeos {
+    /* Surfaces - neutres profondes, sans teinte bleue ni neon */
+    --vo-bg: #0b0b0d;
+    --vo-bg-sunken: #070708;
+    --vo-surface: #16161a;
+    --vo-surface-2: #1d1d22;
+    --vo-surface-3: #26262c;
+    --vo-line: rgba(255, 255, 255, 0.075);
+    --vo-line-strong: rgba(255, 255, 255, 0.14);
+
+    /* Texte - 3 niveaux, jamais en dessous de 12px */
+    --vo-text: #f4f4f6;
+    --vo-text-2: #a2a2ab;
+    --vo-text-3: #6d6d77;
+    --vo-text-on-accent: #ffffff;
+
+    /* Un seul accent de marque */
+    --vo-accent: #5b7cfa;
+    --vo-accent-hover: #6f8bff;
+    --vo-accent-press: #4a68e0;
+    --vo-accent-quiet: rgba(91, 124, 250, 0.14);
+    --vo-accent-line: rgba(91, 124, 250, 0.42);
+
+    /* Semantiques - usage fonctionnel uniquement */
+    --vo-success: #3ecf8e;
+    --vo-warning: #e8b339;
+    --vo-danger: #ff5a5f;
+    --vo-danger-quiet: rgba(255, 90, 95, 0.12);
+
+    /* Typographie */
+    --vo-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    --vo-font-numeric: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --vo-text-xs: 12px;
+    --vo-text-sm: 13px;
+    --vo-text-base: 14px;
+    --vo-text-md: 16px;
+    --vo-text-lg: 20px;
+    --vo-text-xl: 26px;
+    --vo-text-2xl: 34px;
+
+    /* Espacement - base 4 */
+    --vo-space-1: 4px;
+    --vo-space-2: 8px;
+    --vo-space-3: 12px;
+    --vo-space-4: 16px;
+    --vo-space-5: 20px;
+    --vo-space-6: 24px;
+    --vo-space-8: 32px;
+    --vo-space-10: 40px;
+    --vo-space-12: 48px;
+    --vo-space-16: 64px;
+
+    /* Rayons */
+    --vo-radius-sm: 8px;
+    --vo-radius-md: 12px;
+    --vo-radius-lg: 16px;
+    --vo-radius-xl: 20px;
+    --vo-radius-pill: 999px;
+
+    /* Elevation - 3 niveaux maximum */
+    --vo-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --vo-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+    --vo-shadow-3: 0 24px 56px -16px rgba(0, 0, 0, 0.7);
+
+    /* Mouvement */
+    --vo-dur-1: 120ms;
+    --vo-dur-2: 180ms;
+    --vo-dur-3: 240ms;
+    --vo-dur-4: 320ms;
+    --vo-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --vo-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* Chrome */
+    --vo-topbar-height: 56px;
+    --vo-tabbar-height: 60px;
+
+    background: var(--vo-bg);
+    color: var(--vo-text);
+    font-family: var(--vo-font);
+    font-size: var(--vo-text-base);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme clair - pret, non active (decision produit: sombre uniquement) */
+.vibeos[data-theme="light"] {
+    --vo-bg: #f6f6f8;
+    --vo-bg-sunken: #ececf0;
+    --vo-surface: #ffffff;
+    --vo-surface-2: #f2f2f5;
+    --vo-surface-3: #e7e7ec;
+    --vo-line: rgba(0, 0, 0, 0.08);
+    --vo-line-strong: rgba(0, 0, 0, 0.16);
+    --vo-text: #16161a;
+    --vo-text-2: #5a5a64;
+    --vo-text-3: #8b8b95;
+    --vo-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --vo-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.14);
+    --vo-shadow-3: 0 24px 56px -16px rgba(0, 0, 0, 0.18);
+}
+
+.vibeos *,
+.vibeos *::before,
+.vibeos *::after {
+    box-sizing: border-box;
+}
+
+/*
+ * Resets d'elements en specificite ZERO (`:where`).
+ * Sans cela, `.vibeos button` (0,1,1) l'emporterait sur les classes des CSS
+ * Modules (0,1,0) et ecraserait par exemple le fond des boutons primaires.
+ */
+:where(.vibeos) :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+}
+
+:where(.vibeos) :where(button) {
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+:where(.vibeos) :where(button:disabled) {
+    cursor: not-allowed;
+}
+
+:where(.vibeos) :where(a) {
+    color: inherit;
+    text-decoration: none;
+}
+
+.vibeos :focus-visible {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: 2px;
+    border-radius: var(--vo-radius-sm);
+}
+
+:where(.vibeos) :where(h1, h2, h3, h4) {
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--vo-text);
+}
+
+:where(.vibeos) :where(p) {
+    margin: 0;
+}
+
+.vibeos [data-numeric] {
+    font-family: var(--vo-font-numeric);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+/* Scrollbars discretes, seulement dans VibeOS */
+.vibeos ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.vibeos ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vibeos ::-webkit-scrollbar-thumb {
+    background: var(--vo-surface-3);
+    border: 3px solid transparent;
+    border-radius: var(--vo-radius-pill);
+    background-clip: content-box;
+}
+
+.vibeos ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a42;
+    background-clip: content-box;
+}
+
+.vibeos-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vibeos *,
+    .vibeos *::before,
+    .vibeos *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        /*
+         * Les delais aussi: les entrees en cascade utilisent `animation-fill-mode:
+         * both`, donc un delai non neutralise laisserait le contenu invisible
+         * pendant sa duree - exactement l'inverse du but recherche.
+         */
+        animation-delay: 0ms !important;
+        transition-delay: 0ms !important;
+    }
+}
