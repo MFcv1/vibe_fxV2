@@ -26,14 +26,22 @@ export function createEmptyProject(overrides = {}) {
         format: 'insta-port',
         /* Id TEMPLATES, ou objet { id: 'custom', presetId, zones } pour le personnalise. */
         template: 'minimal',
+        overlayMode: 'landscape',
+        /* Images de la composition: [{ id, name, slotId, blob }] - des Blobs,
+           jamais des dataURLs (plan §7). */
         images: [],
+        /* Reglages par zone: { [slotId]: { imageId, zoom, x, y, border, blur } }. */
+        slots: {},
         texts: [],
         assets: [],
         geometry: { padding: 0, gap: 12, radius: 0, customLayoutGap: 12 },
         background: {
             color: '#000000',
             blur: false,
+            grain: 15,
             textures: [],
+            activeTextureId: null,
+            textureOpacity: 60,
             mesh: null,
             lumen: null,
             smoothBlur: null,
@@ -64,6 +72,7 @@ export function normalizeProject(raw) {
         vision: { ...base.vision, ...(raw.vision || {}) },
         studio: { ...base.studio, ...(raw.studio || {}) },
         images: Array.isArray(raw.images) ? raw.images : [],
+        slots: raw.slots && typeof raw.slots === 'object' ? raw.slots : {},
         texts: Array.isArray(raw.texts) ? raw.texts : [],
         assets: Array.isArray(raw.assets) ? raw.assets : [],
     };

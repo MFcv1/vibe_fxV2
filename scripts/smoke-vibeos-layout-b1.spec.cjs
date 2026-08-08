@@ -51,7 +51,7 @@ test("layout VibeOS: import, composition, template, export", async ({ page }) =>
 
   // Etat vide honnete puis import global (2 images).
   await expect(page.getByRole("button", { name: "Importer des images" })).toBeVisible();
-  const globalInput = page.locator('input[type="file"][multiple]');
+  const globalInput = page.getByTestId("vibeos-image-input");
   await globalInput.setInputFiles([
     path.join(dir, "photo-a.png"),
     path.join(dir, "photo-b.png"),
@@ -89,8 +89,8 @@ test("layout VibeOS: import, composition, template, export", async ({ page }) =>
 
   // Modele Double (2 zones) -> deux slots listes.
   await page.getByRole("option", { name: /Double/ }).click();
-  await expect(page.getByRole("button", { name: "Image 1" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Image 2" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Image 1", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Image 2", exact: true })).toBeVisible();
 
   // Template thematique: ouverture du sheet, application, toast.
   await page.getByRole("button", { name: "Parcourir les templates" }).click();

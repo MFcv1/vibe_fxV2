@@ -1,0 +1,406 @@
+/* Ecran Vision VibeOS - photo a gauche, corrections a droite.
+   Meme squelette responsive que Layout (plan §5): la page ne scrolle jamais sur
+   desktop, seul le panneau droit scrolle. */
+
+.screen {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* ---------- Apercu ---------- */
+.stage {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: var(--vo-space-6);
+    background: var(--vo-bg-sunken);
+    overflow: hidden;
+}
+
+.canvasWrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.canvas,
+.compareImage {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: var(--vo-radius-sm);
+    box-shadow: var(--vo-shadow-2);
+}
+
+/* Comparaison: on montre l'original a la place du rendu, meme cadre exact. */
+.canvasHidden {
+    display: none;
+}
+
+.stageActions {
+    position: absolute;
+    top: var(--vo-space-4);
+    right: var(--vo-space-4);
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--vo-space-2);
+}
+
+.emptyStage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-4);
+    max-width: 380px;
+    text-align: center;
+}
+
+.emptyStageTitle {
+    font-size: var(--vo-text-lg);
+}
+
+.emptyStageBody {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Panneau ---------- */
+.panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-6);
+    width: 380px;
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--vo-space-5);
+    border-left: 1px solid var(--vo-line);
+    background: var(--vo-bg);
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+}
+
+.blockHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.blockTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+.blockHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    line-height: 1.5;
+}
+
+.autoMessage {
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-accent-quiet);
+    border: 1px solid var(--vo-accent-line);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+    line-height: 1.5;
+}
+
+.tagRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vo-space-2);
+}
+
+.hiddenInput {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ---------- Looks ---------- */
+.lookGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--vo-space-3);
+}
+
+.lookCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    text-align: left;
+    transition: border-color var(--vo-dur-2) var(--vo-ease),
+        transform var(--vo-dur-2) var(--vo-ease-out),
+        box-shadow var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.lookCard:hover {
+    border-color: var(--vo-line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.lookCard:active {
+    transform: translateY(0) scale(0.99);
+}
+
+.lookCardActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+}
+
+/* Look contre-indique pour CETTE photo: present, mais visiblement en retrait. */
+.lookCardMuted {
+    opacity: 0.5;
+}
+
+.lookThumb {
+    display: block;
+    aspect-ratio: 96 / 58;
+    border-radius: var(--vo-radius-sm);
+    overflow: hidden;
+    background: var(--vo-bg-sunken);
+}
+
+.lookThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.lookThumbEmpty {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(120deg, var(--vo-surface-2), var(--vo-surface-3));
+}
+
+.lookLabel {
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+    color: var(--vo-text);
+}
+
+.lookHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+}
+
+.lookBadge {
+    position: absolute;
+    top: calc(var(--vo-space-2) + 4px);
+    right: calc(var(--vo-space-2) + 4px);
+    padding: 1px 6px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* ---------- Divers panneau ---------- */
+.rowSplit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+}
+
+.rowLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+.textInput {
+    width: 100%;
+    height: 36px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text);
+}
+
+.textInput:focus {
+    outline: none;
+    border-color: var(--vo-accent-line);
+}
+
+/* ---------- Bibliotheque de profils ---------- */
+.libraryBrowser {
+    display: flex;
+    gap: var(--vo-space-4);
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.brandList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 0 0 148px;
+    overflow-y: auto;
+}
+
+.brandRow {
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+    text-align: left;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.brandRow:hover {
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+}
+
+.brandRowActive,
+.brandRowActive:hover {
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+}
+
+.profileList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.profileRow {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    text-align: left;
+    transition: border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.profileRow:hover {
+    border-color: var(--vo-line-strong);
+}
+
+.profileRowActive {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+}
+
+.profileName {
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+}
+
+.profileDesc {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.profileMeta {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+/* ---------- Export ---------- */
+.exportRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.exportEstimate {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+    .screen {
+        flex-direction: column;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    .stage {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        flex: 0 0 auto;
+        height: 46dvh;
+        min-height: 240px;
+        padding: var(--vo-space-4);
+        border-bottom: 1px solid var(--vo-line);
+    }
+
+    .panel {
+        width: 100%;
+        border-left: 0;
+        flex: 1 1 auto;
+        overflow-y: visible;
+    }
+
+    .libraryBrowser {
+        flex-direction: column;
+    }
+
+    .brandList {
+        flex-direction: row;
+        flex: 0 0 auto;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .brandRow {
+        white-space: nowrap;
+    }
+}

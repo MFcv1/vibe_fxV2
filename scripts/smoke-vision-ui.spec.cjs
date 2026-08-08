@@ -97,12 +97,31 @@ async function openStudio(page) {
   await page.goto(`${baseUrl}/studio`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-  const openPreferred = page.getByRole("button", { name: /ouvrir.*mise en page/i }).first();
-  const openFallback = page.getByRole("button", { name: /creer.*mise en page/i }).first();
-  if (await openPreferred.count()) await openPreferred.click();
-  else if (await openFallback.count()) await openFallback.click();
+  /*
+   * En dev, /studio est protege par le portail d'authentification: sans ce
+   * contournement la suite ne pouvait plus entrer dans le studio (6 tests en
+   * echec, corrige le 2026-08-08). Le bouton n'agit qu'une fois React hydrate,
+   * et le serveur de dev peut recharger la page pendant la compilation: on
+   * reclique jusqu'a ce que le studio soit la et le RESTE.
+   */
+  const visionTab = page.getByRole("button", { name: /^vision$/i });
+  const bypass = page.getByRole("button", { name: /contourner.*authentification/i });
+  let stable = 0;
+  for (let attempt = 0; attempt < 40 && stable < 3; attempt += 1) {
+    if (await visionTab.isVisible().catch(() => false)) {
+      stable += 1;
+    } else {
+      stable = 0;
+      if (await bypass.isVisible().catch(() => false)) await bypass.click().catch(() => {});
+      const openPreferred = page.getByRole("button", { name: /ouvrir.*mise en page/i }).first();
+      const openFallback = page.getByRole("button", { name: /creer.*mise en page/i }).first();
+      if (await openPreferred.count()) await openPreferred.click().catch(() => {});
+      else if (await openFallback.count()) await openFallback.click().catch(() => {});
+    }
+    await page.waitForTimeout(1000);
+  }
 
-  await expect(page.getByRole("button", { name: /^vision$/i })).toBeVisible({ timeout: 15000 });
+  await expect(visionTab).toBeVisible({ timeout: 15000 });
 }
 
 async function uploadImage(page, file) {

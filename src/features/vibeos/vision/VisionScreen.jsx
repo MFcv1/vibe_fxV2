@@ -1,0 +1,376 @@
+"use client";
+
+import React, { useMemo, useRef, useState } from 'react';
+import {
+    Columns2, Download, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
+} from 'lucide-react';
+import {
+    Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider,
+} from '../primitives';
+import useVisionEditor from './useVisionEditor';
+import { describeSignals } from './autoEnhance';
+import { VISION_BRAND_LIBRARY } from './visionLooks';
+import styles from './vision.module.css';
+
+const cx = (...values) => values.filter(Boolean).join(' ');
+
+/* Reglages fins: exactement les cles supportees par le moteur Vision v3
+   (utils/visionColorScience.VISION_SUPPORTED_FILTER_KEYS). */
+const ADVANCED_GROUPS = [
+    {
+        id: 'light',
+        title: 'Lumière',
+        controls: [
+            { key: 'brightness', label: 'Luminosité', min: 60, max: 140, defaultValue: 100, unit: '%' },
+            { key: 'contrast', label: 'Contraste', min: 60, max: 180, defaultValue: 100, unit: '%' },
+            { key: 'highlights', label: 'Hautes lumières', min: -50, max: 50, defaultValue: 0 },
+            { key: 'shadows', label: 'Ombres', min: -50, max: 50, defaultValue: 0 },
+        ],
+    },
+    {
+        id: 'color',
+        title: 'Couleur',
+        controls: [
+            { key: 'temperature', label: 'Température', min: -30, max: 30, defaultValue: 0 },
+            { key: 'saturation', label: 'Saturation', min: 0, max: 180, defaultValue: 100, unit: '%' },
+            { key: 'vibrance', label: 'Éclat des couleurs', min: -50, max: 50, defaultValue: 0 },
+            { key: 'skinSaturation', label: 'Teintes de peau', min: -30, max: 30, defaultValue: 0 },
+            { key: 'skySaturation', label: 'Ciel', min: -40, max: 40, defaultValue: 0 },
+            { key: 'foliageSaturation', label: 'Verdure', min: -40, max: 40, defaultValue: 0 },
+            { key: 'warmSaturation', label: 'Tons chauds', min: -40, max: 40, defaultValue: 0 },
+        ],
+    },
+    {
+        id: 'texture',
+        title: 'Matière',
+        controls: [
+            { key: 'clarity', label: 'Relief', min: -30, max: 40, defaultValue: 0 },
+            { key: 'sharpness', label: 'Netteté', min: 0, max: 50, defaultValue: 0 },
+            { key: 'dehaze', label: 'Voile atmosphérique', min: 0, max: 50, defaultValue: 0 },
+            { key: 'grain', label: 'Grain', min: 0, max: 80, defaultValue: 0 },
+            { key: 'vignette', label: 'Vignettage', min: 0, max: 60, defaultValue: 0 },
+        ],
+    },
+];
+
+export default function VisionScreen() {
+    const editor = useVisionEditor();
+    const {
+        image, metrics, signals,
+        filters, setFilters,
+        intensity, setIntensity,
+        looks, previews, activeLookId,
+        autoMessage, isLoadingImage,
+        canvasRef, handleImageUpload,
+        autoEnhance, applyLook, resetFilters,
+        undo, redo, canUndo, canRedo,
+        exportController,
+    } = editor;
+
+    const [isComparing, setIsComparing] = useState(false);
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [libraryBrandId, setLibraryBrandId] = useState(VISION_BRAND_LIBRARY[0]?.id || null);
+    const importRef = useRef(null);
+
+    const {
+        exportName, setExportName, exportFormat, setExportFormat,
+        exportQuality, setExportQuality, estimatedSize,
+        isExportModalOpen, setIsExportModalOpen, handleDownload, performExport,
+    } = exportController;
+
+    const signalTags = useMemo(() => (signals ? describeSignals(signals) : []), [signals]);
+    const libraryBrand = VISION_BRAND_LIBRARY.find((brand) => brand.id === libraryBrandId);
+    const safeSmartphone = filters.safeSmartphone !== false;
+
+    const compareHandlers = {
+        onPointerDown: () => setIsComparing(true),
+        onPointerUp: () => setIsComparing(false),
+        onPointerLeave: () => setIsComparing(false),
+        onPointerCancel: () => setIsComparing(false),
+    };
+
+    return (
+        <div className={styles.screen} data-testid="vibeos-vision-screen">
+            {/* ---------- Aperçu ---------- */}
+            <section className={styles.stage} aria-label="Aperçu de la photo">
+                {image ? (
+                    <>
+                        <div className={styles.stageActions}>
+                            <IconButton label="Annuler" disabled={!canUndo} onClick={undo}>
+                                <Undo2 size={15} />
+                            </IconButton>
+                            <IconButton label="Rétablir" disabled={!canRedo} onClick={redo}>
+                                <Redo2 size={15} />
+                            </IconButton>
+                            <IconButton
+                                label="Comparer avec l'original (maintiens le clic)"
+                                active={isComparing}
+                                {...compareHandlers}
+                            >
+                                <Columns2 size={15} />
+                            </IconButton>
+                            <Button variant="primary" size="sm" icon={<Download size={13} />} onClick={handleDownload}>
+                                Exporter
+                            </Button>
+                        </div>
+                        <div className={styles.canvasWrap}>
+                            <canvas ref={canvasRef} className={cx(styles.canvas, isComparing && styles.canvasHidden)} />
+                            {isComparing ? (
+                                <img
+                                    src={image.src}
+                                    alt="Photo d'origine"
+                                    className={styles.compareImage}
+                                    data-testid="vibeos-vision-compare"
+                                />
+                            ) : null}
+                        </div>
+                    </>
+                ) : (
+                    <div className={styles.emptyStage}>
+                        <h2 className={styles.emptyStageTitle}>Choisis une photo</h2>
+                        <p className={styles.emptyStageBody}>
+                            Importe une photo de téléphone : Vision l&apos;analyse et te propose
+                            des améliorations qui ne la cassent jamais.
+                        </p>
+                        <Button
+                            variant="primary"
+                            size="lg"
+                            icon={<Upload size={15} />}
+                            onClick={() => importRef.current?.click()}
+                        >
+                            Importer une photo
+                        </Button>
+                    </div>
+                )}
+            </section>
+
+            {/* ---------- Panneau ---------- */}
+            <aside className={styles.panel} aria-label="Réglages Vision">
+                <input
+                    ref={importRef}
+                    type="file"
+                    accept="image/*"
+                    className={styles.hiddenInput}
+                    onChange={handleImageUpload}
+                    data-testid="vibeos-vision-input"
+                />
+
+                <section className={styles.block}>
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        block
+                        icon={<Sparkles size={16} />}
+                        disabled={!image || !metrics || isLoadingImage}
+                        onClick={autoEnhance}
+                        data-testid="vibeos-vision-auto"
+                    >
+                        Améliorer ma photo
+                    </Button>
+                    {autoMessage ? (
+                        <p className={styles.autoMessage} data-testid="vibeos-vision-message">{autoMessage}</p>
+                    ) : (
+                        <p className={styles.blockHint}>
+                            Un bouton, une analyse : lumière, relief, couleurs et teints sont corrigés
+                            en gardant la photo naturelle.
+                        </p>
+                    )}
+                    {signalTags.length ? (
+                        <div className={styles.tagRow}>
+                            {signalTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}
+                        </div>
+                    ) : null}
+                    <Slider
+                        label="Intensité"
+                        value={intensity}
+                        onChange={setIntensity}
+                        min={0}
+                        max={100}
+                        defaultValue={80}
+                        formatValue={(value) => `${value}%`}
+                    />
+                </section>
+
+                {/* Looks */}
+                <section className={styles.block}>
+                    <div className={styles.blockHead}>
+                        <h3 className={styles.blockTitle}>Looks</h3>
+                        <span className={styles.blockHint}>{looks.length} choisis pour cette photo</span>
+                    </div>
+                    <div className={styles.lookGrid} data-testid="vibeos-vision-looks">
+                        {looks.map((look, index) => (
+                            <button
+                                key={look.id}
+                                type="button"
+                                className={cx(
+                                    styles.lookCard,
+                                    look.id === activeLookId && styles.lookCardActive,
+                                    look.discouraged && styles.lookCardMuted,
+                                )}
+                                onClick={() => applyLook(look)}
+                                title={look.discouraged ? `Peu adapté : ${look.avoidFor}` : look.reason}
+                            >
+                                <span className={styles.lookThumb}>
+                                    {previews[look.id]
+                                        ? <img src={previews[look.id]} alt="" />
+                                        : <span className={styles.lookThumbEmpty} />}
+                                </span>
+                                <span className={styles.lookLabel}>{look.label}</span>
+                                <span className={styles.lookHint}>
+                                    {look.discouraged ? `Peu adapté : ${look.avoidFor}` : look.reason}
+                                </span>
+                                {!look.discouraged && index < 2 && signals ? (
+                                    <span className={styles.lookBadge}>Conseillé</span>
+                                ) : null}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Réglages avancés */}
+                <Collapsible title="Réglages avancés" defaultOpen={false} testId="vibeos-vision-advanced">
+                    <section className={styles.block}>
+                        <div className={styles.rowSplit}>
+                            <span className={styles.rowLabel}>
+                                <ShieldCheck size={13} /> Garde-fous smartphone
+                            </span>
+                            <Segmented
+                                label="Garde-fous smartphone"
+                                value={safeSmartphone ? 'on' : 'off'}
+                                onChange={(value) => setFilters('safeSmartphone', value === 'on')}
+                                options={[
+                                    { value: 'on', label: 'Actifs' },
+                                    { value: 'off', label: 'Libres' },
+                                ]}
+                            />
+                        </div>
+                        <p className={styles.blockHint}>
+                            Actifs, ils empêchent les peaux orange, les ciels fluo et les noirs bouchés.
+                            À couper seulement si tu sais ce que tu fais.
+                        </p>
+                    </section>
+
+                    {ADVANCED_GROUPS.map((group) => (
+                        <section key={group.id} className={styles.block}>
+                            <h3 className={styles.blockTitle}>{group.title}</h3>
+                            {group.controls.map((control) => (
+                                <Slider
+                                    key={control.key}
+                                    label={control.label}
+                                    value={filters[control.key] ?? control.defaultValue}
+                                    onChange={(value) => setFilters(control.key, value)}
+                                    min={control.min}
+                                    max={control.max}
+                                    defaultValue={control.defaultValue}
+                                    formatValue={(value) => `${value}${control.unit || ''}`}
+                                />
+                            ))}
+                        </section>
+                    ))}
+
+                    <section className={styles.block}>
+                        <h3 className={styles.blockTitle}>Bibliothèque complète</h3>
+                        <p className={styles.blockHint}>
+                            Tous les profils par marque, avec ce pour quoi ils sont faits — et ce qu&apos;ils abîment.
+                        </p>
+                        <Button variant="secondary" block onClick={() => setIsLibraryOpen(true)}>
+                            Parcourir par marque
+                        </Button>
+                        <Button variant="ghost" size="sm" icon={<RotateCcw size={13} />} onClick={resetFilters}>
+                            Tout remettre à zéro
+                        </Button>
+                    </section>
+                </Collapsible>
+            </aside>
+
+            {/* ---------- Sheets ---------- */}
+            <Sheet
+                open={isLibraryOpen}
+                onClose={() => setIsLibraryOpen(false)}
+                title="Bibliothèque de profils"
+                wide
+            >
+                <div className={styles.libraryBrowser}>
+                    <div className={styles.brandList}>
+                        {VISION_BRAND_LIBRARY.map((brand) => (
+                            <button
+                                key={brand.id}
+                                type="button"
+                                className={cx(styles.brandRow, brand.id === libraryBrandId && styles.brandRowActive)}
+                                onClick={() => setLibraryBrandId(brand.id)}
+                            >
+                                {brand.name}
+                            </button>
+                        ))}
+                    </div>
+                    <div className={styles.profileList}>
+                        {(libraryBrand?.profiles || []).map((profile) => (
+                            <button
+                                key={profile.id}
+                                type="button"
+                                className={cx(styles.profileRow, profile.id === activeLookId && styles.profileRowActive)}
+                                onClick={() => {
+                                    applyLook({ ...profile, label: profile.label });
+                                    setIsLibraryOpen(false);
+                                }}
+                            >
+                                <span className={styles.profileName}>{profile.label}</span>
+                                <span className={styles.profileDesc}>{profile.hint}</span>
+                                <span className={styles.profileMeta}>
+                                    Idéal : {profile.bestFor} · À éviter : {profile.avoidFor}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </Sheet>
+
+            <Sheet
+                open={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                title="Exporter la photo"
+            >
+                <div className={styles.exportRow}>
+                    <span className={styles.rowLabel}>Nom du fichier</span>
+                    <input
+                        type="text"
+                        className={styles.textInput}
+                        value={exportName}
+                        aria-label="Nom du fichier"
+                        onChange={(event) => setExportName(event.target.value)}
+                    />
+                </div>
+                <div className={styles.rowSplit}>
+                    <span className={styles.rowLabel}>Format</span>
+                    <Segmented
+                        label="Format d'export"
+                        value={exportFormat}
+                        onChange={setExportFormat}
+                        options={[
+                            { value: 'jpg', label: 'JPG' },
+                            { value: 'png', label: 'PNG' },
+                            { value: 'webp', label: 'WebP' },
+                        ]}
+                    />
+                </div>
+                {exportFormat !== 'png' ? (
+                    <Slider
+                        label="Qualité"
+                        value={exportQuality}
+                        onChange={setExportQuality}
+                        min={40}
+                        max={100}
+                        defaultValue={90}
+                        formatValue={(value) => `${value}%`}
+                    />
+                ) : null}
+                <p className={styles.exportEstimate}>
+                    Poids estimé : <span data-numeric>{estimatedSize || '—'}</span>
+                </p>
+                <Button variant="primary" size="lg" block icon={<Download size={15} />} onClick={performExport}>
+                    Télécharger
+                </Button>
+            </Sheet>
+        </div>
+    );
+}

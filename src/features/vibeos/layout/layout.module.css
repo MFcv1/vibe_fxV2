@@ -59,7 +59,111 @@
     right: var(--vo-space-4);
     z-index: 5;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--vo-space-2);
+}
+
+/* ---------- Couches posees sur le canvas ---------- */
+
+/* Comparaison avant/apres: l'original, cadre exactement sur le canvas. */
+.compareOverlay {
+    position: absolute;
+    z-index: 4;
+    overflow: hidden;
+    border-radius: var(--vo-radius-sm);
+    pointer-events: none;
+}
+
+.compareOverlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.compareTag {
+    position: absolute;
+    left: var(--vo-space-3);
+    top: var(--vo-space-3);
+    padding: 2px var(--vo-space-2);
+    border-radius: var(--vo-radius-pill);
+    background: rgba(0, 0, 0, 0.66);
+    color: #fff;
+    font-size: var(--vo-text-xs);
+}
+
+.zoneLayerHost {
+    position: absolute;
+    z-index: 6;
+}
+
+.zoneLayer {
+    position: absolute;
+    inset: 0;
+}
+
+.zoneBox {
+    position: absolute;
+    border: 1px solid var(--vo-accent-line);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-accent-quiet);
+    cursor: grab;
+    touch-action: none;
+}
+
+.zoneBox:active {
+    cursor: grabbing;
+}
+
+.zoneBoxActive {
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 1px var(--vo-accent) inset;
+}
+
+.zoneName {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    max-width: calc(100% - 32px);
+    padding: 1px 6px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
+.zoneDelete {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+}
+
+.zoneDelete:hover {
+    background: var(--vo-danger);
+}
+
+.zoneHandle {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--vo-radius-pill);
+    border: 2px solid var(--vo-bg);
+    background: var(--vo-accent);
+    cursor: nwse-resize;
+    touch-action: none;
 }
 
 .stageDrop {
@@ -94,7 +198,14 @@
 }
 
 /* ---------- Panneau ---------- */
+/*
+ * `position: relative` n'est pas decoratif: les champs de fichier caches sont
+ * en `position: absolute`. Sans bloc conteneur ici, ils se rattachent au bloc
+ * initial et allongent la zone scrollable du document — la page entiere se
+ * mettait a scroller des que « Reglages avances » etait ouvert (bug 2026-08-08).
+ */
 .panel {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--vo-space-6);
@@ -214,6 +325,7 @@
 }
 
 .slotImport {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: var(--vo-space-1);
@@ -555,6 +667,245 @@
 .generatedChoices {
     display: flex;
     gap: var(--vo-space-2);
+}
+
+/* ---------- Zones du modele personnalise (panneau) ---------- */
+.shapeGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--vo-space-2);
+}
+
+.shapeButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--vo-space-2);
+    min-height: 74px;
+    padding: var(--vo-space-2);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line);
+    cursor: grab;
+    transition: border-color var(--vo-dur-1) var(--vo-ease),
+        background var(--vo-dur-1) var(--vo-ease);
+}
+
+.shapeButton:hover {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-surface-2);
+}
+
+.shapeGlyph {
+    display: block;
+    min-width: 10px;
+    min-height: 8px;
+    border-radius: 3px;
+    background: var(--vo-surface-3);
+    border: 1px solid var(--vo-line-strong);
+}
+
+.shapeLabel {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Textures ---------- */
+.textureGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: var(--vo-space-2);
+}
+
+.textureThumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    overflow: hidden;
+}
+
+.textureThumbActive {
+    border-color: var(--vo-accent);
+}
+
+.textureSelect {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.textureSelect img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ---------- Apercu Instagram ---------- */
+.phone {
+    margin: 0 auto;
+    width: min(320px, 100%);
+    padding: 10px;
+    border-radius: 38px;
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line-strong);
+    box-shadow: var(--vo-shadow-2);
+}
+
+.phoneScreen {
+    border-radius: 30px;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+}
+
+.postView {
+    display: flex;
+    flex-direction: column;
+}
+
+.postHead {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-3);
+    font-size: var(--vo-text-sm);
+}
+
+.postAvatar {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--vo-radius-pill);
+    background: linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7);
+}
+
+.postAuthor {
+    flex: 1 1 auto;
+    font-weight: 600;
+}
+
+.postMore {
+    opacity: 0.6;
+}
+
+.postMedia {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+
+.postMedia img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.postMediaPano {
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--vo-dur-3) var(--vo-ease-out);
+}
+
+.panoNav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+}
+
+.panoNavPrev {
+    left: var(--vo-space-2);
+}
+
+.panoNavNext {
+    right: var(--vo-space-2);
+}
+
+.panoDots {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.panoDots span {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.panoDots span[data-active='true'] {
+    background: var(--vo-accent);
+}
+
+.postActions {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-3);
+}
+
+.postSave {
+    margin-left: auto;
+}
+
+.postCaption {
+    padding: 0 var(--vo-space-3) var(--vo-space-4);
+    font-size: var(--vo-text-sm);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.storyView {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    background: #000;
+}
+
+.storyView img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.storyBar {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    height: 2px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.storyBar span {
+    display: block;
+    width: 34%;
+    height: 100%;
+    border-radius: var(--vo-radius-pill);
+    background: #fff;
+}
+
+.storyFoot {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    padding: var(--vo-space-2) var(--vo-space-4);
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    font-size: var(--vo-text-sm);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* ---------- Export ---------- */

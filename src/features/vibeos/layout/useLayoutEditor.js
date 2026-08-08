@@ -8,7 +8,11 @@ import useCanvasEvents from '../../vibefx-studio/hooks/useCanvasEvents';
 import useImageUpload from '../../vibefx-studio/hooks/useImageUpload';
 import useExport from '../../vibefx-studio/hooks/useExport';
 import { DEFAULT_CUSTOM_LAYOUT_GAP, DEFAULT_CUSTOM_TEMPLATE, FORMATS, TEMPLATES } from '../../vibefx-studio/data/constants';
+import {
+    createCustomZone, normalizeCustomZones, updateCustomTemplateZones,
+} from '../../vibefx-studio/utils/customLayout';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
+import { hasStoredComposition, restoreComposition, snapshotComposition } from './layoutPersistence';
 
 /*
  * Composition des moteurs EXISTANTS de vibefx-studio pour l'ecran Layout VibeOS
@@ -19,7 +23,7 @@ import { useVibeOsProject } from '../project/VibeOsProjectProvider';
  */
 
 const THUMBNAIL_WIDTH = 256;
-const THUMBNAIL_DEBOUNCE_MS = 1500;
+const PERSIST_DEBOUNCE_MS = 1500;
 const HISTORY_LIMIT = 30;
 const DEFAULT_LAYOUT_MESH_COLORS = ['#6366f1', '#a855f7', '#ec4899', '#050505'];
 /* Meme etat initial que VibeFxStudio.jsx (parite de comportement). */
@@ -40,7 +44,7 @@ const mapTextsWithIds = (texts = []) => {
 };
 
 export default function useLayoutEditor() {
-    const { project, updateProject, ensureProject } = useVibeOsProject();
+    const { project, status, updateProject, ensureProject } = useVibeOsProject();
 
     /* ---- Etat layout de l'ancien moteur, tel quel ---- */
     const layoutState = useLayoutState();
@@ -78,9 +82,9 @@ export default function useLayoutEditor() {
     const [layoutBgMeshColors, setLayoutBgMeshColors] = useState(DEFAULT_LAYOUT_MESH_COLORS);
     const [layoutLumenBackground, setLayoutLumenBackground] = useState(null);
     const [layoutSmoothBlur, setLayoutSmoothBlur] = useState({ ...DEFAULT_SMOOTH_BLUR_STATE });
-    const [layoutTextures] = useState([]);
-    const [activeTextureId] = useState(null);
-    const [layoutTextureOpacity] = useState(60);
+    const [layoutTextures, setLayoutTextures] = useState([]);
+    const [activeTextureId, setActiveTextureId] = useState(null);
+    const [layoutTextureOpacity, setLayoutTextureOpacity] = useState(60);
     const [isProcessing, setIsProcessing] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -189,6 +193,136 @@ export default function useLayoutEditor() {
         setImages((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
+    /* Retire l'image d'une zone sans toucher aux autres (miroir de
+       VibeFxStudio.handleRemoveSlotImage, version zone-only). */
+    const handleRemoveSlotImage = useCallback((slotId) => {
+        setSlotConfigs((prev) => {
+            if (!prev[slotId]) return prev;
+            const config = { ...prev[slotId] };
+            delete config.image;
+            delete config.imageSrc;
+            delete config.imageName;
+            return { ...prev, [slotId]: config };
+        });
+    }, [setSlotConfigs]);
+
+    /* ---- Textures du fond (moteur renderLayoutImageTexture, inchange) ---- */
+
+    const handleTextureUpload = useCallback((event) => {
+        const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+        if (!files.length) return;
+        files.forEach((file, index) => {
+            const img = new window.Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                const textureId = `texture-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
+                setLayoutTextures((prev) => [
+                    ...prev,
+                    { id: textureId, image: img, src: objectUrl, name: file.name || `Texture ${prev.length + 1}` },
+                ]);
+                setActiveTextureId(textureId);
+            };
+            img.src = objectUrl;
+        });
+        event.target.value = '';
+    }, []);
+
+    const removeTexture = useCallback((textureId) => {
+        setLayoutTextures((prev) => {
+            const next = prev.filter((texture) => texture.id !== textureId);
+            setActiveTextureId((current) => (current === textureId ? (next[0]?.id ?? null) : current));
+            return next;
+        });
+    }, []);
+
+    /* ---- Zones du modele personnalise (utils/customLayout.js, inchange) ---- */
+
+    /* Ajout d'une zone (clic sur une forme, ou glisser-deposer sur l'apercu):
+       meme sequence que VibeFxStudio.handleAddCustomZone. */
+    const addCustomZone = useCallback((shape, position = null) => {
+        const zoneIndex = activeTemplate.customLayout?.zones?.length || 0;
+        const created = createCustomZone(shape, zoneIndex, position);
+        const nextZone = {
+            ...created,
+            homeX: created.x, homeY: created.y, homeW: created.w, homeH: created.h,
+        };
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            const zones = [...(previousTemplate.customLayout?.zones || []), nextZone];
+            return updateCustomTemplateZones(
+                {
+                    ...previousTemplate,
+                    customLayout: { ...previousTemplate.customLayout, presetId: 'manual' },
+                },
+                normalizeCustomZones(zones, nextZone.id),
+            );
+        });
+        setSelectedSlotIndex(nextZone.id);
+        setActiveTextId(null);
+    }, [activeTemplate, setActiveTemplate, setSelectedSlotIndex, setActiveTextId]);
+
+    /* Deplacement / redimension d'une zone: reprise litterale de
+       VibeFxStudio.handleUpdateCustomZone (clamps + memoire "home" + reflow). */
+    const updateCustomZone = useCallback((zoneId, patch) => {
+        if (!zoneId) return;
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            const currentZones = previousTemplate.customLayout?.zones || [];
+            const zoneToUpdate = currentZones.find((zone) => zone.id === zoneId);
+            if (!zoneToUpdate) return previousTemplate;
+
+            const updatedZone = { ...zoneToUpdate, ...patch };
+            if ('w' in patch) {
+                const targetW = Math.max(0.08, Math.min(1, patch.w));
+                updatedZone.w = targetW;
+                if (updatedZone.x + targetW > 1) updatedZone.x = Math.max(0, 1 - targetW);
+            }
+            if ('h' in patch) {
+                const targetH = Math.max(0.08, Math.min(1, patch.h));
+                updatedZone.h = targetH;
+                if (updatedZone.y + targetH > 1) updatedZone.y = Math.max(0, 1 - targetH);
+            }
+            if ('x' in patch) updatedZone.x = Math.max(0, Math.min(1 - updatedZone.w, patch.x));
+            if ('y' in patch) updatedZone.y = Math.max(0, Math.min(1 - updatedZone.h, patch.y));
+
+            const homePatch = {
+                homeX: updatedZone.x, homeY: updatedZone.y,
+                homeW: updatedZone.w, homeH: updatedZone.h,
+            };
+            const zones = currentZones.map((zone) => (
+                zone.id === zoneId ? { ...zone, ...updatedZone, ...homePatch, hidden: false } : zone
+            ));
+            return updateCustomTemplateZones(previousTemplate, normalizeCustomZones(zones, zoneId));
+        });
+    }, [setActiveTemplate]);
+
+    const deleteCustomZone = useCallback((zoneId) => {
+        if (!zoneId) return;
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            const zones = (previousTemplate.customLayout?.zones || []).filter((zone) => zone.id !== zoneId);
+            return updateCustomTemplateZones(previousTemplate, zones);
+        });
+        setSelectedSlotIndex((current) => (current === zoneId ? null : current));
+        setSlotConfigs((previous) => {
+            const next = { ...previous };
+            delete next[zoneId];
+            return next;
+        });
+    }, [setActiveTemplate, setSelectedSlotIndex, setSlotConfigs]);
+
+    const clearCustomZones = useCallback(() => {
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            return {
+                ...previousTemplate,
+                slots: 0,
+                customLayout: { ...previousTemplate.customLayout, presetId: 'manual', zones: [] },
+            };
+        });
+        setSelectedSlotIndex(null);
+    }, [setActiveTemplate, setSelectedSlotIndex]);
+
     /* ---- Fonds generes (meme sequence que VibeFxStudio) ---- */
 
     const applyLayoutMesh = useCallback((colors) => {
@@ -249,10 +383,14 @@ export default function useLayoutEditor() {
         slotConfigs: Object.fromEntries(Object.entries(slotConfigs).map(([k, v]) => [k, { ...v }])),
         layoutLumenBackground: layoutLumenBackground ? { ...layoutLumenBackground } : null,
         layoutSmoothBlur: layoutSmoothBlur ? { ...layoutSmoothBlur } : null,
+        layoutTextures: layoutTextures.map((texture) => texture),
+        activeTextureId,
+        layoutTextureOpacity,
     }), [images, activeFormat, activeTemplate, overlayMode, texts, assets,
         padding, gap, customLayoutGap, radius,
         layoutBgColor, layoutBgBlur, layoutBgTexture, layoutBgGradient,
-        layoutBgMeshColors, slotConfigs, layoutLumenBackground, layoutSmoothBlur]);
+        layoutBgMeshColors, slotConfigs, layoutLumenBackground, layoutSmoothBlur,
+        layoutTextures, activeTextureId, layoutTextureOpacity]);
 
     const restoreState = useCallback((state) => {
         if (!state) return;
@@ -274,6 +412,9 @@ export default function useLayoutEditor() {
         setSlotConfigs(state.slotConfigs || {});
         setLayoutLumenBackground(state.layoutLumenBackground || null);
         setLayoutSmoothBlur(state.layoutSmoothBlur || { ...DEFAULT_SMOOTH_BLUR_STATE });
+        setLayoutTextures(state.layoutTextures || []);
+        setActiveTextureId(state.activeTextureId ?? null);
+        setLayoutTextureOpacity(state.layoutTextureOpacity ?? 60);
     }, [setActiveFormat, setActiveTemplate, setOverlayMode, setTexts, setAssets,
         setPadding, setGap, setRadius, setLayoutBgColor, setLayoutBgBlur,
         setLayoutBgTexture, setSlotConfigs]);
@@ -292,6 +433,9 @@ export default function useLayoutEditor() {
         if (JSON.stringify(a.assets) !== JSON.stringify(b.assets)) return false;
         if (a.layoutLumenBackground?.id !== b.layoutLumenBackground?.id) return false;
         if (JSON.stringify(a.layoutSmoothBlur) !== JSON.stringify(b.layoutSmoothBlur)) return false;
+        if (a.layoutTextures?.length !== b.layoutTextures?.length) return false;
+        if (a.activeTextureId !== b.activeTextureId) return false;
+        if (a.layoutTextureOpacity !== b.layoutTextureOpacity) return false;
         const keysA = Object.keys(a.slotConfigs || {});
         const keysB = Object.keys(b.slotConfigs || {});
         if (keysA.length !== keysB.length) return false;
@@ -446,52 +590,120 @@ export default function useLayoutEditor() {
         || texts.length > 0
         || assets.length > 0;
 
-    /* ---- Projet commun: garantir un projet + synchroniser les metadonnees ---- */
+    /* ---- Projet commun: garantir un projet, relire, sauvegarder ---- */
+
     useEffect(() => {
         ensureProject();
         /* Une seule fois a l'entree de l'ecran. */
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    /* Vignette 256px + metadonnees legeres, debounce pour ne pas re-rendre en boucle.
-       Les images elles-memes (Blobs IndexedDB) arrivent a la tranche B2. */
-    const thumbnailTimer = useRef(null);
+    /*
+     * Reprise d'un projet: les images reviennent des Blobs IndexedDB (plan §7).
+     * Tant que cette relecture n'est pas terminee, on n'ecrit RIEN dans le
+     * projet - sinon un ecran encore vide ecraserait la composition enregistree.
+     */
+    const hydrationRef = useRef('idle');
+    const [isHydrating, setIsHydrating] = useState(false);
+
     useEffect(() => {
-        if (!project || !hasRenderableOutput) return undefined;
-        if (thumbnailTimer.current) clearTimeout(thumbnailTimer.current);
-        thumbnailTimer.current = setTimeout(() => {
-            thumbnailTimer.current = null;
+        if (hydrationRef.current !== 'idle') return;
+        if (status !== 'ready') return;
+        if (!project) return;
+        if (!hasStoredComposition(project)) {
+            hydrationRef.current = 'done';
+            return;
+        }
+        hydrationRef.current = 'running';
+        /* Micro-tache: la relecture est asynchrone, elle ne doit pas declencher
+           de rendu en cascade depuis le corps de l'effet. */
+        Promise.resolve().then(async () => {
+            setIsHydrating(true);
             try {
-                const { width, height } = getCanvasDimensions();
-                if (!width || !height) return;
-                const thumbCanvas = document.createElement('canvas');
-                thumbCanvas.width = THUMBNAIL_WIDTH;
-                thumbCanvas.height = Math.max(1, Math.round((THUMBNAIL_WIDTH * height) / width));
-                const fullCanvas = document.createElement('canvas');
-                fullCanvas.width = width;
-                fullCanvas.height = height;
-                renderPipeline(fullCanvas, width, height, false, 'low');
-                thumbCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-                updateProject({
-                    format: activeFormat.id,
-                    template: activeTemplate.id === 'custom'
-                        ? { id: 'custom', presetId: activeTemplate.customLayout?.presetId }
-                        : activeTemplate.id,
-                    geometry: { padding, gap, radius, customLayoutGap },
-                    thumbnail: thumbCanvas.toDataURL('image/jpeg', 0.7),
-                });
-            } catch {
-                /* Vignette non bloquante. */
+                const restored = await restoreComposition(project);
+                if (!restored) return;
+                if (restored.format) setActiveFormat(restored.format);
+                if (restored.template) setActiveTemplate(restored.template);
+                setOverlayMode(restored.overlayMode);
+                setImages(restored.images);
+                setSlotConfigs(restored.slotConfigs);
+                setTexts(restored.texts);
+                setAssets(restored.assets);
+                if (restored.geometry) {
+                    setPadding(restored.geometry.padding ?? 40);
+                    setGap(restored.geometry.gap ?? 20);
+                    setRadius(restored.geometry.radius ?? 0);
+                    setCustomLayoutGap(restored.geometry.customLayoutGap ?? DEFAULT_CUSTOM_LAYOUT_GAP);
+                }
+                const background = restored.background || {};
+                if (background.color !== undefined) setLayoutBgColor(background.color);
+                if (background.blur !== undefined) setLayoutBgBlur(background.blur);
+                if (background.grain !== undefined) setLayoutBgTexture(background.grain);
+                setLayoutTextures(background.textures || []);
+                setActiveTextureId(background.activeTextureId ?? null);
+                if (background.textureOpacity !== undefined) setLayoutTextureOpacity(background.textureOpacity);
+                setLayoutBgGradient(background.meshEnabled);
+                if (background.meshColors?.length) setLayoutBgMeshColors(background.meshColors);
+                setLayoutLumenBackground(background.lumen);
+                if (background.smoothBlur) setLayoutSmoothBlur(background.smoothBlur);
+            } finally {
+                hydrationRef.current = 'done';
+                setIsHydrating(false);
             }
-        }, THUMBNAIL_DEBOUNCE_MS);
+        });
+    }, [status, project, setActiveFormat, setActiveTemplate, setOverlayMode, setSlotConfigs,
+        setTexts, setAssets, setPadding, setGap, setRadius, setLayoutBgColor, setLayoutBgBlur,
+        setLayoutBgTexture]);
+
+    /*
+     * Sauvegarde debouncee: composition complete (images en Blobs, zones,
+     * textes, stickers, fond) + vignette 256px pour l'accueil.
+     */
+    const persistTimer = useRef(null);
+    const blobCacheRef = useRef(new Map());
+    useEffect(() => {
+        if (!project || hydrationRef.current !== 'done') return undefined;
+        if (!hasRenderableOutput) return undefined;
+        if (persistTimer.current) clearTimeout(persistTimer.current);
+        persistTimer.current = setTimeout(async () => {
+            persistTimer.current = null;
+            try {
+                const patch = await snapshotComposition({
+                    activeFormat, activeTemplate, overlayMode,
+                    images, slotConfigs, texts, assets,
+                    padding, gap, radius, customLayoutGap,
+                    layoutBgColor, layoutBgBlur, layoutBgTexture,
+                    layoutBgGradient, layoutBgMeshColors,
+                    layoutTextures, activeTextureId, layoutTextureOpacity,
+                    layoutLumenBackground, layoutSmoothBlur,
+                }, blobCacheRef.current);
+
+                const { width, height } = getCanvasDimensions();
+                if (width && height) {
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = THUMBNAIL_WIDTH;
+                    thumbCanvas.height = Math.max(1, Math.round((THUMBNAIL_WIDTH * height) / width));
+                    const fullCanvas = document.createElement('canvas');
+                    fullCanvas.width = width;
+                    fullCanvas.height = height;
+                    renderPipeline(fullCanvas, width, height, false, 'low');
+                    thumbCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                    patch.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
+                }
+                updateProject(patch);
+            } catch {
+                /* Sauvegarde non bloquante: l'edition continue en memoire. */
+            }
+        }, PERSIST_DEBOUNCE_MS);
         return () => {
-            if (thumbnailTimer.current) clearTimeout(thumbnailTimer.current);
+            if (persistTimer.current) clearTimeout(persistTimer.current);
         };
-        /* project omis volontairement: la vignette repond aux changements d'edition,
-           pas aux reecritures du store qu'elle provoque elle-meme. */
+        /* project omis volontairement: la sauvegarde repond aux changements
+           d'edition, pas aux reecritures du store qu'elle provoque elle-meme. */
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [images, activeFormat, activeTemplate, padding, gap, radius, customLayoutGap,
+    }, [images, activeFormat, activeTemplate, overlayMode, padding, gap, radius, customLayoutGap,
         layoutBgColor, layoutBgBlur, layoutBgTexture, layoutBgGradient, layoutBgMeshColors,
+        layoutTextures, activeTextureId, layoutTextureOpacity,
         layoutLumenBackground, layoutSmoothBlur, texts, assets, slotConfigs, hasRenderableOutput]);
 
     return {
@@ -499,7 +711,7 @@ export default function useLayoutEditor() {
         ...layoutState,
         images, setImages,
         customLayoutGap, setCustomLayoutGap,
-        isProcessing, loadingProgress,
+        isProcessing, loadingProgress, isHydrating,
         slotModel, hasRenderableOutput,
         /* refs + events canvas */
         canvasRef,
@@ -507,9 +719,16 @@ export default function useLayoutEditor() {
         /* helpers */
         ...helpers,
         /* imports */
-        handleImageUpload, handleReplaceImageUpload, handleSlotImageUpload, handleRemoveImage,
+        handleImageUpload, handleReplaceImageUpload, handleSlotImageUpload,
+        handleRemoveImage, handleRemoveSlotImage,
         /* templates */
         applyCustomPreset, applyThemedTemplate,
+        /* zones du modele personnalise */
+        addCustomZone, updateCustomZone, deleteCustomZone, clearCustomZones,
+        /* textures du fond */
+        layoutTextures, activeTextureId, setActiveTextureId,
+        layoutTextureOpacity, setLayoutTextureOpacity,
+        handleTextureUpload, removeTexture,
         /* fonds generes */
         layoutBgGradient, layoutBgMeshColors, applyLayoutMesh,
         layoutLumenBackground, applyLumenBackground,

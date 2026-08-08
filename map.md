@@ -290,7 +290,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- services/                 # Modele/client Firestore/Storage projet (tracks + playlists), cache/search provider, IndexedDB, manifest, File System Access, import dev public/music/local-imports, downloads locaux et audit droits
 |   |   |   |-- SoundtrackPage.jsx        # Experience full page Soundtrack dans le studio, sans canvas/sidebar, import IA gratuit par defaut sans pistes starter injectees, consomme le controller audio global
 |   |   |   `-- soundtrack.css          # CSS dark-ui/technical-ui scope Soundtrack charge par /studio/layout, incluant le player bas et le mini-player header
-|   |   |-- utils/                      # Utilitaires canvas/image + color science Vision (`visionColorScience.js`, `visionMetrics.js`)
+|   |   |-- utils/                      # Utilitaires canvas/image + color science Vision (`visionColorScience.js`, `visionMetrics.js`, `visionRecommendation.js` — signaux image, scoring profil<->photo et rendu des vignettes, partages entre l'ancien VisionPanel et l'ecran Vision VibeOS)
 |   |   |-- video/                      # Module Vibe_CUT importe, dont `export/useExportController.js` (logique d'export extraite du panneau), `engine/textOverlayRenderer.js` (rendu canvas des textes extrait de VideoPreview) et `engine/xfadeTransitions.js` (contrepartie canvas exacte des transitions natives `xfade` de FFmpeg, courbes relevees sur des rendus reels), `export/` pour ExportManifest + services localMock/Firebase future, `store/videoStore.js` dont l'action additive `applyMontageScore` (partition de montage, lot L2), `data/musicCatalog.js` pour catalogue/sources/licences, `data/musicRights.js` pour audit/manifeste droits musique, `services/exportRightsManifestClient.js` pour persistance Firestore owner-scoped, `model/timelineModel.js` pour le modele canonique tracks/items, `model/mediaModel.js` (SANS AUCUN IMPORT) pour les mouvements photo, leur intensite et `applyImageMotionTransform` — la transformation d'apercu que le test de parite charge telle quelle, `utils/audioWaveform.js` pour l'extraction waveform client, `utils/quickTools.js` pour la palette rapide drag/drop, et `panels/VibeCutQuickPanel.jsx` pour le panneau droit VibeCut
 |   |   |-- index.js
 |   |   |-- components/modals/LumenShaderModal.jsx # Modal iframe Lumen Shader Studio + pont postMessage pour appliquer le shader comme fond Layout
@@ -378,9 +378,12 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
-|   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2) - moteurs vibefx-studio importes, jamais reecrits
-|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, vignette 256px vers le projet VibeOS
-|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran, undo/redo) + panneau 4 blocs (Format, Modele, Images, Habillage avec fond Couleur/Flou/Genere + Flou pro) + reglages avances (textes, zone selectionnee zoom/pan/bordure/flou, geometrie) + sheet d'export
+|   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
+|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
+|   |   |   |-- layoutPersistence.js    # Traduction etat editeur <-> projet VibeOS : images/textures/Lumen en **Blobs** (jamais des dataURL), zones custom, slots, textes, stickers, fond ; restauration en elements Image
+|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran, undo/redo, comparer, apercu Insta) + panneau 4 blocs (Format, Modele, Images, Habillage avec fond Couleur/Flou/Genere + Flou pro) + reglages avances (textes, stickers, zones custom, textures, zone selectionnee, geometrie) + sheet d'export
+|   |   |   |-- ZoneOverlay.jsx         # Editeur de zones du modele personnalise pose sur l'apercu : deplacement, poignee de redimension, suppression (geometrie d'interface uniquement, le rendu reste au moteur)
+|   |   |   |-- InstaPreviewSheet.jsx   # Apercu Instagram du visuel exporte : post, story, carrousel panorama (maquette CSS Modules, aucune donnee reelle)
 |   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
 |   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
 |   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS ; rendu final par renderLayoutMeshBackground (moteur existant)
@@ -397,8 +400,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- shell/
 |   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier vers /studio jusqu'a la phase F) + tab bar basse mobile safe-area
 |   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
-|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (phases B a E)
+|   |   |   |-- SpacePlaceholder.jsx    # Ecran provisoire des espaces en construction (phases D et E)
 |   |   |   `-- shell.module.css
+|   |   |-- vision/                     # Ecran Vision reel (phase C) - science des couleurs existante importee, jamais reecrite
+|   |   |   |-- useVisionEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue vision-pro), export, mesure de l'image (visionMetrics), tri des looks (scoreProfileForImage), vignettes en file d'attente, historique 30 etats, lien avec le projet commun
+|   |   |   |-- visionLooks.js          # Les 12 looks du premier niveau : pointeurs vers de vrais profils CAMERA_BRANDS, resolus par buildVisionProfileModel, renommes en francais + bibliotheque complete par marque pour les avances
+|   |   |   |-- autoEnhance.js          # « Ameliorer ma photo » : correction deduite des mesures + phrase humaine, et garde-fou par image (guardLookForImage) qui empeche un look de fermer une photo de nuit
+|   |   |   |-- VisionScreen.jsx        # Bouton Ameliorer, intensite 0-100, 12 looks tries avec badges « Conseille » et raisons, comparer (maintien = original), avances (lumiere/couleur/matiere, garde-fous, bibliotheque par marque), sheet d'export
+|   |   |   `-- vision.module.css
 |   |   `-- styles/
 |   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
 |   |-- vibefx-shared/
@@ -553,6 +562,94 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-08 (VibeOS phase C — l'ecran Vision reel)
+
+- **`/creer/vision` n'est plus un placeholder** : l'ecran Vision tourne, monte
+  sur `src/features/vibeos/vision/`. Comme pour Layout, **rien n'a ete
+  reecrit** : rendu (`useCanvasRenderer` en vue photo), export (`useExport`),
+  mesure d'image (`visionMetrics`), bornes de securite
+  (`normalizeVisionFilters`) et scoring (`scoreProfileForImage`) sont importes.
+- **Extraction, pas duplication** : `getImageRecommendationSignals`,
+  `scoreProfileForImage`, `renderVisionProfilePreview` et les constantes
+  d'apercu vivaient DANS `components/panels/VisionPanel.jsx` (non exportees).
+  Elles sont sorties telles quelles dans
+  `src/features/vibefx-studio/utils/visionRecommendation.js` ; l'ancien panneau
+  les importe desormais. Aucun changement de comportement (plan §4.2 :
+  « extraire la logique dans un module partage plutot que dupliquer »).
+- **Un bouton « Ameliorer ma photo »** : `visionMetrics` mesure la photo, la
+  correction est deduite des signaux (sombre, plate, fade, deja saturee,
+  visages) et repasse par les garde-fous smartphone. Une phrase en francais dit
+  ce qui a ete fait : « Photo un peu sombre et plate — j'ai relevé la lumière
+  et remis du relief. »
+- **Intensite 0-100 (defaut 80)** branchee sur `filterIntensity`, le melange
+  lineaire deja implemente par le pipeline : a 0 on revoit exactement
+  l'original (verifie par le smoke).
+- **12 looks maximum**, rendus sur la VRAIE photo, renommes en francais
+  (« Peau douce », « Nuit néon », « Ciel profond »...), tries pour la photo
+  courante par `scoreProfileForImage`, badge « Conseillé » sur les deux
+  premiers, looks contre-indiques rejetes en fin de liste avec la raison. La
+  bibliotheque complete par marque reste en reglages avances.
+- **Bug produit trouve et corrige en route** : sur une photo de nuit, un look
+  contraste+vignette pouvait fermer l'image (luminance moyenne mesuree a
+  4/255). `normalizeVisionFilters` borne dans l'absolu mais ne regarde pas
+  l'image ; `guardLookForImage` croise desormais le look ET les signaux de la
+  photo (vignette plafonnee, ombres relevees, contraste limite en basse
+  lumiere).
+- **Nouveau smoke `npm run test:vibeos-vision`** : parcours reel (import,
+  amelioration, intensite, look, comparaison, garde-fous, bibliotheque) ET le
+  critere du plan §6 — sur 5 photos types (portrait, paysage, nuit, plate,
+  deja saturee), les 12 looks sont appliques et mesures : aucun ne produit une
+  image grise, noire ou cramee, et le tri ne recommande pas la meme chose pour
+  toutes.
+- **Correctif de test** : `scripts/smoke-vision-ui.spec.cjs` (ancien panneau)
+  n'entrait plus dans `/studio` — il ne franchissait pas le portail
+  d'authentification de dev, et 6 de ses 9 tests echouaient avant meme de
+  tester quoi que ce soit. Le contournement est desormais gere. Restent 2
+  echecs de fond, identiques avec ou sans l'extraction ci-dessus (verifie en
+  revenant au fichier d'origine).
+
+## Journal — 2026-08-08 (VibeOS phase B tranche 3 — finitions Layout)
+
+- **Textures de fond** : import multiple, selection de la texture active,
+  opacite ; le moteur `renderLayoutImageTexture` etait deja la, seul l'etat
+  manquait. Les textures entrent aussi dans l'historique undo/redo.
+- **Editeur de zones du modele personnalise** : palette de formes
+  (`CUSTOM_SHAPE_LIBRARY`) en clic ou en glisser-deposer sur l'apercu, puis
+  deplacement a la souris/au doigt et poignee de redimension posees exactement
+  sur le canvas (`ZoneOverlay.jsx`), plus les reglages fins (largeur, hauteur,
+  position, arrondi), la suppression et « Vider le canevas ». Toute la
+  geometrie de placement reste celle de `utils/customLayout.js`.
+- **Stickers** : le moteur d'assets existant ne fournit qu'un element, le
+  scotch — il est expose tel quel (ajout, rotation, opacite, glisser sur
+  l'apercu) plutot que d'inventer un moteur.
+- **Comparaison avant/apres** : maintien du clic = la photo d'origine, cadree
+  exactement sur le canvas.
+- **Apercu Instagram** (`InstaPreviewSheet.jsx`) : post, story et carrousel
+  panorama, en CSS Modules.
+- **Le projet survit au rechargement** : `layoutPersistence.js` traduit l'etat
+  de l'editeur en enregistrement projet — images, textures et fond Lumen en
+  **Blobs** IndexedDB (jamais des dataURL, plan §7), plus zones, slots, textes,
+  stickers, geometrie et fond. Au retour sur la page, tout est recharge et
+  l'edition reprend ou elle en etait.
+- **Parite d'export enfin MESUREE** : `npm run test:vibeos-layout-parity`
+  pilote l'ancien Layout (`/studio`) et le nouveau (`/creer/layout-visuel`)
+  avec la meme photo et les memes reglages, puis compare les deux canvas pixel
+  a pixel : **0 pixel d'ecart** sur 1080x1350. Le grain est mis a 0 des deux
+  cotes — son motif de bruit est tire au hasard a chaque chargement de page,
+  aucune comparaison exacte n'est possible avec.
+- **Bug trouve et corrige en route** : des que « Reglages avances » etait
+  ouvert, la PAGE entiere se mettait a scroller sur desktop (regression de
+  l'invariant pose en tranche B1). Cause : les champs de fichier caches sont en
+  `position: absolute` et, sans bloc conteneur, se rattachaient au bloc initial
+  — ils allongeaient la zone scrollable du document au lieu d'etre clipes par
+  le panneau. `position: relative` sur le panneau et sur le label d'import.
+  Garde ajoutee au smoke.
+- **Smokes** : `npm run test:vibeos-layout` execute desormais B1 + B3 ;
+  `scripts/smoke-vibeos-layout-b3.spec.cjs` couvre textures, stickers, zones
+  (dont un vrai deplacement a la souris), comparaison, apercu Insta,
+  rechargement de page avec reprise du projet, et la barre d'outils sur
+  mobile 390px.
 
 ## Journal — 2026-08-08 (menage documentaire — todo.md recentre sur VibeOS)
 

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Bold, Download, ImagePlus, Italic, LayoutTemplate, Layers, Maximize2, Plus, Redo2,
-    Sparkles, Trash2, Type, Undo2, Upload, Waves, X,
+    Bold, Columns2, Download, Eraser, ImagePlus, Italic, LayoutTemplate, Layers, Maximize2,
+    Plus, Redo2, Smartphone, Sparkles, Sticker, Trash2, Type, Undo2, Upload, Waves, X,
 } from 'lucide-react';
 import {
-    CUSTOM_LAYOUT_PRESETS, FONT_OPTIONS, FORMATS, TEMPLATES,
+    CUSTOM_LAYOUT_PRESETS, CUSTOM_SHAPE_LIBRARY, FONT_OPTIONS, FORMATS, TEMPLATES,
 } from '../../vibefx-studio/data/constants';
 import {
     Button, Collapsible, IconButton, Progress, Segmented, Sheet, Slider, Tile, TileGrid,
@@ -17,9 +17,55 @@ import TemplatePreviewSvg from './TemplatePreviewSvg';
 import MeshSheet from './MeshSheet';
 import LumenSheet from './LumenSheet';
 import SmoothBlurSheet from './SmoothBlurSheet';
+import ZoneOverlay from './ZoneOverlay';
+import InstaPreviewSheet from './InstaPreviewSheet';
 import styles from './layout.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
+
+const SHAPE_DATA_TYPE = 'application/vibefx-shape';
+
+/*
+ * Boite exacte du canvas affiche, en pixels, relative a son conteneur.
+ * Les couches posees par-dessus (zones custom, comparaison avant/apres)
+ * doivent tomber au pixel pres sur le canvas, dont la taille depend du format
+ * ET de la place disponible: on la mesure plutot que de la deviner.
+ */
+function useCanvasBox(canvasRef, wrapRef, watch) {
+    const [box, setBox] = useState(null);
+
+    const measure = useCallback(() => {
+        const canvas = canvasRef.current;
+        const wrap = wrapRef.current;
+        if (!canvas || !wrap) {
+            setBox(null);
+            return;
+        }
+        const canvasRect = canvas.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
+        setBox({
+            left: canvasRect.left - wrapRect.left,
+            top: canvasRect.top - wrapRect.top,
+            width: canvasRect.width,
+            height: canvasRect.height,
+        });
+    }, [canvasRef, wrapRef]);
+
+    useEffect(() => {
+        measure();
+        const canvas = canvasRef.current;
+        if (!canvas || typeof ResizeObserver === 'undefined') return undefined;
+        const observer = new ResizeObserver(measure);
+        observer.observe(canvas);
+        window.addEventListener('resize', measure);
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', measure);
+        };
+    }, [measure, canvasRef, watch]);
+
+    return box;
+}
 
 /* Silhouette proportionnelle d'un format (les tuiles montrent la vraie forme). */
 function FormatShape({ ratio }) {
@@ -45,11 +91,17 @@ export default function LayoutScreen() {
         layoutBgBlur, setLayoutBgBlur,
         layoutBgTexture, setLayoutBgTexture,
         selectedSlotIndex, setSelectedSlotIndex,
-        slotModel, hasRenderableOutput, isProcessing, loadingProgress,
+        slotModel, hasRenderableOutput, isProcessing, loadingProgress, isHydrating,
         canvasRef, handlePointerDown, handlePointerMove, handlePointerUp,
-        handleImageUpload, handleSlotImageUpload, handleRemoveImage,
+        handleImageUpload, handleSlotImageUpload, handleRemoveImage, handleRemoveSlotImage,
         addText, updateActiveText, deleteActiveText, currentText,
+        assets, activeAssetId, setActiveAssetId,
+        addAsset, updateActiveAsset, deleteActiveAsset, currentAsset,
         applyCustomPreset, applyThemedTemplate,
+        addCustomZone, updateCustomZone, deleteCustomZone, clearCustomZones,
+        layoutTextures, activeTextureId, setActiveTextureId,
+        layoutTextureOpacity, setLayoutTextureOpacity,
+        handleTextureUpload, removeTexture,
         layoutBgGradient, layoutBgMeshColors, applyLayoutMesh,
         layoutLumenBackground, applyLumenBackground, clearGeneratedBackground,
         layoutSmoothBlur, setLayoutSmoothBlur,
@@ -63,7 +115,12 @@ export default function LayoutScreen() {
     const [isLumenSheetOpen, setIsLumenSheetOpen] = useState(false);
     const [isSmoothBlurSheetOpen, setIsSmoothBlurSheetOpen] = useState(false);
     const [isDropTarget, setIsDropTarget] = useState(false);
+    const [isComparing, setIsComparing] = useState(false);
+    const [instaPreviewUrl, setInstaPreviewUrl] = useState(null);
+    const [isZoneEditOpen, setIsZoneEditOpen] = useState(false);
     const globalImportRef = useRef(null);
+    const textureImportRef = useRef(null);
+    const canvasWrapRef = useRef(null);
 
     const {
         exportName, setExportName, exportFormat, setExportFormat,
@@ -72,6 +129,12 @@ export default function LayoutScreen() {
     } = exportController;
 
     const isCustomTemplate = activeTemplate.id === 'custom';
+    const customZones = useMemo(
+        () => (isCustomTemplate ? (activeTemplate.customLayout?.zones || []) : []),
+        [isCustomTemplate, activeTemplate],
+    );
+    const canvasBox = useCanvasBox(canvasRef, canvasWrapRef, `${activeFormat.id}-${hasRenderableOutput}`);
+    const originalImageSrc = images[0]?.src || null;
     const appliedThemedId = activeTemplate.customLayout?.presetId;
     const hasGeneratedBackground = layoutBgGradient || Boolean(layoutLumenBackground);
     const backgroundMode = hasGeneratedBackground ? 'generated' : (layoutBgBlur ? 'blur' : 'color');
@@ -99,15 +162,51 @@ export default function LayoutScreen() {
         }
     };
 
+    /* Depot sur l'apercu: une forme de zone si on vient de la palette,
+       sinon des fichiers images. */
     const handleDrop = (event) => {
         event.preventDefault();
         setIsDropTarget(false);
+        const shapeId = event.dataTransfer?.getData(SHAPE_DATA_TYPE);
+        if (shapeId && isCustomTemplate) {
+            const shape = CUSTOM_SHAPE_LIBRARY.find((item) => item.id === shapeId);
+            if (shape && canvasBox) {
+                const safeLeft = canvasBox.left + (padding / activeFormat.w) * canvasBox.width;
+                const safeTop = canvasBox.top + (padding / activeFormat.h) * canvasBox.height;
+                const safeWidth = canvasBox.width * ((activeFormat.w - padding * 2) / activeFormat.w);
+                const safeHeight = canvasBox.height * ((activeFormat.h - padding * 2) / activeFormat.h);
+                const wrapRect = canvasWrapRef.current?.getBoundingClientRect();
+                const localX = (event.clientX - (wrapRect?.left || 0) - safeLeft) / Math.max(1, safeWidth);
+                const localY = (event.clientY - (wrapRect?.top || 0) - safeTop) / Math.max(1, safeHeight);
+                addCustomZone(shape, {
+                    x: Math.max(0, Math.min(1 - shape.w, localX - shape.w / 2)),
+                    y: Math.max(0, Math.min(1 - shape.h, localY - shape.h / 2)),
+                });
+                return;
+            }
+        }
         const files = Array.from(event.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
         if (files.length) handleImageUpload(makeFileEvent(files));
     };
 
     const handleFullscreen = () => {
         canvasRef.current?.requestFullscreen?.();
+    };
+
+    const openInstaPreview = () => {
+        try {
+            setInstaPreviewUrl(canvasRef.current?.toDataURL('image/jpeg', 0.92) || null);
+        } catch {
+            setInstaPreviewUrl(null);
+        }
+    };
+
+    /* « Comparer » = maintien: on relache, on revoit son montage. */
+    const compareHandlers = {
+        onPointerDown: () => setIsComparing(true),
+        onPointerUp: () => setIsComparing(false),
+        onPointerLeave: () => setIsComparing(false),
+        onPointerCancel: () => setIsComparing(false),
     };
 
     return (
@@ -129,6 +228,17 @@ export default function LayoutScreen() {
                             <IconButton label="Rétablir (Shift+Cmd+Z)" disabled={!canRedo} onClick={redo}>
                                 <Redo2 size={15} />
                             </IconButton>
+                            <IconButton
+                                label="Comparer avec l'original (maintiens le clic)"
+                                disabled={!originalImageSrc}
+                                active={isComparing}
+                                {...compareHandlers}
+                            >
+                                <Columns2 size={15} />
+                            </IconButton>
+                            <IconButton label="Aperçu Instagram" onClick={openInstaPreview}>
+                                <Smartphone size={15} />
+                            </IconButton>
                             <IconButton label="Plein écran" onClick={handleFullscreen}>
                                 <Maximize2 size={15} />
                             </IconButton>
@@ -136,7 +246,7 @@ export default function LayoutScreen() {
                                 Exporter
                             </Button>
                         </div>
-                        <div className={styles.canvasWrap}>
+                        <div className={styles.canvasWrap} ref={canvasWrapRef}>
                             <canvas
                                 ref={canvasRef}
                                 className={styles.canvas}
@@ -145,6 +255,32 @@ export default function LayoutScreen() {
                                 onPointerUp={handlePointerUp}
                                 onPointerLeave={handlePointerUp}
                             />
+                            {/* Comparaison: l'original brut, recadré dans le format. */}
+                            {isComparing && originalImageSrc && canvasBox ? (
+                                <div
+                                    className={styles.compareOverlay}
+                                    style={canvasBox}
+                                    data-testid="vibeos-compare-overlay"
+                                >
+                                    <img src={originalImageSrc} alt="Photo d'origine" />
+                                    <span className={styles.compareTag}>Original</span>
+                                </div>
+                            ) : null}
+                            {/* Édition des zones du modèle personnalisé. */}
+                            {isZoneEditOpen && isCustomTemplate && canvasBox ? (
+                                <div className={styles.zoneLayerHost} style={canvasBox}>
+                                    <ZoneOverlay
+                                        zones={customZones}
+                                        selectedZoneId={selectedSlotIndex}
+                                        canvasWidth={activeFormat.w}
+                                        canvasHeight={activeFormat.h}
+                                        padding={padding}
+                                        onSelect={setSelectedSlotIndex}
+                                        onUpdate={updateCustomZone}
+                                        onDelete={deleteCustomZone}
+                                    />
+                                </div>
+                            ) : null}
                         </div>
                     </>
                 ) : (
@@ -162,6 +298,11 @@ export default function LayoutScreen() {
                 {isProcessing ? (
                     <div className={styles.progressWrap}>
                         <Progress value={loadingProgress} label="Import en cours" />
+                    </div>
+                ) : null}
+                {isHydrating ? (
+                    <div className={styles.progressWrap}>
+                        <Progress value={100} label="Reprise de ton projet" />
                     </div>
                 ) : null}
             </section>
@@ -240,6 +381,7 @@ export default function LayoutScreen() {
                                 multiple
                                 className={styles.hiddenInput}
                                 onChange={handleImageUpload}
+                                data-testid="vibeos-image-input"
                             />
                         </label>
                     </div>
@@ -265,7 +407,14 @@ export default function LayoutScreen() {
                                 >
                                     {slot.label}
                                 </button>
-                                {!slot.imageSrc ? <span className={styles.blockHint}>vide</span> : null}
+                                {slot.imageSrc ? (
+                                    <IconButton
+                                        label={`Retirer l'image de « ${slot.label} »`}
+                                        onClick={() => handleRemoveSlotImage(slot.id)}
+                                    >
+                                        <X size={13} />
+                                    </IconButton>
+                                ) : <span className={styles.blockHint}>vide</span>}
                             </div>
                         ))}
                     </div>
@@ -440,6 +589,221 @@ export default function LayoutScreen() {
                         ) : null}
                     </section>
 
+                    {/* Stickers: le moteur d'assets existant ne fournit qu'un
+                        élément, le scotch — on l'expose tel quel plutôt que de
+                        réécrire un moteur. */}
+                    <section className={styles.block}>
+                        <div className={styles.blockHead}>
+                            <h3 className={styles.blockTitle}><Sticker size={13} />Stickers</h3>
+                            <Button variant="ghost" size="sm" icon={<Plus size={13} />} onClick={() => addAsset('tape')}>
+                                Scotch
+                            </Button>
+                        </div>
+                        {assets.length > 0 ? (
+                            <div className={styles.textList}>
+                                {assets.map((asset, index) => (
+                                    <button
+                                        key={asset.id}
+                                        type="button"
+                                        className={cx(styles.textRow, asset.id === activeAssetId && styles.textRowActive)}
+                                        onClick={() => setActiveAssetId(asset.id === activeAssetId ? null : asset.id)}
+                                    >
+                                        <span className={styles.textRowContent}>Scotch {index + 1}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className={styles.blockHint}>
+                                Aucun sticker. Ajoute un scotch, puis glisse-le sur l&apos;aperçu.
+                            </p>
+                        )}
+                        {currentAsset ? (
+                            <div className={styles.textEditor}>
+                                <Slider
+                                    label="Rotation"
+                                    value={currentAsset.rotate ?? 0}
+                                    onChange={(value) => updateActiveAsset('rotate', value)}
+                                    min={-45} max={45} defaultValue={-5}
+                                    formatValue={(v) => `${v}°`}
+                                />
+                                <Slider
+                                    label="Opacité"
+                                    value={currentAsset.opacity ?? 90}
+                                    onChange={(value) => updateActiveAsset('opacity', value)}
+                                    min={10} max={100} defaultValue={90}
+                                    formatValue={(v) => `${v}%`}
+                                />
+                                <Button variant="ghost" size="sm" icon={<Trash2 size={13} />} onClick={deleteActiveAsset}>
+                                    Supprimer ce sticker
+                                </Button>
+                            </div>
+                        ) : null}
+                    </section>
+
+                    {/* Éditeur de zones du modèle personnalisé */}
+                    {isCustomTemplate ? (
+                        <section className={styles.block}>
+                            <div className={styles.blockHead}>
+                                <h3 className={styles.blockTitle}><LayoutTemplate size={13} />Zones</h3>
+                                <span className={styles.blockHint}>{customZones.length} zone{customZones.length > 1 ? 's' : ''}</span>
+                            </div>
+                            <Button
+                                variant={isZoneEditOpen ? 'primary' : 'secondary'}
+                                block
+                                onClick={() => setIsZoneEditOpen((open) => !open)}
+                                data-testid="vibeos-zone-edit-toggle"
+                            >
+                                {isZoneEditOpen ? 'Terminer le placement' : 'Déplacer et redimensionner'}
+                            </Button>
+                            <p className={styles.blockHint}>
+                                Ajoute un bloc : clique une forme, ou glisse-la où tu veux sur l&apos;aperçu.
+                            </p>
+                            <div className={styles.shapeGrid}>
+                                {CUSTOM_SHAPE_LIBRARY.map((shape) => (
+                                    <button
+                                        key={shape.id}
+                                        type="button"
+                                        draggable
+                                        className={styles.shapeButton}
+                                        title={shape.description}
+                                        onDragStart={(event) => {
+                                            event.dataTransfer.setData(SHAPE_DATA_TYPE, shape.id);
+                                            event.dataTransfer.effectAllowed = 'copy';
+                                        }}
+                                        onClick={() => {
+                                            setIsZoneEditOpen(true);
+                                            addCustomZone(shape, null);
+                                        }}
+                                    >
+                                        <span
+                                            className={styles.shapeGlyph}
+                                            style={{ width: `${shape.w * 62}px`, height: `${shape.h * 62}px` }}
+                                        />
+                                        <span className={styles.shapeLabel}>{shape.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedSlotIndex !== null && customZones.some((zone) => zone.id === selectedSlotIndex) ? (
+                                <div className={styles.textEditor}>
+                                    {(() => {
+                                        const zone = customZones.find((item) => item.id === selectedSlotIndex);
+                                        return (
+                                            <>
+                                                <Slider
+                                                    label="Largeur"
+                                                    value={Math.round(zone.w * 100)}
+                                                    onChange={(value) => updateCustomZone(zone.id, { w: value / 100 })}
+                                                    min={8} max={100} formatValue={(v) => `${v}%`}
+                                                />
+                                                <Slider
+                                                    label="Hauteur"
+                                                    value={Math.round(zone.h * 100)}
+                                                    onChange={(value) => updateCustomZone(zone.id, { h: value / 100 })}
+                                                    min={8} max={100} formatValue={(v) => `${v}%`}
+                                                />
+                                                <Slider
+                                                    label="Position horizontale"
+                                                    value={Math.round(zone.x * 100)}
+                                                    onChange={(value) => updateCustomZone(zone.id, { x: value / 100 })}
+                                                    min={0} max={100} formatValue={(v) => `${v}%`}
+                                                />
+                                                <Slider
+                                                    label="Position verticale"
+                                                    value={Math.round(zone.y * 100)}
+                                                    onChange={(value) => updateCustomZone(zone.id, { y: value / 100 })}
+                                                    min={0} max={100} formatValue={(v) => `${v}%`}
+                                                />
+                                                <Slider
+                                                    label="Arrondi de la zone"
+                                                    value={zone.radius !== undefined ? Math.round(zone.radius) : radius}
+                                                    onChange={(value) => updateCustomZone(zone.id, { radius: value })}
+                                                    min={0} max={100} formatValue={(v) => `${v}px`}
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    icon={<Trash2 size={13} />}
+                                                    onClick={() => deleteCustomZone(zone.id)}
+                                                >
+                                                    Supprimer cette zone
+                                                </Button>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            ) : null}
+                            {customZones.length > 0 ? (
+                                <Button variant="ghost" size="sm" icon={<Eraser size={13} />} onClick={clearCustomZones}>
+                                    Vider le canevas
+                                </Button>
+                            ) : null}
+                        </section>
+                    ) : null}
+
+                    {/* Textures du fond (moteur existant : une texture active, opacité) */}
+                    <section className={styles.block}>
+                        <div className={styles.blockHead}>
+                            <h3 className={styles.blockTitle}><Layers size={13} />Textures du fond</h3>
+                            <label className={styles.slotImport}>
+                                <Plus size={13} />
+                                Importer
+                                <input
+                                    ref={textureImportRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className={styles.hiddenInput}
+                                    onChange={handleTextureUpload}
+                                    data-testid="vibeos-texture-input"
+                                />
+                            </label>
+                        </div>
+                        {layoutTextures.length > 0 ? (
+                            <>
+                                <div className={styles.textureGrid}>
+                                    {layoutTextures.map((texture) => (
+                                        <span
+                                            key={texture.id}
+                                            className={cx(
+                                                styles.textureThumb,
+                                                texture.id === activeTextureId && styles.textureThumbActive,
+                                            )}
+                                        >
+                                            <button
+                                                type="button"
+                                                className={styles.textureSelect}
+                                                aria-label={`Utiliser ${texture.name}`}
+                                                aria-pressed={texture.id === activeTextureId}
+                                                onClick={() => setActiveTextureId(texture.id)}
+                                            >
+                                                <img src={texture.src} alt="" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.importedRemove}
+                                                aria-label={`Retirer ${texture.name}`}
+                                                onClick={() => removeTexture(texture.id)}
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                                <Slider
+                                    label="Opacité de la texture"
+                                    value={layoutTextureOpacity}
+                                    onChange={setLayoutTextureOpacity}
+                                    min={0} max={100} defaultValue={60}
+                                    formatValue={(v) => `${v}%`}
+                                />
+                            </>
+                        ) : (
+                            <p className={styles.blockHint}>
+                                Aucune texture. Importe un papier, un béton, un tissu : il passe sous tes images.
+                            </p>
+                        )}
+                    </section>
+
                     {selectedSlotConfig ? (
                         <section className={styles.block}>
                             <h3 className={styles.blockTitle}>Zone sélectionnée</h3>
@@ -525,6 +889,13 @@ export default function LayoutScreen() {
                 open={isLumenSheetOpen}
                 onClose={() => setIsLumenSheetOpen(false)}
                 onUseBackground={applyLumenBackground}
+            />
+
+            <InstaPreviewSheet
+                open={Boolean(instaPreviewUrl)}
+                onClose={() => setInstaPreviewUrl(null)}
+                previewUrl={instaPreviewUrl}
+                format={activeFormat}
             />
 
             <SmoothBlurSheet
