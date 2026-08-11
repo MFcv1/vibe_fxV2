@@ -42,9 +42,11 @@ node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id>    # fidélité ré
 2. **Export en sRVB.** Lightroom propose Adobe RVB par défaut. En Adobe RVB, la
    table est fausse d'un bout à l'autre **sans aucun signe**.
 3. **Le contrôle à vide se fait avant toute capture.** Une fois par machine.
-4. **Un preset importé reste à `recommendedIntensity: 100`.** Baisser
-   l'intensité ne réduit pas le contraste, ça mélange l'image traitée avec
-   l'originale — ça délave les couleurs et ça éloigne de Lightroom.
+4. **Tout preset reste à `recommendedIntensity: 100`** — importé comme écrit à
+   la main. Baisser l'intensité ne réduit pas le contraste, ça mélange l'image
+   traitée avec l'originale : ça délave les couleurs et ça éloigne de la
+   référence. Le curseur est un choix esthétique offert à l'utilisateur, jamais
+   un correctif technique.
 5. **Un chiffre d'écrêtage ne veut rien dire seul.** Il se compare à celui de
    Lightroom sur la même photo, jamais dans l'absolu.
 
@@ -62,7 +64,7 @@ Trois presets dans `/creer/vision`, tous à 100 % d'intensité :
 
 | Preset | Origine | Fidélité couleur | Rugosité |
 |---|---|---|---|
-| `powlisher` | écrit à la main, mesuré sur 19 photos | — | — |
+| `powlisher` | écrit à la main, mesuré sur 19 photos | cibles atteintes à 100 % | — |
 | `cn11` | capturé de Lightroom | **0,64/255** | 0,89 |
 | `cn17` | capturé de Lightroom | — | 4,70 → 0,69 (`--lisser 1`) |
 

@@ -89,9 +89,12 @@ Quatre choses apprises, toutes documentées et toutes codées :
   fausse d'un bout à l'autre sans que rien ne le signale.
 - Un preset avec du **grain** bruite quand même la table (CN17 : rugosité 4,70).
   `--lisser 1` la ramène à 0,69, et ne déplace une table déjà lisse que de 0,05.
-- **Un preset importé reste à `recommendedIntensity: 100`.** Baisser l'intensité
-  ne réduit pas le contraste : ça mélange l'image traitée avec l'originale, ce
-  qui délave les couleurs et éloigne de Lightroom. Essayé, mesuré, annulé.
+- **Tout preset reste à `recommendedIntensity: 100`.** Baisser l'intensité ne
+  réduit pas le contraste : ça mélange l'image traitée avec l'originale, ce qui
+  délave les couleurs et éloigne de la référence. Essayé sur CN11/CN17, mesuré,
+  annulé. `powlisher` était à 85 sans justification : ça lui coûtait sa
+  signature (ciel profond à 201° au lieu de 193,7°, donc hors de sa fourchette
+  teal 178–196°). Remis à 100.
 
 Procédure reproductible, chiffres, verdict, **question de licence** et le détail
 des trois erreurs de mesure commises en route : [docs/lightroom/](docs/lightroom/).

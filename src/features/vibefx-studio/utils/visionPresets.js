@@ -233,7 +233,19 @@ export const VISION_PRESETS = [
             + 'lumières crème et noirs denses. Reconstruit à partir de 19 photos.',
         bestFor: 'voyage, paysage, extérieur, portrait en lumière naturelle',
         avoidFor: 'photos déjà très filtrées ou aux blancs déjà écrêtés',
-        recommendedIntensity: 85,
+        /*
+         * 100, comme tout preset: la definition d'un preset, c'est son rendu a
+         * pleine force. Ce reglage etait a 85 sans justification nulle part, et
+         * ca lui coutait sa signature — le ciel profond ressortait a 201° au
+         * lieu de 193,7°, donc encore BLEU, hors de la fourchette teal 178-196°
+         * que ce preset a ete reconstruit pour atteindre (et que son smoke
+         * verifie, en appelant la fonction a pleine force).
+         *
+         * Le curseur reste offert a l'utilisateur: c'est un choix esthetique,
+         * jamais un correctif technique. Baisser l'intensite ne reduit pas le
+         * contraste, ca melange l'image traitee avec l'originale.
+         */
+        recommendedIntensity: 100,
         transform: powlisherTransform,
     },
     ...IMPORTED_PRESETS,
