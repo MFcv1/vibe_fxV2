@@ -77,16 +77,75 @@ if (!fs.existsSync(args.hald)) fail(`fichier introuvable: ${args.hald}`);
 const image = sharp(args.hald);
 const meta = await image.metadata();
 
-if (meta.width !== expectedSize || meta.height !== expectedSize) {
+/*
+ * Mire en blocs: chaque couleur occupe un carre de NxN pixels au lieu d'un seul.
+ * On le detecte a la taille du fichier, et on ne lit que le CENTRE de chaque
+ * carre.
+ *
+ * Pourquoi c'est indispensable, et pas un detail: sur une mire a un pixel par
+ * couleur, deux pixels voisins sont deux couleurs sans rapport. Le moindre
+ * traitement qui regarde le voisinage fait alors baver les couleurs les unes
+ * sur les autres. C'est invisible dans les tons clairs et RUINEUX dans les
+ * noirs, ou les valeurs valent 4 ou 8 sur 255. Mesure a l'appui sur CN11:
+ * l'entree 26,17,14 ressortait a 5,24,6 (un vert franc) au lieu de 23,15,14.
+ * En blocs de 4x4, la bavure se mange sur les bords et le centre reste pur.
+ */
+const detectedBlock = meta.width && meta.width % expectedSize === 0
+    ? meta.width / expectedSize
+    : 0;
+const block = Number(args.bloc || detectedBlock || 1);
+
+if (!Number.isInteger(block) || block < 1) fail(`--bloc invalide: ${args.bloc}`);
+
+if (meta.width !== expectedSize * block || meta.height !== expectedSize * block) {
     fail(
-        `la mire fait ${meta.width}x${meta.height}, or un niveau ${level} attend ${expectedSize}x${expectedSize}.`,
+        `la mire fait ${meta.width}x${meta.height}, or un niveau ${level}`
+        + ` en blocs de ${block} attend ${expectedSize * block}x${expectedSize * block}.`,
         'C\'est presque toujours un redimensionnement a l\'export. Dans Lightroom, exporte en\n'
         + '« taille d\'origine », sans redimensionnement ni nettete de sortie.\n'
-        + `Si tu as genere la mire a un autre niveau, precise-le avec --level.`,
+        + 'Si tu as genere la mire a un autre niveau, precise-le avec --level.',
     );
 }
 
-const { data: pixels } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+let pixels;
+{
+    const { data } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    if (block === 1) {
+        pixels = data;
+    } else {
+        /*
+         * On ecarte le bord du carre (c'est lui qui recoit la bavure des
+         * voisins) et on MOYENNE ce qui reste. Ecarter le bord traite la
+         * contamination ; moyenner traite le grain, qui lui est un bruit par
+         * pixel qu'un simple centre ne reduirait pas. Avec des blocs de 4, il
+         * reste 2x2 pixels utiles, soit un bruit divise par deux — gratuitement.
+         */
+        const margin = block >= 4 ? 1 : 0;
+        const from = margin;
+        const to = block - margin;
+        const count = (to - from) ** 2;
+        pixels = Buffer.alloc(expectedSize * expectedSize * 3);
+        for (let sy = 0; sy < expectedSize; sy += 1) {
+            for (let sx = 0; sx < expectedSize; sx += 1) {
+                const acc = [0, 0, 0];
+                for (let y = from; y < to; y += 1) {
+                    for (let x = from; x < to; x += 1) {
+                        const s = ((sy * block + y) * meta.width + (sx * block + x)) * 3;
+                        acc[0] += data[s];
+                        acc[1] += data[s + 1];
+                        acc[2] += data[s + 2];
+                    }
+                }
+                const d = (sy * expectedSize + sx) * 3;
+                for (let c = 0; c < 3; c += 1) pixels[d + c] = Math.round(acc[c] / count);
+            }
+        }
+        console.log(
+            `\nMire en blocs de ${block}x${block}: lecture du coeur de chaque carre`
+            + ` (${to - from}x${to - from} pixels moyennes, bord ecarte).`,
+        );
+    }
+}
 
 const deviation = measureHaldDeviation(pixels, level);
 if (deviation.max <= 1) {

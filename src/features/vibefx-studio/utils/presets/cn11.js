@@ -24,10 +24,10 @@ let cached = null;
 export const preset = {
     id: 'cn11',
     label: "CN11",
-    hint: "Preset importé de Lightroom",
+    hint: "Ciel bleu profond, verts sobres",
     description: "Capturé depuis Lightroom par table de conversion complète.",
-    bestFor: "à définir après essai sur tes photos",
-    avoidFor: "photos déjà fortement filtrées",
+    bestFor: "paysage, mer, ciel dégagé, architecture",
+    avoidFor: "portrait rapproché, scène déjà très bleue",
     recommendedIntensity: 100,
     /* Reglages que la table ne peut pas porter (ils dependent des pixels
        voisins ou de la position dans l'image), lus dans le .xmp. */

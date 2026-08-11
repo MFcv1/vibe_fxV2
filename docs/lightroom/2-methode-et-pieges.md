@@ -67,22 +67,64 @@ refus est le comportement attendu, pas un bug.
 npm run preset:mire
 ```
 
-Écrit `presets-lightroom/hald-clut-neutre-niveau8.png` (512×512, 262 144
-couleurs) et un `LISEZ-MOI.md`. Le dossier est ignoré par git.
+Écrit `presets-lightroom/hald-clut-neutre-niveau8-bloc4.png` (2048×2048,
+262 144 couleurs) et un `LISEZ-MOI.md`. Le dossier est ignoré par git.
 
 L'image ressemble à un damier bizarre. C'est normal : ce n'est pas une photo.
+
+#### Pourquoi la mire est en **blocs**, et pourquoi ça n'est pas négociable
+
+La version naïve met **une couleur par pixel**. Deux pixels voisins y sont alors
+deux couleurs sans aucun rapport — une situation qui n'existe dans aucune photo.
+Résultat : tout traitement qui regarde le voisinage fait **baver les couleurs les
+unes sur les autres**, et la table capturée est fausse.
+
+L'erreur est sournoise, parce qu'elle est **proportionnelle en absolu et pas en
+relatif** : négligeable dans les tons clairs, ruineuse dans les noirs où les
+valeurs valent 4 ou 8 sur 255.
+
+Mesuré sur CN11, mire à un pixel par couleur :
+
+| entrée | mire 1 pixel | mire 4×4 | Lightroom sur une vraie photo |
+|---|---|---|---|
+| 4,4,4 | 0,**18**,4 | 11,5,4 | — |
+| 26,17,14 | 5,**24**,6 | — | 23,15,14 |
+
+Le vert n'était pas dans le preset. Il était dans notre méthode. Et il se voyait
+à l'œil sur les photos : volets, ombres et pieds de meubles viraient au vert.
+
+Même capture, même preset, avant/après correction :
+
+| | mire 1 pixel | **mire 4×4** |
+|---|---|---|
+| écart à Lightroom, pixel à pixel | 4,53/255 | **2,67/255** |
+| écart sur la **couleur seule** | 1,70/255 | **0,64/255** |
+| écart dans les noirs (luminance < 20) | 8,06/255 | **1,32/255** |
+
+En blocs de 4×4, la bavure se mange sur le bord du carré ; l'import ne lit que le
+**cœur** (2×2 moyennés, bord écarté). Le seul coût est une image 16 fois plus
+grande, que Lightroom avale sans broncher.
+
+> Autre correctif au passage : la mire porte désormais un **profil sRVB
+> explicite**. Sans lui, l'éditeur doit deviner l'espace du fichier.
 
 ### 2. Dans Lightroom
 
 1. Importer la mire.
 2. Lui appliquer le preset à capturer — **et rien d'autre**. Pas de recadrage,
    pas de correction d'objectif, pas de réglage manuel par-dessus.
-3. Exporter en **PNG**, **taille d'origine** (512×512), sans netteté de sortie,
-   sans filigrane, **sans redimensionnement**.
+3. Exporter en **PNG**, **taille d'origine** (2048×2048), en **sRVB**, sans
+   netteté de sortie, sans filigrane, **sans redimensionnement**.
 
-> Le redimensionnement est le seul vrai piège : il mélange des couleurs voisines
-> et rend la table fausse. L'import le détecte et refuse le fichier au lieu de
-> produire un preset silencieusement faux.
+> Deux pièges, et un seul est détecté automatiquement.
+>
+> Le **redimensionnement** mélange des couleurs voisines et rend la table
+> fausse : l'import le détecte à la taille du fichier et refuse.
+>
+> L'**espace colorimétrique** ne se détecte pas. Lightroom propose Adobe RVB par
+> défaut ; il faut **sRVB**. En Adobe RVB, les mêmes chiffres RVB désignent
+> d'autres couleurs : la table serait fausse d'un bout à l'autre sans que rien ne
+> le signale. À vérifier à **chaque** export.
 
 ### 3. Importer
 
@@ -99,36 +141,36 @@ Le preset apparaît immédiatement dans `/creer/vision`.
 Options : `--hint`, `--bestFor`, `--avoidFor`, `--intensity`, `--level`,
 `--force` (écraser un preset existant), `--lisser` (voir juste en dessous).
 
-### 4. Le grain — le piège que la mire ne pardonne pas
+### 4. Le grain
 
 Un preset qui contient du **grain** ajoute du bruit **aléatoire pixel par
-pixel**. Sur une photo c'est l'effet recherché ; sur une mire, chaque pixel est
-une couleur différente, donc le grain **corrompt chaque case de la table**. On
-ne capture plus une transformation, on capture une transformation + du bruit.
+pixel**. Les blocs n'y peuvent rien : le grain frappe chaque pixel
+individuellement, y compris au cœur du carré. Moyenner le cœur 2×2 divise ce
+bruit par deux, ce que l'import fait déjà — mais ça ne suffit pas toujours.
 
-Le résultat est une table qui n'est plus lisse — et une table non lisse donne
-des **bandes** dans les ciels et un rendu instable dans les dégradés.
-
-L'import mesure donc la **rugosité** de la table et le dit. Ordres de grandeur
-mesurés :
+L'import mesure donc la **rugosité** de la table et le dit. Ordres de grandeur,
+tous mesurés avec la mire en blocs :
 
 | Cas | Rugosité |
 |---|---|
 | aller-retour sans preset | 0,09/255 |
-| CN11 (grain léger) | 1,66/255 |
-| **CN17 (grain marqué)** | **15,60/255** |
+| CN11 (aucun grain) | 0,89/255 |
+| **CN17 (grain marqué)** | **4,70/255** |
 
-Quand c'est bruité, on réimporte avec `--lisser 1` : un noyau [1,2,1] sur chaque
-axe du cube, soit ±4 valeurs sur 255 en entrée. Assez pour effacer un bruit
-aléatoire de moyenne nulle, trop peu pour aplatir une vraie courbe.
+Au-delà de ~3/255, réimporter avec `--lisser 1` : un noyau [1,2,1] sur chaque axe
+du cube, soit ±4 valeurs sur 255 en entrée. Assez pour effacer un bruit aléatoire
+de moyenne nulle, trop peu pour aplatir une vraie courbe. Sur CN17 : 4,70 → 0,69.
 
 **La preuve que le filtre ne casse rien** : appliqué à la mire de contrôle (déjà
-lisse), il ne déplace la table que de **0,05/255**. Appliqué à CN17, il en
-retire 5,81/255 — c'était donc bien du bruit.
+lisse), il ne déplace la table que de **0,05/255**.
 
 Le grain se récupère à sa vraie place, en **effet spatial**, via le `.xmp` →
 `filters.grain`. Un grain figé dans une table de couleurs n'est plus du grain :
 c'est juste une erreur.
+
+> Avec la mire à un pixel, CN11 affichait 1,66/255 de rugosité et CN17 15,60 — on
+> a d'abord cru que les deux avaient du grain. C'était la bavure entre voisines.
+> Seul CN17 en a vraiment.
 
 ---
 
@@ -214,18 +256,23 @@ la même photo développée des deux côtés :
 node scripts/compare-preset-vs-lightroom.mjs <origine.jpg> <version-lightroom.png> cn11
 ```
 
-Mesuré le 2026-08-11, CN11 sur une photo de terrasse plein soleil (2252×4000) :
+Mesuré le 2026-08-11, CN11 sur une photo de terrasse plein soleil (2252×4000),
+capture avec la mire en blocs :
 
 | Échelle | Écart avec Lightroom |
 |---|---|
-| pixel par pixel | 4,53/255 |
-| blocs 4×4 | 2,31/255 |
-| **blocs 16×16 (couleur pure)** | **1,70/255** |
+| pixel par pixel | 2,67/255 (médiane **1**) |
+| blocs 4×4 | 1,25/255 |
+| **blocs 16×16 (couleur pure)** | **0,64/255** |
 
-Lecture : la **couleur** est reproduite à 1,7/255, c'est-à-dire exacte. Les
-~2,8/255 restants sont de la haute fréquence — grain, clarté/texture et netteté
-du preset, que par construction une table de couleurs ne peut pas porter. C'est
-la limite annoncée plus haut, cette fois mesurée.
+Lecture : la **couleur** est reproduite à 0,64/255 — indiscernable. Les ~2/255
+restants sont de la haute fréquence : Lightroom applique par défaut une
+**Netteté de 40** à toute image, que par construction une table de couleurs ne
+peut pas porter.
+
+C'est aussi ce test qui a révélé que la mire à un pixel par couleur était
+fausse : l'écart y était de 4,53/255 au pixel, 1,70 sur la couleur, et **8,06
+dans les noirs** contre 1,32 aujourd'hui.
 
 > Piège rencontré : une photo de téléphone est souvent stockée en paysage avec
 > une balise EXIF « tourne-moi », alors que Lightroom écrit la rotation dans les

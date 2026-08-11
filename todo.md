@@ -17,11 +17,11 @@
 
 1. [AGENTS.md](AGENTS.md) — règles de travail, rituel de fin de phase.
 2. Ce fichier.
-3. [docs/importer-un-preset-lightroom.md](docs/importer-un-preset-lightroom.md)
-   — si tu touches à l'import de presets.
+3. [docs/lightroom/](docs/lightroom/) — **tout ce qui concerne l'import d'un
+   preset Lightroom** : la procédure clic par clic, la méthode et ses pièges, les
+   mesures de CN11/CN17. Commencer par son `README.md`.
 4. [docs/audit-preset-powlisher-2026-08-11.md](docs/audit-preset-powlisher-2026-08-11.md)
-   et [docs/audit-presets-cn11-cn17-2026-08-11.md](docs/audit-presets-cn11-cn17-2026-08-11.md)
-   — si tu touches à la colorimétrie.
+   — si tu touches à `powlisher`.
 5. [map.md](map.md) — arbre du projet. Ses journaux datés : **ne lis que la
    zone que tu touches**, pas le fichier entier.
 
@@ -70,37 +70,40 @@ travaille sur du RAW linéaire, nous sur du JPEG 8 bits déjà développé. Donc
 ne recopie pas — on fait faire le calcul à Lightroom et on lit le résultat, via
 une **Hald CLUT**. Aller-retour vérifié en simulation : **0,24/255 d'écart
 moyen**. Mode d'emploi complet :
-[docs/importer-un-preset-lightroom.md](docs/importer-un-preset-lightroom.md).
+[docs/lightroom/2-methode-et-pieges.md](docs/lightroom/2-methode-et-pieges.md).
 
 ### Lot J — la chaîne a tourné sur un vrai Lightroom
 
-Contrôle à vide **0,018/255** : Lightroom ne décale rien. CN11 et CN17 capturés
-et importés. Fidélité de CN11 sur une vraie photo : **1,70/255 sur la couleur**.
+CN11 et CN17 capturés et importés. Fidélité de CN11 sur une vraie photo :
+**0,64/255 sur la couleur**, 2,67/255 au pixel (médiane 1). Contrôle à vide
+0,018/255.
 
-Trois choses apprises, toutes documentées :
+Quatre choses apprises, toutes documentées et toutes codées :
 
-- L'export Lightroom part par défaut en **Adobe RVB**. Il FAUT **sRVB**, sinon
-  la table est fausse d'un bout à l'autre sans que rien ne le signale.
-- Un preset qui contient du **grain** bruite la table (CN17 : rugosité 15,6/255
-  contre 0,09 à vide). D'où `--lisser`, validé : il ne déplace une table déjà
-  lisse que de 0,05/255.
-- **Un preset importé reste à `recommendedIntensity: 100`.** CN11/CN17 écrasent
-  le canal bleu dans les ombres (jusqu'à 19 % des pixels) — mais **Lightroom
-  écrase autant** (22,7 % contre 24,1 % chez nous). C'est le look, pas un défaut.
-  Baisser l'intensité a été essayé puis **annulé** : ça ne réduit pas le
-  contraste, ça mélange l'image traitée avec l'original, ce qui délave les
-  couleurs et éloigne de Lightroom. L'intensité est un choix esthétique offert à
-  l'utilisateur, jamais un correctif technique.
+- **La mire doit être en BLOCS de 4×4 pixels.** Avec une couleur par pixel, les
+  couleurs bavent les unes sur les autres — invisible dans les clairs, ruineux
+  dans les noirs, qui viraient au **vert** de façon visible sur les photos.
+  Corrigé : `preset:mire` génère du 2048×2048 par défaut, l'import lit le cœur
+  de chaque carré. Écart aux noirs : 8,06 → **1,32/255**.
+- L'export Lightroom part en **Adobe RVB**. Il FAUT **sRVB**, sinon la table est
+  fausse d'un bout à l'autre sans que rien ne le signale.
+- Un preset avec du **grain** bruite quand même la table (CN17 : rugosité 4,70).
+  `--lisser 1` la ramène à 0,69, et ne déplace une table déjà lisse que de 0,05.
+- **Un preset importé reste à `recommendedIntensity: 100`.** Baisser l'intensité
+  ne réduit pas le contraste : ça mélange l'image traitée avec l'originale, ce
+  qui délave les couleurs et éloigne de Lightroom. Essayé, mesuré, annulé.
 
-Chiffres, verdict et **question de licence** :
-[docs/audit-presets-cn11-cn17-2026-08-11.md](docs/audit-presets-cn11-cn17-2026-08-11.md).
+Procédure reproductible, chiffres, verdict, **question de licence** et le détail
+des trois erreurs de mesure commises en route : [docs/lightroom/](docs/lightroom/).
 
 ### Lot K — la suite
 
-`powlisher` reste le preset principal ; CN11 sert de **référence de
-calibration** mesurée. Reste à construire nos propres looks sous nos propres
-noms — et à décider si CN11/CN17 restent dans le bundle avant toute mise en
-ligne (risque de licence).
+1. **Brancher la Netteté 40** que Lightroom applique par défaut (`filters.sharpness`).
+   C'est le dernier écart mesurable avec Lightroom, et le seul gain qui reste.
+2. **Trancher la licence** avant toute mise en ligne : CN11 et CN17 sont dans le
+   bundle sous leurs noms Adobe.
+3. **Construire nos propres looks**, calibrés sur CN11 qui est maintenant une
+   référence exacte.
 
 ---
 
@@ -122,8 +125,13 @@ ligne (risque de licence).
 - **Jamais** recalculer une vignette depuis l'image pleine résolution.
 - **Taille** : chaque preset importé pèse ~144 ko de base64. Au-delà d'une
   dizaine, passer à un chargement paresseux depuis `public/`.
+- **Mire Hald** : toujours en **blocs** (4×4 par défaut). Une mire à un pixel par
+  couleur donne une table fausse dans les noirs, sans aucun signe visible avant
+  de regarder une photo.
 - **Export Lightroom** : toujours **sRVB**, jamais Adobe RVB, et toujours
   vérifier la **rugosité** au retour d'import (grain → `--lisser 1`).
+- **Ne jamais juger un preset sur son écrêtage seul** : il faut le comparer à
+  celui de Lightroom sur la même photo. Sinon on « corrige » le look voulu.
 - **EXIF** : une photo de téléphone est stockée en paysage avec une balise de
   rotation ; Lightroom l'écrit dans les pixels. Comparer sans `.rotate()` donne
   deux images de dimensions différentes.
