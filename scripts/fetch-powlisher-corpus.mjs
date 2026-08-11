@@ -62,6 +62,17 @@ const TWEETS = [
     ['2004212061937799207', 'nuit / ville', 'reference', 4, false],
     ['2004052932464115850', 'ville (Sony A7R V)', 'reference', 2, false],
     ['2036322282742661179', 'moto (Sony A7R V)', 'reference', 1, false],
+
+    /*
+     * AJOUTS 2026-08-12 (2e vague). La 1re vague avait apporte de
+     * l'architecture mais pas de ciel BLEU: les ciels de Shanghai sont blancs
+     * de brume, et la signature du preset (bleu saturé tire vers le teal) ne
+     * s'y exprime pas. Ces trois posts visent explicitement le manque:
+     * Biarritz, mer, exterieur plein soleil.
+     */
+    ['1973026896201003373', 'Biarritz', 'reference', 4, false],
+    ['2041250280445026501', 'presque l\'ete', 'reference', 4, false],
+    ['2076283103580938629', 'exterieur', 'reference', 4, false],
 ];
 
 /*

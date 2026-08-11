@@ -1,6 +1,6 @@
 # Corpus de référence de `powlisher`
 
-Les photos dont le preset `powlisher` a été déduit — **24** après tri. Elles ne sont pas dans
+Les photos dont le preset `powlisher` a été déduit — **36** après tri. Elles ne sont pas dans
 le dépôt — seul ce README l'est. Pour les récupérer :
 
 ```bash
@@ -34,7 +34,7 @@ Les trois signatures qui en sortent, et qui définissent le preset :
 | **Peau préservée** | 26–36°, jamais tirée vers l'orange | 27–36° |
 | **Hautes lumières crème** | sur la moitié du corpus, le point blanc ne monte **jamais** à 255 | pas d'écrêtage |
 
-## Les images, 24 au 2026-08-12
+## Les images, 36 au 2026-08-12
 
 Numérotation **figée** : les numéros 1 à 27 restent sur le corpus d'origine,
 parce que [l'audit](../../audit-preset-powlisher-2026-08-11.md) cite les photos
@@ -54,27 +54,42 @@ tweet ne rend plus le même nombre d'images.
 | 28–31 | Shanghai de nuit, gratte-ciel | architecture, néons, contre-jour |
 | 32–33 | Shanghai depuis la tour | grande surface de ciel, mais **blanc de brume** |
 | 34 | Ducati rouge | rouge saturé, asphalte, horizon |
+| 35–38 | **Biarritz** : Porsche, terrasse sur mer, côte, plage vue d'en haut | **le ciel bleu et la mer** |
+| 39–42 | fin de journée : foule au coucher, littoral, bar, table | lumière rasante, peau au soleil couchant |
+| 43–46 | extérieur : plage, escalier sur la côte, piscine, coucher sur mer | turquoise, contre-jour, soleil dans le cadre |
 
 Écartées à la main : **04** et **09** (portraits studio/intérieur), et **20–27**
 (captures d'écran de Lightroom mobile + station-service de nuit — elles
 montraient d'où vient le look, pas une couleur à mesurer). Le script reproduit ce
 tri ; `--tout` les récupère quand même.
 
-### Le trou qui reste, mesuré
+### Le ciel, comblé le 2026-08-12
 
-| | photos |
+| | avant | après |
+|---|---|---|
+| photos | 24 | **36** |
+| avec du ciel (> 12 % du cadre) | 5 | **10** |
+| **avec du bleu franc** (> 8 %) | 2 | **7** |
+
+Et ces ajouts ont fait mieux que combler un trou : ils ont **validé le preset de
+façon indépendante**. La cible « le ciel atterrit entre 178 et 196° » avait été
+déduite de **deux** photos (img16, img18). Les nouvelles n'ont servi à rien
+construire, et pourtant :
+
+| photo | teinte du ciel |
 |---|---|
-| avec du ciel (> 12 % du cadre) | 5 / 24 |
-| **avec du bleu franc** (> 8 % du cadre) | **2 / 24** — img16 et img18 |
+| img35 (Porsche) | 189,0° ✔ |
+| img36 (terrasse sur mer) | 195,8° ✔ |
+| img37 (côte de Biarritz) | 192,9° ✔ |
+| img40 (littoral) | 193,5° ✔ |
+| img45 (piscine) | 175,0° — c'est le turquoise de l'eau qui domine, pas le ciel |
 
-C'est le point faible du corpus, et il est structurel : la signature de
-`powlisher` est un décalage du **bleu** vers le teal (178–196°), or elle ne
-s'exprime que sur du bleu **saturé**. Les ciels blancs de brume de Shanghai
-apportent de la surface, pas de la matière à mesurer.
+Moyenne sur les 7 photos à ciel mesurable : **189,7°**, étendue 175–196°. La
+signature centrale de `powlisher` tient donc sur 7 photos au lieu de 2.
 
-**Ce qu'il faudrait** : ses photos de Biarritz, de plage, de mer, ou n'importe
-quel extérieur plein soleil. Tant qu'on n'en a pas, tout réglage du ciel repose
-sur deux photos, et il faut le dire au lieu de le maquiller.
+**Ce qui manque encore** : rien de criant côté ciel. Le corpus reste en revanche
+pauvre en **portrait rapproché** (la peau n'est mesurée que sur quelques
+images) et en **scènes de nuit colorées** hors Shanghai.
 
 ## Deux choses qui manquent, et pourquoi
 
