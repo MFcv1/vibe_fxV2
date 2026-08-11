@@ -295,6 +295,53 @@ try {
 }
 check('.xmp : fichier invalide rejeté', rejected, 1, 1);
 
+/* ---------- powlisher-ville : les cibles de la paire avant/apres ----------
+ *
+ * Mesurees sur img47 -> img48 du corpus (sa photo brute a cote de son edit),
+ * zone par zone, en medianes. Voir le README du corpus.
+ *
+ * Ces verifications sont SEPAREES de celles de `powlisher`: les deux presets
+ * vont dans des directions opposees sur le ciel, et c'est voulu.
+ */
+
+const ville = getPresetTransform('powlisher-ville');
+if (!ville) {
+    console.error('ECHEC: preset « powlisher-ville » introuvable.');
+    process.exit(1);
+}
+
+const villeProbe = (h, s, l) => rgbToHsl(...ville(hslToRgb(h, s, l)));
+
+/* Le ciel: teinte conservee, saturation ecrasee (mesure: 0.21 -> 0.04). */
+const cielVille = villeProbe(213, 0.21, 0.79);
+check('ville : ciel, teinte conservée', cielVille[0], 195, 220);
+check('ville : ciel, saturation écrasée', cielVille[1], 0, 0.09);
+
+/* Les neutres virent dore (mesure: teinte ~40 deg, saturation 0.05 -> 0.24). */
+const neutreMoyen = villeProbe(0, 0, 0.30);
+check('ville : neutre moyen, teinte dorée', neutreMoyen[0], 20, 55);
+check('ville : neutre moyen, saturation', neutreMoyen[1], 0.12, 0.32);
+
+const neutreClair = villeProbe(0, 0, 0.58);
+check('ville : neutre clair, teinte dorée', neutreClair[0], 20, 55);
+check('ville : neutre clair, saturation', neutreClair[1], 0.08, 0.28);
+
+/* Les hautes lumieres sont LEVEES (0.58 -> 0.67, 0.83 -> 0.90). */
+check('ville : hautes lumières levées', neutreClair[2], 0.62, 0.72);
+check('ville : blancs levés', villeProbe(0, 0, 0.83)[2], 0.86, 0.94);
+
+/* ... mais le point blanc ne touche pas 255, comme sur powlisher. */
+check('ville : point blanc sous 255', ville([1, 1, 1])[0] * 255, 240, 254.4);
+
+/* Les chauds existants sont renforces (0.23 -> 0.33). */
+const chaudVille = villeProbe(40, 0.23, 0.19);
+check('ville : chauds renforcés', chaudVille[1], 0.28, 0.42);
+check('ville : chauds, teinte tenue', chaudVille[0], 30, 50);
+
+/* Et powlisher V1 n'a pas bouge: les deux presets divergent bien sur le ciel. */
+const cielV1 = rgbToHsl(...transform(hslToRgb(213, 0.21, 0.79)));
+check('ville vs V1 : le ciel diverge', Math.abs(cielVille[0] - cielV1[0]), 15, 180);
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');
