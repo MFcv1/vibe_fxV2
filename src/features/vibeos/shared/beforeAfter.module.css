@@ -15,6 +15,17 @@
     max-width: 100%;
     max-height: 100%;
     touch-action: none;
+    /* Sans ca, glisser le rideau demarre une selection de texte du navigateur :
+       Safari peint alors un aplat bleu sur tout ce qu'il traverse (le canvas,
+       l'original, les etiquettes Avant/Apres). D'ou les « boites bleues » qui
+       apparaissaient en cours de glissement. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.stack ::selection {
+    background: transparent;
 }
 
 .after {

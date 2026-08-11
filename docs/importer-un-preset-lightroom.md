@@ -29,6 +29,38 @@ connaît aussi l'**entrée** — donc la capture est exacte, pas déduite.
 
 ## Marche à suivre
 
+### 0. Le contrôle — ne pas le sauter
+
+Avant de capturer quoi que ce soit, il faut prouver que Lightroom ne décale pas
+les couleurs **tout seul**. Sinon toutes les captures seraient fausses sans que
+rien ne le signale.
+
+On fait passer la mire neutre dans Lightroom **sans lui appliquer le moindre
+réglage**, on la réexporte, et on mesure :
+
+```bash
+npm run preset:mire
+# ... aller-retour dans Lightroom, sans rien toucher ...
+npm run preset:controle -- presets-lightroom/controle-sans-preset.png
+```
+
+| Écart à l'identité | Verdict |
+|---|---|
+| ≤ 2/255 | parfait, on capture |
+| 3 à 8/255 | acceptable, mais à noter : ça se retrouvera dans chaque preset |
+| > 8/255 | **stop** — espace colorimétrique d'export, profil appliqué à l'import, netteté de sortie |
+
+> Mesuré le 2026-08-11 sur Lightroom cloud desktop (macOS) : **0,018/255 de
+> moyenne, 2/255 au max**. La chaîne est propre.
+>
+> Le seul réglage qui a fait échouer le premier essai : l'export était en
+> **Adobe RVB**. Un espace plus large, où les mêmes chiffres RVB désignent
+> d'autres couleurs — la table aurait été fausse d'un bout à l'autre. **Vérifier
+> `sRVB` à chaque export**, c'est le piège qui revient.
+
+`preset:import` refuse volontairement une mire non traitée. Sur le contrôle, ce
+refus est le comportement attendu, pas un bug.
+
 ### 1. Générer la mire
 
 ```bash
@@ -65,7 +97,38 @@ npm run preset:import -- \
 Le preset apparaît immédiatement dans `/creer/vision`.
 
 Options : `--hint`, `--bestFor`, `--avoidFor`, `--intensity`, `--level`,
-`--force` (écraser un preset existant).
+`--force` (écraser un preset existant), `--lisser` (voir juste en dessous).
+
+### 4. Le grain — le piège que la mire ne pardonne pas
+
+Un preset qui contient du **grain** ajoute du bruit **aléatoire pixel par
+pixel**. Sur une photo c'est l'effet recherché ; sur une mire, chaque pixel est
+une couleur différente, donc le grain **corrompt chaque case de la table**. On
+ne capture plus une transformation, on capture une transformation + du bruit.
+
+Le résultat est une table qui n'est plus lisse — et une table non lisse donne
+des **bandes** dans les ciels et un rendu instable dans les dégradés.
+
+L'import mesure donc la **rugosité** de la table et le dit. Ordres de grandeur
+mesurés :
+
+| Cas | Rugosité |
+|---|---|
+| aller-retour sans preset | 0,09/255 |
+| CN11 (grain léger) | 1,66/255 |
+| **CN17 (grain marqué)** | **15,60/255** |
+
+Quand c'est bruité, on réimporte avec `--lisser 1` : un noyau [1,2,1] sur chaque
+axe du cube, soit ±4 valeurs sur 255 en entrée. Assez pour effacer un bruit
+aléatoire de moyenne nulle, trop peu pour aplatir une vraie courbe.
+
+**La preuve que le filtre ne casse rien** : appliqué à la mire de contrôle (déjà
+lisse), il ne déplace la table que de **0,05/255**. Appliqué à CN17, il en
+retire 5,81/255 — c'était donc bien du bruit.
+
+Le grain se récupère à sa vraie place, en **effet spatial**, via le `.xmp` →
+`filters.grain`. Un grain figé dans une table de couleurs n'est plus du grain :
+c'est juste une erreur.
 
 ---
 
@@ -141,3 +204,42 @@ npm run test:vision-preset
 neutre passée dans un preset puis relue doit redonner ce preset. Mesuré sur le
 preset `powlisher` : **0,24/255 d'écart moyen, 1,8 max sur des couleurs
 réelles** — soit une capture fidèle.
+
+### La vérification qui compte vraiment : sur une vraie photo
+
+Un test synthétique ne prouve pas qu'on rend comme Lightroom. Pour ça, il faut
+la même photo développée des deux côtés :
+
+```bash
+node scripts/compare-preset-vs-lightroom.mjs <origine.jpg> <version-lightroom.png> cn11
+```
+
+Mesuré le 2026-08-11, CN11 sur une photo de terrasse plein soleil (2252×4000) :
+
+| Échelle | Écart avec Lightroom |
+|---|---|
+| pixel par pixel | 4,53/255 |
+| blocs 4×4 | 2,31/255 |
+| **blocs 16×16 (couleur pure)** | **1,70/255** |
+
+Lecture : la **couleur** est reproduite à 1,7/255, c'est-à-dire exacte. Les
+~2,8/255 restants sont de la haute fréquence — grain, clarté/texture et netteté
+du preset, que par construction une table de couleurs ne peut pas porter. C'est
+la limite annoncée plus haut, cette fois mesurée.
+
+> Piège rencontré : une photo de téléphone est souvent stockée en paysage avec
+> une balise EXIF « tourne-moi », alors que Lightroom écrit la rotation dans les
+> pixels à l'export. Sans `.rotate()`, les deux images n'ont même pas les mêmes
+> dimensions. Le script s'en charge.
+
+### Comparer des presets entre eux
+
+```bash
+node scripts/audit-vision-presets.mjs              # bandes, dominante, couleurs témoins
+node scripts/compare-vision-presets-on-photos.mjs <photo...>   # sur de vraies photos
+```
+
+Le second est le plus décisif : il mesure l'**écrêtage ajouté**, c'est-à-dire le
+pourcentage de pixels poussés à 0 ou 255 — de la matière **détruite**. Un preset
+conçu pour du RAW se permet d'écraser les noirs parce que le RAW a de la
+réserve ; sur un JPEG déjà développé, il bouche.

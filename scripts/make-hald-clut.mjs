@@ -22,6 +22,21 @@ import { buildHaldIdentity, haldImageSize } from '../src/features/vibefx-studio/
 
 const outputDir = process.argv[2] || 'presets-lightroom';
 const level = Number(process.argv[3] || 8);
+/*
+ * Taille du carre occupe par chaque couleur.
+ *
+ * A 1, chaque couleur tient sur UN pixel, et deux pixels voisins sont deux
+ * couleurs sans rapport. Tout traitement qui regarde le voisinage (nettete,
+ * clarte, texture, reduction de bruit, et jusqu'au dematricage interne d'un
+ * moteur) fait alors baver les couleurs les unes sur les autres. C'est
+ * invisible dans les tons clairs, et catastrophique dans les noirs ou les
+ * valeurs valent 4 ou 8 sur 255.
+ *
+ * A 4, chaque couleur occupe un carre de 4x4 : la bavure se mange sur les
+ * bords et le centre reste pur. C'est le seul cout : une image 16 fois plus
+ * grande, que Lightroom avale sans probleme.
+ */
+const blockSize = Number(process.argv[4] || 1);
 
 if (!Number.isInteger(level) || level < 2 || level > 16) {
     console.error(`Niveau Hald invalide: ${process.argv[3]}. Attendu un entier entre 2 et 16 (8 recommande).`);
@@ -30,9 +45,29 @@ if (!Number.isInteger(level) || level < 2 || level > 16) {
 
 const { data, size, cube } = buildHaldIdentity(level);
 fs.mkdirSync(outputDir, { recursive: true });
-const target = path.join(outputDir, `hald-clut-neutre-niveau${level}.png`);
+const suffix = blockSize > 1 ? `-bloc${blockSize}` : '';
+const target = path.join(outputDir, `hald-clut-neutre-niveau${level}${suffix}.png`);
 
-await sharp(Buffer.from(data), { raw: { width: size, height: size, channels: 3 } })
+/* Chaque couleur repetee sur un carre blockSize x blockSize. */
+const outSize = size * blockSize;
+const pixels = blockSize === 1 ? Buffer.from(data) : Buffer.alloc(outSize * outSize * 3);
+if (blockSize > 1) {
+    for (let y = 0; y < outSize; y += 1) {
+        const sy = Math.floor(y / blockSize);
+        for (let x = 0; x < outSize; x += 1) {
+            const sx = Math.floor(x / blockSize);
+            const s = (sy * size + sx) * 3;
+            const d = (y * outSize + x) * 3;
+            pixels[d] = data[s];
+            pixels[d + 1] = data[s + 1];
+            pixels[d + 2] = data[s + 2];
+        }
+    }
+}
+
+await sharp(pixels, { raw: { width: outSize, height: outSize, channels: 3 } })
+    /* Profil sRGB explicite: sans lui, l'editeur doit deviner l'espace du fichier. */
+    .withMetadata({ icc: 'srgb' })
     .png({ compressionLevel: 9 })
     .toFile(target);
 
@@ -85,5 +120,6 @@ Dans Lightroom, tu peux aussi faire un clic droit sur un preset -> **Exporter**.
 `, 'utf8');
 
 console.log(`Mire ecrite       : ${target}`);
-console.log(`  dimensions      : ${size}x${size} (cube ${cube}^3 = ${cube ** 3} couleurs)`);
+console.log(`  dimensions      : ${outSize}x${outSize} (cube ${cube}^3 = ${cube ** 3} couleurs`
+    + `${blockSize > 1 ? `, ${blockSize}x${blockSize} pixels chacune` : ''})`);
 console.log(`Marche a suivre   : ${readme}`);

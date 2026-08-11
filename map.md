@@ -435,9 +435,9 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   `-- vision.module.css
 |   |   `-- styles/
 |   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
-|   |   |   |-- haldClut.js            # Capture d'un preset externe par Hald CLUT : mire identite, relecture d'une mire traitee vers une LUT 33^3, detection d'une mire non traitee, base64. C'est ce qui permet d'importer un preset Lightroom EXACTEMENT, sans reimplementer Camera Raw
+|   |   |   |-- haldClut.js            # Capture d'un preset externe par Hald CLUT : mire identite, relecture d'une mire traitee vers une LUT 33^3, detection d'une mire non traitee, base64. Depuis le lot J : `measureHaldRoughness` (une table BRUITEE = du grain dans le preset, qui corrompt chaque couleur de la mire) et `smoothHaldCube` (noyau [1,2,1] par axe ; ne deplace une table deja lisse que de 0,05/255). C'est ce qui permet d'importer un preset Lightroom EXACTEMENT, sans reimplementer Camera Raw
 |   |   |   |-- xmpPreset.js           # Lecture d'un .xmp Lightroom/Camera Raw : sert a recuperer les reglages SPATIAUX (clarte, texture, nettete, grain, vignetage) qu'une Hald CLUT ne peut pas capturer, et a produire un resume lisible. La couleur ne vient PAS d'ici
-|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux
+|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Contient `cn11.js` et `cn17.js`, captures le 2026-08-11 sur un vrai Lightroom cloud — REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/audit-presets-cn11-cn17-2026-08-11.md)
 |   |   |   |-- lut3d.js                # Moteur LUT 3D : buildLut3d evalue une fonction de preset sur une grille 33^3, applyLut3d l'applique par interpolation trilineaire en UNE passe. Cout de rendu constant : ajouter un preset ne coute rien
 |   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l'ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). Preset `powlisher` reconstruit par mesure sur 19 photos, cf docs/audit-preset-powlisher-2026-08-11.md
 |   |-- vibefx-shared/
@@ -508,6 +508,10 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- check-pixabay-provider.mjs      # Probe reseau Pixabay Music depuis Node : detecte 403/challenge et confirme si des URL audio CDN sont exposees
 |   |-- import-pixabay-ai-music.mjs     # Scraper/import local Playwright pour https://pixabay.com/music/search/ai-generated/, limite, sans contournement challenge, avec manifest droits
 |   |-- check-vision-corpus.mjs         # Verifie les 12 fixtures smartphone locales ignorees par Git
+|   |-- audit-vision-presets.mjs        # Audit chiffre des presets Vision : BANDES (plus gros saut dans un degrade lisse, le risque n1 d'une LUT), dominante sur l'axe des gris, derive teinte/sat/lum sur des couleurs temoins
+|   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : la mire neutre reexportee sans preset doit revenir a l'identite (<=2/255). Attrape le piege Adobe RVB au lieu de sRVB, qui fausserait chaque preset sans rien signaler
+|   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille
+|   |-- compare-vision-presets-on-photos.mjs # Comparaison des presets sur de vraies photos : ECRETAGE ajoute (matiere detruite), force du look, derive du ciel/vegetation/peau
 |   |-- audit-vision-filters.mjs        # Audit statique des profils Vision et du branchement safe smartphone, incluant temperature/halation/tint global masques
 |   |-- firebase-deploy.mjs             # Wrapper cross-platform deploy backend/functions avec cible controlee, firebase-tools local et timeout discovery 60s
 |   |-- run-video-ui-test.mjs           # Lance un serveur Next local dedie puis les smokes Playwright Vibe_CUT fonctionnel + securite media/capacites avec SMOKE_BASE_URL controle
@@ -589,6 +593,94 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-11 (lot J — CN11 et CN17 captures sur un VRAI Lightroom)
+
+- **La chaine d'import a enfin tourne pour de vrai.** Jusqu'ici elle n'avait ete
+  verifiee qu'en simulation. Lightroom cloud desktop n'etant pas pilotable
+  (`NSAppleScriptEnabled = false`, aucun dictionnaire de script, pas de CLI —
+  seul Lightroom *Classic* a un SDK), l'aller-retour se fait a la main : l'agent
+  genere, mesure et importe, l'utilisateur clique dans Lightroom.
+
+- **Le controle a vide, et il a servi.** Nouveau `scripts/check-hald-control.mjs`
+  (`npm run preset:controle`) : la mire neutre reexportee SANS preset doit
+  revenir a l'identite. Premier essai refuse — l'export partait en **Adobe RVB**,
+  un espace plus large ou les memes chiffres RVB designent d'autres couleurs. La
+  table aurait ete fausse d'un bout a l'autre **sans que rien ne le signale**.
+  En sRVB : **0,018/255 de moyenne, 2/255 au max**. C'est exactement le role de
+  cette etape, et c'est pour ca qu'elle ne se saute pas.
+
+- **Le grain corrompt une capture Hald, et personne ne le voyait.** Un preset
+  qui contient du grain ajoute du bruit ALEATOIRE pixel par pixel ; sur une mire
+  ou chaque pixel est une couleur differente, il corrompt donc chaque case de la
+  table. Mesure de rugosite (derivee seconde le long de chaque axe du cube) :
+  **0,09/255** a vide, **1,66** pour CN11, **15,60** pour CN17. Une table non
+  lisse donne des bandes dans les ciels. D'ou `measureHaldRoughness` et
+  `smoothHaldCube` dans `haldClut.js`, l'option `--lisser` a l'import, et une
+  alerte explicite dans le rapport d'import au-dela de 3/255. Le filtre est
+  valide par la mire de controle : sur une table DEJA lisse il ne deplace que
+  **0,05/255** ; sur CN17 il retire 5,81/255 — c'etait donc bien du bruit. Le
+  grain se recupere a sa vraie place, en effet spatial, via le `.xmp`.
+
+- **La fidelite reelle a Lightroom, mesuree.** Nouveau
+  `scripts/compare-preset-vs-lightroom.mjs` : meme photo, developpee des deux
+  cotes. CN11 sur une terrasse plein soleil (2252x4000) : **4,53/255 pixel a
+  pixel**, mais **1,70/255 en moyennant par blocs 16x16**, c'est-a-dire sur la
+  COULEUR seule. Les ~2,8/255 restants sont de la haute frequence (grain,
+  clarte, nettete) qu'une table de couleurs ne peut pas porter par construction.
+  Piege rencontre : un JPEG de telephone est stocke en paysage avec une balise
+  EXIF de rotation que Lightroom ecrit dans les pixels a l'export — sans
+  `.rotate()`, les deux images n'ont meme pas les memes dimensions.
+
+- **Le verdict, chiffre.** Nouveaux `scripts/audit-vision-presets.mjs` (bandes,
+  dominante, couleurs temoins) et `scripts/compare-vision-presets-on-photos.mjs`
+  (ecretage, force, derive des teintes). Sur 8 photos reelles, la colonne
+  decisive est l'**ecretage ajoute** — de la matiere DETRUITE : `powlisher`
+  **-6,47 %** (il rattrape des pixels deja brules), CN11 **+3,97 %**, CN17
+  **+12,51 %**, qui finit avec 19,3 % des pixels bouches ou brules (visible a
+  l'oeil : les coussins blancs partent en aplat). C'est la consequence directe
+  de leur origine : CN11/CN17 sont regles pour du RAW, qui a de la reserve dans
+  les hautes lumieres ; un JPEG deja developpe n'en a pas. **`powlisher` reste
+  donc le preset principal** ; CN11 devient une reference de calibration exacte.
+  Detail dans `docs/audit-presets-cn11-cn17-2026-08-11.md`.
+
+- **Bandes : ce qui vient de nous, et ce qui vient d'Adobe.** Pire cas 5/255
+  apres lissage pour les deux presets. Verification faite en relisant le
+  degrade directement dans la mesure Lightroom 64^3 : elle saute deja de 2,8/255
+  (CN11, ciel) et 5,9/255 (CN17, gris). Environ la moitie du residu est donc le
+  preset lui-meme, l'autre moitie le prix de la table 33^3. Aucune bande visible
+  sur les rendus reels.
+
+- **Erreur de lecture corrigee dans la foulee.** L'audit disait d'abord que CN17
+  « detruit les blancs ». Faux : la metrique additionnait les canaux a 0 et a
+  255. Separes, CN17 ecrete MOINS les blancs que l'original (1,07 % contre
+  2,10 %) ; ce qui etait compte, c'etait du NOIR — le canal bleu ecrase dans les
+  tons chauds. Aucun pixel n'est reellement mort (3 canaux a 0 ou 255 : 0,00 %
+  partout). L'utilisateur, qui trouvait CN17 tres bien a l'oeil, avait raison.
+
+- **Seconde erreur, corrigee elle aussi : l'intensite.** Constatant l'ecrasement
+  du canal bleu dans les ombres, l'intensite par defaut de CN11/CN17 a d'abord
+  ete baissee a 85/90 — l'ecretage tombait de 6,93/19,48 % a ~1,3 %. La
+  verification manquante l'a invalide : **Lightroom lui-meme ecrete 22,74 %** de
+  cette photo sous CN11, contre 24,10 % chez nous. Ces ombres denses sont donc le
+  PRESET, pas un defaut de notre moteur, et baisser l'intensite ELOIGNAIT le
+  rendu de Lightroom (4,64/255 contre 4,53). Pire, ca change le look d'une facon
+  que l'oeil detecte : baisser l'intensite ne reduit pas le contraste, ca melange
+  l'image traitee avec l'image d'origine, donc les couleurs du preset se diluent
+  dans les couleurs neutres du JPEG — d'ou une impression de couleur delavee,
+  tirant vers le vert dans les ombres. Signale par le porteur du projet en
+  regardant les rendus, AVANT qu'on ait les chiffres. Remis a 100. **Regle** :
+  `recommendedIntensity` d'un preset IMPORTE reste a 100 ; le curseur est un
+  choix esthetique offert a l'utilisateur, jamais un correctif technique. Teste
+  et ecarte aussi : un garde-fou relevant le pied de courbe avant le preset (meme
+  a 6 % il ne descend qu'a 5,6 % et il delave les noirs). Le seul ecart restant
+  avec Lightroom est SPATIAL (clarte, texture, nettete, grain, vignetage :
+  2,8/255 des 4,53/255), a recuperer via le `.xmp`.
+
+- **Reserve produit maintenue.** Les tables de CN11 et CN17 sont dans le bundle
+  sous leurs noms Adobe. Pour tester et calibrer en interne : aucun souci. Avant
+  toute mise en ligne publique, il faut trancher — un *look* ne s'approprie pas,
+  une bibliotheque de presets sous licence si.
 
 ## Journal — 2026-08-08 (VibeOS phase F — bascule : le pipeline, /studio, la suppression)
 
@@ -1802,3 +1894,5 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - Mise a jour 2026-08-11 (presets Vision, remplacement des 12 looks) : les 12 « looks » et la bibliotheque de profils par marque sont supprimes (`visionLooks.js`, le Sheet « Bibliotheque de profils », le tri `scoreProfileForImage` cote Vision, `guardLookForImage` devenu mort). A la place, Vision expose des presets compiles en LUT 3D. Le premier, `powlisher`, est une reconstruction MESUREE du rendu de @powl_d : 19 photos recuperees en resolution d'origine via l'API de syndication X, plus 50 frames extraites d'une video ou il montre ses reglages Lightroom (Contraste -50, Hautes lumieres -30, HDR et corrections d'objectif desactives, pastilles sur Lumiere/Couleur/Effets/Detail). Mesures cles : le bleu descend quand la luminance monte (B-G 0 -> -12/255), les tons moyens virent olive (R-G ~ -5), le ciel atterrit a 178-194 deg (cyan, jamais bleu), le feuillage tombe a 85-105 deg avec S <= 0.35, la peau est preservee (27-36 deg), le point blanc reste sous 255 et les noirs restent denses (aucun matte). Ni grain ni vignetage systematiques (mesures a l'appui). Nouveaux fichiers : `utils/lut3d.js`, `utils/visionPresets.js`, `vision/presetPreview.js`, `scripts/smoke-vision-preset.mjs` (20 verifications rejouant les cibles de l'audit). Perf : le smoke navigateur Vision passe en 6,9 s. Bug trouve et corrige en route : `applyVisionStage` (project/pipeline.js) jugeait l'etage Vision « neutre » et le SAUTAIT, parce qu'un preset est une LUT qui ne modifie aucune cle de `filters` — le preset ne descendait donc ni jusqu'au Studio ni jusqu'a l'export. L'etage teste desormais `vision.presetId` separement. Correction au passage d'un echec PREEXISTANT : `scripts/audit-vision-filters.mjs` plantait depuis le commit ee19c8c car il lisait `VisionPanel.jsx` et `VibeFxStudio.jsx`, supprimes avec l'ancienne interface /studio.
 
 - Mise a jour 2026-08-11 (import de presets Lightroom, exact) : le porteur du projet demande d'integrer CN11/CN17 (pack Adobe « Cinema II »). Verification faite : leurs valeurs ne sont PAS publiees sur le web (les resultats ne sont que des packs tiers sans rapport) et Lightroom n'est pas installe sur la machine. Recopier des valeurs de curseurs serait de toute facon faux : Lightroom applique ses reglages a du RAW lineaire dans son espace de travail, l'app travaille sur du JPEG 8 bits deja developpe. Solution retenue, qui evite completement le probleme : la capture par **Hald CLUT**. On genere une mire contenant une fois chaque couleur d'une grille RVB, on la fait passer dans Lightroom avec le preset, et l'image qui ressort EST la table de conversion du preset. Aucune approximation sur la couleur. Nouveaux fichiers : `utils/haldClut.js`, `utils/xmpPreset.js`, `utils/presets/` (genere), `scripts/make-hald-clut.mjs`, `scripts/import-lightroom-preset.mjs`, `docs/importer-un-preset-lightroom.md`. Le `.xmp` reste lu en complement, pour les seuls reglages qu'une Hald CLUT ne peut pas voir (clarte, texture, nettete, grain, vignetage — ils dependent des pixels voisins ou de la position). `visionPresets.js` accepte desormais deux formes de preset, indiscernables au rendu : une fonction pure (powlisher) ou une table importee (`getLut`). Aller-retour verifie de bout en bout : mire -> preset -> reimport -> comparaison, ecart moyen 0,24/255 et max 1,8/255 sur des couleurs reelles. Le smoke `test:vision-preset` passe de 20 a 40 verifications. Reserve produit notee dans la doc : embarquer une table de preset Adobe sous son nom dans un produit public est un risque de licence — l'usage sain est la calibration de presets maison.
+
+- Mise a jour 2026-08-11 (elagage de `todo.md`) : le porteur du projet signale que `todo.md` (372 lignes) fait relire a chaque agent, a chaque session, l'historique complet de phases livrees et closes — du contexte paye pour rien. Correction : `todo.md` retombe a ~160 lignes et ne porte plus QUE le chantier actif (les presets de Vision). Le detail des phases A-G du redesign part dans `docs/archive-vibeos-2026-08-11.md`, et le prompt de reprise part dans `docs/prompt-reprise-2026-08-11.md` (il ne sert qu'une fois, a quelqu'un qui l'a deja recu en entier). `AGENTS.md` est aligne sur cette pratique : nouvelle regle « todo.md doit rester court », seuil d'archivage a ~200 lignes, et le prompt de reprise se range desormais dans `docs/` avec un lien depuis `todo.md` au lieu d'etre colle a la fin.

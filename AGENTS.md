@@ -71,9 +71,26 @@ se suffire a lui-meme et contenir :
 - les interdits du chantier ;
 - le rituel de fin de phase a rejouer.
 
-Le meme texte est recopie en fin de `todo.md`, mais le chat fait foi : un lot
-n'est pas termine tant que le prompt de reprise n'a pas ete affiche dans la
+Le meme texte est conserve dans le depot, mais le chat fait foi : un lot n'est
+pas termine tant que le prompt de reprise n'a pas ete affiche dans la
 conversation.
+
+Ou le ranger : dans `docs/prompt-reprise-<date>.md`, avec un lien depuis
+`todo.md` — PAS colle en fin de `todo.md`. Raison : `todo.md` est relu a chaque
+session par chaque agent, alors que le prompt de reprise ne sert qu'une fois, et
+a quelqu'un qui l'a deja recu en entier. L'y laisser gonfle le contexte de tout
+le monde pour rien.
+
+### `todo.md` doit rester court
+
+C'est le fichier que tout agent relit en debut de session. Il ne porte QUE le
+chantier ACTIF. Des qu'un lot est livre et clos, son detail part dans
+`docs/archive-<chantier>-<date>.md`, et `todo.md` n'en garde qu'une ligne de
+tableau plus un lien.
+
+Si `todo.md` depasse ~200 lignes, c'est qu'il y a de l'archivage a faire : le
+faire AVANT d'ajouter le lot suivant. Le but n'est pas la coquetterie, c'est le
+cout : chaque ligne inutile est relue a chaque session, par chaque agent.
 
 ## Discipline de deploiement et couts
 

@@ -27,6 +27,8 @@ import {
     haldToLut3d,
     lutToBase64,
     measureHaldDeviation,
+    measureHaldRoughness,
+    smoothHaldCube,
 } from '../src/features/vibefx-studio/utils/haldClut.js';
 import { parseXmpPreset } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 
@@ -94,7 +96,17 @@ if (deviation.max <= 1) {
     );
 }
 
-const lut = haldToLut3d(pixels, level, LUT_SIZE);
+/*
+ * Grain: un preset qui en contient bruite la mire, donc la table. On le mesure
+ * et on le dit — un preset bruite capture sans lissage donne des bandes et un
+ * rendu instable dans les degrades.
+ */
+const roughness = measureHaldRoughness(pixels, level);
+const passes = args.lisser === true ? 1 : Number(args.lisser || 0);
+const cleaned = passes > 0 ? smoothHaldCube(pixels, level, passes) : pixels;
+const roughnessAfter = passes > 0 ? measureHaldRoughness(cleaned, level) : roughness;
+
+const lut = haldToLut3d(cleaned, level, LUT_SIZE);
 
 /* ---------- lecture du .xmp (optionnel) ---------- */
 
@@ -206,6 +218,19 @@ console.log(`  module        : ${modulePath}`);
 console.log(`  identifiant   : ${args.id}`);
 console.log(`  table         : ${LUT_SIZE}^3 depuis un cube Hald de ${level * level}^3`);
 console.log(`  ecart mesure  : moyen ${deviation.mean.toFixed(2)}/255, max ${deviation.max}/255`);
+console.log(
+    `  rugosite      : ${roughness.mean.toFixed(2)}/255`
+    + (passes > 0 ? ` -> ${roughnessAfter.mean.toFixed(2)}/255 apres ${passes} lissage(s)` : ''),
+);
+if (roughnessAfter.mean > 3) {
+    console.log('');
+    console.log('  ATTENTION: la table capturee est BRUITEE, pas lisse. C\'est presque');
+    console.log('  toujours du GRAIN dans le preset: il perturbe chaque pixel de la mire,');
+    console.log('  donc chaque couleur de la table. Resultat: des bandes dans les ciels et');
+    console.log('  un rendu instable dans les degrades.');
+    console.log('  Reimporte avec  --lisser 1  (ou 2 si ca ne suffit pas), et recupere le');
+    console.log('  grain a sa vraie place, en effet spatial, via le .xmp.');
+}
 if (xmp) {
     console.log(`  .xmp          : ${xmp.name}${xmp.group ? ` (${xmp.group})` : ''}`);
     if (xmp.summary.length) {

@@ -52,6 +52,7 @@ export default function BeforeAfter({
     testId = 'vibeos-before-after',
 }) {
     const stackRef = useRef(null);
+    const handleRef = useRef(null);
     const draggingRef = useRef(false);
     const positionRef = useRef(defaultPosition);
     const [position, setPosition] = useState(defaultPosition);
@@ -84,6 +85,13 @@ export default function BeforeAfter({
             return;
         }
         if (mode !== 'slider') return;
+        /* Empeche le navigateur de demarrer une selection de texte (ou un
+           drag d'image) sur le geste : c'est la deuxieme moitie du correctif
+           des aplats bleus, la premiere etant `user-select: none` en CSS.
+           On rend le focus a la main, sinon le clavier ne prendrait plus le
+           relais apres un clic sur la poignee. */
+        event.preventDefault();
+        handleRef.current?.focus?.({ preventScroll: true });
         draggingRef.current = true;
         write(positionFromEvent(event));
     };
@@ -169,6 +177,7 @@ export default function BeforeAfter({
 
             {active && mode === 'slider' && beforeSrc ? (
                 <div
+                    ref={handleRef}
                     className={styles.handle}
                     role="slider"
                     tabIndex={0}
