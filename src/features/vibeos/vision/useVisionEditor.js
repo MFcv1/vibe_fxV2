@@ -4,31 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useCanvasRenderer from '../../vibefx-studio/hooks/useCanvasRenderer';
 import useExport from '../../vibefx-studio/hooks/useExport';
 import { DEFAULT_FILTERS } from '../../vibefx-studio/hooks/useStudioFilters';
-import { normalizeVisionFilters } from '../../vibefx-studio/utils/visionColorScience';
 import { measureVisionImageData } from '../../vibefx-studio/utils/visionMetrics';
-import {
-    getImageRecommendationSignals,
-    renderVisionProfilePreview,
-    scoreProfileForImage,
-} from '../../vibefx-studio/utils/visionRecommendation';
+import { getImageRecommendationSignals } from '../../vibefx-studio/utils/visionRecommendation';
+import { VISION_PRESETS } from '../../vibefx-studio/utils/visionPresets';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
-import { resolveProjectSource } from '../project/pipeline';
+import { loadImageFromBlob, resolveProjectSource } from '../project/pipeline';
 import { srcToBlob } from '../layout/layoutPersistence';
-import { VISION_LOOKS } from './visionLooks';
-import { buildAutoEnhancement, guardLookForImage } from './autoEnhance';
+import { getPhoto as getLibraryPhoto, putPhoto as putLibraryPhoto } from '../library/libraryDb';
+import { buildPreviewSource, renderPresetPreview } from './presetPreview';
+import { buildAutoEnhancement } from './autoEnhance';
 
 /*
  * Orchestration de l'ecran Vision VibeOS.
  *
  * Comme pour Layout, tous les moteurs sont IMPORTES: rendu (`useCanvasRenderer`
  * en vue photo), export (`useExport`), mesure d'image (`visionMetrics`),
- * garde-fous et bornes (`normalizeVisionFilters`), tri des looks
- * (`scoreProfileForImage`) et vignettes (`renderVisionProfilePreview`).
+ * bornes des reglages manuels (`normalizeVisionFilters`) et vignettes de
+ * presets (`presetPreview`, qui s'appuie sur la LUT 3D de `visionPresets`).
  * Ce hook ne contient que de l'etat d'ecran et le lien avec le projet commun.
  */
 
 const METRICS_SAMPLE_WIDTH = 320;
-const PREVIEW_QUEUE_DELAY_MS = 24;
 const HISTORY_LIMIT = 30;
 const PERSIST_DEBOUNCE_MS = 1200;
 /* Vision travaille sur la photo elle-meme, pas sur un format social: on passe
@@ -65,7 +61,7 @@ export default function useVisionEditor() {
     const [sourceKind, setSourceKind] = useState(null);
     const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
     const [intensity, setIntensity] = useState(80);
-    const [activeLookId, setActiveLookId] = useState(null);
+    const [activePresetId, setActivePresetId] = useState(null);
     const [autoMessage, setAutoMessage] = useState(null);
     const [previews, setPreviews] = useState({});
     const [isLoadingImage, setIsLoadingImage] = useState(false);
@@ -81,9 +77,10 @@ export default function useVisionEditor() {
        lineaire deja implemente par le pipeline (`filterIntensity`). */
     const appliedFilters = useMemo(() => ({
         ...filters,
+        presetId: activePresetId,
         safeSmartphone: filters.safeSmartphone !== false,
         filterIntensity: intensity,
-    }), [filters, intensity]);
+    }), [filters, intensity, activePresetId]);
 
     const { getCanvasDimensions, renderPipeline } = useCanvasRenderer({
         canvasRef, images, view: 'vision-pro',
@@ -135,7 +132,7 @@ export default function useVisionEditor() {
                 const storedVision = project.vision || {};
                 if (storedVision.filters) setFilters(storedVision.filters);
                 if (typeof storedVision.intensity === 'number') setIntensity(storedVision.intensity);
-                if (storedVision.profileId) setActiveLookId(storedVision.profileId);
+                if (storedVision.presetId) setActivePresetId(storedVision.presetId);
             } finally {
                 hydrationRef.current = 'done';
                 setIsLoadingImage(false);
@@ -143,7 +140,15 @@ export default function useVisionEditor() {
         });
     }, [status, project]);
 
-    /* Import direct depuis l'ecran Vision. */
+    /*
+     * Import direct depuis l'ecran Vision.
+     *
+     * La photo importee remplace VRAIMENT la source du projet: la composition
+     * publiee par Layout est effacee et la nouvelle photo devient l'image du
+     * projet. Sans cela, la composition restait prioritaire dans
+     * `resolveProjectSource` et reapparaissait au rechargement - c'est ce qui
+     * donnait l'impression d'une photo impossible a enlever.
+     */
     const handleImageUpload = useCallback((event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -154,11 +159,52 @@ export default function useVisionEditor() {
             setImage(img);
             setSourceKind('import');
             setIsLoadingImage(false);
+            updateProject({
+                composition: null,
+                images: [{ id: `vision-${Date.now()}`, name: file.name, slotId: null, blob: file }],
+                slots: {},
+                thumbnail: null,
+            });
         };
         img.onerror = () => setIsLoadingImage(false);
         img.src = URL.createObjectURL(file);
         event.target.value = '';
-    }, []);
+    }, [updateProject]);
+
+    /*
+     * Retire la photo de l'apercu. Ce n'est PAS une suppression: le fichier
+     * reste dans la bibliotheque, on ne fait que vider l'espace de travail
+     * (composition et image du projet), pour repartir d'une page blanche.
+     */
+    const clearImage = useCallback(() => {
+        setImage(null);
+        setSourceKind(null);
+        setActivePresetId(null);
+        setAutoMessage(null);
+        setFilters({ ...DEFAULT_FILTERS });
+        /* Sans ca, les vignettes resteraient celles de la photo qu'on vient de
+           retirer. */
+        setPreviews({});
+        updateProject({ composition: null, images: [], slots: {}, thumbnail: null });
+    }, [updateProject]);
+
+    /*
+     * Detache Vision de la composition Layout: on revient a la photo brute du
+     * projet, ou a un ecran vide s'il n'y en a pas. C'est la sortie de secours
+     * quand on veut repartir d'une photo au lieu d'un visuel deja compose.
+     */
+    const detachComposition = useCallback(async () => {
+        updateProject({ composition: null });
+        const record = (project?.images || [])[0];
+        if (record?.blob) {
+            const loaded = await loadImageFromBlob(record.blob, record.name);
+            setImage(loaded);
+            setSourceKind(loaded ? 'photo' : null);
+        } else {
+            setImage(null);
+            setSourceKind(null);
+        }
+    }, [updateProject, project]);
 
     /* ---- Analyse de la photo (une mesure par photo) ---- */
     const metrics = useMemo(() => (image ? measureSourceImage(image) : null), [image]);
@@ -168,41 +214,44 @@ export default function useVisionEditor() {
         [metrics],
     );
 
-    /* ---- Les 12 looks, tries pour CETTE photo ---- */
-    const looks = useMemo(() => {
-        if (!signals) {
-            return VISION_LOOKS.map((look) => ({ ...look, score: 0, reason: look.hint, discouraged: false }));
-        }
-        return VISION_LOOKS
-            .map((look) => {
-                const { score, reason } = scoreProfileForImage(look, signals);
-                return { ...look, score, reason, discouraged: score < 0 };
-            })
-            .sort((a, b) => {
-                if (a.discouraged !== b.discouraged) return a.discouraged ? 1 : -1;
-                return b.score - a.score;
-            });
-    }, [signals]);
+    /* ---- Les presets ---- */
+    const presets = useMemo(() => VISION_PRESETS.map((preset) => ({
+        id: preset.id,
+        label: preset.label,
+        hint: preset.hint,
+        description: preset.description,
+        bestFor: preset.bestFor,
+        avoidFor: preset.avoidFor,
+        recommendedIntensity: preset.recommendedIntensity,
+    })), []);
 
-    /* Vignettes rendues sur la VRAIE photo, une par une pour ne pas bloquer
-       l'interface (file d'attente, comme l'ancien panneau). */
+    /*
+     * Vignettes: la photo est reduite UNE fois, puis chaque preset n'est qu'une
+     * passe LUT sur ces ~90 000 pixels. Plus de file d'attente etalee dans le
+     * temps: l'ensemble tient largement dans une frame, meme si la liste de
+     * presets s'allonge.
+     */
     useEffect(() => {
-        if (!image) return undefined;
         let cancelled = false;
-        const queue = [...VISION_LOOKS];
-        const runNext = () => {
-            if (cancelled) return;
-            const look = queue.shift();
-            if (!look) return;
-            const dataUrl = renderVisionProfilePreview(image, look);
-            if (cancelled) return;
-            if (dataUrl) setPreviews((current) => ({ ...current, [look.id]: dataUrl }));
-            setTimeout(runNext, PREVIEW_QUEUE_DELAY_MS);
-        };
+        /* On laisse le navigateur peindre la photo avant de calculer les
+           vignettes: c'est l'apercu qui compte pour la sensation de reactivite.
+           Tout passe par ce callback, jamais par le corps de l'effet, pour ne
+           pas declencher de rendu en cascade. */
         const timer = setTimeout(() => {
-            setPreviews({});
-            runNext();
-        }, PREVIEW_QUEUE_DELAY_MS);
+            if (cancelled) return;
+            if (!image) {
+                setPreviews({});
+                return;
+            }
+            const source = buildPreviewSource(image);
+            if (!source || cancelled) return;
+            const next = {};
+            for (const preset of VISION_PRESETS) {
+                const dataUrl = renderPresetPreview(source, preset.id);
+                if (dataUrl) next[preset.id] = dataUrl;
+            }
+            if (!cancelled) setPreviews(next);
+        }, 0);
         return () => {
             cancelled = true;
             clearTimeout(timer);
@@ -214,23 +263,23 @@ export default function useVisionEditor() {
     const [historyIndex, setHistoryIndex] = useState(-1);
     const isRestoringRef = useRef(false);
 
-    const pushHistory = useCallback((nextFilters, nextIntensity, nextLookId) => {
+    const pushHistory = useCallback((nextFilters, nextIntensity, nextPresetId) => {
         if (isRestoringRef.current) return;
         setHistory((previous) => {
             const trimmed = previous.slice(0, historyIndex + 1);
-            trimmed.push({ filters: nextFilters, intensity: nextIntensity, lookId: nextLookId });
+            trimmed.push({ filters: nextFilters, intensity: nextIntensity, presetId: nextPresetId });
             if (trimmed.length > HISTORY_LIMIT) trimmed.shift();
             setHistoryIndex(Math.min(HISTORY_LIMIT - 1, trimmed.length - 1));
             return trimmed;
         });
     }, [historyIndex]);
 
-    const commit = useCallback((nextFilters, nextIntensity, nextLookId, message = null) => {
+    const commit = useCallback((nextFilters, nextIntensity, nextPresetId, message = null) => {
         setFilters(nextFilters);
         setIntensity(nextIntensity);
-        setActiveLookId(nextLookId);
+        setActivePresetId(nextPresetId);
         if (message !== null) setAutoMessage(message);
-        pushHistory(nextFilters, nextIntensity, nextLookId);
+        pushHistory(nextFilters, nextIntensity, nextPresetId);
     }, [pushHistory]);
 
     const restore = useCallback((entry) => {
@@ -238,7 +287,7 @@ export default function useVisionEditor() {
         isRestoringRef.current = true;
         setFilters(entry.filters);
         setIntensity(entry.intensity);
-        setActiveLookId(entry.lookId);
+        setActivePresetId(entry.presetId);
         setTimeout(() => { isRestoringRef.current = false; }, 50);
     }, []);
 
@@ -258,31 +307,40 @@ export default function useVisionEditor() {
 
     /* ---- Actions ---- */
 
+    /* « Améliorer ma photo » corrige la lumiere et le relief; le preset, lui,
+       porte le look. Les deux se cumulent, donc on garde le preset en place. */
     const autoEnhance = useCallback(() => {
         if (!metrics) return;
         const enhancement = buildAutoEnhancement(metrics);
-        commit(enhancement.filters, 80, null, enhancement.message);
-    }, [metrics, commit]);
+        commit(enhancement.filters, 80, activePresetId, enhancement.message);
+    }, [metrics, commit, activePresetId]);
 
-    const applyLook = useCallback((look) => {
-        if (!look) return;
-        const base = {
-            ...DEFAULT_FILTERS,
-            ...look.filters,
-            safeSmartphone: filters.safeSmartphone !== false,
-        };
-        /* Bornes absolues du moteur PUIS garde-fou lie a cette photo. */
-        const nextFilters = guardLookForImage(normalizeVisionFilters(base), signals || {}, metrics || {});
-        commit(nextFilters, look.recommendedIntensity || 80, look.id, `Look « ${look.label} » — ${look.bestFor}.`);
-    }, [commit, filters.safeSmartphone, signals, metrics]);
+    /*
+     * Appliquer un preset ne touche PAS aux reglages manuels: le preset est une
+     * LUT posee avant eux dans le pipeline. Recliquer sur le preset actif le
+     * retire, ce qui donne une comparaison immediate avec la photo d'origine.
+     */
+    const applyPreset = useCallback((preset) => {
+        if (!preset) return;
+        if (preset.id === activePresetId) {
+            commit(filters, intensity, null, 'Preset retiré — tu vois la photo sans le look.');
+            return;
+        }
+        commit(
+            filters,
+            preset.recommendedIntensity || 85,
+            preset.id,
+            `Preset « ${preset.label} » — ${preset.bestFor}.`,
+        );
+    }, [commit, activePresetId, filters, intensity]);
 
     const updateFilter = useCallback((key, value) => {
         setFilters((current) => {
             const next = { ...current, [key]: value };
-            pushHistory(next, intensity, activeLookId);
+            pushHistory(next, intensity, activePresetId);
             return next;
         });
-    }, [pushHistory, intensity, activeLookId]);
+    }, [pushHistory, intensity, activePresetId]);
 
     const resetFilters = useCallback(() => {
         commit({ ...DEFAULT_FILTERS }, 80, null, null);
@@ -299,7 +357,7 @@ export default function useVisionEditor() {
             persistTimer.current = null;
             try {
                 const patch = {
-                    vision: { profileId: activeLookId, intensity, filters },
+                    vision: { presetId: activePresetId, intensity, filters },
                 };
                 /* Photo importee directement depuis Vision: elle rejoint le
                    projet (Blob), pour que Layout et l'accueil la retrouvent.
@@ -312,6 +370,21 @@ export default function useVisionEditor() {
                     }
                 }
                 updateProject(patch);
+
+                /* La photo vient de la bibliotheque (identifiant `ph-...`): on y
+                   reporte le preset applique, pour pouvoir ensuite filtrer la
+                   grille par preset sans rouvrir chaque photo. */
+                const record = (project.images || [])[0];
+                if (record?.id?.startsWith('ph-')) {
+                    const stored = await getLibraryPhoto(record.id);
+                    if (stored) {
+                        const preset = VISION_PRESETS.find((item) => item.id === activePresetId);
+                        await putLibraryPhoto({
+                            ...stored,
+                            preset: preset ? { id: preset.id, label: preset.label } : null,
+                        });
+                    }
+                }
             } catch {
                 /* Sauvegarde non bloquante. */
             }
@@ -320,18 +393,18 @@ export default function useVisionEditor() {
             if (persistTimer.current) clearTimeout(persistTimer.current);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters, intensity, activeLookId, image]);
+    }, [filters, intensity, activePresetId, image]);
 
     return {
         image, images, metrics, signals, sourceKind,
         filters, appliedFilters, setFilters: updateFilter,
         intensity, setIntensity,
-        looks, previews, activeLookId,
+        presets, previews, activePresetId,
         autoMessage,
         isLoadingImage,
         canvasRef,
-        handleImageUpload,
-        autoEnhance, applyLook, resetFilters,
+        handleImageUpload, detachComposition, clearImage,
+        autoEnhance, applyPreset, resetFilters,
         undo, redo,
         canUndo: historyIndex > 0,
         canRedo: historyIndex < history.length - 1,

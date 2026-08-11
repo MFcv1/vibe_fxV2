@@ -50,7 +50,7 @@ export function createEmptyProject(overrides = {}) {
            { blob (PNG pleine resolution), width, height, updatedAt }. C'est
            l'entree du pipeline pour Vision et Studio (plan §4.3). */
         composition: null,
-        vision: { profileId: null, intensity: 80, filters: null },
+        vision: { presetId: null, intensity: 80, filters: null },
         studio: { presetRef: null, filters: null, variants: [] },
         soundtrackTrackId: null,
         /* Vignette 256px (dataURL) pour l'accueil - ecrite par les pages d'edition. */

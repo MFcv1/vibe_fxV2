@@ -2,6 +2,10 @@ const IDENTITY_CURVE = [0, 64, 128, 192, 255];
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 export const VISION_SUPPORTED_FILTER_KEYS = [
+    /* Identifiant du preset applique en LUT 3D (voir `visionPresets.js`).
+       Ce n'est pas un reglage borne comme les autres: c'est une reference vers
+       une transformation compilee, appliquee AVANT les reglages manuels. */
+    'presetId',
     'brightness',
     'contrast',
     'saturation',

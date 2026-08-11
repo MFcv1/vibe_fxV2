@@ -189,6 +189,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- creer/                      # Surface VibeOS (redesign en side-build, phase A). Toutes les pages noindex, derriere StudioAuthGate
 |   |   |   |-- layout.js               # Charge vibeos.css (seule feuille de style), monte StudioAuthGate + VibeOsShell (providers projet/audio/toasts)
 |   |   |   |-- page.js                 # Accueil incubateur (HomeScreen)
+|   |   |   |-- bibliotheque/page.js    # Photothèque VibeOS : monte `features/vibeos/library/LibraryScreen` (grille masonry, carrousel)
 |   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
 |   |   |   |-- studio/page.js          # Espace Studio : monte `features/vibeos/studio/StudioScreen`
 |   |   |   |-- vision/page.js          # Espace Vision : monte `features/vibeos/vision/VisionScreen`
@@ -369,8 +370,17 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- audio/
 |   |   |   `-- AudioProvider.jsx       # Audio global ET moteur de lecture de VibeOS (phase E) : l'element <audio> vit dans le layout /creer et survit aux navigations, plus la file, l'aleatoire, le volume, l'enchainement automatique en fin de piste et un resolveur de source qui redemande le Blob et fabrique sa PROPRE URL d'objet (celles de useLocalSoundtrackLibrary sont revoquees au demontage)
 |   |   |-- home/
-|   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant, 5 cartes d'espaces (Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
+|   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant + « Nouvel espace vierge », 6 cartes d'espaces (Bibliothèque/Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
+|   |   |-- library/                    # Photothèque VibeOS (2026-08-11) : les photos importees vivent ici et ne sont jamais reimportees
+|   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` (store photos, index addedAt + exif.device), separee de la base des projets : supprimer un projet ne doit pas effacer les photos
+|   |   |   |-- exif.js                 # Lecteur EXIF maison, sans dependance : APP1 JPEG / TIFF, marque, modele, objectif, ISO, ouverture, vitesse, focale, orientation, date de prise de vue. Ne lit que les 128 premiers Ko et ne rejette jamais
+|   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 720px stockee une fois pour toutes, EXIF, dimensions. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari)
+|   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
+|   |   |   |-- useLibrary.js           # Etat de la photothèque : chargement, import sequentiel avec progression, suppression, filtres appareil/look/recherche, tris, cache des URLs d'objet
+|   |   |   |-- LibraryScreen.jsx       # Barre d'outils (recherche, appareils EXIF, looks, tri, densite − ▦ +, Importer), grille masonry positionnee en transform, puces appareil/look au survol, selection multiple, depot de fichiers. La largeur de la grille est mesuree par un ref de rappel (la grille n'existe pas quand la bibliotheque est vide : un effet ne se rejouerait pas a son apparition)
+|   |   |   |-- Lightbox.jsx            # Carrousel plein ecran : zoom partage FLIP depuis la tuile, vignette affichee avant la pleine resolution, rail de 3 diapositives, glissement au doigt, frise, clavier
+|   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
 |   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
 |   |   |   |-- layoutPersistence.js    # Traduction etat editeur <-> projet VibeOS : images/textures/Lumen en **Blobs** (jamais des dataURL), zones custom, slots, textes, stickers, fond ; restauration en elements Image
@@ -397,7 +407,9 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
 |   |   |   |-- PublishButton.jsx       # « Publier » (phase F) : rend le projet via le pipeline, depose le resultat dans publishHandoff, ouvre /publier ; desactive tant qu'il n'y a ni composition ni photo
 |   |   |   `-- shell.module.css
-|   |   |-- shared/                     # Sheets de fonds generes partages entre Layout et Studio (sortis de layout/ a la phase D)
+|   |   |-- shared/                     # Composants partages entre ecrans (sheets de fonds generes sortis de layout/ a la phase D, avant/apres ajoute le 2026-08-11)
+|   |   |   |-- BeforeAfter.jsx         # Avant/apres reel : l'original superpose au rendu et revele par `clip-path` (rien n'est demonte, donc aucun clignotement), 3 modes (rideau deplacable souris/doigt/fleches, cote a cote, maintien), position ecrite directement sur le noeud DOM pendant le geste. Le cadre porte le **rapport de la photo** (prop `ratio` -> `aspect-ratio`) : sans lui, une photo verticale s'etalait sur toute la largeur de la scene
+|   |   |   |-- beforeAfter.module.css
 |   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS (meshPreviewStyle exporte) ; rendu final par renderLayoutMeshBackground (moteur existant)
 |   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
 |   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
@@ -416,13 +428,15 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- StudioScreen.jsx        # Tuiles d'ambiances rendues sur la vraie image, intensite, Surprends-moi, variantes, fond genere (Mesh/Lumen en Sheet partage), avances (garde-fous, recadrage, filtres manuels, teinte, styles perso), sheet d'export
 |   |   |   `-- studio.module.css
 |   |   |-- vision/                     # Ecran Vision reel (phase C) - science des couleurs existante importee, jamais reecrite
-|   |   |   |-- useVisionEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue vision-pro), export, mesure de l'image (visionMetrics), tri des looks (scoreProfileForImage), vignettes en file d'attente, historique 30 etats, lien avec le projet commun
-|   |   |   |-- visionLooks.js          # Les 12 looks du premier niveau : pointeurs vers de vrais profils CAMERA_BRANDS, resolus par buildVisionProfileModel, renommes en francais + bibliotheque complete par marque pour les avances
-|   |   |   |-- autoEnhance.js          # « Ameliorer ma photo » : correction deduite des mesures + phrase humaine, et garde-fou par image (guardLookForImage) qui empeche un look de fermer une photo de nuit
-|   |   |   |-- VisionScreen.jsx        # Bouton Ameliorer, intensite 0-100, 12 looks tries avec badges « Conseille » et raisons, comparer (maintien = original), avances (lumiere/couleur/matiere, garde-fous, bibliotheque par marque), sheet d'export
+|   |   |   |-- useVisionEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue vision-pro), export, mesure de l'image (visionMetrics), vignettes de presets, historique 30 etats, lien avec le projet commun. Importer une photo EFFACE la composition du projet (sinon elle restait prioritaire et revenait au rechargement), `detachComposition` revient a la photo brute, et le preset applique est reporte sur la fiche de la photothèque
+|   |   |   |-- presetPreview.js        # Vignettes des presets : la photo est reduite UNE fois dans un canvas partage, puis chaque vignette n'est qu'une passe LUT (avant : un drawImage pleine resolution + 4 passes pixel + un encodage JPEG PAR vignette, cause directe des saccades)
+|   |   |   |-- autoEnhance.js          # « Ameliorer ma photo » : correction deduite des mesures + phrase humaine. Se cumule au preset, qui porte le look
+|   |   |   |-- VisionScreen.jsx        # Bouton Ameliorer, intensite 0-100, grille de presets (second clic = retrait, comparaison immediate), avant/apres reel (shared/BeforeAfter : rideau / cote a cote / maintien), « Changer de photo » et « Quitter la composition » toujours accessibles, avances (lumiere/couleur/matiere, garde-fous), sheet d'export
 |   |   |   `-- vision.module.css
 |   |   `-- styles/
 |   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
+|   |   |   |-- lut3d.js                # Moteur LUT 3D : buildLut3d evalue une fonction de preset sur une grille 33^3, applyLut3d l'applique par interpolation trilineaire en UNE passe. Cout de rendu constant : ajouter un preset ne coute rien
+|   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l'ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). Preset `powlisher` reconstruit par mesure sur 19 photos, cf docs/audit-preset-powlisher-2026-08-11.md
 |   |-- vibefx-shared/
 |   |   `-- utils/
 |   |       `-- smoothBlur.js           # Moteur partage du Flou lisse pro : normalisation, looks rapides, random safe, reset clean, courbes, masques preview et rendu canvas
@@ -734,6 +748,84 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
   ne lit que pour la zone qu'on touche. C'est un choix de **contexte** : un
   agent qui reprend le chantier ne doit pas avaler 350 lignes d'historique
   avant d'ecrire sa premiere ligne de code.
+
+## Journal — 2026-08-11 (photothèque VibeOS, vrai avant/apres, image bloquee)
+
+- **L'image qu'on ne pouvait plus enlever : cause trouvee.** Vision (et Studio)
+  prennent leur source dans `resolveProjectSource`, qui donne **la composition
+  du Layout en priorite** sur la photo du projet. Importer une autre photo dans
+  Vision ne changeait que l'etat local de l'ecran : au rechargement, la
+  composition stockee en IndexedDB reprenait la main. Trois sorties ajoutees,
+  aucune magie : `handleImageUpload` efface desormais la composition et remplace
+  vraiment l'image du projet ; `detachComposition` (« Quitter la composition »)
+  revient a la photo brute ; et l'accueil a un bouton « Nouvel espace vierge ».
+
+- **Nouvel ecran `/creer/bibliotheque`** (`src/features/vibeos/library/`) : les
+  photos importees sont stockees une fois pour toutes dans une base IndexedDB
+  **separee** (`vibeos-library`), avec leur vignette WebP et leur EXIF. On ne
+  reimporte plus une photo pour la retoucher : « Retoucher » ouvre un **nouvel
+  espace** monte sur cette photo, ce qui evite d'ecraser une composition en
+  cours.
+
+- **Vraie masonry, pas des colonnes CSS.** `column-count` remplit la premiere
+  colonne avant la suivante : l'ordre chronologique se lirait de haut en bas,
+  colonne par colonne. `masonry.js` place donc chaque photo dans la colonne la
+  plus courte en gardant l'ordre de la liste, et rend des rectangles absolus.
+  Les tuiles sont posees en `transform`, donc changer la densite les fait
+  **glisser** au lieu de reconstruire la grille.
+
+- **Indexation EXIF maison, zero dependance** (`exif.js`, ~200 lignes) : on ne
+  lit que les 128 premiers Ko du fichier (l'APP1 y tient largement) et on n'en
+  sort que huit champs. Verifie sur les vraies photos : « Samsung Galaxy S24
+  Ultra », « Canon EOS 200D », focale/ouverture/vitesse/ISO/date. Un fichier
+  sans EXIF n'echoue jamais, il retombe sur la date du fichier.
+
+- **HEIC : dit honnetement.** Chromium ne sait pas les decoder ; l'import les
+  compte comme « illisibles par ce navigateur » au lieu d'echouer en silence
+  (Safari, lui, les accepte).
+
+- **Carrousel** (`Lightbox.jsx`) : zoom partage FLIP depuis la tuile cliquee
+  (l'animation porte sur le cadre au rapport de la photo, donc aucune
+  deformation), vignette deja decodee affichee au premier trait puis fondu vers
+  la pleine resolution, rail de trois diapositives, glissement au doigt ecrit
+  directement sur le DOM, fermeture par glissement vertical, frise, clavier.
+
+- **Avant/apres refait** (`shared/BeforeAfter.jsx`). L'ancien bouton « maintiens
+  le clic » avait trois defauts structurels : il perdait l'appui des que le
+  curseur sortait du bouton, il faisait `display: none` sur le canvas (donc un
+  saut de mise en page a chaque appui), et il ne comparait qu'en tout-ou-rien.
+  L'original est maintenant superpose au rendu et revele par `clip-path` : rien
+  n'est demonte. Trois modes (rideau, cote a cote, maintien), position ecrite
+  sur le noeud pendant le geste, relachement global sur `blur` pour ne jamais
+  rester bloque.
+
+- **Trois bugs attrapes en verifiant** :
+  1. en mode « cote a cote », l'original occupait tout le cadre — un element
+     flex refuse de passer sous la largeur intrinseque de son contenu sans
+     `min-width: 0`, et une photo de 6000 px poussait l'autre moitie hors ecran ;
+  2. sur une photo **verticale**, la comparaison etalait l'image sur toute la
+     largeur (elle avait l'air « passee en paysage »). En sortant le canvas de
+     `canvasWrap` pour l'envelopper, son `max-height: 100%` ne resolvait plus
+     contre une hauteur definie. Le cadre porte maintenant le **rapport de la
+     photo** (`aspect-ratio`, variable `--ba-ratio`) : il epouse l'image et
+     reste borne par la scene ;
+  3. la barre d'actions de l'apercu etait posee en absolu **par-dessus** la
+     photo : sur un portrait, elle tombait en plein milieu. La scene est
+     devenue une colonne — barre d'actions sur sa propre ligne, puis la photo ;
+  4. dans la bibliotheque, la largeur de la grille etait mesuree par un effet,
+     alors que la grille **n'existe pas** tant qu'aucune photo n'est importee :
+     l'observateur ne se rattachait donc jamais apres le premier import et la
+     masonry restait calee sur une largeur perimee. La mesure passe maintenant
+     par un ref de rappel, declenche au moment exact ou la grille apparait.
+
+- **« Retirer » (à côté de « Changer de photo »)** : vide l'apercu et l'espace de
+  travail sans toucher a la bibliotheque. C'est une deselection, pas une
+  suppression.
+
+- **Gates** : `npm run lint` (0 erreur), `npm run build`, `npm run
+  test:vibeos-library` (nouveau : EXIF + masonry en Node, puis parcours complet
+  au navigateur), `test:vibeos-vision`, `test:vibeos-pipeline`,
+  `test:vibeos-layout`, `test:vibeos-studio`, `test:routes`, `test:scope`.
 
 ## Journal — 2026-08-08 (VibeOS phase D — l'ecran Studio reel)
 
@@ -1703,3 +1795,5 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - Mise a jour 2026-07-31 (audit d'usage du montage avance) : le porteur du projet a essaye `/video/avance` et n'a pas trouve comment poser une transition, en constatant par ailleurs que « la colorimetrie ne se voit pas sur l'apercu ». Un audit pilote au navigateur — on importe, on clique, et surtout on MESURE les pixels du canvas au lieu de croire le code — a confirme les deux et en a trouve trois autres. Les 24 tests de la phase 4 passaient pourtant : ils verifiaient que chaque action ECRIT dans le modele, jamais qu'elle SE VOIT. Cinq correctifs. (1) `advanced/Inspector.jsx` gagne une section « Transition vers le plan N+1 » qui appelle la meme action `applyTransition` que le montage rapide : les 15 transitions exportables d'abord, les autres sous un intertitre « Apercu uniquement », plus la duree, le retour a la coupe franche et « Appliquer a toutes les coupes » ; aucune section sur le dernier plan, qui n'a pas de suivant. Jusqu'ici la piste Transitions restait vide a vie alors que l'accueil promet des transitions. (2) `adapters/useTimeline.js` : `selectItem(item, { seek: true })` amene la tete de lecture DANS l'element choisi quand elle n'y est pas deja — mesure a l'appui, on reglait la colorimetrie du plan 3 pendant que l'apercu montrait le plan 1, et la bibliotheque de medias deplacait deja le curseur alors que la timeline non, donc les deux chemins se contredisaient. (3) le meme `selectItem` traite le type `effect`, qu'il ne connaissait pas et qui mettait TOUTES les selections a `null` : un element « Colorimetrie du clip N » renvoie desormais vers son clip au lieu de vider l'inspecteur. (4) `advanced.module.css` : un `input[type=range]:disabled` se voit desormais desactive (opacite 0,4, `cursor: not-allowed`), le curseur d'intensite du mouvement s'affichant jusqu'ici plein et a 100 % sans repondre. (5) la timeline passe de `height: 322px` en dur a `clamp(232px, 42dvh, 322px)` : sur une fenetre de 720 px l'apercu tombait a ~250 px. L'audit a aussi ECARTE des soupcons, pour ne pas corriger ce qui marche : la colorimetrie est bien rendue par l'apercu (saturation 0 -> saturation mesuree 0,995 puis 0 ; exposition +100 -> 63/255 d'ecart), la rotation aussi (218/255), il n'y a AUCUNE boucle de rendu au repos (0 dessin en 3 s apres edition, mesure en instrumentant `drawImage`) et zero erreur console sur tout le parcours. `scripts/smoke-vibecut-advanced-v2.spec.cjs` gagne 3 tests (14 au total) qui ancrent le VISIBLE et non l'ecrit : la tete de lecture entre dans l'element choisi et n'y resaute pas au second clic, la piste Effets renvoie vers son clip, une transition se pose / se dose / s'applique partout / se retire, et le dernier plan n'en propose pas. `npm run test:vibecut-ui-v2` passe de 24 a 27 tests navigateur. Reste ouvert et documente : le texte est petit en portrait parce que l'echelle vaut `fontSize x largeur/1920` des DEUX cotes (`render-service/src/server.js:593`) — la parite est intacte, la corriger demande de changer les deux cotes et de relancer la parite, c'est un lot a part. Aucun deploiement.
 
 - Mise a jour 2026-07-31 (Timeline V2 du montage avance) : apres essai reel, le porteur du projet signale des « chevauchements pas terrible » en posant des transitions, et un panneau de droite ou « on ne sait pas qui est quoi ». Diagnostic mesure sur ses captures : trois photos de 4,00 s, un fondu de 1,41 s, total 10,59 s (= 12 - 1,41), donc le modele applique bien la vraie convention de montage (`cursor += duree - overlap`, timelineModel.js:223) et fait se CHEVAUCHER les deux plans. L'ancienne vue dessinait chaque element en absolu avec un fond opaque : le plan 2 recouvrait la queue du plan 1, qui se lisait 2,6 s a l'ecran pendant que l'inspecteur annoncait 4,00 s. Le modele avait raison, c'est l'affichage qui mentait. Audit des conventions de DaVinci Resolve et Premiere Pro : une transition se dessine SUR la piste video a cheval sur la coupe et jamais sur une piste separee, la colorimetrie est un attribut du plan signale par un badge, le son d'un plan est attache au plan, et l'inspecteur est organise par nature de selection. Refonte livree : `adapters/useTimeline.js` gagne `buildDisplayLanes`, une projection d'AFFICHAGE qui replie les sept pistes du modele en QUATRE rangees reelles (Video, Texte, Musique, et Volets seulement s'il porte quelque chose) ; `timelineModel.js` n'est PAS modifie, il reste le contrat d'export et l'ancien front s'en sert jusqu'a la phase 7. `advanced/TimelineView.jsx` est reecrit : les plans sont poses jointifs au MILIEU de leur transition (la largeur dessinee redevient vraie), la pastille de transition chevauche la jointure et ses deux bords sont des poignees qui changent la duree, la colorimetrie / le mouvement / la vitesse / le volume deviennent des badges sur le plan qui selectionnent le plan ET ouvrent leur section d'inspecteur, et le son d'un plan devient une forme d'onde attachee sous le plan. Les trois pistes repliees gardent leurs commandes dans la barre d'outils (masquer les transitions, contourner la colorimetrie, couper le son des plans) : un bouton mort serait interdit. Plafond d'une transition a 45 % du plus court des deux plans via `getMaxTransitionDuration`, qui REUTILISE `MAX_TRANSITION_SHARE` de `data/styleRecipes.js` — une seule regle dans tout le produit, et `audit-scope.mjs` refuse une copie ; auparavant `resolveCutTransitionOverlap` acceptait jusqu'a 100 %, une transition pouvait devorer un plan entier. `advanced/Inspector.jsx` : l'en-tete nomme la NATURE de la selection (« Plan video », « Transition », « Texte », « Musique ») avant son nom, l'ordre des sections est fixe (Mouvement, Transformation, Vitesse, Colorimetrie, Transition, Son du plan), chaque section porte un sous-titre d'une ligne, « Transition vers le plan 2 » devient « Transition » avec la mention « S'applique a la coupe entre ce plan et le plan N », et une transition selectionnee ouvre le MEME panneau que depuis le plan — un seul chemin d'ecriture, `sceneActions.applyTransition`. Quatre bugs trouves en chemin : `fromItemId` vit dans `item.params` et non a la racine, donc la pastille ne s'affichait pas du tout (trouve par le test, pas par la relecture) ; une photo affichait un badge « son » et une forme d'onde alors qu'une photo n'a pas de son (vu a l'ecran) ; `setPointerCapture` leve si le pointeur n'est plus actif et une exception dans un handler `pointerdown` interrompt l'interaction entiere (capture et liberation passent par un helper defensif) ; masquer une piste repliee ne la masquait pas, la bascule aurait ete un bouton mort. Mesures apres coup : plan de 4 s dessine 4,00 s (352 px a 88 px/s), poser un fondu retire 3 % de largeur au lieu de 35 %, plafond effectif 1,80 s sur des plans de 4 s, apercu passe de 35 % a 45 % de la hauteur de fenetre, zero erreur console. `scripts/smoke-vibecut-advanced-v2.spec.cjs` passe a 15 tests et `npm run test:vibecut-ui-v2` de 27 a 28 tests navigateur ; les quatre tests qui decrivaient les sept rangees ont ete REECRITS a couverture egale, pas supprimes. Aucun deploiement.
+
+- Mise a jour 2026-08-11 (presets Vision, remplacement des 12 looks) : les 12 « looks » et la bibliotheque de profils par marque sont supprimes (`visionLooks.js`, le Sheet « Bibliotheque de profils », le tri `scoreProfileForImage` cote Vision, `guardLookForImage` devenu mort). A la place, Vision expose des presets compiles en LUT 3D. Le premier, `powlisher`, est une reconstruction MESUREE du rendu de @powl_d : 19 photos recuperees en resolution d'origine via l'API de syndication X, plus 50 frames extraites d'une video ou il montre ses reglages Lightroom (Contraste -50, Hautes lumieres -30, HDR et corrections d'objectif desactives, pastilles sur Lumiere/Couleur/Effets/Detail). Mesures cles : le bleu descend quand la luminance monte (B-G 0 -> -12/255), les tons moyens virent olive (R-G ~ -5), le ciel atterrit a 178-194 deg (cyan, jamais bleu), le feuillage tombe a 85-105 deg avec S <= 0.35, la peau est preservee (27-36 deg), le point blanc reste sous 255 et les noirs restent denses (aucun matte). Ni grain ni vignetage systematiques (mesures a l'appui). Nouveaux fichiers : `utils/lut3d.js`, `utils/visionPresets.js`, `vision/presetPreview.js`, `scripts/smoke-vision-preset.mjs` (20 verifications rejouant les cibles de l'audit). Perf : le smoke navigateur Vision passe en 6,9 s. Bug trouve et corrige en route : `applyVisionStage` (project/pipeline.js) jugeait l'etage Vision « neutre » et le SAUTAIT, parce qu'un preset est une LUT qui ne modifie aucune cle de `filters` — le preset ne descendait donc ni jusqu'au Studio ni jusqu'a l'export. L'etage teste desormais `vision.presetId` separement. Correction au passage d'un echec PREEXISTANT : `scripts/audit-vision-filters.mjs` plantait depuis le commit ee19c8c car il lisait `VisionPanel.jsx` et `VibeFxStudio.jsx`, supprimes avec l'ancienne interface /studio.

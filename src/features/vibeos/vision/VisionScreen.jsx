@@ -2,15 +2,16 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import {
-    Columns2, Download, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
+    Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
     Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider,
 } from '../primitives';
+import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import PipelineSourceNote from '../project/PipelineSourceNote';
 import useVisionEditor from './useVisionEditor';
 import { describeSignals } from './autoEnhance';
-import { VISION_BRAND_LIBRARY } from './visionLooks';
 import styles from './vision.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
@@ -60,17 +61,18 @@ export default function VisionScreen() {
         image, metrics, signals, sourceKind,
         filters, setFilters,
         intensity, setIntensity,
-        looks, previews, activeLookId,
+        presets, previews, activePresetId,
         autoMessage, isLoadingImage,
-        canvasRef, handleImageUpload,
-        autoEnhance, applyLook, resetFilters,
+        canvasRef, handleImageUpload, detachComposition, clearImage,
+        autoEnhance, applyPreset, resetFilters,
         undo, redo, canUndo, canRedo,
         exportController,
     } = editor;
 
+    /* Comparaison: elle reste allumee tant qu'on ne l'eteint pas, et le mode
+       choisi (rideau / cote a cote / maintien) est un reglage a part entiere. */
     const [isComparing, setIsComparing] = useState(false);
-    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-    const [libraryBrandId, setLibraryBrandId] = useState(VISION_BRAND_LIBRARY[0]?.id || null);
+    const [compareMode, setCompareMode] = useState('slider');
     const importRef = useRef(null);
 
     const {
@@ -80,15 +82,7 @@ export default function VisionScreen() {
     } = exportController;
 
     const signalTags = useMemo(() => (signals ? describeSignals(signals) : []), [signals]);
-    const libraryBrand = VISION_BRAND_LIBRARY.find((brand) => brand.id === libraryBrandId);
     const safeSmartphone = filters.safeSmartphone !== false;
-
-    const compareHandlers = {
-        onPointerDown: () => setIsComparing(true),
-        onPointerUp: () => setIsComparing(false),
-        onPointerLeave: () => setIsComparing(false),
-        onPointerCancel: () => setIsComparing(false),
-    };
 
     return (
         <div className={styles.screen} data-testid="vibeos-vision-screen">
@@ -97,6 +91,17 @@ export default function VisionScreen() {
                 {image ? (
                     <>
                         <div className={styles.stageActions}>
+                            {/* Les modes vivent sur la meme ligne que les autres
+                                actions de l'apercu, a gauche des fleches. */}
+                            {isComparing ? (
+                                <Segmented
+                                    label="Mode de comparaison"
+                                    value={compareMode}
+                                    onChange={setCompareMode}
+                                    options={COMPARE_MODES}
+                                    className={styles.compareModes}
+                                />
+                            ) : null}
                             <IconButton label="Annuler" disabled={!canUndo} onClick={undo}>
                                 <Undo2 size={15} />
                             </IconButton>
@@ -104,26 +109,35 @@ export default function VisionScreen() {
                                 <Redo2 size={15} />
                             </IconButton>
                             <IconButton
-                                label="Comparer avec l'original (maintiens le clic)"
+                                label={isComparing ? 'Masquer la comparaison' : "Comparer avec l'original"}
                                 active={isComparing}
-                                {...compareHandlers}
+                                onClick={() => setIsComparing((current) => !current)}
+                                data-testid="vibeos-vision-compare-toggle"
                             >
                                 <Columns2 size={15} />
+                            </IconButton>
+                            <IconButton
+                                label="Changer de photo"
+                                onClick={() => importRef.current?.click()}
+                                data-testid="vibeos-vision-change-photo"
+                            >
+                                <ImagePlus size={15} />
                             </IconButton>
                             <Button variant="primary" size="sm" icon={<Download size={13} />} onClick={handleDownload}>
                                 Exporter
                             </Button>
                         </div>
+
                         <div className={styles.canvasWrap}>
-                            <canvas ref={canvasRef} className={cx(styles.canvas, isComparing && styles.canvasHidden)} />
-                            {isComparing ? (
-                                <img
-                                    src={image.src}
-                                    alt="Photo d'origine"
-                                    className={styles.compareImage}
-                                    data-testid="vibeos-vision-compare"
-                                />
-                            ) : null}
+                            <BeforeAfter
+                                beforeSrc={image.src}
+                                ratio={(image.naturalWidth || image.width) / (image.naturalHeight || image.height)}
+                                mode={compareMode}
+                                active={isComparing}
+                                testId="vibeos-vision-compare"
+                            >
+                                <canvas ref={canvasRef} className={styles.canvas} />
+                            </BeforeAfter>
                         </div>
                     </>
                 ) : (
@@ -133,14 +147,25 @@ export default function VisionScreen() {
                             Importe une photo de téléphone : Vision l&apos;analyse et te propose
                             des améliorations qui ne la cassent jamais.
                         </p>
-                        <Button
-                            variant="primary"
-                            size="lg"
-                            icon={<Upload size={15} />}
-                            onClick={() => importRef.current?.click()}
-                        >
-                            Importer une photo
-                        </Button>
+                        <div className={styles.emptyActions}>
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                icon={<Upload size={15} />}
+                                onClick={() => importRef.current?.click()}
+                            >
+                                Importer une photo
+                            </Button>
+                            <Button
+                                as={Link}
+                                href="/creer/bibliotheque"
+                                variant="secondary"
+                                size="lg"
+                                icon={<Images size={15} />}
+                            >
+                                Ouvrir la bibliothèque
+                            </Button>
+                        </div>
                     </div>
                 )}
             </section>
@@ -162,6 +187,44 @@ export default function VisionScreen() {
                         stage="vision"
                         testId="vibeos-vision-source"
                     />
+                    {/* Sortie de secours: la composition Layout est prioritaire sur
+                        la photo, donc sans ce bouton on ne pouvait plus revenir a
+                        une simple photo une fois une composition publiee. */}
+                    {image ? (
+                        <div className={styles.sourceActions}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<ImagePlus size={13} />}
+                                onClick={() => importRef.current?.click()}
+                            >
+                                Changer de photo
+                            </Button>
+                            {/* Deselection, pas suppression: la photo reste dans
+                                la bibliotheque, on vide juste l'apercu. */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<ImageOff size={13} />}
+                                onClick={clearImage}
+                                title="Vide l'aperçu — la photo reste dans ta bibliothèque"
+                                data-testid="vibeos-vision-clear"
+                            >
+                                Retirer
+                            </Button>
+                            {sourceKind === 'composition' ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={<RotateCcw size={13} />}
+                                    onClick={detachComposition}
+                                    data-testid="vibeos-vision-detach"
+                                >
+                                    Quitter la composition
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <Button
                         variant="primary"
                         size="lg"
@@ -197,37 +260,34 @@ export default function VisionScreen() {
                     />
                 </section>
 
-                {/* Looks */}
+                {/* Presets */}
                 <section className={styles.block}>
                     <div className={styles.blockHead}>
-                        <h3 className={styles.blockTitle}>Looks</h3>
-                        <span className={styles.blockHint}>{looks.length} choisis pour cette photo</span>
+                        <h3 className={styles.blockTitle}>Presets</h3>
+                        <span className={styles.blockHint}>
+                            {activePresetId ? 'Reclique pour comparer' : 'Le look de base'}
+                        </span>
                     </div>
-                    <div className={styles.lookGrid} data-testid="vibeos-vision-looks">
-                        {looks.map((look, index) => (
+                    <div className={styles.lookGrid} data-testid="vibeos-vision-presets">
+                        {presets.map((preset) => (
                             <button
-                                key={look.id}
+                                key={preset.id}
                                 type="button"
                                 className={cx(
                                     styles.lookCard,
-                                    look.id === activeLookId && styles.lookCardActive,
-                                    look.discouraged && styles.lookCardMuted,
+                                    preset.id === activePresetId && styles.lookCardActive,
                                 )}
-                                onClick={() => applyLook(look)}
-                                title={look.discouraged ? `Peu adapté : ${look.avoidFor}` : look.reason}
+                                onClick={() => applyPreset(preset)}
+                                title={preset.description}
+                                aria-pressed={preset.id === activePresetId}
                             >
                                 <span className={styles.lookThumb}>
-                                    {previews[look.id]
-                                        ? <img src={previews[look.id]} alt="" />
+                                    {previews[preset.id]
+                                        ? <img src={previews[preset.id]} alt="" />
                                         : <span className={styles.lookThumbEmpty} />}
                                 </span>
-                                <span className={styles.lookLabel}>{look.label}</span>
-                                <span className={styles.lookHint}>
-                                    {look.discouraged ? `Peu adapté : ${look.avoidFor}` : look.reason}
-                                </span>
-                                {!look.discouraged && index < 2 && signals ? (
-                                    <span className={styles.lookBadge}>Conseillé</span>
-                                ) : null}
+                                <span className={styles.lookLabel}>{preset.label}</span>
+                                <span className={styles.lookHint}>{preset.hint}</span>
                             </button>
                         ))}
                     </div>
@@ -275,13 +335,6 @@ export default function VisionScreen() {
                     ))}
 
                     <section className={styles.block}>
-                        <h3 className={styles.blockTitle}>Bibliothèque complète</h3>
-                        <p className={styles.blockHint}>
-                            Tous les profils par marque, avec ce pour quoi ils sont faits — et ce qu&apos;ils abîment.
-                        </p>
-                        <Button variant="secondary" block onClick={() => setIsLibraryOpen(true)}>
-                            Parcourir par marque
-                        </Button>
                         <Button variant="ghost" size="sm" icon={<RotateCcw size={13} />} onClick={resetFilters}>
                             Tout remettre à zéro
                         </Button>
@@ -290,46 +343,6 @@ export default function VisionScreen() {
             </aside>
 
             {/* ---------- Sheets ---------- */}
-            <Sheet
-                open={isLibraryOpen}
-                onClose={() => setIsLibraryOpen(false)}
-                title="Bibliothèque de profils"
-                wide
-            >
-                <div className={styles.libraryBrowser}>
-                    <div className={styles.brandList}>
-                        {VISION_BRAND_LIBRARY.map((brand) => (
-                            <button
-                                key={brand.id}
-                                type="button"
-                                className={cx(styles.brandRow, brand.id === libraryBrandId && styles.brandRowActive)}
-                                onClick={() => setLibraryBrandId(brand.id)}
-                            >
-                                {brand.name}
-                            </button>
-                        ))}
-                    </div>
-                    <div className={styles.profileList}>
-                        {(libraryBrand?.profiles || []).map((profile) => (
-                            <button
-                                key={profile.id}
-                                type="button"
-                                className={cx(styles.profileRow, profile.id === activeLookId && styles.profileRowActive)}
-                                onClick={() => {
-                                    applyLook({ ...profile, label: profile.label });
-                                    setIsLibraryOpen(false);
-                                }}
-                            >
-                                <span className={styles.profileName}>{profile.label}</span>
-                                <span className={styles.profileDesc}>{profile.hint}</span>
-                                <span className={styles.profileMeta}>
-                                    Idéal : {profile.bestFor} · À éviter : {profile.avoidFor}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </Sheet>
 
             <Sheet
                 open={isExportModalOpen}

@@ -3,11 +3,16 @@
  *
  * Deux tests:
  *  1. Parcours reel: import -> « Ameliorer ma photo » (phrase humaine + pixels
- *     qui changent) -> intensite -> application d'un look -> comparaison
- *     avant/apres -> garde-fous smartphone -> bibliotheque par marque.
+ *     qui changent) -> intensite -> application du preset, puis retrait par un
+ *     second clic -> comparaison avant/apres -> garde-fous smartphone.
  *  2. Critere du plan §6 (phase C): sur 5 photos types (portrait, paysage,
- *     nuit, plate, deja saturee), AUCUN des 12 looks ne produit d'image grise
- *     ou cassee, et le tri ne recommande pas la meme chose pour toutes.
+ *     nuit, plate, deja saturee), AUCUN preset ne produit d'image grise ou
+ *     cassee.
+ *
+ * Depuis le 2026-08-11 les 12 « looks » et la bibliotheque par marque n'existent
+ * plus: Vision expose des presets compiles en LUT 3D
+ * (`utils/visionPresets.js`). La science du preset lui-meme est verifiee a part,
+ * sans navigateur, par `scripts/smoke-vision-preset.mjs`.
  */
 
 const { test, expect } = require("@playwright/test");
@@ -96,7 +101,7 @@ async function readCanvasStats(page) {
   });
 }
 
-test("vision VibeOS: analyse, amelioration, look, comparaison", async ({ page }) => {
+test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page }) => {
   test.setTimeout(120_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
@@ -112,11 +117,12 @@ test("vision VibeOS: analyse, amelioration, look, comparaison", async ({ page })
   await expect.poll(async () => canvas.evaluate((node) => node.width), { timeout: 15000 })
     .toBeGreaterThan(0);
 
-  // Les 12 looks sont rendus sur la VRAIE photo (vignettes en <img>).
-  const lookGrid = page.getByTestId("vibeos-vision-looks");
-  await expect(lookGrid.locator("button")).toHaveCount(12);
-  await expect.poll(async () => lookGrid.locator("img").count(), { timeout: 20000 })
-    .toBeGreaterThan(6);
+  // Les presets sont rendus sur la VRAIE photo (vignettes en <img>).
+  const presetGrid = page.getByTestId("vibeos-vision-presets");
+  const presetCount = await presetGrid.locator("button").count();
+  expect(presetCount).toBeGreaterThan(0);
+  await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 20000 })
+    .toBe(presetCount);
 
   // « Ameliorer ma photo »: phrase humaine + pixels reellement modifies.
   const before = await readCanvasStats(page);
@@ -139,30 +145,72 @@ test("vision VibeOS: analyse, amelioration, look, comparaison", async ({ page })
   }, { timeout: 15000 }).toBeLessThan(1.5);
   await intensity.fill("80");
 
-  // Application d'un look: la carte devient active et l'image change encore.
-  const firstLook = lookGrid.locator("button").first();
-  const lookName = (await firstLook.innerText()).split("\n")[0];
-  await firstLook.click();
-  await expect(message).toContainText(lookName);
+  /* Application du preset: la carte devient active et l'image change encore.
+     Un second clic le retire — c'est la comparaison la plus directe. */
+  const firstPreset = presetGrid.locator("button").first();
+  const presetName = (await firstPreset.innerText()).split("\n")[0];
+  const beforePreset = await readCanvasStats(page);
+  await firstPreset.click();
+  await expect(message).toContainText(presetName);
+  await expect(firstPreset).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => {
+    const after = await readCanvasStats(page);
+    return Math.abs(after.mean - beforePreset.mean) + Math.abs(after.stdDev - beforePreset.stdDev);
+  }, { timeout: 15000 }).toBeGreaterThan(0.5);
 
-  // Comparaison: maintien = photo d'origine.
-  const compare = page.getByRole("button", { name: /Comparer avec l'original/ });
-  const compareBox = await compare.boundingBox();
-  await page.mouse.move(compareBox.x + compareBox.width / 2, compareBox.y + compareBox.height / 2);
-  await page.mouse.down();
-  await expect(page.getByTestId("vibeos-vision-compare")).toBeVisible();
-  await page.mouse.up();
-  await expect(page.getByTestId("vibeos-vision-compare")).toBeHidden();
+  await firstPreset.click();
+  await expect(firstPreset).toHaveAttribute("aria-pressed", "false");
+  await expect(message).toContainText("retiré");
+  await firstPreset.click();
 
-  // Avances: garde-fous actifs par defaut, bibliotheque complete accessible.
+  /* Comparaison: le rideau reste affiche sans maintenir le clic (c'etait le
+     defaut de l'ancienne version), la poignee se deplace au clavier, et les
+     trois modes existent. */
+  const compareToggle = page.getByTestId("vibeos-vision-compare-toggle");
+  await compareToggle.click();
+  const original = page.getByTestId("vibeos-vision-compare-before");
+  await expect(original).toBeVisible();
+  const curtain = page.getByRole("slider", { name: "Position du rideau avant/après" });
+  await expect(curtain).toHaveAttribute("aria-valuenow", "50");
+  await curtain.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(curtain).toHaveAttribute("aria-valuenow", "52");
+
+  await page.getByRole("tab", { name: "Côte à côte" }).click();
+  await expect(original).toBeVisible();
+  await page.getByRole("tab", { name: "Maintien" }).click();
+  /* En mode maintien, l'original n'apparait que pendant l'appui. */
+  await expect(original).toBeHidden();
+
+  await page.getByRole("tab", { name: "Rideau" }).click();
+
+  /* Regression : sur une photo VERTICALE, le cadre de comparaison doit garder
+     exactement la place et le format de l'apercu normal. Il prenait toute la
+     largeur de la scene et debordait en hauteur (« l'image passait en
+     paysage »). */
+  await page.getByTestId("vibeos-vision-input").setInputFiles(path.join(dir, "portrait.png"));
+  await expect.poll(async () => page.locator("canvas").first().evaluate((node) => node.width),
+    { timeout: 20000 }).toBeGreaterThan(0);
+  const stage = await page.getByTestId("vibeos-vision-screen")
+    .locator("section").first().boundingBox();
+  const compared = await page.getByTestId("vibeos-vision-compare").boundingBox();
+  /* Format d'origine conservé (la fixture portrait fait 480x600)... */
+  expect(compared.width / compared.height).toBeCloseTo(0.8, 1);
+  /* ...et le cadre reste DANS la scène, sans déborder. */
+  expect(compared.height).toBeLessThanOrEqual(stage.height + 1);
+  expect(compared.width).toBeLessThanOrEqual(stage.width + 1);
+
+  await compareToggle.click();
+  await expect(original).toBeHidden();
+
+  /* « Retirer » vide l'apercu sans rien supprimer ailleurs. */
+  await page.getByTestId("vibeos-vision-clear").click();
+  await expect(page.getByRole("button", { name: "Importer une photo" })).toBeVisible();
+
+  // Avances: garde-fous actifs par defaut.
   await page.getByRole("button", { name: "Réglages avancés" }).click();
   const guards = page.getByRole("tab", { name: "Actifs" });
   await expect(guards).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "Parcourir par marque" }).click();
-  const library = page.getByRole("dialog", { name: "Bibliothèque de profils" });
-  await expect(library).toBeVisible();
-  await expect(library.getByRole("button", { name: /Velvia/ })).toBeVisible();
-  await library.getByRole("button", { name: "Fermer" }).click();
 
   // Garde anti-scroll desktop, panneau avance deplie.
   const pageScrollable = await page.evaluate(
@@ -171,15 +219,14 @@ test("vision VibeOS: analyse, amelioration, look, comparaison", async ({ page })
   expect(pageScrollable).toBe(false);
 });
 
-test("vision VibeOS: 12 looks surs sur 5 photos types", async ({ page }) => {
+test("vision VibeOS: presets surs sur 5 photos types", async ({ page }) => {
   test.setTimeout(240_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
 
   await openVisionScreen(page);
 
-  const lookGrid = page.getByTestId("vibeos-vision-looks");
-  const recommendations = {};
+  const presetGrid = page.getByTestId("vibeos-vision-presets");
 
   for (const photo of PHOTOS) {
     await page.getByTestId("vibeos-vision-input").setInputFiles(path.join(dir, photo.file));
@@ -187,15 +234,14 @@ test("vision VibeOS: 12 looks surs sur 5 photos types", async ({ page }) => {
       async () => page.locator("canvas").first().evaluate((node) => node.width),
       { timeout: 20000 },
     ).toBeGreaterThan(0);
-    await expect(lookGrid.locator("button")).toHaveCount(12);
+    const count = await presetGrid.locator("button").count();
+    expect(count).toBeGreaterThan(0);
 
-    // Le premier look propose pour cette photo (le mieux note).
-    recommendations[photo.id] = (await lookGrid.locator("button").first().innerText()).split("\n")[0];
-
-    // Chaque look est applique, puis mesure: ni gris plat, ni ecrase.
-    for (let index = 0; index < 12; index += 1) {
-      await lookGrid.locator("button").nth(index).click();
-      const label = (await lookGrid.locator("button").nth(index).innerText()).split("\n")[0];
+    // Chaque preset est applique, puis mesure: ni gris plat, ni ecrase.
+    for (let index = 0; index < count; index += 1) {
+      const card = presetGrid.locator("button").nth(index);
+      if ((await card.getAttribute("aria-pressed")) !== "true") await card.click();
+      const label = (await card.innerText()).split("\n")[0];
       /* Le rendu passe par requestAnimationFrame: on attend que le canvas se
          stabilise avant de mesurer. */
       await page.waitForTimeout(120);
@@ -206,8 +252,4 @@ test("vision VibeOS: 12 looks surs sur 5 photos types", async ({ page }) => {
       expect(stats.stdDev, `${context}: image plate/grise`).toBeGreaterThan(1.5);
     }
   }
-
-  // Le tri doit vraiment dependre de la photo, pas proposer la meme chose.
-  const distinct = new Set(Object.values(recommendations));
-  expect(distinct.size, `recommandations: ${JSON.stringify(recommendations)}`).toBeGreaterThan(1);
 });

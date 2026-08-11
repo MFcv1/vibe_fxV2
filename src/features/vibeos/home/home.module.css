@@ -204,6 +204,43 @@
     background: linear-gradient(135deg, #2a2a33, #1b1b21);
 }
 
+.resumeRow {
+    display: flex;
+    align-items: stretch;
+    gap: var(--vo-space-3);
+    flex-wrap: wrap;
+}
+
+.resumeRow > *:first-child {
+    flex: 1 1 320px;
+}
+
+/* Bibliotheque: une mini-masonry, exactement la forme de l'ecran. */
+.vLibrary {
+    position: absolute;
+    inset: 14%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 5px;
+}
+
+.vLibrary span {
+    border-radius: 5px;
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-3);
+}
+
+.vLibrary span:nth-child(1) {
+    grid-row: span 2;
+    background: linear-gradient(160deg, #3a3a45, #1e1e24);
+}
+
+.vLibrary span:nth-child(4) {
+    grid-row: span 2;
+    background: linear-gradient(160deg, #2c2c36, #17171c);
+}
+
 .vStudio {
     position: absolute;
     inset: 0;

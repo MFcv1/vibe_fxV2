@@ -9,6 +9,8 @@ import {
     applySafeGlobalTint
 } from '../utils/canvasUtils';
 import { normalizeVisionFilters } from '../utils/visionColorScience';
+import { applyLut3d, LUT_SIZE } from '../utils/lut3d';
+import { getPresetLut } from '../utils/visionPresets';
 
 /**
  * renderStudio - Rendu du mode Studio/Vision (crop et filtres).
@@ -134,6 +136,15 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
 
     const doPixelOps = doColorPixelOps;
     const doSpatialPixelOpsForQuality = doSpatialPixelOps;
+
+    // ── Stage 1.5: Preset (LUT 3D) ───────────────────────
+    // Le preset pose le look de base; les reglages manuels des etapes suivantes
+    // s'appliquent PAR-DESSUS. Une seule passe, cout constant quel que soit le
+    // preset (voir `utils/lut3d.js`).
+    const presetLut = getPresetLut(safeFilters.presetId);
+    if (presetLut) {
+        applyLut3d(ctx, w, h, presetLut, LUT_SIZE, 1);
+    }
 
     if (doPixelOps) {
         // ── Stage 2: Fused Pixel Ops (single pass) ───────

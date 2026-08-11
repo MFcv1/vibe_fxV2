@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Clapperboard, Eye, Home, LayoutGrid, Music, Send, Sparkles } from 'lucide-react';
+import { Clapperboard, Eye, Home, Images, LayoutGrid, Music, Sparkles } from 'lucide-react';
 import { VibeOsAudioProvider } from '../audio/AudioProvider';
 import { VibeOsProjectProvider } from '../project/VibeOsProjectProvider';
 import { ToastProvider } from '../primitives';
@@ -21,6 +21,7 @@ import styles from './shell.module.css';
 const cx = (...values) => values.filter(Boolean).join(' ');
 
 const SPACES = [
+    { href: '/creer/bibliotheque', label: 'Bibliothèque', icon: Images },
     { href: '/creer/layout-visuel', label: 'Layout', icon: LayoutGrid },
     { href: '/creer/studio', label: 'Studio', icon: Sparkles },
     { href: '/creer/vision', label: 'Vision', icon: Eye },
@@ -30,6 +31,7 @@ const SPACES = [
 
 const MOBILE_TABS = [
     { href: '/creer', label: 'Accueil', icon: Home, exact: true },
+    { href: '/creer/bibliotheque', label: 'Photos', icon: Images },
     { href: '/creer/layout-visuel', label: 'Layout', icon: LayoutGrid },
     { href: '/creer/studio', label: 'Studio', icon: Sparkles },
     { href: '/creer/vision', label: 'Vision', icon: Eye },

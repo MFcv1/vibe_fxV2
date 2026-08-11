@@ -1,0 +1,711 @@
+/* Bibliotheque photo VibeOS.
+   Meme squelette que les autres ecrans: la page ne scrolle jamais, seule la
+   grille scrolle. Les tuiles sont positionnees en absolu par `masonry.js`. */
+
+.screen {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+    background: var(--vo-bg-sunken);
+}
+
+.hiddenInput {
+    display: none;
+}
+
+/* ---------- Barre d'outils ---------- */
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-4);
+    flex-wrap: wrap;
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border-bottom: 1px solid var(--vo-line);
+    background: var(--vo-bg);
+}
+
+.toolbarLead {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.wordmark {
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vo-text);
+}
+
+.toolbarCount {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    font-family: var(--vo-font-numeric);
+}
+
+.toolbarMain {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.toolbarSearch {
+    flex: 0 1 220px;
+    min-width: 140px;
+}
+
+.select {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    height: 30px;
+    padding: 0 var(--vo-space-2) 0 var(--vo-space-3);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface);
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    transition: border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.select:hover {
+    border-color: var(--vo-line-strong);
+}
+
+.select select {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--vo-text);
+    font: inherit;
+    font-size: var(--vo-text-xs);
+    max-width: 160px;
+    padding-right: var(--vo-space-2);
+    cursor: pointer;
+}
+
+.density {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface);
+    overflow: hidden;
+}
+
+.density button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--vo-text-2);
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease), color var(--vo-dur-1) var(--vo-ease);
+}
+
+.density button:hover:not(:disabled) {
+    background: var(--vo-surface-3);
+    color: var(--vo-text);
+}
+
+.density button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.densityValue {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 var(--vo-space-2);
+    font-family: var(--vo-font-numeric);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text);
+    border-left: 1px solid var(--vo-line);
+    border-right: 1px solid var(--vo-line);
+    height: 100%;
+}
+
+/* ---------- Progression d'import ---------- */
+.importBar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 var(--vo-space-4);
+    background: var(--vo-surface);
+    border-bottom: 1px solid var(--vo-line);
+    overflow: hidden;
+}
+
+.importFill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--vo-accent-quiet);
+    transition: width var(--vo-dur-3) var(--vo-ease-out);
+}
+
+.importLabel {
+    position: relative;
+    font-family: var(--vo-font-numeric);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Grille ---------- */
+.body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--vo-space-3);
+}
+
+.grid {
+    position: relative;
+    width: 100%;
+}
+
+.tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    border-radius: var(--vo-radius-sm);
+    overflow: hidden;
+    background: var(--vo-surface-2);
+    /* Le glissement des tuiles au changement de densite: seule la position est
+       animee en composite, la taille suit dans le meme temps. */
+    transition:
+        transform var(--vo-dur-4) var(--vo-ease-out),
+        width var(--vo-dur-4) var(--vo-ease-out),
+        height var(--vo-dur-4) var(--vo-ease-out);
+    will-change: transform;
+}
+
+.tileOpen {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+}
+
+.tileOpen img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--vo-dur-4) var(--vo-ease-out);
+}
+
+.tile:hover .tileOpen img {
+    transform: scale(1.03);
+}
+
+.tile[data-selected="true"] {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: -2px;
+}
+
+/* Puces d'indexation, comme dans la reference: appareil a gauche, look a droite. */
+.tileChips {
+    position: absolute;
+    left: var(--vo-space-2);
+    right: var(--vo-space-2);
+    bottom: var(--vo-space-2);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+    pointer-events: none;
+}
+
+.tile:hover .tileChips,
+.tile:focus-within .tileChips {
+    opacity: 1;
+    transform: none;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 3px 8px;
+    border-radius: var(--vo-radius-pill);
+    background: rgba(10, 10, 12, 0.72);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--vo-text);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chipPreset {
+    color: var(--vo-accent);
+    border-color: var(--vo-accent-line);
+}
+
+.tileTools {
+    position: absolute;
+    top: var(--vo-space-2);
+    right: var(--vo-space-2);
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+}
+
+.tile:hover .tileTools,
+.tile:focus-within .tileTools {
+    opacity: 1;
+    transform: none;
+}
+
+.tileTool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(10, 10, 12, 0.72);
+    backdrop-filter: blur(12px);
+    color: var(--vo-text);
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.tileTool:hover {
+    background: rgba(30, 30, 36, 0.9);
+}
+
+.tileSelect {
+    position: absolute;
+    top: var(--vo-space-2);
+    left: var(--vo-space-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(10, 10, 12, 0.5);
+    color: transparent;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity var(--vo-dur-2) var(--vo-ease);
+}
+
+.tile:hover .tileSelect,
+.tile:focus-within .tileSelect,
+.tileSelect[data-selected="true"] {
+    opacity: 1;
+}
+
+.tileSelect[data-selected="true"] {
+    background: var(--vo-accent);
+    border-color: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+.noMatch {
+    padding: var(--vo-space-8) 0;
+    text-align: center;
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-3);
+}
+
+/* ---------- Vide ---------- */
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-4);
+    max-width: 420px;
+    margin: max(8vh, var(--vo-space-12)) auto;
+    text-align: center;
+}
+
+.emptyIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--vo-radius-lg);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-2);
+}
+
+.emptyTitle {
+    font-size: var(--vo-text-lg);
+}
+
+.emptyBody {
+    font-size: var(--vo-text-sm);
+    color: var(--vo-text-2);
+}
+
+/* ---------- Selection / depot ---------- */
+.selectionBar {
+    position: absolute;
+    left: 50%;
+    bottom: var(--vo-space-6);
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid var(--vo-line-strong);
+    background: rgba(22, 22, 26, 0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: var(--vo-shadow-3);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.selectionBar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--vo-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.selectionDanger {
+    color: var(--vo-danger) !important;
+}
+
+.dropVeil {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(11, 11, 13, 0.82);
+    backdrop-filter: blur(6px);
+    border: 2px dashed var(--vo-accent-line);
+    color: var(--vo-text);
+    font-size: var(--vo-text-md);
+    pointer-events: none;
+}
+
+.dropVeil span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+}
+
+/* ---------- Carrousel plein ecran ---------- */
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+}
+
+.lightboxBackdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 6, 8, 0.96);
+    backdrop-filter: blur(28px);
+}
+
+.lightboxBar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-3) var(--vo-space-4);
+}
+
+.lightboxMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.lightboxName {
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lightboxSub {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lightboxActions {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    flex: 0 0 auto;
+}
+
+.lightboxCount {
+    font-family: var(--vo-font-numeric);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+    margin-right: var(--vo-space-2);
+}
+
+.lightboxButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 var(--vo-space-3);
+    border-radius: var(--vo-radius-pill);
+    border: 0;
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+    font-size: var(--vo-text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.lightboxButton:hover {
+    background: var(--vo-accent-hover);
+}
+
+.lightboxIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+    color: var(--vo-text-2);
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease), border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.lightboxIcon:hover {
+    color: var(--vo-text);
+    border-color: var(--vo-line-strong);
+}
+
+.lightboxStage {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+}
+
+.lightboxStage:active {
+    cursor: grabbing;
+}
+
+.lightboxTrack {
+    display: flex;
+    width: 300%;
+    height: 100%;
+    /* Position de depart: la diapositive du milieu est centree. */
+    transform: translate3d(-33.3333%, 0, 0);
+}
+
+.slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 33.3333%;
+    height: 100%;
+    padding: var(--vo-space-4);
+}
+
+.slideFrame {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    /* Le cadre prend le rapport de la photo: le zoom partage part donc d'une
+       tuile de meme forme, sans deformation. */
+    height: 100%;
+    border-radius: var(--vo-radius-md);
+    overflow: hidden;
+    box-shadow: var(--vo-shadow-3);
+    will-change: transform;
+}
+
+.slideThumb,
+.slideFull {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.slideThumb {
+    filter: blur(1px);
+}
+
+.slideFull {
+    opacity: 0;
+    transition: opacity var(--vo-dur-3) var(--vo-ease);
+}
+
+.slideFull[data-ready="true"] {
+    opacity: 1;
+}
+
+.lightboxNav {
+    position: absolute;
+    top: 50%;
+    z-index: 3;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--vo-line);
+    background: rgba(22, 22, 26, 0.7);
+    backdrop-filter: blur(16px);
+    color: var(--vo-text);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+}
+
+.lightboxNav:hover {
+    opacity: 1;
+}
+
+.lightboxNavPrev {
+    left: var(--vo-space-4);
+}
+
+.lightboxNavNext {
+    right: var(--vo-space-4);
+}
+
+.filmstrip {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 6px;
+    padding: var(--vo-space-3) var(--vo-space-4);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.filmstrip::-webkit-scrollbar {
+    display: none;
+}
+
+.filmstripItem {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity var(--vo-dur-2) var(--vo-ease), border-color var(--vo-dur-2) var(--vo-ease);
+}
+
+.filmstripItem img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.filmstripItem[data-active="true"] {
+    opacity: 1;
+    border-color: var(--vo-accent);
+}
+
+.filmstripItem:hover {
+    opacity: 1;
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 860px) {
+    .toolbar {
+        gap: var(--vo-space-2);
+        padding: var(--vo-space-2) var(--vo-space-3);
+    }
+
+    .toolbarMain {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+
+    .toolbarSearch {
+        flex: 0 0 160px;
+    }
+
+    .lightboxNav {
+        display: none;
+    }
+
+    .selectionBar {
+        bottom: calc(var(--vo-tabbar-height) + var(--vo-space-3));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tile,
+    .tileOpen img,
+    .tileChips,
+    .tileTools {
+        transition-duration: 1ms;
+    }
+}

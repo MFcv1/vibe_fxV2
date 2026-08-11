@@ -19,7 +19,11 @@ const BUTTON_SIZES = {
     lg: styles.sizeLg,
 };
 
+/* `as` permet un bouton-lien (Link Next) sans dupliquer le style: c'est le meme
+   composant que Card utilise deja. Le `type="button"` n'est pose que sur un
+   vrai <button>. */
 export function Button({
+    as: Component = 'button',
     variant = 'secondary',
     size = 'md',
     block = false,
@@ -30,15 +34,15 @@ export function Button({
     ...rest
 }) {
     return (
-        <button
-            type="button"
+        <Component
+            {...(Component === 'button' ? { type: 'button' } : null)}
             className={cx(styles.button, BUTTON_VARIANTS[variant], BUTTON_SIZES[size], block && styles.block, className)}
             {...rest}
         >
             {icon}
             {children ? <span>{children}</span> : null}
             {iconEnd}
-        </button>
+        </Component>
     );
 }
 

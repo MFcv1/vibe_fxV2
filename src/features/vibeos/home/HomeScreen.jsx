@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Clapperboard, Copy, Eye, ImageIcon, LayoutGrid, MoreHorizontal, Music, Play, Sparkles, Trash2 } from 'lucide-react';
-import { Card, IconButton, useToast } from '../primitives';
+import { ArrowRight, Clapperboard, Copy, Eye, FilePlus2, ImageIcon, Images, LayoutGrid, MoreHorizontal, Music, Play, Sparkles, Trash2 } from 'lucide-react';
+import { Button, Card, IconButton, useToast } from '../primitives';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
 import styles from './home.module.css';
 
@@ -13,6 +13,17 @@ import styles from './home.module.css';
  */
 
 const SPACES = [
+    {
+        href: '/creer/bibliotheque',
+        icon: Images,
+        title: 'Bibliothèque',
+        desc: 'Toutes tes photos importées, classées par appareil, prêtes à retoucher.',
+        visual: (
+            <span className={styles.vLibrary} aria-hidden="true">
+                <span /><span /><span /><span /><span /><span /><span />
+            </span>
+        ),
+    },
     {
         href: '/creer/layout-visuel',
         icon: LayoutGrid,
@@ -139,8 +150,13 @@ function RecentCard({ recent, onOpen, onDuplicate, onDelete }) {
 }
 
 export default function HomeScreen() {
-    const { project, recents, openProject, duplicateProject, removeProject } = useVibeOsProject();
+    const { project, recents, createProject, openProject, duplicateProject, removeProject } = useVibeOsProject();
     const { push } = useToast();
+
+    const handleNewProject = async () => {
+        await createProject();
+        push('Nouvel espace créé, vierge de toute image.', { tone: 'success' });
+    };
 
     const handleOpen = async (id) => {
         const opened = await openProject(id);
@@ -169,19 +185,32 @@ export default function HomeScreen() {
             </header>
 
             {project ? (
-                <Card as={Link} interactive href="/creer/layout-visuel" className={styles.resumeCard} data-testid="vibeos-resume">
-                    <span className={styles.resumeThumb} aria-hidden="true">
-                        {project.thumbnail ? <img src={project.thumbnail} alt="" /> : <ImageIcon size={18} />}
-                    </span>
-                    <span className={styles.resumeBody}>
-                        <span className={styles.resumeTitle}>Reprendre « {project.title} »</span>
-                        <span className={styles.resumeMeta}>Modifié {formatRelativeDate(project.updatedAt)}</span>
-                    </span>
-                    <span className={styles.resumeAction}>
-                        <Play size={14} />
-                        Reprendre
-                    </span>
-                </Card>
+                <div className={styles.resumeRow}>
+                    <Card as={Link} interactive href="/creer/layout-visuel" className={styles.resumeCard} data-testid="vibeos-resume">
+                        <span className={styles.resumeThumb} aria-hidden="true">
+                            {project.thumbnail ? <img src={project.thumbnail} alt="" /> : <ImageIcon size={18} />}
+                        </span>
+                        <span className={styles.resumeBody}>
+                            <span className={styles.resumeTitle}>Reprendre « {project.title} »</span>
+                            <span className={styles.resumeMeta}>Modifié {formatRelativeDate(project.updatedAt)}</span>
+                        </span>
+                        <span className={styles.resumeAction}>
+                            <Play size={14} />
+                            Reprendre
+                        </span>
+                    </Card>
+                    {/* Repartir a zero sans supprimer le projet en cours: c'est la
+                        sortie propre quand l'ecran garde une image dont on ne
+                        veut plus. */}
+                    <Button
+                        variant="secondary"
+                        icon={<FilePlus2 size={15} />}
+                        onClick={handleNewProject}
+                        data-testid="vibeos-new-project"
+                    >
+                        Nouvel espace vierge
+                    </Button>
+                </div>
             ) : null}
 
             <section className={styles.section} aria-label="Espaces de création">

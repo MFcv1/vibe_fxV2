@@ -101,45 +101,6 @@ export function buildAutoEnhancement(metrics) {
     };
 }
 
-/*
- * Garde-fou applique a un LOOK, en fonction de la photo.
- *
- * `normalizeVisionFilters` borne les reglages dans l'absolu, mais il ne
- * regarde pas l'image: un look contraste + vignette applique a une photo de
- * nuit deja sombre pouvait la fermer completement (mesure a 4/255 pendant les
- * tests du 2026-08-08). Ici on croise le look ET les signaux de la photo pour
- * garder une image lisible — c'est la promesse « impossible de rater ».
- */
-export function guardLookForImage(lookFilters, signals = {}, metrics = {}) {
-    const filters = { ...lookFilters };
-    const meanLuma = metrics?.meanLuma ?? 128;
-
-    if (signals.lowLight || meanLuma < 90) {
-        filters.vignette = Math.min(filters.vignette ?? 0, 12);
-        filters.shadows = Math.max(filters.shadows ?? 0, 16);
-        filters.brightness = Math.max(filters.brightness ?? 100, 104);
-        filters.contrast = Math.min(filters.contrast ?? 100, 120);
-        filters.fadedBlacks = Math.max(filters.fadedBlacks ?? 0, 2);
-    }
-
-    if ((metrics?.clippedHighlightRatio || 0) > 0.04) {
-        filters.brightness = Math.min(filters.brightness ?? 100, 104);
-        filters.highlights = Math.min(filters.highlights ?? 0, -10);
-    }
-
-    if (signals.saturated) {
-        filters.vibrance = Math.min(filters.vibrance ?? 0, 10);
-        filters.skySaturation = Math.min(filters.skySaturation ?? 0, -6);
-        filters.foliageSaturation = Math.min(filters.foliageSaturation ?? 0, -6);
-    }
-
-    if (signals.portrait) {
-        filters.skinSaturation = Math.max(-6, Math.min(6, filters.skinSaturation ?? 0));
-    }
-
-    return normalizeVisionFilters(filters);
-}
-
 /* Etiquettes courtes de ce que l'analyse a vu, pour l'afficher sous la photo. */
 export function describeSignals(signals = {}) {
     const tags = [];

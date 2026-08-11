@@ -139,8 +139,17 @@ export async function resolveProjectSource(project) {
 export function applyVisionStage(sourceImage, project) {
     const vision = project?.vision || {};
     const intensity = typeof vision.intensity === 'number' ? vision.intensity : 80;
-    if (isNeutralFilterSet(vision.filters, intensity)) return null;
-    return renderFilterStage(sourceImage, vision.filters, {
+    /*
+     * Un preset est une LUT posee en amont des reglages manuels: il ne modifie
+     * AUCUNE cle de `filters`. Le jeu de filtres peut donc etre parfaitement
+     * neutre alors que le look, lui, est bien la — d'ou ce test separe. Sans
+     * lui, l'etage Vision etait purement et simplement saute, et le preset ne
+     * descendait ni jusqu'au Studio ni jusqu'a l'export.
+     */
+    const hasPreset = Boolean(vision.presetId);
+    if (Number(intensity) <= 0) return null;
+    if (!hasPreset && isNeutralFilterSet(vision.filters, intensity)) return null;
+    return renderFilterStage(sourceImage, { ...vision.filters, presetId: vision.presetId }, {
         intensity,
         safeSmartphone: vision.filters?.safeSmartphone !== false,
     });

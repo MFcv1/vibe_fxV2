@@ -124,9 +124,9 @@ test("pipeline VibeOS: composition -> Vision -> Studio -> publication", async ({
      source 640x800. */
   expect(compositionStats.width / compositionStats.height).toBeCloseTo(1080 / 1350, 2);
 
-  // Un look franc, pour que l'etage Vision soit mesurable plus loin.
-  const looks = page.getByTestId("vibeos-vision-looks");
-  await looks.locator("button").first().click();
+  // Un preset franc, pour que l'etage Vision soit mesurable plus loin.
+  const presets = page.getByTestId("vibeos-vision-presets");
+  await presets.locator("button").first().click();
   await expect(page.getByTestId("vibeos-vision-message")).toBeVisible();
   await expect.poll(async () => distance(await readCanvasStats(page), compositionStats), { timeout: 20000 })
     .toBeGreaterThan(2);
@@ -146,7 +146,7 @@ test("pipeline VibeOS: composition -> Vision -> Studio -> publication", async ({
   const studioBaseStats = await readCanvasStats(page);
 
   /* Le Studio ne part PAS de la composition nue: son image de travail porte
-     deja le look Vision. On le mesure des deux cotes plutot que de croire le
+     deja le preset Vision. On le mesure des deux cotes plutot que de croire le
      libelle. */
   expect(
     distance(studioBaseStats, compositionStats),
@@ -190,7 +190,7 @@ test("pipeline VibeOS: la composition circule aussi sur mobile", async ({ page }
   await expect(page.getByTestId("vibeos-vision-source"))
     .toHaveAttribute("data-source-kind", "composition", { timeout: 30000 });
 
-  await page.getByTestId("vibeos-vision-looks").locator("button").first().click();
+  await page.getByTestId("vibeos-vision-presets").locator("button").first().click();
   await page.waitForTimeout(2500);
 
   await page.getByRole("link", { name: "Studio" }).last().click();

@@ -17,7 +17,7 @@ Ces choix ont été validés explicitement par l'utilisateur le 2026-08-08 :
 2. **Hub unique** : l'accueil inclut aussi VibeCut (lien vers `/video` existant). Une seule porte d'entrée pour toute la création.
 3. **Deux niveaux partout** : interface simple par défaut (peu de réglages, gros parti pris), panneau « Réglages avancés » qui révèle tout le reste. Rien n'est supprimé, tout est ré-hiérarchisé.
 4. **Projet commun qui circule** : l'image importée et les réglages suivent l'utilisateur entre Layout, Studio et Vision. Soundtrack partage le même shell mais gère sa bibliothèque musicale.
-5. **Vision = auto-magique + looks réduits** : un bouton « Améliorer » qui analyse la photo et corrige automatiquement, plus une collection courte (10-15) de looks forts et sûrs, adaptés à la photo.
+5. **Vision = auto-magique + presets** : un bouton « Améliorer » qui analyse la photo et corrige automatiquement, plus une collection courte de presets forts et sûrs. *(Révisé le 2026-08-11 : « 10-15 looks adaptés à la photo » → un petit nombre de presets construits par mesure, sans tri automatique. La quantité ne faisait pas la qualité.)*
 6. **Studio = redesign + 3-4 features fortes** (ambiances en un clic, aléatoire intelligent, historique de variantes, styles perso).
 7. **Soundtrack = Spotify classique complet** : colonne gauche bibliothèque/playlists, zone centrale avec rangées et recherche, lecteur fixe en bas.
 8. **Mini-lecteur global** : un petit lecteur discret dans le header commun, visible sur toutes les pages de création ; clic → retour à Soundtrack.
@@ -276,8 +276,24 @@ But : « ma photo de téléphone devient superbe en un geste, sans jamais être 
 **Écran simple :**
 1. En vedette : bouton **« ✨ Améliorer ma photo »** (primaire, lg). Il exécute une correction automatique construite sur l'existant : `visionMetrics` analyse l'image → correction ciblée (exposition si `meanLuma` bas, dehaze/clarity si plat via `tonalRange`, vibrance prudente si peu saturé, protection peau via `skinToneRatio`, garde-fous `applySmartphoneOutputGuards`). Afficher ensuite une ligne humaine : « Photo un peu sombre et plate — j'ai relevé la lumière et le relief. » (dérivée des signaux `getImageRecommendationSignals`).
 2. **Slider d'intensité global** (0-100, défaut 80) qui pondère la correction — implémente une interpolation `DEFAULT_FILTERS → filtres cibles`.
-3. **Looks** : une rangée horizontale de 12 tuiles-aperçus max, **rendues sur la vraie photo** (le mécanisme de miniatures de `VisionPanel` existe déjà : `PREVIEW_RENDER_WIDTH`, `applyFusedPixelOps`). Les 12 looks sont une curation des familles existantes : 2 Natural Clean, 2 Portrait Skin, 2 Landscape Vivid Safe, 2 Cinema Night, 1 Chrome Street, 1 Monochrome Rich, 1 Editorial Matte, 1 Film Soft — choisis parmi les profils `CAMERA_BRANDS` les mieux notés, renommés en français évocateur (« Peau douce », « Nuit néon », « Ciel profond »… — PAS les noms de pellicules en premier niveau).
-   - **Tri intelligent** : `scoreProfileForImage()` ordonne les tuiles pour CETTE photo ; badge « Conseillé » sur les 2 premiers ; les looks contre-indiqués (score négatif) passent en fin avec opacité réduite + tooltip « Peu adapté : [raison] ».
+3. **Presets** ~~Looks~~ : *(révisé le 2026-08-11 — voir plus bas)* une grille de
+   tuiles-aperçus rendues sur la vraie photo. Un second clic sur le preset actif
+   le retire, ce qui donne la comparaison la plus directe qui soit.
+
+> **Révision du 2026-08-11 — les 12 looks sont abandonnés.**
+>
+> À l'usage ils dénaturaient les photos et rendaient l'écran lent (12 vignettes
+> recalculées depuis la pleine résolution à chaque changement de photo). La
+> curation par familles `CAMERA_BRANDS`, le tri `scoreProfileForImage`, les
+> badges « Conseillé » et la bibliothèque par marque sont **supprimés**.
+>
+> À la place : des **presets compilés en LUT 3D**, écrits comme des fonctions
+> pures dans `utils/visionPresets.js`. Motif technique décisif : le moteur
+> n'offrait que des saturations par bande de teinte, **aucun décalage de
+> teinte** — il ne pouvait donc pas produire le ciel teal qui fait la signature
+> du look visé. Le premier preset, `powlisher`, est reconstruit **par mesure**
+> sur 19 photos ; méthode, chiffres et réserves dans
+> [audit-preset-powlisher-2026-08-11.md](audit-preset-powlisher-2026-08-11.md).
    - Chaque look s'applique avec son intensité recommandée (`inferIntensityGuidance`), modulée par le slider.
 4. **Avant/après** : bouton « Comparer » (maintien = photo d'origine) + le split existant `visionCompareSplit` en avancé.
 
@@ -332,8 +348,9 @@ Rituel de fin de CHAQUE phase (AGENTS.md) : `npm run lint`, `npm run build`, smo
 - Critères : reproduire n'importe quel visuel faisable dans l'ancien Layout ; export identique au pixel près (comparer avec un export de référence de l'ancien onglet).
 
 **Phase C — Vision**
-- Améliorer auto + intensité + 12 looks triés + avant/après + avancé.
-- Critères : sur 5 photos tests (portrait, paysage, nuit, plate, déjà saturée), aucun des 12 looks ne produit d'image « grise »/cassée ; le tri recommande des looks différents selon la photo.
+- Améliorer auto + intensité + presets + avant/après + avancé.
+- Critères : sur 5 photos tests (portrait, paysage, nuit, plate, déjà saturée), aucun preset ne produit d'image « grise »/cassée. *(Le critère « le tri recommande des looks différents » tombe avec le tri, supprimé le 2026-08-11.)*
+- La science du preset elle-même est vérifiée sans navigateur par `npm run test:vision-preset` : 20 cibles chiffrées issues de l'audit (rampe neutre, placement du ciel/feuillage/peau, point blanc, densité des noirs, fidélité LUT ↔ fonction pure).
 
 **Phase D — Studio**
 - Ambiances, intensité, Surprends-moi, variantes, styles perso, mesh/lumen en Sheet, avancé.
@@ -343,6 +360,12 @@ Rituel de fin de CHAQUE phase (AGENTS.md) : `npm run lint`, `npm run build`, smo
 
 **Phase F — Bascule**
 - Redirections `/studio` → `/creer` (+ mapping workspaces), suppression de l'ancien UI (§4.4), nettoyage, passe QA transverse : parcours complet « importer → composer → Vision → Studio → musique → publier » sur desktop ET mobile, `npm run lint && npm run build` + toutes les suites.
+
+**Phase G — Photothèque (ajoutée le 2026-08-11, hors plan initial)** · ✅ terminée
+- `/creer/bibliotheque` : les photos importées sont stockées durablement (IndexedDB `vibeos-library`, base **séparée** de celle des projets), avec vignette et EXIF. Grille masonry **calculée** (colonne la plus courte, ordre de lecture préservé, tuiles en `transform`), densité réglable, filtres par appareil EXIF / par look / recherche, carrousel plein écran à zoom partagé FLIP.
+- Avant/après sorti en composant partagé `vibeos/shared/BeforeAfter.jsx` (rideau / côte à côte / maintien) : l'original est superposé au rendu et révélé par `clip-path`, plus aucun démontage de nœud.
+- Conséquence sur le pipeline, à connaître : la composition Layout reste prioritaire dans `resolveProjectSource`, donc **tout écran qui laisse changer de photo doit effacer `project.composition`**. Vision le fait désormais, et « Retoucher » depuis la photothèque crée un **nouvel espace** plutôt que d'écraser la composition en cours.
+- Non fait, assumé : la synchronisation Google Drive (OAuth Google + aller-retour serveur), suivie dans `todo.md`.
 
 Chaque phase = une PR/un lot cohérent. Ne pas commencer une phase si la précédente a des critères rouges.
 
