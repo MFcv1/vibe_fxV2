@@ -56,3 +56,8 @@ next-env.d.ts
 # Reglages Claude Code personnels (permissions gcloud) — non versionnes
 .claude/settings.local.json
 presets-lightroom/
+
+# Corpus de reference de `powlisher` : ces photos ne sont pas les notres.
+# `node scripts/fetch-powlisher-corpus.mjs` les retelecharge a la demande.
+docs/lightroom/corpus-powlisher/*
+!docs/lightroom/corpus-powlisher/README.md
