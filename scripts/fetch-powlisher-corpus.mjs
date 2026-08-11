@@ -50,7 +50,35 @@ const TWEETS = [
     ['2014712191803404484', 'interieur WeWork New York', 'reference', 2, false],
     ['2014086419535319150', 'Marrakech (via le tweet cite)', 'reference', 4, true],
     ['1988657267739406751', 'il nomme son preset : Lightroom « Cinema 2 »', 'filiation', 8, true],
+
+    /*
+     * AJOUTS 2026-08-12, demandes par le porteur du projet pour combler le trou
+     * du corpus d'origine: il n'y avait que 3 ou 4 vrais paysages avec du ciel,
+     * alors que c'est precisement l'usage de l'app (mer, calanque, terrasse).
+     * Numerotes a partir de 28: les numeros 1-27 restent figes sur le corpus
+     * d'origine, sinon les mesures de l'audit ne renverraient plus aux bonnes
+     * photos.
+     */
+    ['2004212061937799207', 'nuit / ville', 'reference', 4, false],
+    ['2004052932464115850', 'ville (Sony A7R V)', 'reference', 2, false],
+    ['2036322282742661179', 'moto (Sony A7R V)', 'reference', 1, false],
 ];
+
+/*
+ * Le tri fait a la main par le porteur du projet, reinscrit ici pour qu'un
+ * `fetch` refasse EXACTEMENT le dossier au lieu de tout ramener.
+ *
+ * - 04 et 09: portraits studio/interieur, ecartes pour recentrer le corpus sur
+ *   l'architecture, le paysage et la voiture.
+ * - 20 a 27 (role `filiation`): captures d'ecran de Lightroom mobile et station
+ *   service de nuit. Elles servaient a montrer d'ou vient le look, pas a
+ *   mesurer une couleur — le chrome sombre de l'interface fausse toute mesure.
+ *
+ * `--tout` les recupere quand meme.
+ */
+const EXCLUS = new Set([4, 9]);
+const ROLES_EXCLUS = new Set(['filiation']);
+const tout = process.argv.includes('--tout');
 
 /*
  * Le corpus comprenait aussi 50 frames extraites d'une video ou il montre ses
@@ -61,13 +89,15 @@ const TWEETS = [
  * colorimetrie.
  */
 
-const outputDir = process.argv[2] || 'docs/lightroom/corpus-powlisher';
+const outputDir = process.argv.find((a) => !a.startsWith('--') && a.endsWith('corpus-powlisher'))
+    || 'docs/lightroom/corpus-powlisher';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
 
 fs.mkdirSync(outputDir, { recursive: true });
 
 let index = 0;
 let failures = 0;
+let ignores = 0;
 const manifest = [];
 
 for (const [id, sujet, role, attendu, citation] of TWEETS) {
@@ -120,6 +150,11 @@ for (const [id, sujet, role, attendu, citation] of TWEETS) {
 
     for (const media of photos) {
         index += 1;
+        /* Numerotation figee: on incremente TOUJOURS, meme sur une image ecartee. */
+        if (!tout && (EXCLUS.has(index) || ROLES_EXCLUS.has(role))) {
+            ignores += 1;
+            continue;
+        }
         /* `?name=orig` = resolution d'origine. Toute autre variante est reechantillonnee. */
         const base = media.media_url_https.replace(/\.(jpg|jpeg|png)$/i, '');
         const ext = (media.media_url_https.match(/\.(jpg|jpeg|png)$/i) || ['.jpg'])[0];
@@ -148,6 +183,7 @@ fs.writeFileSync(
 );
 
 console.log(`\n${manifest.length} image(s) dans ${outputDir}/`);
+if (ignores) console.log(`${ignores} ecartee(s) par le tri du corpus (--tout pour les avoir).`);
 if (failures) {
     console.log(
         `${failures} echec(s). Si tout echoue, c'est que l'API de syndication a change ou`

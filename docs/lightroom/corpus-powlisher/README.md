@@ -1,6 +1,6 @@
 # Corpus de référence de `powlisher`
 
-Les **27 photos** dont le preset `powlisher` a été déduit. Elles ne sont pas dans
+Les photos dont le preset `powlisher` a été déduit — **24** après tri. Elles ne sont pas dans
 le dépôt — seul ce README l'est. Pour les récupérer :
 
 ```bash
@@ -34,23 +34,47 @@ Les trois signatures qui en sortent, et qui définissent le preset :
 | **Peau préservée** | 26–36°, jamais tirée vers l'orange | 27–36° |
 | **Hautes lumières crème** | sur la moitié du corpus, le point blanc ne monte **jamais** à 255 | pas d'écrêtage |
 
-## Les images, une par une
+## Les images, 24 au 2026-08-12
 
-Numérotation **identique** à celle de
-[l'audit](../../audit-preset-powlisher-2026-08-11.md), qui cite les photos par
-leur numéro. Le script la verrouille et prévient si un tweet ne rend plus le même
-nombre d'images.
+Numérotation **figée** : les numéros 1 à 27 restent sur le corpus d'origine,
+parce que [l'audit](../../audit-preset-powlisher-2026-08-11.md) cite les photos
+par leur numéro (« img12 (hélico) », « img16 (Marrakech) »). Les ajouts partent
+donc de 28. Le script verrouille le compte attendu par tweet et prévient si un
+tweet ne rend plus le même nombre d'images.
 
-| # | Sujet | Rôle | Mesures de l'audit |
-|---|---|---|---|
-| 01–04 | Sony A7R3 / nostalgie | référence | img01 (pont) : peau 35,8° · feuillage 105,9° · ciel 175,1° · blanc plafonné à 224 |
-| 05–07 | dont la Lamborghini | référence | img05 : blanc plafonné à 205 · img07 : ciel **194,2°** sur 38 % du cadre |
-| 08–10 | portraits / NYC Vessel | référence | img03 : ciel 181,0° |
-| 11–12 | dont hélico Biarritz | référence | img11 : feuillage **85,8° S0,18** · img12 : peau 33,2° · feuillage 84,4° · ciel 188,4° |
-| 13 | prise d'avion (Paris, iPhone 17 Pro) | référence | blanc plafonné à **181**, aucun pixel ≥ 255 |
-| 14–15 | intérieur WeWork New York | référence | img14 : seule photo à écrêter franchement (0,43 % ≥ 255) |
-| 16–19 | Marrakech (via le tweet cité) | référence | img16 : ciel **189,0°** sur 32 % du cadre · img18 : ciel 191,0° sur 42 % · img19 : ciel 183,9° |
-| 20–27 | il nomme son preset : Lightroom « Cinéma 2 » | **filiation** | pas mesurées — elles servent uniquement à établir d'où vient le look |
+| # | Sujet | Apport |
+|---|---|---|
+| 01–03 | portraits extérieurs, rivière, rue | peau, verts |
+| 05–07 | Lamborghini jaune, garage, quai | jaune saturé, noirs denses |
+| 08, 10 | portrait urbain de nuit, voiture dans le brouillard | tons froids délavés |
+| 11–12 | plage au coucher, **hélico Biarritz** | peau 33°, feuillage 84°, ciel 188° |
+| 13 | hublot d'avion sur Paris | blanc plafonné à **181**, aucun pixel ≥ 255 |
+| 14–15 | intérieurs WeWork New York | img14 : seule photo à écrêter (0,43 % ≥ 255) |
+| 16–19 | Marrakech | **le vrai bleu du corpus** : img16 ciel 189° sur 32 %, img18 ciel 191° sur 42 % |
+| 28–31 | Shanghai de nuit, gratte-ciel | architecture, néons, contre-jour |
+| 32–33 | Shanghai depuis la tour | grande surface de ciel, mais **blanc de brume** |
+| 34 | Ducati rouge | rouge saturé, asphalte, horizon |
+
+Écartées à la main : **04** et **09** (portraits studio/intérieur), et **20–27**
+(captures d'écran de Lightroom mobile + station-service de nuit — elles
+montraient d'où vient le look, pas une couleur à mesurer). Le script reproduit ce
+tri ; `--tout` les récupère quand même.
+
+### Le trou qui reste, mesuré
+
+| | photos |
+|---|---|
+| avec du ciel (> 12 % du cadre) | 5 / 24 |
+| **avec du bleu franc** (> 8 % du cadre) | **2 / 24** — img16 et img18 |
+
+C'est le point faible du corpus, et il est structurel : la signature de
+`powlisher` est un décalage du **bleu** vers le teal (178–196°), or elle ne
+s'exprime que sur du bleu **saturé**. Les ciels blancs de brume de Shanghai
+apportent de la surface, pas de la matière à mesurer.
+
+**Ce qu'il faudrait** : ses photos de Biarritz, de plage, de mer, ou n'importe
+quel extérieur plein soleil. Tant qu'on n'en a pas, tout réglage du ciel repose
+sur deux photos, et il faut le dire au lieu de le maquiller.
 
 ## Deux choses qui manquent, et pourquoi
 
