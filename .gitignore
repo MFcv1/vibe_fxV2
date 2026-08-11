@@ -55,3 +55,4 @@ next-env.d.ts
 
 # Reglages Claude Code personnels (permissions gcloud) — non versionnes
 .claude/settings.local.json
+presets-lightroom/

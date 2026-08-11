@@ -24,6 +24,16 @@ import { buildAutoEnhancement } from './autoEnhance';
  * Ce hook ne contient que de l'etat d'ecran et le lien avec le projet commun.
  */
 
+/* Cles que le preset s'approprie quand il en porte: elles ne peuvent pas vivre
+   dans une LUT (elles dependent des pixels voisins ou de la position). */
+const PRESET_SPATIAL_KEYS = ['clarity', 'sharpness', 'dehaze', 'grain', 'vignette'];
+
+const withoutPresetSpatials = (filters) => {
+    const next = { ...filters };
+    for (const key of PRESET_SPATIAL_KEYS) next[key] = DEFAULT_FILTERS[key];
+    return next;
+};
+
 const METRICS_SAMPLE_WIDTH = 320;
 const HISTORY_LIMIT = 30;
 const PERSIST_DEBOUNCE_MS = 1200;
@@ -223,6 +233,10 @@ export default function useVisionEditor() {
         bestFor: preset.bestFor,
         avoidFor: preset.avoidFor,
         recommendedIntensity: preset.recommendedIntensity,
+        /* Un preset importe de Lightroom peut porter des reglages que la LUT ne
+           peut pas contenir (clarte, grain, vignetage...): ils dependent des
+           pixels voisins ou de la position dans l'image. */
+        spatialFilters: preset.spatialFilters || null,
     })), []);
 
     /*
@@ -323,11 +337,16 @@ export default function useVisionEditor() {
     const applyPreset = useCallback((preset) => {
         if (!preset) return;
         if (preset.id === activePresetId) {
-            commit(filters, intensity, null, 'Preset retiré — tu vois la photo sans le look.');
+            commit(withoutPresetSpatials(filters), intensity, null,
+                'Preset retiré — tu vois la photo sans le look.');
             return;
         }
+        /* On repart des valeurs par defaut sur les cles spatiales avant
+           d'appliquer celles du preset: sinon le grain ou le vignetage du
+           preset precedent resterait en place apres un changement. */
+        const nextFilters = { ...withoutPresetSpatials(filters), ...(preset.spatialFilters || {}) };
         commit(
-            filters,
+            nextFilters,
             preset.recommendedIntensity || 85,
             preset.id,
             `Preset « ${preset.label} » — ${preset.bestFor}.`,

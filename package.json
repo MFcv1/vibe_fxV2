@@ -61,6 +61,8 @@
     "test:vibeos-layout": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-layout-b1.spec.cjs scripts/smoke-vibeos-layout-b3.spec.cjs",
     "test:vibeos-library": "node scripts/smoke-vibeos-library.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-library-ui.spec.cjs",
     "test:vision-preset": "node scripts/smoke-vision-preset.mjs",
+    "preset:mire": "node scripts/make-hald-clut.mjs",
+    "preset:import": "node scripts/import-lightroom-preset.mjs",
     "test:vibeos-vision": "node scripts/smoke-vision-preset.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-vision.spec.cjs",
     "test:vibeos-studio": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-studio.spec.cjs",
     "test:vibeos-soundtrack": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-soundtrack.spec.cjs",

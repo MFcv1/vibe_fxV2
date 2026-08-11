@@ -33,6 +33,7 @@
 | F — Bascule | pipeline chaîné, `/studio` → `/creer`, publication sur `/publier`, ancienne UI supprimée | ✅ 2026-08-08 |
 | G — Photothèque | `/creer/bibliotheque` : masonry calculée, indexation EXIF par appareil, carrousel plein écran, vrai avant/après, sorties de secours sur l'image bloquée | ✅ 2026-08-11 |
 | H — Presets Vision | les 12 looks et la bibliothèque par marque supprimés ; moteur LUT 3D + preset `powlisher` reconstruit par mesure | ✅ 2026-08-11 |
+| I — Import Lightroom | capture exacte d'un preset externe par Hald CLUT + lecture du `.xmp` pour les réglages spatiaux | ✅ 2026-08-11 |
 
 **Le redesign VibeOS est livré.** L'ancienne interface `/studio` n'existe plus.
 
@@ -171,10 +172,13 @@ choix produit, pas de la dette cachée.
    dans l'ancienne interface et sont parties avec elle. Les routes API et le
    ledger IA sont intacts ; `src/config/aiLaunch.js` les marque « à porter dans
    VibeOS ». À porter dans `/creer` si on les veut.
-2. **Étoffer la bibliothèque de presets** — il n'y en a qu'un. L'architecture LUT
-   a été faite pour ça : un preset = une fonction pure dans
-   `utils/visionPresets.js`, et le coût de rendu ne bouge pas. Un second preset
-   « nuit / intérieur » est mesurable dès maintenant à partir du corpus Cinema 2.
+2. **Importer des presets Lightroom** — la chaîne est prête et vérifiée, il ne
+   manque que Lightroom installé. Trois commandes, décrites dans
+   [docs/importer-un-preset-lightroom.md](docs/importer-un-preset-lightroom.md) :
+   `npm run preset:mire`, on applique le preset à la mire dans Lightroom, puis
+   `npm run preset:import`. La couleur est capturée **exactement** (aller-retour
+   mesuré à 0,24/255), le `.xmp` complète les réglages spatiaux. Marche pour
+   CN11, CN17, un pack acheté ou un preset perso.
 3. **Couverture émulateurs du parcours publication** — `smoke-studio-emulator-ui`
    pilotait l'ancienne UI ; il a été retiré. `test:publication-flow` et
    `test:emulators` couvrent toujours la logique et les règles, mais plus le
@@ -247,7 +251,7 @@ npm run build
 npm run test:scope                # isolation + fichiers supprimés / fichiers à garder
 npm run test:vibeos-library       # EXIF + masonry (Node), puis import/grille/carrousel/persistance (navigateur)
 npm run test:vibeos-layout        # B1 + B3
-npm run test:vision-preset        # 20 vérifications de la science du preset (Node, sans navigateur)
+npm run test:vision-preset        # 40 vérifications : science du preset + chaîne d'import (Node)
 npm run test:vibeos-vision        # le preset ci-dessus, puis parcours + presets sûrs sur 5 photos types
 npm run test:vision-filters       # audit du vocabulaire de filtres et du renderer
 npm run test:vibeos-studio        # parcours + 10 ambiances distinctes sur 3 photos types

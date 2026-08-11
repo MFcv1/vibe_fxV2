@@ -23,6 +23,7 @@
 /* Extension explicite: ce module est aussi importe tel quel par le smoke test
    Node (`scripts/smoke-vision-preset.mjs`), ou la resolution ESM l'exige. */
 import { buildLut3d, LUT_SIZE } from './lut3d.js';
+import { IMPORTED_PRESETS } from './presets/index.js';
 
 const clamp01 = (value) => (value < 0 ? 0 : value > 1 ? 1 : value);
 
@@ -211,6 +212,18 @@ function powlisherTransform(input) {
 
 /* ---------- Registre ---------- */
 
+/*
+ * Un preset arrive par l'un de deux chemins, et les deux finissent en LUT:
+ *
+ *  - `transform` : une fonction pure ecrite ici (cas de `powlisher`, reconstruit
+ *    par mesure). Elle est compilee en LUT au premier usage.
+ *  - `getLut`    : une table deja capturee, importee de Lightroom via une Hald
+ *    CLUT (`scripts/import-lightroom-preset.mjs`). Rien a compiler: c'est le
+ *    resultat mesure du moteur d'Adobe, pas une approximation.
+ *
+ * Cote rendu, les deux sont indiscernables — d'ou le fait qu'ajouter un preset
+ * importe ne coute rien au moteur.
+ */
 export const VISION_PRESETS = [
     {
         id: 'powlisher',
@@ -223,6 +236,7 @@ export const VISION_PRESETS = [
         recommendedIntensity: 85,
         transform: powlisherTransform,
     },
+    ...IMPORTED_PRESETS,
 ];
 
 export const VISION_PRESET_BY_ID = VISION_PRESETS.reduce((map, preset) => {
@@ -241,7 +255,10 @@ export function getPresetLut(presetId) {
     if (lutCache.has(presetId)) return lutCache.get(presetId);
     const preset = VISION_PRESET_BY_ID[presetId];
     if (!preset) return null;
-    const lut = buildLut3d(preset.transform, LUT_SIZE);
+    /* Preset importe: la table est deja la, il n'y a rien a compiler. */
+    const lut = typeof preset.getLut === 'function'
+        ? preset.getLut()
+        : buildLut3d(preset.transform, LUT_SIZE);
     lutCache.set(presetId, lut);
     return lut;
 }

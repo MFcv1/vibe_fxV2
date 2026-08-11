@@ -16,6 +16,15 @@ import {
     getPresetTransform,
 } from '../src/features/vibefx-studio/utils/visionPresets.js';
 import { LUT_SIZE, applyLut3dToData } from '../src/features/vibefx-studio/utils/lut3d.js';
+import {
+    buildHaldIdentity,
+    haldImageSize,
+    haldToLut3d,
+    lutFromBase64,
+    lutToBase64,
+    measureHaldDeviation,
+} from '../src/features/vibefx-studio/utils/haldClut.js';
+import { parseXmpPreset } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 
 let failures = 0;
 const results = [];
@@ -169,8 +178,122 @@ check('intensite 0 = image intacte', Math.abs(untouched[1] - 200), 0, 0);
 /* ---------- 5. le registre ---------- */
 
 check('au moins un preset expose', VISION_PRESETS.length, 1, 99);
-const missing = VISION_PRESETS.filter((p) => !p.id || !p.label || typeof p.transform !== 'function');
-check('presets complets (id/label/transform)', missing.length, 0, 0);
+/* Un preset est valide s'il sait produire une LUT, par l'un des deux chemins:
+   une fonction pure ecrite a la main, ou une table importee de Lightroom. */
+const malformed = VISION_PRESETS.filter(
+    (p) => !p.id || !p.label
+        || (typeof p.transform !== 'function' && typeof p.getLut !== 'function'),
+);
+check('presets complets (id/label/table)', malformed.length, 0, 0);
+/* Chaque preset declare doit reellement produire une LUT de la bonne taille. */
+const badLut = VISION_PRESETS.filter((p) => {
+    const table = getPresetLut(p.id);
+    return !table || table.length !== LUT_SIZE ** 3 * 3;
+});
+check('chaque preset produit sa LUT', badLut.length, 0, 0);
+
+/* ---------- 6. import Lightroom : Hald CLUT ---------- */
+
+/*
+ * La chaine d'import doit tenir un aller-retour exact: une mire neutre passee
+ * dans un preset puis relue doit redonner ce preset. C'est la garantie que
+ * `import-lightroom-preset.mjs` ne produira pas un preset faux en silence.
+ */
+const HALD_LEVEL = 6; /* cube 36 — assez pour tester, rapide */
+const identity = buildHaldIdentity(HALD_LEVEL);
+check('mire Hald : taille image', identity.size, haldImageSize(HALD_LEVEL), haldImageSize(HALD_LEVEL));
+check('mire Hald : octets', identity.data.length, identity.cube ** 3 * 3, identity.cube ** 3 * 3);
+
+/* Une mire neutre relue doit redonner l'identite. */
+const identityLut = haldToLut3d(identity.data, HALD_LEVEL, LUT_SIZE);
+let identityError = 0;
+for (let i = 0; i < identityLut.length; i += 3) {
+    const cell = i / 3;
+    const r = cell % LUT_SIZE;
+    const g = Math.floor(cell / LUT_SIZE) % LUT_SIZE;
+    const b = Math.floor(cell / (LUT_SIZE * LUT_SIZE));
+    identityError = Math.max(identityError, Math.abs(identityLut[i] - (r / (LUT_SIZE - 1)) * 255));
+    identityError = Math.max(identityError, Math.abs(identityLut[i + 1] - (g / (LUT_SIZE - 1)) * 255));
+    identityError = Math.max(identityError, Math.abs(identityLut[i + 2] - (b / (LUT_SIZE - 1)) * 255));
+}
+check('mire neutre relue = identite', identityError, 0, 2, '/255');
+
+/* Une mire neutre doit etre detectee comme « preset non applique ». */
+check('mire neutre detectee comme telle', measureHaldDeviation(identity.data, HALD_LEVEL).max, 0, 1);
+
+/* Aller-retour complet: on applique le preset a la mire, on relit, on compare. */
+const processed = new Uint8Array(identity.data.length);
+const haldPixel = [0, 0, 0];
+for (let i = 0; i < identity.data.length; i += 3) {
+    haldPixel[0] = identity.data[i] / 255;
+    haldPixel[1] = identity.data[i + 1] / 255;
+    haldPixel[2] = identity.data[i + 2] / 255;
+    const out = transform(haldPixel);
+    processed[i] = Math.round(Math.max(0, Math.min(1, out[0])) * 255);
+    processed[i + 1] = Math.round(Math.max(0, Math.min(1, out[1])) * 255);
+    processed[i + 2] = Math.round(Math.max(0, Math.min(1, out[2])) * 255);
+}
+check('mire traitee detectee comme traitee', measureHaldDeviation(processed, HALD_LEVEL).max, 2, 255);
+
+const importedLut = haldToLut3d(processed, HALD_LEVEL, LUT_SIZE);
+let roundTripMax = 0;
+for (let i = 0; i < lut.length; i += 1) {
+    roundTripMax = Math.max(roundTripMax, Math.abs(lut[i] - importedLut[i]));
+}
+check('aller-retour Hald -> LUT', roundTripMax, 0, 12, '/255');
+
+/* La LUT doit survivre au passage en base64 (c'est ainsi qu'elle est stockee). */
+const decoded = lutFromBase64(lutToBase64(lut));
+let base64Error = 0;
+for (let i = 0; i < lut.length; i += 1) {
+    base64Error = Math.max(base64Error, Math.abs(lut[i] - decoded[i]));
+}
+check('LUT intacte apres base64', base64Error, 0, 0);
+
+/* ---------- 7. import Lightroom : lecture du .xmp ---------- */
+
+const sampleXmp = `<?xpacket begin="\ufeff"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   crs:Contrast2012="-50"
+   crs:Highlights2012="-30"
+   crs:Clarity2012="20"
+   crs:Texture="10"
+   crs:GrainAmount="24"
+   crs:PostCropVignetteAmount="-40"
+   crs:HueAdjustmentBlue="-38"
+   crs:SaturationAdjustmentGreen="-55">
+   <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">CN11</rdf:li></rdf:Alt></crs:Name>
+   <crs:Group><rdf:Alt><rdf:li xml:lang="x-default">Cinéma II</rdf:li></rdf:Alt></crs:Group>
+   <crs:ToneCurvePV2012>
+    <rdf:Seq><rdf:li>0, 0</rdf:li><rdf:li>128, 132</rdf:li><rdf:li>255, 243</rdf:li></rdf:Seq>
+   </crs:ToneCurvePV2012>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>`;
+
+const parsed = parseXmpPreset(sampleXmp);
+check('.xmp : nom lu', parsed.name === 'CN11' ? 1 : 0, 1, 1);
+check('.xmp : groupe lu', parsed.group === 'Cinéma II' ? 1 : 0, 1, 1);
+check('.xmp : contraste', parsed.basic.contrast, -50, -50);
+check('.xmp : hautes lumières', parsed.basic.highlights, -30, -30);
+check('.xmp : teinte du bleu', parsed.hsl.blue.hue, -38, -38);
+check('.xmp : saturation du vert', parsed.hsl.green.saturation, -55, -55);
+check('.xmp : courbe maître', parsed.curves.master?.length || 0, 3, 3);
+/* Les reglages spatiaux sont le vrai apport du .xmp: une Hald CLUT ne les voit pas. */
+check('.xmp : grain transposé', parsed.spatialFilters.grain || 0, 1, 60);
+check('.xmp : vignetage transposé', parsed.spatialFilters.vignette || 0, 1, 60);
+check('.xmp : clarté transposée', parsed.spatialFilters.clarity || 0, 1, 40);
+check('.xmp : résumé lisible', parsed.summary.length, 3, 99);
+
+let rejected = 0;
+try {
+    parseXmpPreset('<xml>pas un preset</xml>');
+} catch {
+    rejected = 1;
+}
+check('.xmp : fichier invalide rejeté', rejected, 1, 1);
 
 /* ---------- rapport ---------- */
 
