@@ -109,6 +109,44 @@ fond** — un ciel pâle d'hiver (s = 0,20) reçoit donc exactement le même −
 qu'un ciel franc de Biarritz (s = 0,45). C'est le premier correctif d'un
 `powlisher` V2, et il est vérifiable sur cette paire.
 
+### La règle du ciel, mesurée sur TOUTE la base
+
+C'est le résultat le plus utile du corpus, et aucune source seule ne le donne.
+
+| ciel **voilé** | zone claire quasi blanche (s < 0,10) | saturation restante |
+|---|---|---|
+| img32 (Shanghai) | **90 %** | 0,15 |
+| img33 (Shanghai) | 75 % | 0,13 |
+| img48 (son édit de la paire) | 84 % | 0,11 |
+
+| ciel **franc** | zone claire quasi blanche | saturation | teinte |
+|---|---|---|---|
+| img16 · img18 (Marrakech) | 1 % · 4 % | 0,38 · 0,40 | 191,8° · 193,2° |
+| img35 · img36 · img40 (Biarritz) | 9 % · 0 % · 0 % | 0,39 · 0,51 · 0,50 | 188,1° · 198,9° · 193,9° |
+
+**Sa règle** : un ciel voilé, il ne cherche pas à le rendre bleu — il le laisse
+**partir au blanc**. Un ciel franc, il le tient en teal à 188–199°, saturation
+forte.
+
+`powlisher` V1 fait l'inverse sur les ciels voilés : il garde la saturation
+(0,19 → 0,14 seulement) et tourne à 170°, ce qui donne un cyan qu'il ne produit
+jamais. C'est le cahier des charges d'un V2.
+
+### Comment cette règle a été trouvée, et pourquoi ça vaut d'être lu
+
+Aucune des deux sources ne la donne seule, et chacune induit en erreur dans un
+sens différent :
+
+- **La paire seule** (n = 1) disait « il ne fait presque pas de teal ». Faux en
+  général : sur un ciel franc, il pousse fort.
+- **Le corpus seul** disait « il tire les bleus pâles PLUS vers le cyan »
+  (182,5° contre 194,3°). C'était un **biais de sélection** : on ne mesurait que
+  les pixels restés bleus, alors que ceux qu'il désature à blanc — l'essentiel
+  d'un ciel voilé — sortaient de la mesure.
+
+Il fallait les deux, plus un contrôle par groupe de lumière. À retenir avant de
+tirer une conclusion d'un chiffre unique sur ce corpus.
+
 **Ce qui vaudrait le plus cher maintenant** : d'autres paires avant/après. C'est
 la seule vérité terrain sur son traitement.
 
