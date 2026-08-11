@@ -73,6 +73,15 @@ const TWEETS = [
     ['1973026896201003373', 'Biarritz', 'reference', 4, false],
     ['2041250280445026501', 'presque l\'ete', 'reference', 4, false],
     ['2076283103580938629', 'exterieur', 'reference', 4, false],
+
+    /*
+     * LA PAIRE AVANT/APRES, et c'est la piece la plus precieuse du corpus.
+     * Il y publie sa photo brute d'iPhone A COTE de son edit final. On connait
+     * donc son ENTREE et sa SORTIE sur la meme image — la seule facon de mesurer
+     * ce qu'il fait vraiment, au lieu de le deduire d'une photo finie.
+     * img47 = avant (brut), img48 = apres (son edit).
+     */
+    ['1997328906508960039', 'PAIRE avant/apres', 'paire', 2, false],
 ];
 
 /*

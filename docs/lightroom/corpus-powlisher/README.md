@@ -1,6 +1,6 @@
 # Corpus de référence de `powlisher`
 
-Les photos dont le preset `powlisher` a été déduit — **36** après tri. Elles ne sont pas dans
+Les photos dont le preset `powlisher` a été déduit — **38** après tri. Elles ne sont pas dans
 le dépôt — seul ce README l'est. Pour les récupérer :
 
 ```bash
@@ -34,7 +34,7 @@ Les trois signatures qui en sortent, et qui définissent le preset :
 | **Peau préservée** | 26–36°, jamais tirée vers l'orange | 27–36° |
 | **Hautes lumières crème** | sur la moitié du corpus, le point blanc ne monte **jamais** à 255 | pas d'écrêtage |
 
-## Les images, 36 au 2026-08-12
+## Les images, 38 au 2026-08-12
 
 Numérotation **figée** : les numéros 1 à 27 restent sur le corpus d'origine,
 parce que [l'audit](../../audit-preset-powlisher-2026-08-11.md) cite les photos
@@ -57,6 +57,7 @@ tweet ne rend plus le même nombre d'images.
 | 35–38 | **Biarritz** : Porsche, terrasse sur mer, côte, plage vue d'en haut | **le ciel bleu et la mer** |
 | 39–42 | fin de journée : foule au coucher, littoral, bar, table | lumière rasante, peau au soleil couchant |
 | 43–46 | extérieur : plage, escalier sur la côte, piscine, coucher sur mer | turquoise, contre-jour, soleil dans le cadre |
+| **47–48** | **PAIRE avant/après** : sa photo brute d'iPhone, puis son édit final | **la pièce maîtresse** — voir ci-dessous |
 
 Écartées à la main : **04** et **09** (portraits studio/intérieur), et **20–27**
 (captures d'écran de Lightroom mobile + station-service de nuit — elles
@@ -86,6 +87,30 @@ construire, et pourtant :
 
 Moyenne sur les 7 photos à ciel mesurable : **189,7°**, étendue 175–196°. La
 signature centrale de `powlisher` tient donc sur 7 photos au lieu de 2.
+
+### La paire avant/après (img47 → img48), et ce qu'elle révèle
+
+Il a publié sa photo **brute** à côté de son **édit final**. On connaît donc son
+entrée ET sa sortie sur la même image — la seule façon de mesurer ce qu'il fait,
+au lieu de le déduire d'une photo finie.
+
+| ciel | teinte | saturation |
+|---|---|---|
+| son avant (brut iPhone) | 211,0° | 0,20 |
+| **son après** | **207,6°** | **0,11** |
+| notre `powlisher` | **172,3°** | 0,15 |
+
+**Sur un ciel pâle et couvert, il ne fait presque pas de teal** : −3° de teinte,
+et il **désature** (0,20 → 0,11). Nous décalons de −39°.
+
+Cause identifiée dans `powlisherTransform` : la pondération est
+`smoothstep(0, 0.12, s)`. Au-delà de s = 0,12, le décalage s'applique **à
+fond** — un ciel pâle d'hiver (s = 0,20) reçoit donc exactement le même −39°
+qu'un ciel franc de Biarritz (s = 0,45). C'est le premier correctif d'un
+`powlisher` V2, et il est vérifiable sur cette paire.
+
+**Ce qui vaudrait le plus cher maintenant** : d'autres paires avant/après. C'est
+la seule vérité terrain sur son traitement.
 
 **Ce qui manque encore** : rien de criant côté ciel. Le corpus reste en revanche
 pauvre en **portrait rapproché** (la peau n'est mesurée que sur quelques
