@@ -126,6 +126,20 @@ est dans [1-procedure.md](docs/lightroom/1-procedure.md), étape 1 bis.
 > doit **les demander** — c'est une étape du protocole, à rappeler à chaque
 > import.
 
+**Ce qui est DÉJÀ capturé, et qu'on ne relève donc pas** : tout ce qui dépend de
+la seule couleur du pixel — exposition, contraste, hautes lumières, ombres,
+blancs, noirs, courbe, TSL, étalonnage, virage, N&B, et le **profil**. La mire
+capture le résultat, pas la liste des curseurs.
+
+**⚠️ Piège des réglages « Auto ».** Certains presets Premium affichent « Auto
+Blancs », « Auto Noirs » avec des valeurs non nulles (vu sur la famille FT :
++14 / +35). Un « Auto » est calculé **à partir de la photo** : sur la mire, dont
+l'histogramme ne ressemble à aucune image, il calculerait tout autre chose — et
+la table serait fausse **sans que rien ne le signale**. Test : appliquer le
+preset à deux photos très différentes ; si ces nombres changent, le preset
+s'adapte et n'est pas capturable tel quel. À écarter, ou à capturer Auto remis
+à 0 (on fige alors une version qui ne s'adapte plus).
+
 ### Reste ouvert
 
 1. **Brancher la Netteté 40** que Lightroom applique par défaut

@@ -133,6 +133,42 @@ dégradés, masques IA). Ils dépendent du contenu de la photo — une mire de
 couleurs n'a ni ciel ni sujet. Si le panneau **Masquage** d'un preset n'est pas
 vide, la capture sera fausse **sans le signaler**. À vérifier avant d'importer.
 
+### Ce qui EST capturé, et qu'on n'a donc pas à relever
+
+Tout ce qui transforme un pixel **en fonction de sa seule couleur** est déjà dans
+la table, fondu dedans. Inutile de le noter, inutile de le rejouer :
+
+> Exposition, Contraste, Hautes lumières, Ombres, **Blancs, Noirs**, la **Courbe**
+> (maître et par canal), le mélangeur **TSL**, l'**étalonnage**, le **virage
+> partiel**, la conversion **N&B**, et le **Profil** (« Moderne 01 », « Adobe
+> Couleur »…). Un profil est lui-même une table de couleurs : la mire l'avale
+> sans rien de plus.
+
+C'est la force de la méthode : elle capture le **résultat**, pas la liste des
+curseurs. La question qui trie, à chaque réglage : *a-t-il besoin de regarder les
+pixels voisins ou la position dans l'image ?* Non → la mire s'en occupe. Oui →
+c'est un effet spatial, à relever. Ça dépend du sujet → non capturable.
+
+### ⚠️ Le piège des réglages « Auto »
+
+Certains presets Premium n'affichent pas « Exposition » mais « **Auto**
+Exposition », « **Auto** Blancs », « **Auto** Noirs », avec des valeurs non
+nulles (vu sur la famille **FT / « inspiré d'un film »** : Auto Blancs +14, Auto
+Noirs +35).
+
+Un réglage « Auto » est **calculé à partir de la photo elle-même**. Or
+l'histogramme de la mire — un damier de 262 144 couleurs réparties uniformément —
+ne ressemble à aucune photo : l'Auto y calculerait tout autre chose que sur une
+vraie image. **La table capturée serait fausse, sans que rien ne le signale.**
+
+**Le test, trente secondes :** appliquer le preset à deux photos très
+différentes (une sombre, une claire) et regarder ces nombres. S'ils **changent**,
+le preset s'adapte à l'image et n'est pas capturable tel quel.
+
+Deux issues, au choix : **écarter** ces presets, ou les capturer **Auto remis à
+0** — en sachant qu'on fige alors une version qui ne s'adapte plus. C'est un
+choix produit, à trancher avant d'en importer une série.
+
 **Puis on importe :**
 
 ```bash
