@@ -90,23 +90,41 @@ Le corpus n'est pas versionné (`node scripts/fetch-powlisher-corpus.mjs` le
 récupère). Sous-dossier `ciel/` : les photos où le ciel est mesurable — c'est lui
 qui porte la cible.
 
-## La mission suivante (lot K), dans l'ordre
+## La mission suivante — synchroniser nos réglages avec Lightroom
 
-1. **Brancher la Netteté 40** que Lightroom applique par défaut
-   (`filters.sharpness`). Dernier écart mesurable avec Lightroom.
-2. **Trancher la licence** avant toute mise en ligne : CN11 et CN17 sont dans le
-   bundle sous leurs noms Adobe.
-3. **Construire nos propres looks**, calibrés sur CN11 qui est une référence
-   exacte.
+**Avant tout nouvel import.** La capture par Hald CLUT donne la **couleur**
+exactement, jamais les effets **spatiaux** (grain, vignetage, clarté, texture,
+netteté, voile). Ceux-là se recopient à la main dans `spatialFilters` — mais nos
+chiffres ne sont pas ceux de Lightroom.
 
-Deux réglages de `powlisher-showcase` sont posés **au jugement**, et c'est
-assumé : son vignetage (22), faute de surface uniforme mesurable dans ses photos,
-et son grain (20). Pour le grain, la mesure disait 35 — mais le ~2,5/255 de
-référence avait été mesuré sur ses JPEG réduits à 900 px, alors que notre grain
-est posé à la résolution de la photo : réduire une image **moyenne** son grain,
-les deux chiffres ne sont pas comparables. À l'œil, 35 passe sur une voiture
-(cadre plein de matière) et se voit trop sur un paysage (grand ciel lisse). 20
-tient sur les deux.
+Mesuré sur la mire CN17 (faite de carrés unis : toute variation à l'intérieur
+d'un carré **est** le grain) : **Lightroom Grain 15 = 6,27/255**, notre Grain 15
+≈ 0,8/255, notre maximum (42) = 2,84/255. **~8× d'écart à chiffre égal.**
+
+Le travail : fabriquer une **mire d'effets** (aplats, dégradés, bords de
+contraste varié), la faire passer dans Lightroom un curseur à la fois, mesurer
+les deux côtés, puis **aligner notre moteur** pour qu'un même chiffre donne le
+même effet. Détail dans `todo.md`.
+
+⚠️ Après réétalonnage, les valeurs de `powlisher-showcase` (grain 20, vignetage
+22, relief 14) doivent être revues et **revalidées à l'œil**.
+
+## Puis — importer d'autres presets (paysage, architecture urbaine, cinéma…)
+
+Méthode Hald CLUT, procédure dans `docs/lightroom/1-procedure.md`. **Étape 1 bis
+obligatoire** : relever les panneaux Effets et Détail, remettre le grain à 0
+avant d'exporter la mire, redéclarer les valeurs en `spatialFilters`.
+
+⚠️ **Lightroom n'est pas pilotable** : tu ne peux pas lire ces valeurs, tu dois
+**les demander** — et c'est à toi de le rappeler à chaque preset.
+⚠️ **Les masques** (ciel, sujet, dégradés, IA) ne sont capturables d'aucune
+façon : si le panneau Masquage n'est pas vide, la capture est fausse **sans le
+signaler**.
+
+## Reste ouvert
+
+1. **Trancher la licence** : CN11 et CN17 portent leurs noms Adobe.
+2. **Construire nos propres looks**, calibrés sur CN11.
 
 ## Les interdits du chantier
 
