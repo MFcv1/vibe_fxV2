@@ -163,6 +163,33 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
   await expect(message).toContainText("retiré");
   await firstPreset.click();
 
+  /*
+   * Un preset peut porter des effets qu'une LUT ne peut pas contenir (grain,
+   * vignetage, relief). Deux choses doivent alors etre vraies, et elles se
+   * verifient ici parce qu'aucune mesure de couleur ne les verrait:
+   *   - le preset le DIT, au lieu de faire bouger des reglages en silence;
+   *   - les reglages concernes portent vraiment la valeur du preset.
+   */
+  const showcase = presetGrid.locator("button").filter({ hasText: "Showcase" });
+  if (await showcase.count()) {
+    await showcase.first().click();
+    await expect(message).toContainText("Il pose aussi");
+    await page.getByTestId("vibeos-vision-advanced").getByRole("button").first().click();
+    /* Les reglages qui ont bouge remontent en tete du panneau, dans « Modifiés ».
+       Sans ca, il faut parcourir seize curseurs pour voir ce que le preset a
+       pose. Le compteur doit couvrir au moins les trois cles du showcase. */
+    const modifies = page.getByTestId("vibeos-vision-modifies");
+    await expect(modifies).toBeVisible();
+    expect(await modifies.getByRole("slider").count()).toBeGreaterThanOrEqual(3);
+    const grain = page.getByRole("slider", { name: /^Grain/ });
+    await expect(grain).toBeVisible();
+    expect(Number(await grain.inputValue())).toBeGreaterThan(0);
+    /* Retire le preset pour laisser l'ecran dans l'etat attendu par la suite. */
+    await showcase.first().click();
+    await page.getByTestId("vibeos-vision-advanced").getByRole("button").first().click();
+    await firstPreset.click();
+  }
+
   /* Comparaison: le rideau reste affiche sans maintenir le clic (c'etait le
      defaut de l'ancienne version), la poignee se deplace au clavier, et les
      trois modes existent. */

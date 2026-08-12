@@ -77,7 +77,61 @@ npm run preset:controle -- <le-fichier-exporté.png>
 2. Onglet **Premium** → groupe **Style : cinéma II** → cliquer **CN11**
    (survoler ne fait qu'un aperçu, il faut cliquer).
 3. **Rien d'autre.** Aucun curseur touché par-dessus.
-4. Réexporter avec **exactement** les réglages de l'étape 0.
+4. **RELEVER LES EFFETS NON-LUT** — étape obligatoire, voir juste en dessous.
+5. Réexporter avec **exactement** les réglages de l'étape 0.
+
+### Étape 1 bis — Relever ce qu'une table de couleurs ne peut pas contenir
+
+**Un preset Lightroom n'est pas que de la couleur.** Constaté sur le pack
+« Cinéma II » : **CN11 n'a aucun effet**, mais **CN17 pose un Grain 15**, et la
+**Netteté reste à 40** sur les deux (c'est le défaut de Lightroom, pas le
+preset). D'autres familles bougent la texture, la clarté ou le noir et blanc.
+
+Ces réglages dépendent des **pixels voisins** ou de la **position** dans
+l'image : une Hald CLUT ne les voit pas, et pire, **le grain POURRIT la
+capture** — il bruite chaque pastille de la mire, donc la table mesurée devient
+fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quoi sert
+`--lisser`.)
+
+**La bonne méthode, dans l'ordre :**
+
+1. Appliquer le preset à la mire.
+2. **Relever** les valeurs des panneaux ci-dessous.
+3. **Remettre à 0** dans Lightroom tout ce qui est spatial (Grain surtout) avant
+   d'exporter la mire → la table capturée est propre, sans `--lisser`.
+4. Redéclarer ces valeurs dans `spatialFilters` du preset importé.
+
+**Les panneaux à ouvrir et à relever, à chaque preset :**
+
+| Panneau Lightroom | Réglage | Notre clé |
+|---|---|---|
+| **Effets** | Texture | (pas encore branché) |
+| **Effets** | Clarté | `clarity` |
+| **Effets** | Correction du voile | `dehaze` |
+| **Effets** | Vignette | `vignette` |
+| **Effets** | **Grain** | `grain` |
+| **Détail** | Netteté | `sharpness` |
+| **Détail** | Réduction du bruit | (pas branché) |
+| En-tête | **N&B** activé ? | `saturation: 0` |
+| En-tête | Profil (Couleur / autre) | — noter, ça change la base |
+
+> ⚠️ **Lightroom n'est pas pilotable** (pas d'AppleScript, pas de CLI sur la
+> version cloud). L'agent ne peut donc PAS lire ces valeurs lui-même : il doit
+> **les demander**, capture d'écran des panneaux à l'appui. C'est une étape du
+> protocole, pas un détail — un preset importé sans ce relevé rend une couleur
+> juste et un rendu incomplet.
+
+**Le `.xmp`, quand il est disponible**, porte déjà ces valeurs
+(`crs:GrainAmount`, `crs:Texture`, `crs:Clarity2012`, `crs:Dehaze`,
+`crs:PostCropVignetteAmount`, `crs:Sharpness`) et
+[xmpPreset.js](../../src/features/vibefx-studio/utils/xmpPreset.js) les lit déjà.
+Les presets **Premium** d'Adobe ne s'exportent pas en `.xmp` : pour eux, c'est le
+relevé à l'écran qui fait foi.
+
+**Ce qui n'est capturable d'AUCUNE façon** : les **masques** (ciel, sujet,
+dégradés, masques IA). Ils dépendent du contenu de la photo — une mire de
+couleurs n'a ni ciel ni sujet. Si le panneau **Masquage** d'un preset n'est pas
+vide, la capture sera fausse **sans le signaler**. À vérifier avant d'importer.
 
 **Puis on importe :**
 

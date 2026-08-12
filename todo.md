@@ -1,169 +1,173 @@
 # TODO — Vibe_fx V2
 
-> **Dernière mise à jour : 2026-08-11.**
+> **Point d'étape : 2026-08-12.**
 >
-> Ce fichier ne porte QUE le chantier **actif** : les **presets de Vision**.
-> Il est court **exprès** — un agent le relit à chaque session, tout ce qui
-> traîne ici coûte du contexte à chaque fois.
->
-> Tout ce qui est livré et clos vit dans des archives, à ouvrir **seulement**
-> si on touche à la zone concernée :
-> - [docs/archive-vibeos-2026-08-11.md](docs/archive-vibeos-2026-08-11.md) —
->   redesign VibeOS, phases A à G.
-> - [docs/archive-vibecut-2026-08-04.md](docs/archive-vibecut-2026-08-04.md) —
->   reconstruction VibeCut (`/video`, `render-service/`).
+> Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
+> agent le relit à chaque session. Le détail de ce qui est clos vit dans les
+> archives et dans les journaux datés de `map.md`.
 
 **À lire avant de coder, dans cet ordre :**
 
 1. [AGENTS.md](AGENTS.md) — règles de travail, rituel de fin de phase.
 2. Ce fichier.
-3. [docs/lightroom/](docs/lightroom/) — **tout ce qui concerne l'import d'un
-   preset Lightroom** : la procédure clic par clic, la méthode et ses pièges, les
-   mesures de CN11/CN17. Commencer par son `README.md`.
-4. [docs/audit-preset-powlisher-2026-08-11.md](docs/audit-preset-powlisher-2026-08-11.md)
-   — si tu touches à `powlisher`.
+3. [docs/presets-valides.md](docs/presets-valides.md) — **si tu touches aux
+   presets** : ceux qui ne se suppriment jamais, et ce qu'un preset doit passer
+   pour y entrer.
+4. [docs/lightroom/](docs/lightroom/) — **si tu importes un preset** : la
+   procédure clic par clic, la méthode et ses pièges, le corpus de `powlisher`.
 5. [map.md](map.md) — arbre du projet. Ses journaux datés : **ne lis que la
-   zone que tu touches**, pas le fichier entier.
+   zone que tu touches**.
+
+Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
+[VibeOS](docs/archive-vibeos-2026-08-11.md) ·
+[VibeCut](docs/archive-vibecut-2026-08-04.md) ·
+[presets, lots H/I/J](docs/archive-presets-vision-2026-08-12.md).
 
 ---
 
-## Où on en est
+## Ce qui est fait
 
-Le redesign VibeOS est **livré** (phases A→G, archivées). Toute la création vit
-sous `/creer`, la publication sous `/publier`, la vidéo sous `/video`.
+Le **redesign VibeOS** est livré : création sous `/creer`, publication sous
+`/publier`, vidéo sous `/video`.
 
-Le chantier actif, c'est **la colorimétrie de Vision** :
+**La colorimétrie de Vision** tourne sur un moteur de LUT 3D 33³
+([lut3d.js](src/features/vibefx-studio/utils/lut3d.js)), plus une chaîne d'import
+qui capture un preset Lightroom **exactement**, par Hald CLUT.
 
-| Lot | Contenu | État |
+### Les cinq presets
+
+| Preset | Ce qu'il est | Effets non-LUT |
 |---|---|---|
-| H — Presets | 12 « looks » et bibliothèque par marque supprimés ; moteur LUT 3D + preset `powlisher` reconstruit par mesure | ✅ 2026-08-11 |
-| I — Import Lightroom | capture exacte d'un preset externe par Hald CLUT + lecture du `.xmp` | ✅ 2026-08-11 |
-| J — Capture réelle CN11 / CN17 | chaîne validée sur un vrai Lightroom cloud, contrôle + 2 presets + verdict | ✅ 2026-08-11 |
-| **K — Presets maison** | **construire nos propres looks en se calibrant sur CN11** | **← à faire** |
+| `powlisher` | le look de `@powl_d`, reconstruit par mesure sur 19 photos | — |
+| `powlisher-ciel` | le ciel **converge** vers sa teinte (190–199°) au lieu d'être tourné d'un angle fixe | — |
+| `powlisher-showcase` | clair-obscur : le décor est vidé de sa couleur, le sujet reste seul coloré | grain 20, vignetage 22, relief 14 |
+| `cn11`, `cn17` | captures **exactes** de Lightroom (pack Adobe « Cinéma II ») | — |
 
-### Lot H — pourquoi les looks ont sauté
+**Tous les cinq sont dans [docs/presets-valides.md](docs/presets-valides.md) :
+ils ne se suppriment pas et ne se remplacent pas.** Un nouveau variant s'ajoute à
+côté.
 
-Ils dénaturaient les photos, et ils étaient lents : chaque changement de photo
-relançait 12 vignettes, chacune repartant de l'image **pleine résolution** avec
-4 passes pixel et un encodage JPEG.
+Trois presets ont été **supprimés** le 2026-08-12 (`powlisher-ville`,
+`powlisher-v2`, `powlisher-v2-dore`) : source biaisée et trait de contour visible
+dans le ciel. Les leçons sont dans « Pièges connus ».
 
-À la place, des presets compilés en **LUT 3D** :
+### Ce qu'un preset peut porter en plus de sa couleur
 
-- [lut3d.js](src/features/vibefx-studio/utils/lut3d.js) — une fonction de preset
-  est évaluée **une fois** sur une grille 33³, puis appliquée en **une passe**.
-  Coût de rendu **constant** : ajouter un preset ne coûte rien.
-- [visionPresets.js](src/features/vibefx-studio/utils/visionPresets.js) — les
-  presets. Deux formes possibles, indiscernables au rendu : `transform` (fonction
-  pure écrite à la main) ou `getLut` (table importée de Lightroom).
-- [presetPreview.js](src/features/vibeos/vision/presetPreview.js) — la photo est
-  réduite **une seule fois** dans un canvas partagé.
+`spatialFilters` : grain, vignetage, relief, netteté, voile. Ils dépendent des
+pixels voisins ou de la position, donc **aucune table de couleurs ne les
+contient**. Le panneau les affiche **en couleur d'accent**, les remonte en tête
+dans « Modifiés », et le preset annonce ce qu'il pose.
 
-Un seul preset existe : `powlisher`, reconstruit **par mesure** sur 19 photos
-(ciel tiré vers le teal 178–194°, verts olive, peau préservée, hautes lumières
-crème, noirs denses). Chiffres et réserves dans
-[l'audit](docs/audit-preset-powlisher-2026-08-11.md).
+### L'interface des réglages (corrigée le 2026-08-12)
 
-### Lot I — capturer un preset externe sans approximer
+Bornes lues depuis le moteur (avant, un tiers de la course ne faisait rien) ·
+réglages au repos **alignés** · les modifiés et ceux qu'un preset pilote
+remontent dans **« Modifiés »** · aperçu en **résolution / 2** pendant le geste ·
+**grain réparé** (il plafonnait à 0,9/255, invisible ; 20 donne 1,05, 42 donne
+2,84). Le détail est dans le journal de [map.md](map.md).
 
-Recopier les curseurs d'un `.xmp` donnerait un rendu **différent** : Lightroom
-travaille sur du RAW linéaire, nous sur du JPEG 8 bits déjà développé. Donc on
-ne recopie pas — on fait faire le calcul à Lightroom et on lit le résultat, via
-une **Hald CLUT**. Aller-retour vérifié en simulation : **0,24/255 d'écart
-moyen**. Mode d'emploi complet :
-[docs/lightroom/2-methode-et-pieges.md](docs/lightroom/2-methode-et-pieges.md).
+---
 
-### Lot J — la chaîne a tourné sur un vrai Lightroom
+## Ce qui reste
 
-CN11 et CN17 capturés et importés. Fidélité de CN11 sur une vraie photo :
-**0,64/255 sur la couleur**, 2,67/255 au pixel (médiane 1). Contrôle à vide
-0,018/255.
+### Lot suivant — importer d'autres presets Lightroom
 
-Quatre choses apprises, toutes documentées et toutes codées :
+Objectif : élargir la bibliothèque avec les familles **paysage, architecture
+urbaine, voyage, cinéma, film**, par la méthode Hald CLUT déjà validée.
 
-- **La mire doit être en BLOCS de 4×4 pixels.** Avec une couleur par pixel, les
-  couleurs bavent les unes sur les autres — invisible dans les clairs, ruineux
-  dans les noirs, qui viraient au **vert** de façon visible sur les photos.
-  Corrigé : `preset:mire` génère du 2048×2048 par défaut, l'import lit le cœur
-  de chaque carré. Écart aux noirs : 8,06 → **1,32/255**.
-- L'export Lightroom part en **Adobe RVB**. Il FAUT **sRVB**, sinon la table est
-  fausse d'un bout à l'autre sans que rien ne le signale.
-- Un preset avec du **grain** bruite quand même la table (CN17 : rugosité 4,70).
-  `--lisser 1` la ramène à 0,69, et ne déplace une table déjà lisse que de 0,05.
-- **Tout preset reste à `recommendedIntensity: 100`.** Baisser l'intensité ne
-  réduit pas le contraste : ça mélange l'image traitée avec l'originale, ce qui
-  délave les couleurs et éloigne de la référence. Essayé sur CN11/CN17, mesuré,
-  annulé. `powlisher` était à 85 sans justification : ça lui coûtait sa
-  signature (ciel profond à 201° au lieu de 193,7°, donc hors de sa fourchette
-  teal 178–196°). Remis à 100.
+**Le point à ne pas rater, et il est nouveau :** un preset Lightroom n'est pas
+que de la couleur. Constaté sur « Cinéma II » — **CN11 n'a aucun effet, CN17 pose
+un Grain 15**, la Netteté reste à 40 sur les deux. D'autres familles bougent la
+texture, la clarté ou le noir et blanc.
 
-Procédure reproductible, chiffres, verdict, **question de licence** et le détail
-des trois erreurs de mesure commises en route : [docs/lightroom/](docs/lightroom/).
+**Donc, à chaque import :** relever les panneaux **Effets** et **Détail** de
+Lightroom AVANT d'exporter la mire, remettre le grain à 0 pour que la table soit
+propre, puis redéclarer les valeurs dans `spatialFilters`. La procédure et le
+tableau des réglages à relever sont dans
+[docs/lightroom/1-procedure.md](docs/lightroom/1-procedure.md), étape 1 bis.
 
-### Lot K — la suite
+> **Lightroom n'est pas pilotable** : l'agent ne peut pas lire ces valeurs. Il
+> doit **les demander** — c'est une étape du protocole, à rappeler à chaque
+> import.
 
-1. **Brancher la Netteté 40** que Lightroom applique par défaut (`filters.sharpness`).
-   C'est le dernier écart mesurable avec Lightroom, et le seul gain qui reste.
-2. **Trancher la licence** avant toute mise en ligne : CN11 et CN17 sont dans le
-   bundle sous leurs noms Adobe.
-3. **Construire nos propres looks**, calibrés sur CN11 qui est maintenant une
-   référence exacte.
+### Reste ouvert
+
+1. **Brancher la Netteté 40** que Lightroom applique par défaut
+   (`filters.sharpness`) — dernier écart mesurable avec Lightroom.
+2. **Trancher la licence** : CN11 et CN17 sont dans le bundle sous leurs noms
+   Adobe. À régler avant toute mise en ligne.
+3. **Construire nos propres looks**, calibrés sur CN11 qui est une référence
+   exacte.
+
+**Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
+bibliothèque Midjourney (partis avec l'ancienne UI, routes et ledger intacts,
+cf. `src/config/aiLaunch.js`) ; synchro Google Drive de la photothèque (demandée,
+pas faite — la bibliothèque est locale en IndexedDB) ; couverture émulateurs du
+parcours publication, à réécrire sur `/publier`.
 
 ---
 
 ## Pièges connus — ne pas les réintroduire
 
+**Presets et couleur**
+
+- **Une règle qui dépend de la teinte doit s'éteindre quand le pixel n'a plus de
+  teinte.** Dans un voile quasi blanc, la teinte est du bruit : deux pixels
+  identiques à l'œil peuvent être à 40° l'un de l'autre. Une règle qui s'y fie
+  trace un **trait de contour** — invisible dans les moyennes, évident à
+  l'écran. Le test « amplification dans un voile » le garde.
+- **Juger un preset à l'œil, sur une vraie photo, avant de le livrer.** Les trois
+  presets supprimés passaient toutes leurs mesures ; le ciel kaki du showcase
+  s'est vu à l'écran, pas dans les chiffres.
+- **Photos de test : Unsplash**, parce qu'elles sont **peu retouchées**. Celles
+  d'un corpus de référence sont déjà des édits finis : les repasser dans un
+  preset étale deux fois le même traitement. Elles restent **hors du dépôt**
+  (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>`.
+- **Ne jamais se caler sur une source dont on ignore ce qu'elle mesure.** La
+  « paire avant/après » du photographe est passée par une IA générative :
+  écartée. Le corpus seul induit en erreur par **biais de sélection**.
+- **Deux saturations, ne pas les confondre.** Le mélangeur travaille en HSL, où
+  un ciel pâle ressort à 0,36 quand l'œil voit du blanc cassé. Les cibles du
+  corpus sont en **chroma `(max−min)/max`**.
+- **Ordre dans un preset écrit à la main** : le virage split vient **après** le
+  mélangeur de teintes (ordre réel de Lightroom).
+- **Le bruit s'ajoute en quadrature.** Pour mesurer un grain, extraire son
+  écart-type (`√((total² − base²)/2)`) au lieu de lire la différence brute.
+
+**Import Lightroom** — le détail est dans
+[1-procedure.md](docs/lightroom/1-procedure.md) et
+[2-methode-et-pieges.md](docs/lightroom/2-methode-et-pieges.md). L'essentiel :
+mire en **blocs**, export **sRVB**, `.rotate()` avant toute comparaison, **grain
+à 0 avant de capturer** (il pourrit la table), **masques non capturables** — si
+le panneau Masquage n'est pas vide, la capture est fausse sans le signaler. Et
+chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paresseux.
+
+**Interface et pipeline**
+
 - **`resolveProjectSource`** : la composition du Layout est **prioritaire** sur
   la photo du projet. Tout écran qui laisse changer de photo doit effacer
-  `project.composition`, sinon l'ancienne image revient au rechargement.
+  `project.composition`.
 - **`applyVisionStage`** ([pipeline.js](src/features/vibeos/project/pipeline.js))
-  : un preset ne modifie **aucune** clé de `filters`. Il faut tester
+  : un preset peut ne modifier **aucune** clé de `filters`. Tester
   `vision.presetId` **séparément**, sinon l'étage Vision est jugé « neutre » et
-  sauté — le preset ne descend alors ni jusqu'au Studio ni jusqu'à l'export.
-- **Ordre dans un preset écrit à la main** : le virage split vient **après** le
-  mélangeur de teintes (ordre réel de Lightroom). Avant, le mélangeur le
-  désature et l'écart visé retombe d'un quart.
-- **Décalage de teinte** : toujours pondéré par la saturation
-  (`smoothstep(0, 0.12, s)`). Un pixel quasi gris n'a pas de teinte définie ; le
-  décaler crée des bandes visibles après interpolation de la LUT.
+  sauté.
+- **Bornes des réglages : une seule source**, côté moteur. L'interface les lit,
+  elle ne les redéclare jamais.
+- **Un curseur recentré ne convertit JAMAIS position ↔ valeur** : l'arrondi crée
+  une **zone morte** et le curseur se bloque. On élargit la course
+  symétriquement et on borne la valeur à la sortie.
+- **La qualité `low` saute relief, netteté, voile et grain.** Dans Vision, le
+  geste porte justement sur ces réglages : y passer en `low` les rend sans effet
+  visible. Vision garde `high`.
 - **Jamais** recalculer une vignette depuis l'image pleine résolution.
-- **Taille** : chaque preset importé pèse ~144 ko de base64. Au-delà d'une
-  dizaine, passer à un chargement paresseux depuis `public/`.
-- **Mire Hald** : toujours en **blocs** (4×4 par défaut). Une mire à un pixel par
-  couleur donne une table fausse dans les noirs, sans aucun signe visible avant
-  de regarder une photo.
-- **Export Lightroom** : toujours **sRVB**, jamais Adobe RVB, et toujours
-  vérifier la **rugosité** au retour d'import (grain → `--lisser 1`).
-- **Ne jamais juger un preset sur son écrêtage seul** : il faut le comparer à
-  celui de Lightroom sur la même photo. Sinon on « corrige » le look voulu.
-- **EXIF** : une photo de téléphone est stockée en paysage avec une balise de
-  rotation ; Lightroom l'écrit dans les pixels. Comparer sans `.rotate()` donne
-  deux images de dimensions différentes.
-
----
-
-## Reste à faire (hors chantier presets)
-
-Rien de bloquant — du choix produit, pas de la dette cachée.
-
-1. **Rail agents IA et bibliothèque Midjourney** — partis avec l'ancienne UI.
-   Routes API et ledger intacts ; `src/config/aiLaunch.js` les marque « à
-   porter ». À reposer dans `/creer` si on les veut.
-2. **Synchronisation Google Drive de la photothèque** — demandée, **pas faite**.
-   La bibliothèque est locale (IndexedDB), rien ne part sur un serveur. Demande
-   un vrai OAuth Google + un aller-retour serveur : lot backend à part entière.
-3. **Couverture émulateurs du parcours publication** — le smoke pilotait
-   l'ancienne UI. `test:publication-flow` couvre encore la logique, plus le
-   parcours navigateur. À réécrire sur `/publier` si on y tient.
-4. **Corpus Vision réel** — `check:vision-corpus` est non bloquant et le corpus
-   est absent. À faire **le jour où le corpus existe**, pas avant.
 
 ---
 
 ## Règles non négociables
 
+- **Jamais supprimer ni remplacer un preset** de `docs/presets-valides.md`.
 - **Jamais de Tailwind** dans le nouveau code : CSS Modules + tokens `--vo-*`.
-- **Jamais réécrire un moteur existant** : on l'importe. Si la logique utile est
-  enfermée dans un composant, on l'**extrait**.
+- **Jamais réécrire un moteur existant** : on l'importe, ou on l'**extrait**.
 - **IndexedDB** : des Blobs, jamais de dataURL.
 - **Desktop ET mobile** sérieux. Textes UI en français simple.
 - **Aucun déploiement** sans demande explicite : tout se vérifie en local.
@@ -180,11 +184,7 @@ npm run dev                    # http://localhost:3000 -> /creer
 npm run lint                   # 0 erreur (5 warnings préexistants)
 npm run build
 npm run test:scope
-npm run test:vision-preset     # 40 vérifications : preset + chaîne d'import (Node, 1 s)
-npm run preset:mire / preset:controle / preset:import          # capture d'un preset Lightroom
-node scripts/audit-vision-presets.mjs                          # bandes, dominante, couleurs témoins
-node scripts/compare-vision-presets-on-photos.mjs <photo...>   # écrêtage et force, sur de vraies photos
-node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id>   # fidélité réelle à Lightroom
+npm run test:vision-preset     # 67 vérifications (Node, 1 s)
 npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
@@ -192,9 +192,19 @@ npm run test:vibeos-library / -layout / -studio / -soundtrack   # si tu y touche
 npm run test:routes            # si tu touches aux routes (build + start)
 ```
 
-Tous verts au 2026-08-11.
+Outils des presets :
+
+```bash
+npm run preset:mire / preset:controle / preset:import          # capturer un preset Lightroom
+node scripts/planche-presets.mjs <photo...>                    # LA PLANCHE À REGARDER
+node scripts/mesure-ciel-powlisher.mjs [--photo <f>]           # où le ciel atterrit
+node scripts/audit-vision-presets.mjs                          # bandes, dominante, témoins
+node scripts/compare-vision-presets-on-photos.mjs <photo...>   # écrêtage et force
+node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id>   # fidélité réelle
+```
+
+Tous verts au 2026-08-12.
 
 **Échecs préexistants, hors chantier** : `smoke-vibecut-media-safety.spec.cjs`
 (3) et `test:vibecut-export-local-mp4` — fixtures manquantes, chemins Windows
-d'origine, pointeurs Git LFS. Les suites `test:vibecut-*` ne concernent pas ce
-chantier ([archive](docs/archive-vibecut-2026-08-04.md#commandes)).
+d'origine, pointeurs Git LFS ([archive](docs/archive-vibecut-2026-08-04.md#commandes)).

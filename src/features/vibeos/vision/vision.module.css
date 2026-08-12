@@ -137,6 +137,21 @@
     font-weight: 600;
 }
 
+/* Le compteur de la section « Modifiés »: combien de reglages ont bouge. */
+.blockCount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+}
+
 .blockHint {
     font-size: var(--vo-text-xs);
     color: var(--vo-text-3);

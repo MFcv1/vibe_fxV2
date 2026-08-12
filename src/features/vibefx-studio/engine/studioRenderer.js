@@ -186,7 +186,14 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
         if (pattern) {
             ctx.globalCompositeOperation = 'overlay';
             ctx.fillStyle = pattern;
-            ctx.globalAlpha = (safeFilters.grain / 100) * 0.5;
+            /*
+             * Le SEUL endroit qui dose le grain (la mire, elle, est opaque).
+             * Le coefficient est cale sur une mesure: les photos de reference
+             * portent un grain d'ecart-type ~2,5/255, atteint ici vers 35.
+             * Avant, deux attenuations se multipliaient et le maximum donnait
+             * +0,12/255 — un curseur qui ne faisait rien.
+             */
+            ctx.globalAlpha = (safeFilters.grain / 100) * 0.28;
             ctx.fillRect(0, 0, w, h);
         }
         ctx.restore();

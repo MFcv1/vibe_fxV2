@@ -4,8 +4,8 @@
  * Pourquoi un outil de plus : `audit-vision-presets.mjs` mesure des couleurs
  * choisies, `compare-vision-presets-on-photos.mjs` mesure des familles de
  * teintes sur une photo entiere. Aucun des deux ne repond a la question qui
- * decide de V2 : « que devient LE CIEL, y compris les pixels que le preset
- * desature jusqu'au blanc ? »
+ * decide d'un preset de ciel : « que devient LE CIEL, y compris les pixels que
+ * le preset desature jusqu'au blanc ? »
  *
  * C'est exactement la ou les deux mesures precedentes se sont trompees (voir
  * docs/lightroom/corpus-powlisher/README.md) : en ne comptant que les pixels
@@ -24,8 +24,8 @@
  * gris a peine teinte (un ciel pale y sort a 0.36 quand l'oeil voit du blanc).
  * Toutes les cibles du corpus sont exprimees dans cette mesure-ci.
  *
- *   node scripts/mesure-ciel-powlisher.mjs            # le corpus, par groupe
- *   node scripts/mesure-ciel-powlisher.mjs --paire    # img47 -> img48 + presets
+ *   node scripts/mesure-ciel-powlisher.mjs                  # le corpus, par groupe
+ *   node scripts/mesure-ciel-powlisher.mjs --photo <fichier>  # une de NOS photos
  */
 
 import { existsSync } from 'node:fs';
@@ -47,9 +47,13 @@ const ZONE_TOP = 0.45;
 const ZONE_LUM = 0.55;
 const SEUIL_BLANC = 0.10;
 
+/*
+ * Les photos a ciel bien visible ont ete rangees a la main dans `ciel/`: ce sont
+ * elles qui portent la cible. On les cherche donc la en priorite.
+ */
 function fichier(id) {
-    const suffixe = id === 47 || id === 48 ? 'paire' : 'reference';
-    return `${DIR}/img${String(id).padStart(2, '0')}-${suffixe}.jpg`;
+    const nom = `img${String(id).padStart(2, '0')}-reference.jpg`;
+    return existsSync(`${DIR}/ciel/${nom}`) ? `${DIR}/ciel/${nom}` : `${DIR}/${nom}`;
 }
 
 function hsv(r, g, b) {
@@ -139,29 +143,33 @@ const ligne = (nom, m) => `  ${nom.padEnd(24)} `
     + `   teinte ${m.hue === null ? '    -  ' : `${m.hue.toFixed(1).padStart(6)}°`}`
     + `   sat ${m.sat === null ? '  -  ' : m.sat.toFixed(2).padStart(5)}`;
 
-/* ---------- mode paire : la seule verite terrain ---------- */
+/* ---------- mode photo : nos propres avant/apres ---------- */
 
-async function modePaire() {
-    for (const id of [47, 48]) {
-        if (!existsSync(fichier(id))) {
-            console.error(`\nManque ${fichier(id)} — lancer node scripts/fetch-powlisher-corpus.mjs\n`);
-            process.exit(1);
-        }
+/*
+ * Ce mode a remplace le mode `--paire` le 2026-08-12.
+ *
+ * L'ancienne verite terrain etait sa « paire avant/apres » publiee. Elle est
+ * ECARTEE: il a fait passer l'image par une IA generative avant de la publier,
+ * donc l'ecart entre les deux n'est pas sa colorimetrie, c'est sa colorimetrie
+ * PLUS ce qu'une IA a invente. On ne cale pas un preset sur une incertitude.
+ *
+ * A la place, on mesure sur NOS photos, dont on connait l'origine, et on compare
+ * la sortie aux cibles lues sur ses photos finies (`ciel/`).
+ */
+async function modePhoto(file) {
+    if (!existsSync(file)) {
+        console.error(`\nIntrouvable: ${file}\n`);
+        process.exit(1);
     }
-
-    const brut = await zoneClaire(fichier(47));
-    const sien = await zoneClaire(fichier(48));
-
-    console.log('\nLA PAIRE — img47 (son brut iPhone) -> img48 (son edit final)');
-    console.log('Ciel pale et couvert. C\'est le seul endroit ou on connait son entree ET sa sortie.\n');
-    console.log(ligne('son brut (img47)', mesurer(brut)));
-    console.log(ligne('SA CIBLE (img48)', mesurer(sien)));
+    const source = await zoneClaire(file);
+    console.log(`\nNOTRE PHOTO — ${file}`);
+    console.log('Cible lue sur ses photos a ciel franc: teinte 189-198°, saturation 0.19-0.49.\n');
+    console.log(ligne('l\'originale', mesurer(source)));
     console.log('');
     for (const preset of VISION_PRESETS) {
-        console.log(ligne(`${preset.id} sur son brut`, mesurer(applique(preset.id, brut))));
+        console.log(ligne(preset.id, mesurer(applique(preset.id, source))));
     }
-    console.log('\nLire : sur ce ciel-la, il DESATURE (part au blanc qui monte fort) sans');
-    console.log('tourner au cyan. Un preset qui garde la saturation et tombe sous 190° rate sa regle.\n');
+    console.log('');
 }
 
 /* ---------- mode corpus : ou ses couleurs atterrissent ---------- */
@@ -186,5 +194,6 @@ async function modeCorpus() {
     console.log('  ciel franc -> teal tenu a 188-199°, saturation forte (0.32-0.49).\n');
 }
 
-if (process.argv.includes('--paire')) await modePaire();
+const photo = process.argv.indexOf('--photo');
+if (photo !== -1) await modePhoto(process.argv[photo + 1]);
 else await modeCorpus();

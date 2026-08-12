@@ -367,8 +367,44 @@
 }
 
 .sliderLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
     font-size: var(--vo-text-sm);
     color: var(--vo-text-2);
+}
+
+/*
+ * Un reglage pilote par le preset actif. La pastille et la piste passent a
+ * l'accent: sans ca, rien ne distingue un grain pose par le preset d'un grain
+ * que l'utilisateur aurait monte lui-meme.
+ */
+.sliderAccent .sliderLabel {
+    color: var(--vo-accent, #7c8cff);
+}
+
+.sliderAccentDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--vo-accent, #7c8cff);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--vo-accent, #7c8cff) 22%, transparent);
+}
+
+.sliderAccent .sliderInput::-webkit-slider-runnable-track {
+    background: color-mix(in srgb, var(--vo-accent, #7c8cff) 38%, var(--vo-surface-3));
+}
+
+.sliderAccent .sliderInput::-moz-range-track {
+    background: color-mix(in srgb, var(--vo-accent, #7c8cff) 38%, var(--vo-surface-3));
+}
+
+.sliderAccent .sliderInput::-webkit-slider-thumb {
+    background: var(--vo-accent, #7c8cff);
+}
+
+.sliderAccent .sliderInput::-moz-range-thumb {
+    background: var(--vo-accent, #7c8cff);
 }
 
 .sliderValue {

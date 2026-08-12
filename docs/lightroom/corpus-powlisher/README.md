@@ -1,6 +1,6 @@
 # Corpus de référence de `powlisher`
 
-Les photos dont le preset `powlisher` a été déduit — **38** après tri. Elles ne sont pas dans
+Les photos dont le preset `powlisher` a été déduit — **36** après tri. Elles ne sont pas dans
 le dépôt — seul ce README l'est. Pour les récupérer :
 
 ```bash
@@ -29,12 +29,12 @@ Les trois signatures qui en sortent, et qui définissent le preset :
 
 | Signature | Mesure sur le corpus | Cible du preset |
 |---|---|---|
-| **Le ciel n'est jamais bleu** | atterrit entre **178° et 194°** (un ciel neutre est à 210–225°) | 178–196° |
+| **Le ciel atterrit toujours au même endroit** | **190–199°** sur six photos (un ciel neutre est à 210–225°) | `powlisher` 178–196°, `powlisher-ciel` 190–199° |
 | **Verts olive** | feuillage à 84–107°, saturation ≤ 0,35 | 85–105° |
 | **Peau préservée** | 26–36°, jamais tirée vers l'orange | 27–36° |
 | **Hautes lumières crème** | sur la moitié du corpus, le point blanc ne monte **jamais** à 255 | pas d'écrêtage |
 
-## Les images, 38 au 2026-08-12
+## Les images, 36 au 2026-08-12
 
 Numérotation **figée** : les numéros 1 à 27 restent sur le corpus d'origine,
 parce que [l'audit](../../audit-preset-powlisher-2026-08-11.md) cite les photos
@@ -57,7 +57,10 @@ tweet ne rend plus le même nombre d'images.
 | 35–38 | **Biarritz** : Porsche, terrasse sur mer, côte, plage vue d'en haut | **le ciel bleu et la mer** |
 | 39–42 | fin de journée : foule au coucher, littoral, bar, table | lumière rasante, peau au soleil couchant |
 | 43–46 | extérieur : plage, escalier sur la côte, piscine, coucher sur mer | turquoise, contre-jour, soleil dans le cadre |
-| **47–48** | **PAIRE avant/après** : sa photo brute d'iPhone, puis son édit final | **la pièce maîtresse** — voir ci-dessous |
+
+Le sous-dossier **`ciel/`** rassemble à la main les photos où le ciel occupe
+assez de cadre pour être mesuré (12, 13, 16, 18, 35, 36, 37, 39, 46). C'est ce
+tas-là qui porte la cible du ciel, et les scripts le regardent en priorité.
 
 Écartées à la main : **04** et **09** (portraits studio/intérieur), et **20–27**
 (captures d'écran de Lightroom mobile + station-service de nuit — elles
@@ -88,67 +91,112 @@ construire, et pourtant :
 Moyenne sur les 7 photos à ciel mesurable : **189,7°**, étendue 175–196°. La
 signature centrale de `powlisher` tient donc sur 7 photos au lieu de 2.
 
-### La paire avant/après (img47 → img48), et ce qu'elle révèle
+### La paire avant/après (ex-img47/48) — ÉCARTÉE le 2026-08-12
 
-Il a publié sa photo **brute** à côté de son **édit final**. On connaît donc son
-entrée ET sa sortie sur la même image — la seule façon de mesurer ce qu'il fait,
-au lieu de le déduire d'une photo finie.
+Il avait publié sa photo **brute** à côté de son **édit final**. C'était, sur le
+papier, la pièce maîtresse : le seul endroit où on connaissait son entrée ET sa
+sortie sur la même image.
 
-| ciel | teinte | saturation |
-|---|---|---|
-| son avant (brut iPhone) | 211,0° | 0,20 |
-| **son après** | **207,6°** | **0,11** |
-| notre `powlisher` | **172,3°** | 0,15 |
+**Elle ne vaut rien comme mesure, et elle a coûté cher.** Il dit lui-même avoir
+fait passer l'image par une **IA générative** pour « booster la résolution et le
+traitement ». Ce qui sépare les deux images n'est donc pas sa colorimétrie :
+c'est sa colorimétrie **plus ce qu'une IA a inventé**, qui est spatial et hors de
+portée de toute table de couleurs. Le signe était là dès le départ : pour une
+même couleur d'entrée, sa sortie variait de **± 22,3/255**, contre 1,9 à 4,8 sur
+une vraie paire Lightroom.
 
-**Sur un ciel pâle et couvert, il ne fait presque pas de teal** : −3° de teinte,
-et il **désature** (0,20 → 0,11). Nous décalons de −39°.
+Trois presets ont été construits en partie sur elle. Ils ont tous été supprimés.
+La règle : **on ne cale pas un preset sur une source dont on ne sait pas ce
+qu'elle mesure.** Les photos et les chiffres qui en venaient ont été retirés de
+ce document, du script de récupération et du script de mesure — pour qu'ils ne
+reviennent pas par la fenêtre à la prochaine session.
 
-Cause identifiée dans `powlisherTransform` : la pondération est
-`smoothstep(0, 0.12, s)`. Au-delà de s = 0,12, le décalage s'applique **à
-fond** — un ciel pâle d'hiver (s = 0,20) reçoit donc exactement le même −39°
-qu'un ciel franc de Biarritz (s = 0,45). C'est le premier correctif d'un
-`powlisher` V2, et il est vérifiable sur cette paire.
+Ce qui la remplace : **nos propres avant/après**, sur nos photos, dont on connaît
+l'origine.
 
-### La règle du ciel, mesurée sur TOUTE la base
+```bash
+node scripts/mesure-ciel-powlisher.mjs --photo <notre-photo.jpg>
+```
 
-C'est le résultat le plus utile du corpus, et aucune source seule ne le donne.
+### Où son ciel ATTERRIT — la mesure qui porte le preset
 
-| ciel **voilé** | zone claire quasi blanche (s < 0,10) | saturation restante |
-|---|---|---|
-| img32 (Shanghai) | **90 %** | 0,15 |
-| img33 (Shanghai) | 75 % | 0,13 |
-| img48 (son édit de la paire) | 84 % | 0,11 |
+C'est le résultat le plus utile du corpus, et il est simple : **tous ses ciels
+francs finissent dans une fenêtre étroite**, quelle que soit la photo.
 
-| ciel **franc** | zone claire quasi blanche | saturation | teinte |
+| photo | teinte | chroma | part partie au blanc |
 |---|---|---|---|
-| img16 · img18 (Marrakech) | 1 % · 4 % | 0,38 · 0,40 | 191,8° · 193,2° |
-| img35 · img36 · img40 (Biarritz) | 9 % · 0 % · 0 % | 0,39 · 0,51 · 0,50 | 188,1° · 198,9° · 193,9° |
+| img16 (Marrakech) | 190,5° | 0,32 | 1 % |
+| img18 (Marrakech) | 195,0° | 0,39 | 17 % |
+| img35 (Porsche) | 189,8° | 0,39 | 11 % |
+| img36 (terrasse sur mer) | 198,1° | 0,49 | 0 % |
+| img37 (côte de Biarritz) | 193,6° | 0,19 | 20 % |
+| img40 (littoral) | 193,8° | 0,39 | 15 % |
 
-**Sa règle** : un ciel voilé, il ne cherche pas à le rendre bleu — il le laisse
-**partir au blanc**. Un ciel franc, il le tient en teal à 188–199°, saturation
-forte.
+**Fenêtre : 190–199°.** Un ciel voilé, lui, part largement au blanc (img32 :
+95 % de la zone claire sous chroma 0,10) — il ne cherche pas à le rendre bleu.
 
-`powlisher` V1 fait l'inverse sur les ciels voilés : il garde la saturation
-(0,19 → 0,14 seulement) et tourne à 170°, ce qui donne un cyan qu'il ne produit
-jamais. C'est le cahier des charges d'un V2.
+```bash
+node scripts/mesure-ciel-powlisher.mjs                    # où son ciel atterrit
+node scripts/mesure-ciel-powlisher.mjs --photo <photo>    # une de NOS photos
+```
 
-### Comment cette règle a été trouvée, et pourquoi ça vaut d'être lu
+### Ce que cette fenêtre dit, et que `powlisher` V1 ratait
 
-Aucune des deux sources ne la donne seule, et chacune induit en erreur dans un
-sens différent :
+Ses entrées, elles, n'ont aucune raison d'être groupées : un ciel de Marrakech,
+un ciel de Biarritz et un ciel de zénith ne partent pas de la même couleur. Des
+entrées dispersées, des sorties groupées — **ça ne décrit pas une rotation, ça
+décrit une convergence.**
 
-- **La paire seule** (n = 1) disait « il ne fait presque pas de teal ». Faux en
-  général : sur un ciel franc, il pousse fort.
-- **Le corpus seul** disait « il tire les bleus pâles PLUS vers le cyan »
-  (182,5° contre 194,3°). C'était un **biais de sélection** : on ne mesurait que
-  les pixels restés bleus, alors que ceux qu'il désature à blanc — l'essentiel
-  d'un ciel voilé — sortaient de la mesure.
+V1 faisait l'autre chose : il retirait un **angle fixe** (−38° au plus fort du
+mélangeur). La preuve la plus parlante s'obtient en appliquant le preset à **ses
+propres photos**, qui sont déjà ses édits finis, donc déjà à la bonne couleur —
+un preset juste ne devrait presque pas les bouger :
 
-Il fallait les deux, plus un contrôle par groupe de lumière. À retenir avant de
-tirer une conclusion d'un chiffre unique sur ce corpus.
+| appliqué à ses photos | img16 | img18 | img35 | img36 | img37 | moyenne |
+|---|---|---|---|---|---|---|
+| `powlisher` V1 | −21,3 | −21,5 | −17,9 | −21,4 | −31,1 | **22,6°** |
+| `powlisher-ciel` | −6,1 | −4,1 | −1,8 | −6,1 | −9,4 | **5,5°** |
 
-**Ce qui vaudrait le plus cher maintenant** : d'autres paires avant/après. C'est
-la seule vérité terrain sur son traitement.
+Et sur une photo à nous (crique méditerranéenne, ciel d'entrée à **214,2°**,
+chroma 0,58) : V1 la pose à **185,7°**, sous sa propre fenêtre, dans un menthe
+qu'il ne produit sur aucune de ses photos. `powlisher-ciel` la pose à **195,4°**.
+
+### Le piège qui a coûté trois presets
+
+Une première tentative (`powlisher-v2`, supprimée) déclenchait sa règle sur la
+**teinte** d'un pixel sans vérifier que cette teinte veuille dire quelque chose.
+Or dans un voile quasi blanc, la teinte est du **bruit** : deux pixels que l'œil
+voit identiques peuvent être à 40° l'un de l'autre. La règle basculait donc d'un
+pixel à l'autre au milieu d'un dégradé lisse et **dessinait un trait de contour
+en plein ciel**.
+
+Ça ne se voyait dans **aucune moyenne** — seulement à l'écran. D'où la mesure qui
+le rend visible, et le test qui la garde (`npm run test:vision-preset`) :
+l'amplification, soit l'écart de sortie divisé par l'écart d'entrée, mesurée sur
+des pixels quasi neutres dont la teinte bruite.
+
+| preset | amplification dans un voile |
+|---|---|
+| `powlisher` | 3,03× (n'a jamais montré de trait) |
+| la version supprimée | **7,32×** (trait visible à l'écran) |
+| `powlisher-ciel` | 3,03× — n'ajoute rien |
+
+**La règle à retenir** : toute règle qui dépend de la teinte doit s'éteindre
+quand le pixel n'en a plus.
+
+### Ne jamais conclure d'une seule source
+
+On s'est fait avoir deux fois, en sens opposés. Le corpus seul disait « il tire
+les bleus pâles PLUS vers le cyan » (182,5° contre 194,3°) : **biais de
+sélection**, on ne mesurait que les pixels restés bleus, alors que ceux qu'il
+désature jusqu'au blanc — l'essentiel d'un ciel voilé — sortaient de la mesure.
+C'est pour ça que `mesure-ciel-powlisher.mjs` affiche la part partie au blanc
+**à côté** de la teinte. Et la paire avant/après, elle, disait l'inverse — mais
+elle était passée par une IA (voir plus haut).
+
+**Ce qui vaudrait le plus cher maintenant** : d'autres avant/après **à nous**,
+sur des sujets différents (portrait, nuit, contre-jour). C'est la seule vérité
+terrain dont on maîtrise l'origine.
 
 **Ce qui manque encore** : rien de criant côté ciel. Le corpus reste en revanche
 pauvre en **portrait rapproché** (la peau n'est mesurée que sur quelques

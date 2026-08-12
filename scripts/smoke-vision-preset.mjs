@@ -25,6 +25,7 @@ import {
     measureHaldDeviation,
 } from '../src/features/vibefx-studio/utils/haldClut.js';
 import { parseXmpPreset } from '../src/features/vibefx-studio/utils/xmpPreset.js';
+import { visionBoundsFor } from '../src/features/vibefx-studio/utils/visionColorScience.js';
 
 let failures = 0;
 const results = [];
@@ -295,52 +296,238 @@ try {
 }
 check('.xmp : fichier invalide rejeté', rejected, 1, 1);
 
-/* ---------- powlisher-ville : les cibles de la paire avant/apres ----------
+/* ---------- powlisher-ciel : le ciel converge au lieu d'etre tourne ----------
  *
- * Mesurees sur img47 -> img48 du corpus (sa photo brute a cote de son edit),
- * zone par zone, en medianes. Voir le README du corpus.
+ * Trois choses a garder, et la troisieme est celle qui a coute une version.
  *
- * Ces verifications sont SEPAREES de celles de `powlisher`: les deux presets
- * vont dans des directions opposees sur le ciel, et c'est voulu.
+ *  1. Un ciel bleu atterrit dans SA fenetre (190-199°), au lieu de passer
+ *     dessous dans le menthe comme le fait la rotation fixe de V1.
+ *  2. Un ciel DEJA dans la fenetre n'est presque pas bouge — c'est ce qui
+ *     distingue « placer une couleur » de « la pousser ».
+ *  3. Aucune regle ne depend de la teinte d'un pixel qui n'en a plus. Dans un
+ *     voile quasi blanc, la teinte est du bruit; une regle qui s'y fie trace un
+ *     trait de contour en plein degrade. C'est ce qui est arrive a la version
+ *     precedente, et ca ne se voyait dans AUCUNE moyenne — d'ou ce test.
  */
 
-const ville = getPresetTransform('powlisher-ville');
-if (!ville) {
-    console.error('ECHEC: preset « powlisher-ville » introuvable.');
+const ciel = getPresetTransform('powlisher-ciel');
+if (!ciel) {
+    console.error('ECHEC: preset « powlisher-ciel » introuvable.');
     process.exit(1);
 }
 
-const villeProbe = (h, s, l) => rgbToHsl(...ville(hslToRgb(h, s, l)));
+const cielProbe = (h, s, l) => rgbToHsl(...ciel(hslToRgb(h, s, l)));
+const chroma = ([r, g, b]) => {
+    const max = Math.max(r, g, b);
+    return max <= 0 ? 0 : (max - Math.min(r, g, b)) / max;
+};
 
-/* Le ciel: teinte conservee, saturation ecrasee (mesure: 0.21 -> 0.04). */
-const cielVille = villeProbe(213, 0.21, 0.79);
-check('ville : ciel, teinte conservée', cielVille[0], 195, 220);
-check('ville : ciel, saturation écrasée', cielVille[1], 0, 0.09);
+/* 1. Un vrai ciel bleu tombe dans sa fenetre. Les trois sondes couvrent un ciel
+   de bord de mer (205°), un ciel de plein midi (215°) et un bleu profond de
+   zenith (230°) — sur la photo temoin, l'entree mesuree est a 214°. */
+const cieux = [cielProbe(205, 0.55, 0.60), cielProbe(215, 0.60, 0.55), cielProbe(230, 0.65, 0.45)];
+check('ciel : teinte min', Math.min(...cieux.map((p) => p[0])), 188, 199);
+check('ciel : teinte max', Math.max(...cieux.map((p) => p[0])), 188, 202);
+/* Et il garde sa couleur: converger n'est pas delaver. */
+check('ciel : reste un bleu franc', Math.min(chroma(ciel(hslToRgb(215, 0.60, 0.55)))), 0.35, 1);
 
-/* Les neutres virent dore (mesure: teinte ~40 deg, saturation 0.05 -> 0.24). */
-const neutreMoyen = villeProbe(0, 0, 0.30);
-check('ville : neutre moyen, teinte dorée', neutreMoyen[0], 20, 55);
-check('ville : neutre moyen, saturation', neutreMoyen[1], 0.12, 0.32);
+/* La ou V1 le pousse sous sa propre fenetre. C'est le defaut corrige, fige. */
+const cielV1 = rgbToHsl(...transform(hslToRgb(215, 0.60, 0.55)));
+check('V1 poussait le ciel trop bas', cielV1[0], 150, 188);
+check('ciel : redresse vs V1', cielProbe(215, 0.60, 0.55)[0] - cielV1[0], 8, 40, '°');
 
-const neutreClair = villeProbe(0, 0, 0.58);
-check('ville : neutre clair, teinte dorée', neutreClair[0], 20, 55);
-check('ville : neutre clair, saturation', neutreClair[1], 0.08, 0.28);
+/* 2. Un ciel deja pose dans sa fenetre ne doit presque plus bouger. */
+for (const [nom, depart] of [['190°', 190], ['195°', 195], ['199°', 199]]) {
+    const bouge = Math.abs(cielProbe(depart, 0.45, 0.62)[0] - depart);
+    check(`ciel deja juste (${nom}) : ne bouge plus`, bouge, 0, 8, '°');
+}
 
-/* Les hautes lumieres sont LEVEES (0.58 -> 0.67, 0.83 -> 0.90). */
-check('ville : hautes lumières levées', neutreClair[2], 0.62, 0.72);
-check('ville : blancs levés', villeProbe(0, 0, 0.83)[2], 0.86, 0.94);
+/*
+ * 3. LE TEST DE L'ARTEFACT, et il vaut une explication parce qu'il est né d'un
+ * bug qu'aucune moyenne n'attrapait.
+ *
+ * Le regime teste est celui d'un VOILE: des pixels quasi neutres (chroma 0,015 a
+ * 0,05) dont la teinte bruite de 10 a 40° d'un pixel a l'autre. C'est ce qui se
+ * passe reellement dans un ciel blanchi ou une brume d'horizon. Deux pixels que
+ * l'oeil voit identiques doivent le rester en sortie: si le preset les separe
+ * PLUS que l'entree ne les separait, il dessine un contour la ou la photo etait
+ * lisse — le fameux trait diagonal de la version precedente.
+ *
+ * On mesure donc une amplification (ecart de sortie / ecart d'entree), et on la
+ * compare a celle de `powlisher`, qui sert de plancher: la regle du ciel a le
+ * droit d'exister, pas d'ajouter du contour.
+ *
+ *   powlisher                 3,03×   (jamais montre de trait)
+ *   la version supprimee      7,32×   (le trait etait visible a l'ecran)
+ */
+function amplificationVoile(fn) {
+    let max = 0;
+    for (let l = 0.55; l <= 0.95; l += 0.05) {
+        for (const s of [0.015, 0.03, 0.05]) {
+            for (let h = 150; h <= 280; h += 5) {
+                for (const ecartTeinte of [10, 20, 40]) {
+                    const a = hslToRgb(h, s, l);
+                    const b = hslToRgb(h + ecartTeinte, s, l);
+                    const fa = fn(a);
+                    const fb = fn(b);
+                    let dIn = 0;
+                    let dOut = 0;
+                    for (let c = 0; c < 3; c += 1) {
+                        dIn = Math.max(dIn, Math.abs(a[c] - b[c]) * 255);
+                        dOut = Math.max(dOut, Math.abs(fa[c] - fb[c]) * 255);
+                    }
+                    if (dIn >= 1) max = Math.max(max, dOut / dIn);
+                }
+            }
+        }
+    }
+    return max;
+}
+const voileV1 = amplificationVoile(transform);
+const voileCiel = amplificationVoile(ciel);
+check('voile : powlisher, niveau de reference', voileV1, 0, 4, '×');
+check('voile : la regle du ciel n\'ajoute pas de contour', voileCiel - voileV1, 0, 0.3, '×');
 
-/* ... mais le point blanc ne touche pas 255, comme sur powlisher. */
-check('ville : point blanc sous 255', ville([1, 1, 1])[0] * 255, 240, 254.4);
+/* 4. Hors du ciel, c'est powlisher au bit pres: on ajoute, on ne remplace pas. */
+const horsCiel = [
+    ['feuillage', [105, 0.50, 0.38]],
+    ['feuillage clair', [115, 0.45, 0.42]],
+    ['peau claire', [25, 0.40, 0.65]],
+    ['peau matte', [28, 0.45, 0.45]],
+    ['gris moyen', [0, 0, 0.50]],
+    ['turquoise peu profond', [165, 0.45, 0.55]],
+    ['rouge sombre', [8, 0.55, 0.25]],
+];
+let ecartHorsCiel = 0;
+for (const [, [h, s, l]] of horsCiel) {
+    const a = transform(hslToRgb(h, s, l));
+    const b = ciel(hslToRgb(h, s, l));
+    for (let c = 0; c < 3; c += 1) ecartHorsCiel = Math.max(ecartHorsCiel, Math.abs(a[c] - b[c]) * 255);
+}
+check('hors ciel = powlisher (vert/peau/gris)', ecartHorsCiel, 0, 0, '/255');
 
-/* Les chauds existants sont renforces (0.23 -> 0.33). */
-const chaudVille = villeProbe(40, 0.23, 0.19);
-check('ville : chauds renforcés', chaudVille[1], 0.28, 0.42);
-check('ville : chauds, teinte tenue', chaudVille[0], 30, 50);
+/* Les signatures communes tiennent. */
+check('ciel : point blanc identique', Math.abs(Math.max(...ciel([1, 1, 1])) - Math.max(...white)) * 255, 0, 0, '/255');
+check('ciel : noirs denses', Math.max(...ciel([0, 0, 0])) * 255, 0, 3);
 
-/* Et powlisher V1 n'a pas bouge: les deux presets divergent bien sur le ciel. */
-const cielV1 = rgbToHsl(...transform(hslToRgb(213, 0.21, 0.79)));
-check('ville vs V1 : le ciel diverge', Math.abs(cielVille[0] - cielV1[0]), 15, 180);
+/* 5. Bandes. Une rampe qui traverse tout le domaine de la regle, rendue par la
+   LUT reelle — c'est la, et pas dans la fonction pure, qu'une marche apparait. */
+const cielLut = getPresetLut('powlisher-ciel');
+const rampe = new Uint8ClampedArray(256 * 4);
+for (let i = 0; i < 256; i += 1) {
+    const t = i / 255;
+    /* Du ciel profond du zenith au voile blanc de l'horizon. */
+    rampe[i * 4] = 40 + (214 - 40) * t;
+    rampe[i * 4 + 1] = 100 + (226 - 100) * t;
+    rampe[i * 4 + 2] = 170 + (232 - 170) * t;
+    rampe[i * 4 + 3] = 255;
+}
+applyLut3dToData(rampe, cielLut, LUT_SIZE, 1);
+let sautCiel = 0;
+for (let i = 1; i < 256; i += 1) {
+    for (let c = 0; c < 3; c += 1) {
+        sautCiel = Math.max(sautCiel, Math.abs(rampe[i * 4 + c] - rampe[(i - 1) * 4 + c]));
+    }
+}
+check('ciel : pas de bandes sur un degrade', sautCiel, 0, 5, '/255');
+
+/* ---------- powlisher-showcase : le clair-obscur ----------
+ *
+ * Les cibles viennent de ses trois photos de voiture (img05/06/07), mesurees:
+ *   - part des pixels sous 40/255 : 48, 52, 69 %
+ *   - 1 % le plus clair           : 183, 170, 137 /255
+ *   - chroma sujet / decor        : 0,69/0,33 · 1,00/0,47 · 0,76/0,20
+ *     soit un ecart de x2,1 a x3,8
+ *
+ * Une LUT ne peut pas garantir la premiere ligne: elle depend de la SCENE, pas
+ * du reglage — une voiture photographiee a midi restera claire. Ce qui se teste
+ * ici, c'est ce qui appartient vraiment au preset: le plafond des hautes
+ * lumieres, et l'ecart de saturation entre le sujet et le decor.
+ */
+
+const showcase = getPresetTransform('powlisher-showcase');
+if (!showcase) {
+    console.error('ECHEC: preset « powlisher-showcase » introuvable.');
+    process.exit(1);
+}
+
+/* 1. Le plafond des hautes lumieres. C'est la signature tonale du look. */
+check('showcase : point blanc bride', Math.max(...showcase([1, 1, 1])) * 255, 175, 195);
+check('showcase : noirs denses', Math.max(...showcase([0, 0, 0])) * 255, 0, 3);
+/* Et il assombrit vraiment: un gris moyen descend nettement. */
+check('showcase : tons moyens creuses', showcase([0.5, 0.5, 0.5])[1] * 255, 85, 115);
+
+/* 2. Le creux de saturation, le mecanisme central.
+   Sonde « decor »: une tole/un beton legerement colore. Sonde « sujet »: le
+   jaune de la voiture, mesure a 31-37° et chroma 0,61-0,88. */
+const decorIn = hslToRgb(35, 0.30, 0.42);
+const sujetIn = hslToRgb(45, 0.85, 0.55);
+const decorOut = chroma(showcase(decorIn));
+const sujetOut = chroma(showcase(sujetIn));
+/* Les bornes sont celles de SES photos, pas un pourcentage choisi: son decor
+   vit entre 0,20 et 0,47 de chroma, son sujet entre 0,69 et 1,00. */
+check('showcase : decor dans sa fourchette', decorOut, 0.15, 0.50);
+check('showcase : sujet dans la sienne', sujetOut, 0.65, 1.00);
+/* Et c'est l'ECART qui fait le look — x2,1 a x3,8 chez lui. */
+check('showcase : ecart sujet/decor', sujetOut / decorOut, 2.0, 8, '×');
+/* Le sujet ne doit pas etre lave au passage. */
+check('showcase : le sujet n\'est pas lave', sujetOut / chroma(sujetIn), 0.85, 1.5, ' ratio');
+
+/*
+ * 3. Un gris reste un gris — au niveau de `powlisher`, pas mieux, pas pire.
+ * Le melange vers l'ocre ne touche que ce qui a ete vide, donc jamais un
+ * neutre; ce qui reste vient du virage split, commun a toute la famille.
+ */
+const grisShowcase = chroma(showcase([0.45, 0.45, 0.45]));
+const grisV1 = chroma(transform([0.45, 0.45, 0.45]));
+check('showcase : les gris restent au niveau V1', grisShowcase - grisV1, -0.02, 0.02);
+
+/* 4. Le bleu n'est pas ocre, et il suit la regle du ciel corrigee. Un ciel
+   delave reste une image; un ciel kaki, ou un ciel a 163°, est un bug — les
+   deux se sont produits ici avant d'etre corriges. */
+const cielShowcase = rgbToHsl(...showcase(hslToRgb(210, 0.45, 0.60)));
+check('showcase : le ciel reste bleu', cielShowcase[0], 188, 250, '°');
+
+/* 5. Aucun contour ajoute dans un voile: on se compare au niveau de
+   `powlisher`, qui sert de plancher a toute la famille. */
+check('showcase : n\'ajoute pas de contour', amplificationVoile(showcase) - voileV1, -4, 0.6, '×');
+
+/* 6. Bandes sur un degrade sombre, la ou une courbe creusee les revele. */
+const showcaseLut = getPresetLut('powlisher-showcase');
+const rampeSombre = new Uint8ClampedArray(256 * 4);
+for (let i = 0; i < 256; i += 1) {
+    rampeSombre[i * 4] = i;
+    rampeSombre[i * 4 + 1] = Math.round(i * 0.92);
+    rampeSombre[i * 4 + 2] = Math.round(i * 0.78);
+    rampeSombre[i * 4 + 3] = 255;
+}
+applyLut3dToData(rampeSombre, showcaseLut, LUT_SIZE, 1);
+let sautShowcase = 0;
+for (let i = 1; i < 256; i += 1) {
+    for (let c = 0; c < 3; c += 1) {
+        sautShowcase = Math.max(sautShowcase, Math.abs(rampeSombre[i * 4 + c] - rampeSombre[(i - 1) * 4 + c]));
+    }
+}
+check('showcase : pas de bandes', sautShowcase, 0, 5, '/255');
+
+/* ---------- les effets non-LUT portes par un preset ----------
+ *
+ * Un preset peut embarquer des reglages qu'une table de couleurs ne peut pas
+ * contenir (grain, vignetage, relief: ils dependent des pixels voisins ou de la
+ * position). Encore faut-il qu'ils soient REELLEMENT applicables: si un preset
+ * demande un grain de 60 alors que les garde-fous plafonnent a 42, le moteur
+ * ramene a 42 en silence et le preset ne rend pas ce qu'il annonce.
+ */
+const horsLut = VISION_PRESETS.filter((p) => p.spatialFilters);
+check('au moins un preset porte des effets', horsLut.length, 1, 99);
+let horsBornes = 0;
+for (const preset of horsLut) {
+    for (const [key, value] of Object.entries(preset.spatialFilters)) {
+        const bounds = visionBoundsFor(key, { safe: true });
+        if (!bounds || value < bounds.min || value > bounds.max) horsBornes += 1;
+    }
+}
+check('effets des presets dans les garde-fous', horsBornes, 0, 0);
 
 /* ---------- rapport ---------- */
 

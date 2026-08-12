@@ -28,6 +28,16 @@ import { buildAutoEnhancement } from './autoEnhance';
    dans une LUT (elles dependent des pixels voisins ou de la position). */
 const PRESET_SPATIAL_KEYS = ['clarity', 'sharpness', 'dehaze', 'grain', 'vignette'];
 
+/* Les memes noms que dans le panneau des reglages: on annonce ce que le preset
+   pose avec les mots que l'utilisateur voit ensuite bouger. */
+const SPATIAL_LABELS = {
+    clarity: 'relief',
+    sharpness: 'netteté',
+    dehaze: 'voile atmosphérique',
+    grain: 'grain',
+    vignette: 'vignettage',
+};
+
 const withoutPresetSpatials = (filters) => {
     const next = { ...filters };
     for (const key of PRESET_SPATIAL_KEYS) next[key] = DEFAULT_FILTERS[key];
@@ -75,6 +85,13 @@ export default function useVisionEditor() {
     const [autoMessage, setAutoMessage] = useState(null);
     const [previews, setPreviews] = useState({});
     const [isLoadingImage, setIsLoadingImage] = useState(false);
+    /*
+     * Vrai pendant qu'un curseur est tenu. Le rendu passe alors en resolution
+     * reduite et en qualite 'low' (voir `useCanvasRenderer`): c'est ce qui rend
+     * le reglage fluide au lieu de saccade. On repasse en pleine qualite des que
+     * le doigt se leve.
+     */
+    const [isAdjusting, setIsAdjusting] = useState(false);
 
     const canvasRef = useRef(null);
     const bgCanvasRef = useRef(null);
@@ -107,7 +124,7 @@ export default function useVisionEditor() {
         isDraggingText: false, activeGuides: [],
         cropRatio: 'original', cropPos: { x: 0, y: 0 }, cropScale: 1, isCropping: false,
         filters: appliedFilters,
-        isDragging: false, requestRef,
+        isDragging: isAdjusting, requestRef,
         setSlotRectsState: null,
     });
 
@@ -345,11 +362,16 @@ export default function useVisionEditor() {
            d'appliquer celles du preset: sinon le grain ou le vignetage du
            preset precedent resterait en place apres un changement. */
         const nextFilters = { ...withoutPresetSpatials(filters), ...(preset.spatialFilters || {}) };
+        /* Un preset qui pose aussi des effets non-LUT le DIT: sinon on voit des
+           reglages bouger dans le panneau sans comprendre qui les a touches. */
+        const portes = Object.keys(preset.spatialFilters || {})
+            .map((key) => SPATIAL_LABELS[key] || key);
+        const mention = portes.length ? ` Il pose aussi : ${portes.join(', ')}.` : '';
         commit(
             nextFilters,
             preset.recommendedIntensity || 85,
             preset.id,
-            `Preset « ${preset.label} » — ${preset.bestFor}.`,
+            `Preset « ${preset.label} » — ${preset.bestFor}.${mention}`,
         );
     }, [commit, activePresetId, filters, intensity]);
 
@@ -365,6 +387,35 @@ export default function useVisionEditor() {
         commit({ ...DEFAULT_FILTERS }, 80, null, null);
         setAutoMessage(null);
     }, [commit]);
+
+    /*
+     * On fige l'etat des reglages au DEBUT du geste. Le panneau s'en sert pour
+     * garder son ordre pendant qu'on tient un curseur: sans ca, celui qu'on
+     * bouge sauterait dans la section « Modifiés » au premier cran, sous le
+     * doigt, et le geste serait coupe net.
+     */
+    const [adjustBaseline, setAdjustBaseline] = useState(null);
+    const startAdjusting = useCallback(() => {
+        setAdjustBaseline(filters);
+        setIsAdjusting(true);
+    }, [filters]);
+    const stopAdjusting = useCallback(() => setIsAdjusting(false), []);
+
+    /*
+     * Les reglages que le preset actif pose lui-meme. L'interface les colore,
+     * pour qu'on voie d'un coup d'oeil qu'un preset ne fait pas QUE de la
+     * couleur: `powlisher-showcase` pose aussi son grain et son vignetage, qui
+     * ne peuvent pas tenir dans une LUT.
+     */
+    const presetDrivenKeys = useMemo(() => {
+        const preset = VISION_PRESETS.find((item) => item.id === activePresetId);
+        return new Set(Object.keys(preset?.spatialFilters || {}));
+    }, [activePresetId]);
+
+    const activePresetLabel = useMemo(
+        () => VISION_PRESETS.find((item) => item.id === activePresetId)?.label || '',
+        [activePresetId],
+    );
 
     /* ---- Sauvegarde dans le projet commun ---- */
     const persistTimer = useRef(null);
@@ -424,6 +475,8 @@ export default function useVisionEditor() {
         canvasRef,
         handleImageUpload, detachComposition, clearImage,
         autoEnhance, applyPreset, resetFilters,
+        startAdjusting, stopAdjusting, isAdjusting, adjustBaseline,
+        presetDrivenKeys, activePresetLabel,
         undo, redo,
         canUndo: historyIndex > 0,
         canRedo: historyIndex < history.length - 1,

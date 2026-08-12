@@ -34,6 +34,16 @@ Le produit cible est un outil web public permettant :
 - Les secrets Meta/Firebase ne doivent jamais etre hardcodes.
 - Les parcours OAuth, publication reseaux, chiffrement token et anti-doublon restent cote serveur Firebase Functions.
 - Les pages publiques doivent etre indexables ; les surfaces studio/app privees doivent etre `noindex`.
+- **Ne jamais supprimer ni remplacer un preset de [docs/presets-valides.md](docs/presets-valides.md).**
+  Ils ont ete regardes et valides sur de vraies photos. Un nouveau variant
+  s'AJOUTE a cote ; il ne prend jamais la place d'un preset valide, meme s'il est
+  cense faire mieux. Ce fichier dit aussi ce qu'un preset doit passer pour y
+  entrer — et pourquoi les mesures seules ne suffisent pas.
+- **Juger un preset a l'oeil avant de le livrer**, sur des photos PEU RETOUCHEES
+  (Unsplash est la bonne source ; les photos d'un corpus de reference sont deja
+  des edits finis, les repasser dans un preset etale deux fois le meme
+  traitement). `node scripts/planche-presets.mjs <photo...>` fabrique la planche
+  a regarder.
 
 ## Rituel de fin de phase (reconstruction VibeCut)
 

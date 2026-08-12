@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import Link from 'next/link';
 import {
     Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider,
 } from '../primitives';
+import { visionBoundsFor } from '../../vibefx-studio/utils/visionColorScience';
 import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import PipelineSourceNote from '../project/PipelineSourceNote';
 import useVisionEditor from './useVisionEditor';
@@ -16,41 +17,49 @@ import styles from './vision.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
 
-/* Reglages fins: exactement les cles supportees par le moteur Vision v3
-   (utils/visionColorScience.VISION_SUPPORTED_FILTER_KEYS). */
+/*
+ * Reglages fins: exactement les cles supportees par le moteur Vision v3
+ * (utils/visionColorScience.VISION_SUPPORTED_FILTER_KEYS).
+ *
+ * Les BORNES ne sont plus ecrites ici. Elles viennent du moteur
+ * (`visionBoundsFor`), et elles changent avec les garde-fous: actifs, le
+ * contraste s'arrete a 125 parce que c'est la que le moteur l'arrete de toute
+ * facon. Avant, l'interface proposait d'aller jusqu'a 180 et le moteur ramenait
+ * a 125 en silence — un tiers de la course ne faisait rien.
+ */
 const ADVANCED_GROUPS = [
     {
         id: 'light',
         title: 'Lumière',
         controls: [
-            { key: 'brightness', label: 'Luminosité', min: 60, max: 140, defaultValue: 100, unit: '%' },
-            { key: 'contrast', label: 'Contraste', min: 60, max: 180, defaultValue: 100, unit: '%' },
-            { key: 'highlights', label: 'Hautes lumières', min: -50, max: 50, defaultValue: 0 },
-            { key: 'shadows', label: 'Ombres', min: -50, max: 50, defaultValue: 0 },
+            { key: 'brightness', label: 'Luminosité', unit: '%' },
+            { key: 'contrast', label: 'Contraste', unit: '%' },
+            { key: 'highlights', label: 'Hautes lumières' },
+            { key: 'shadows', label: 'Ombres' },
         ],
     },
     {
         id: 'color',
         title: 'Couleur',
         controls: [
-            { key: 'temperature', label: 'Température', min: -30, max: 30, defaultValue: 0 },
-            { key: 'saturation', label: 'Saturation', min: 0, max: 180, defaultValue: 100, unit: '%' },
-            { key: 'vibrance', label: 'Éclat des couleurs', min: -50, max: 50, defaultValue: 0 },
-            { key: 'skinSaturation', label: 'Teintes de peau', min: -30, max: 30, defaultValue: 0 },
-            { key: 'skySaturation', label: 'Ciel', min: -40, max: 40, defaultValue: 0 },
-            { key: 'foliageSaturation', label: 'Verdure', min: -40, max: 40, defaultValue: 0 },
-            { key: 'warmSaturation', label: 'Tons chauds', min: -40, max: 40, defaultValue: 0 },
+            { key: 'temperature', label: 'Température' },
+            { key: 'saturation', label: 'Saturation', unit: '%' },
+            { key: 'vibrance', label: 'Éclat des couleurs' },
+            { key: 'skinSaturation', label: 'Teintes de peau' },
+            { key: 'skySaturation', label: 'Ciel' },
+            { key: 'foliageSaturation', label: 'Verdure' },
+            { key: 'warmSaturation', label: 'Tons chauds' },
         ],
     },
     {
         id: 'texture',
         title: 'Matière',
         controls: [
-            { key: 'clarity', label: 'Relief', min: -30, max: 40, defaultValue: 0 },
-            { key: 'sharpness', label: 'Netteté', min: 0, max: 50, defaultValue: 0 },
-            { key: 'dehaze', label: 'Voile atmosphérique', min: 0, max: 50, defaultValue: 0 },
-            { key: 'grain', label: 'Grain', min: 0, max: 80, defaultValue: 0 },
-            { key: 'vignette', label: 'Vignettage', min: 0, max: 60, defaultValue: 0 },
+            { key: 'clarity', label: 'Relief' },
+            { key: 'sharpness', label: 'Netteté' },
+            { key: 'dehaze', label: 'Voile atmosphérique' },
+            { key: 'grain', label: 'Grain' },
+            { key: 'vignette', label: 'Vignettage' },
         ],
     },
 ];
@@ -65,6 +74,7 @@ export default function VisionScreen() {
         autoMessage, isLoadingImage,
         canvasRef, handleImageUpload, detachComposition, clearImage,
         autoEnhance, applyPreset, resetFilters,
+        startAdjusting, stopAdjusting, isAdjusting, adjustBaseline, presetDrivenKeys, activePresetLabel,
         undo, redo, canUndo, canRedo,
         exportController,
     } = editor;
@@ -83,6 +93,78 @@ export default function VisionScreen() {
 
     const signalTags = useMemo(() => (signals ? describeSignals(signals) : []), [signals]);
     const safeSmartphone = filters.safeSmartphone !== false;
+    const isMono = (filters.saturation ?? 100) === 0;
+
+    /*
+     * Les reglages qui ne sont plus au repos remontent EN HAUT du panneau, dans
+     * leur propre section. Sans ca, il faut parcourir seize curseurs pour
+     * retrouver les trois qui ont bouge — et on ne voit pas ce qu'un preset
+     * vient de poser.
+     */
+    const boundsOf = useCallback(
+        (key) => visionBoundsFor(key, { safe: safeSmartphone, mono: isMono }),
+        [safeSmartphone, isMono],
+    );
+
+    /*
+     * L'ordre est GELE pendant qu'on tient un curseur: on classe d'apres l'etat
+     * du panneau au DEBUT du geste (`adjustBaseline`). Sinon le curseur qu'on
+     * bouge sauterait dans « Modifiés » au premier cran, sous le doigt, et le
+     * geste serait coupe net.
+     */
+    const classement = isAdjusting && adjustBaseline ? adjustBaseline : filters;
+
+    const remontes = useMemo(() => {
+        const out = [];
+        for (const group of ADVANCED_GROUPS) {
+            for (const control of group.controls) {
+                const bounds = boundsOf(control.key);
+                if (!bounds) continue;
+                /*
+                 * Un reglage que le PRESET pilote reste en haut tant que le
+                 * preset est actif, quelle que soit sa valeur — meme ramene au
+                 * repos. Sinon il redescend des qu'on le remet a zero puis
+                 * remonte des qu'on y retouche: le panneau saute sous la main a
+                 * chaque aller-retour, et on perd de vue les reglages du preset
+                 * au moment precis ou on est en train de les regler.
+                 */
+                if (presetDrivenKeys.has(control.key)) {
+                    out.push({ ...control, group: group.title });
+                    continue;
+                }
+                const value = classement[control.key] ?? bounds.neutre;
+                if (value !== bounds.neutre) out.push({ ...control, group: group.title });
+            }
+        }
+        return out;
+    }, [classement, boundsOf, presetDrivenKeys]);
+
+    const remontesKeys = useMemo(() => new Set(remontes.map((c) => c.key)), [remontes]);
+
+    /* Un curseur se rend pareil ou qu'il soit: dans « Modifiés » en haut, ou
+       dans son groupe d'origine. Seul le rappel du groupe change. */
+    const renderSlider = (control, groupe = null) => {
+        const bounds = boundsOf(control.key);
+        if (!bounds) return null;
+        const pilote = presetDrivenKeys.has(control.key);
+        return (
+            <Slider
+                key={control.key}
+                label={groupe ? `${control.label} · ${groupe}` : control.label}
+                value={filters[control.key] ?? bounds.neutre}
+                onChange={(value) => setFilters(control.key, value)}
+                min={bounds.min}
+                max={bounds.max}
+                neutral={bounds.neutre}
+                defaultValue={bounds.neutre}
+                accent={pilote}
+                accentTitle={pilote ? `Réglage posé par le preset « ${activePresetLabel} »` : null}
+                onInteractStart={startAdjusting}
+                onInteractEnd={stopAdjusting}
+                formatValue={(value) => `${value}${control.unit || ''}`}
+            />
+        );
+    };
 
     return (
         <div className={styles.screen} data-testid="vibeos-vision-screen">
@@ -316,23 +398,26 @@ export default function VisionScreen() {
                         </p>
                     </section>
 
-                    {ADVANCED_GROUPS.map((group) => (
-                        <section key={group.id} className={styles.block}>
-                            <h3 className={styles.blockTitle}>{group.title}</h3>
-                            {group.controls.map((control) => (
-                                <Slider
-                                    key={control.key}
-                                    label={control.label}
-                                    value={filters[control.key] ?? control.defaultValue}
-                                    onChange={(value) => setFilters(control.key, value)}
-                                    min={control.min}
-                                    max={control.max}
-                                    defaultValue={control.defaultValue}
-                                    formatValue={(value) => `${value}${control.unit || ''}`}
-                                />
-                            ))}
+                    {remontes.length ? (
+                        <section className={styles.block} data-testid="vibeos-vision-modifies">
+                            <h3 className={styles.blockTitle}>
+                                Modifiés
+                                <span className={styles.blockCount}>{remontes.length}</span>
+                            </h3>
+                            {remontes.map((control) => renderSlider(control, control.group))}
                         </section>
-                    ))}
+                    ) : null}
+
+                    {ADVANCED_GROUPS.map((group) => {
+                        const restants = group.controls.filter((c) => !remontesKeys.has(c.key));
+                        if (!restants.length) return null;
+                        return (
+                            <section key={group.id} className={styles.block}>
+                                <h3 className={styles.blockTitle}>{group.title}</h3>
+                                {restants.map((control) => renderSlider(control))}
+                            </section>
+                        );
+                    })}
 
                     <section className={styles.block}>
                         <Button variant="ghost" size="sm" icon={<RotateCcw size={13} />} onClick={resetFilters}>

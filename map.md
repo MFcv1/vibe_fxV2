@@ -440,7 +440,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- xmpPreset.js           # Lecture d'un .xmp Lightroom/Camera Raw : sert a recuperer les reglages SPATIAUX (clarte, texture, nettete, grain, vignetage) qu'une Hald CLUT ne peut pas capturer, et a produire un resume lisible. La couleur ne vient PAS d'ici
 |   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Contient `cn11.js` et `cn17.js`, captures le 2026-08-11 sur un vrai Lightroom cloud — REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/lightroom/3-cn11-cn17-mesures.md)
 |   |   |   |-- lut3d.js                # Moteur LUT 3D : buildLut3d evalue une fonction de preset sur une grille 33^3, applyLut3d l'applique par interpolation trilineaire en UNE passe. Cout de rendu constant : ajouter un preset ne coute rien
-|   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l'ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). Preset `powlisher` reconstruit par mesure sur 19 photos, cf docs/audit-preset-powlisher-2026-08-11.md
+|   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). `powlisher`, reconstruit par mesure (cf docs/audit-preset-powlisher-2026-08-11.md), `powlisher-ciel` (le ciel CONVERGE vers la teinte ou atterrissent ses ciels, 190-199 deg, au lieu d etre tourne d un angle fixe) et `powlisher-showcase` (clair-obscur: creux de saturation qui vide le decor et laisse le sujet seul colore, plus des effets non-LUT via `spatialFilters`). La regle du ciel est partagee (`regleDuCiel`)
 |   |-- vibefx-shared/
 |   |   `-- utils/
 |   |       `-- smoothBlur.js           # Moteur partage du Flou lisse pro : normalisation, looks rapides, random safe, reset clean, courbes, masques preview et rendu canvas
@@ -514,6 +514,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- make-hald-clut.mjs             # Genere la mire Hald. Depuis le lot J elle est en BLOCS de 4x4 pixels par couleur (2048x2048) avec profil sRGB explicite : une couleur par pixel faisait baver les couleurs entre voisines et virait les noirs au vert
 |   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille
 |   |-- compare-vision-presets-on-photos.mjs # Comparaison des presets sur de vraies photos : ECRETAGE ajoute (matiere detruite), force du look, derive du ciel/vegetation/peau
+|   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
+|   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
 |   |-- audit-vision-filters.mjs        # Audit statique des profils Vision et du branchement safe smartphone, incluant temperature/halation/tint global masques
 |   |-- firebase-deploy.mjs             # Wrapper cross-platform deploy backend/functions avec cible controlee, firebase-tools local et timeout discovery 60s
 |   |-- run-video-ui-test.mjs           # Lance un serveur Next local dedie puis les smokes Playwright Vibe_CUT fonctionnel + securite media/capacites avec SMOKE_BASE_URL controle
@@ -595,6 +597,239 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-12 (lot N — `powlisher-showcase`, et trois bugs d'interface)
+
+- **`powlisher-showcase`, le clair-obscur de ses photos de voiture.** Mesure sur
+  img05/06/07: 48 a 69 % des pixels sous 40/255, le 1 % le plus clair plafonne a
+  183/170/137 (jamais pres du blanc), et surtout la voiture est LA SEULE CHOSE
+  COLOREE — chroma sujet 0,69/1,00/0,76 contre 0,33/0,47/0,20 pour le decor, soit
+  un ecart de x2,1 a x3,8. Le tout en chaud sur chaud (sujet 31-37°, decor
+  34-60°), sans aucun contraste froid.
+
+- **Le mecanisme: un CREUX de saturation.** On vide ce qui est moyennement
+  colore (le decor: beton, tole, asphalte, herbe seche) et on laisse intact ce
+  qui l'est deja beaucoup (le sujet). Une LUT sait le faire parce qu'elle lit la
+  saturation du pixel lui-meme. Resultat mesure sur une photo a nous: ecart
+  sujet/decor x1,7 avant, x3,5 apres, et le 1 % le plus clair passe de 208 a 161.
+
+- **Ce que ce preset ne peut PAS faire, et c'est ecrit dans son en-tete.** La
+  lumiere — voiture au soleil devant un hangar noir — est le lieu, l'heure et
+  l'angle, pas la couleur. Sur notre photo de plein midi, la part de pixels
+  sombres monte de 3 a 8 % la ou ses photos a lui sont a 48-69 %: le preset
+  assombrit, il ne rembobine pas la prise de vue. Et la regle se declenche sur la
+  SATURATION, pas sur le sujet: sur une photo ou le ciel est l'element le plus
+  sature, c'est lui qui recoit le projecteur. Preset de SITUATION, pas look
+  universel.
+
+- **Deux corrections nees de l'oeil et du test, pas du plan.** Le premier jet
+  peignait le ciel en KAKI (le melange vers l'ocre attrapait le bleu): l'ocre est
+  desormais retire dans la bande bleue, le vidage non. Et son smoke a revele que
+  le preset heritait du melangeur de V1, donc du ciel a 163° qu'on venait de
+  corriger ailleurs — la regle du ciel est maintenant une fonction PARTAGEE
+  (`regleDuCiel`), utilisee par `powlisher-ciel` et par lui.
+
+- **Un preset porte desormais ses effets non-LUT, et ca se voit.** Le mecanisme
+  existait deja (`spatialFilters`, pour les presets Lightroom importes) mais rien
+  ne le montrait. Le showcase pose grain 20, vignetage 22, relief 14; le panneau
+  affiche ces trois reglages en couleur d'accent avec une pastille, et le preset
+  annonce « Il pose aussi : grain, vignettage, relief ». Le smoke navigateur le
+  verifie.
+
+- **BUG CORRIGE — le curseur Grain ne faisait quasiment rien.** Mesure dans
+  l'app: a fond (42), il ajoutait un grain d'ecart-type **0,9/255**, la ou les
+  photos de reference en portent ~2,5. Deux attenuations se multipliaient: la
+  mire de bruit avait un canal alpha tire au hasard entre 0 et 70/255, PUIS le
+  rendu la posait avec un `globalAlpha` de grain/100 x 0,5. La mire est
+  desormais OPAQUE et le dosage tient en un seul endroit, cale sur la mesure:
+  **grain 35 donne 2,39/255**, grain 42 donne 2,84. Piege de mesure a noter: le
+  bruit s'ajoute en QUADRATURE au detail propre de la photo, donc l'ecart-type
+  du grain seul s'extrait, il ne se lit pas dans la difference brute — la
+  premiere lecture avait conclu « 50 fois trop faible » au lieu de « 3 fois ».
+
+- **Et la mesure a ete corrigee par l'oeil sur la valeur du preset.** Le showcase
+  visait 35, cale sur le ~2,5/255 mesure chez lui. Mais ce ~2,5 vient de ses
+  JPEG publies REDUITS a 900 px, alors que notre grain est pose a la resolution
+  de la photo — reduire une image MOYENNE son grain, les deux chiffres ne sont
+  donc pas comparables directement, et la cible etait trop haute. A l'ecran, 35
+  passe sur une photo de voiture (le cadre est plein de matiere qui le masque)
+  et se voit trop sur un paysage (un grand ciel lisse ne masque rien). Retenu:
+  **20** (1,05/255), teste sur une Lamborghini Unsplash sous structure beton,
+  atmosphere proche de ses trois photos. Le curseur reste offert, en tete du
+  panneau et en couleur d'accent.
+
+- **BUG CORRIGE — « Relief » et « Grain » semblaient morts pendant le geste.**
+  C'etait une consequence du correctif de latence: la qualite 'low' saute
+  justement les operations qui lisent les pixels voisins (relief, nettete,
+  voile, grain), et « Vignettage », qui n'a pas de garde de qualite, reagissait
+  seul — d'ou l'impression que deux curseurs sur trois ne servaient a rien. Dans
+  Vision, le geste porte precisement sur ces reglages: on y garde donc 'high',
+  et la fluidite vient de la resolution divisee par deux. Layout, ou l'on fait
+  glisser une image, garde 'low'. Mesures apres correction: relief 14 = +10 % de
+  contraste local, relief 30 = +22 %.
+
+- **BUG CORRIGE — le curseur recentre avait une ZONE MORTE.** La premiere
+  version convertissait position <-> valeur; quand les deux cotes n'ont pas le
+  meme nombre de crans, deux positions voisines retombent sur la meme valeur et
+  l'arrondi renvoie la pastille en arriere: « Relief » refusait de descendre
+  sous -2. Le champ reste desormais un curseur natif de bout en bout, avec une
+  course ELARGIE symetriquement autour du repos et la valeur bornee a la sortie.
+  Un cran de fleche = un cran de reglage, aucune conversion, donc aucune zone
+  morte possible.
+
+- **Les reglages pilotes par un preset restent EN HAUT tant que le preset est
+  actif**, meme ramenes au repos. Sinon le grain remis a 0 redescendait dans son
+  groupe et remontait des qu'on y retouchait: le panneau sautait sous la main au
+  moment precis ou l'on reglait.
+
+- **BUG CORRIGE — les curseurs a zero n'etaient pas alignes.** Les bornes ne sont
+  pas symetriques (contraste 80..125 autour de 100, ombres -35..+45 autour de 0),
+  et un `input[type=range]` place sa pastille a (valeur - min) / (max - min):
+  deux reglages tous les deux au repos tombaient donc a des hauteurs
+  differentes. Le `Slider` coupe maintenant la course en deux moities EGALES
+  autour du repos. Les reglages additifs (grain, nettete, voile: leur repos EST
+  le minimum) restent a gauche — c'est correct, et ca les distingue d'un coup
+  d'oeil.
+
+- **BUG CORRIGE — un tiers de la course ne faisait rien.** L'interface declarait
+  ses propres bornes, plus larges que celles que le moteur applique: on poussait
+  « Contraste » jusqu'a 180 alors que `normalizeVisionFilters` ramenait a 125,
+  sans que rien ne l'indique. Les bornes vivent desormais en UN endroit
+  (`VISION_SAFE_BOUNDS` / `VISION_FREE_BOUNDS`), le moteur les applique et
+  l'interface les lit — et elles changent quand on coupe les garde-fous.
+
+- **LATENCE CORRIGEE — l'apercu calculait 4 fois trop de pixels.** Vision passait
+  `isDragging: false` en dur: le rendu restait donc en qualite 'high' et en
+  pleine resolution (1,9 Mpx pour une photo de telephone) A CHAQUE cran de
+  curseur, pour un apercu affiche sur ~550 px. Pendant le geste, la resolution
+  est divisee par deux et la qualite passe en 'low' (qui saute relief, nettete,
+  voile et grain — les operations qui lisent les pixels voisins), avec retour en
+  pleine qualite des que le doigt se leve. Deux details qui comptent: la taille
+  AFFICHEE est figee pendant le geste, sinon l'apercu retrecirait a l'ecran; et
+  `canvas.width` n'est reaffecte que s'il change vraiment, au lieu d'une realloc
+  par frame. L'export n'est pas concerne (canvas separe, toujours 'high').
+
+- **VALIDE A L'OEIL le 2026-08-12**, teste par le porteur du projet sur des
+  photos Unsplash (voiture orange en ville). `powlisher-showcase` rejoint donc
+  la liste des presets qui NE SE SUPPRIMENT PAS.
+
+- **Nouveau document `docs/presets-valides.md`**, et c'est le point d'autorite:
+  la liste des presets valides a l'oeil, la regle (un variant s'AJOUTE, il ne
+  remplace jamais) et ce qu'un preset doit passer pour y entrer. Lie depuis
+  `AGENTS.md`, `todo.md` et l'en-tete de chaque preset concerne.
+
+- **Les reglages modifies remontent EN TETE du panneau**, dans une section
+  « Modifiés » avec un compteur, avant « Lumière ». Sans ca, il faut parcourir
+  seize curseurs pour voir les trois qu'un preset vient de poser. Detail qui
+  compte: l'ordre est GELE pendant qu'on tient un curseur (on classe d'apres
+  l'etat au debut du geste), sinon celui qu'on bouge sauterait en haut au
+  premier cran, sous le doigt, et le geste serait coupe net.
+
+- **Nouvel outil `scripts/planche-presets.mjs`** : toutes les photos passees
+  dans tous les presets, cote a cote, dans un seul PNG. Il repond a la seule
+  question qu'aucune mesure ne couvre — « est-ce que ca a l'air bien ? » — et
+  qui a fait supprimer trois presets. Il documente aussi OU trouver des photos
+  de test: **Unsplash**, parce qu'elles sont PEU RETOUCHEES. Les photos du
+  corpus `@powl_d` sont deja ses edits finis: les repasser dans un preset etale
+  deux fois le meme traitement et fausse le jugement.
+
+- **Ce qu'un preset Lightroom cache en plus de sa couleur, et c'est le cahier
+  des charges du lot suivant.** Constate dans Lightroom sur le pack « Cinema
+  II »: **CN11 ne pose aucun effet, CN17 pose un Grain 15**, et la Nettete reste
+  a 40 sur les deux (defaut de Lightroom, pas du preset). D'autres familles
+  bougent la texture, la clarte ou le noir et blanc.
+
+  Une Hald CLUT ne voit rien de tout ca — pire, **le grain POURRIT la capture**:
+  il bruite chaque pastille de la mire, donc la table mesuree devient fausse
+  (c'est ce que detecte la « rugosite » du rapport d'import). La bonne methode
+  est donc: relever les panneaux **Effets** et **Detail**, remettre le grain a 0
+  dans Lightroom AVANT d'exporter la mire, puis redeclarer les valeurs en
+  `spatialFilters`. Le tableau des reglages a relever est inscrit dans
+  `docs/lightroom/1-procedure.md`, etape 1 bis.
+
+  Et deux limites a connaitre: **Lightroom n'est pas pilotable**, donc l'agent ne
+  peut pas lire ces valeurs — il doit LES DEMANDER, c'est une etape du protocole;
+  et **les masques** (ciel, sujet, degrades, masques IA) ne sont capturables
+  d'AUCUNE facon, puisqu'ils dependent du contenu de la photo. Si le panneau
+  Masquage n'est pas vide, la capture est fausse sans le signaler.
+
+- **Gates** : `lint` (0 erreur, 5 warnings preexistants), `build`,
+  `test:vision-preset` (**67** verifications), `test:vibeos-vision` (2 tests
+  navigateur, qui verifient aussi la section « Modifiés »). `powlisher`,
+  `powlisher-ciel`, `cn11` et `cn17` non touches.
+
+## Journal — 2026-08-12 (lot M — `powlisher-ciel`, et la suppression du lot L)
+
+- **Trois presets supprimes** : `powlisher-ville`, `powlisher-v2`,
+  `powlisher-v2-dore`. Ils passaient toutes leurs mesures, et ils etaient
+  pourtant faux sur les deux plans qui comptent.
+
+- **Leur source etait biaisee.** Ils etaient cales en partie sur la « paire
+  avant/apres » du photographe (ex-img47/48), qui a fait passer son image par une
+  IA generative avant de la publier. L'ecart entre les deux images n'etait donc
+  pas sa colorimetrie, mais sa colorimetrie PLUS ce qu'une IA a invente — du
+  spatial, hors de portee de toute table de couleurs. Le signe etait la des le
+  depart : +/- 22,3/255 de dispersion en sortie pour une meme couleur d'entree,
+  contre 1,9 a 4,8 sur une vraie paire Lightroom. La paire est retiree du README
+  du corpus, du script de recuperation et du script de mesure.
+
+- **Ils dessinaient un trait dans le ciel, et AUCUNE moyenne ne le voyait.**
+  Leur regle se declenchait sur la TEINTE d'un pixel sans verifier que cette
+  teinte veuille dire quelque chose. Dans un voile quasi blanc, la teinte est du
+  bruit : deux pixels identiques a l'oeil peuvent etre a 40 deg l'un de l'autre.
+  La regle basculait d'un pixel a l'autre en plein degrade et tracait un contour
+  diagonal, parfaitement visible a l'ecran. Nouvelle mesure pour l'attraper :
+  l'AMPLIFICATION dans un voile (ecart de sortie / ecart d'entree, sur des pixels
+  quasi neutres a teinte bruitee). `powlisher` 3,03x — la version supprimee
+  7,32x. Le test est desormais dans `test:vision-preset`, borne au niveau de
+  `powlisher` : la regle du ciel n'a pas le droit d'ajouter du contour.
+
+- **`powlisher-ciel`, et le raisonnement qui le fonde.** Ses ciels francs
+  atterrissent TOUS entre 190 et 199 deg (six photos), alors que leurs entrees
+  n'ont aucune raison d'etre groupees. Entrees dispersees, sorties groupees : ca
+  ne decrit pas une rotation, ca decrit une CONVERGENCE. V1 fait l'autre chose —
+  un angle fixe (-38 deg au plus fort du melangeur) — donc un ciel deja bleu-cyan
+  finit trop loin, dans le menthe.
+
+- **La mesure qui tranche : appliquer le preset a SES PROPRES PHOTOS**, qui sont
+  deja ses edits finis, donc deja a la bonne couleur. Un preset juste ne devrait
+  presque pas les bouger. V1 leur retire encore 22,6 deg en moyenne (jusqu'a
+  -31,1 sur img37) ; `powlisher-ciel`, 5,5 deg. C'est la difference entre placer
+  une couleur et la pousser.
+
+- **Sur notre photo temoin** (crique mediterraneenne, ciel d'entree a 214,2 deg,
+  chroma 0,58, avec sa version exportee par `powlisher` a cote) : V1 la pose a
+  185,7 deg, SOUS sa propre fenetre, dans un menthe qu'il ne produit sur aucune
+  de ses photos. `powlisher-ciel` la pose a 195,4 deg, chroma 0,52 — au centre de
+  la fenetre, avec le degrade du ciel conserve.
+
+- **Hors du bleu, c'est `powlisher` au bit pres** : feuillage, peau, gris,
+  turquoise d'eau peu profonde, rouge sombre, point blanc et noirs — 0,0/255 de
+  difference, verifie. Le domaine de la regle commence JUSTE EN DESSOUS de la
+  cible (174-192 deg), pour ne pas pousser vers le cyan un turquoise qui y est
+  deja.
+
+- **Le corpus est reorganise** : sous-dossier `ciel/` (12, 13, 16, 18, 35, 36,
+  37, 39, 46), les photos ou le ciel occupe assez de cadre pour etre mesure. Les
+  scripts le regardent en priorite.
+
+- **VALIDE A L'OEIL, et c'est l'etape qui manquait aux trois presets
+  supprimes.** Le porteur du projet a compare `powlisher`, `powlisher-ciel` et
+  CN17 sur ses propres photos, dans l'app : sur une terrasse en plein soleil,
+  `powlisher` tire le ciel vers le menthe, CN17 le pousse vers un azur plus
+  sature en rechauffant fort la terre cuite, et `powlisher-ciel` tient le milieu
+  — un ciel credible, avec les verts et la terre cuite de `powlisher` intacts.
+  Verdict : « un ciel plus naturel sans perdre le reste de powlisher ».
+  **CE PRESET NE SE SUPPRIME PAS** (marque aussi dans `visionPresets.js` et
+  `todo.md`). Un futur variant du ciel s'AJOUTE, il ne le remplace pas.
+
+- **Gates** : `lint` (0 erreur, 5 warnings preexistants), `build`,
+  `test:vision-preset` (**54** verifications, dont les 40 de V1 intactes). Bandes
+  au pire 2/255 sur un degrade de ciel, soit invisible. `powlisher` V1, `cn11` et
+  `cn17` non touches.
+
+- **Archivage** : les lots H/I/J sortent de `todo.md` vers
+  `docs/archive-presets-vision-2026-08-12.md`.
 
 ## Journal — 2026-08-11 (lot J — CN11 et CN17 captures sur un VRAI Lightroom)
 

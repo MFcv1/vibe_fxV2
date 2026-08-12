@@ -6,6 +6,25 @@ import { renderStudio } from '../engine/studioRenderer';
 
 const MAX_INTERACTIVE_PREVIEW_MEGAPIXELS = 3;
 
+/*
+ * Resolution de calcul PENDANT qu'on bouge un curseur.
+ *
+ * Le probleme mesure: l'apercu Vision est calcule a la resolution de la photo
+ * (1,9 Mpx pour une photo de telephone) alors qu'il est AFFICHE sur ~550 px de
+ * large. A chaque cran de curseur, on faisait donc tourner toute la science des
+ * couleurs sur quatre fois plus de pixels que ce que l'ecran montre — d'ou la
+ * sensation de latence.
+ *
+ * Pendant le geste on divise donc la resolution par deux (quatre fois moins de
+ * pixels), et on repasse en pleine resolution des que le doigt se leve. La
+ * qualite 'low' fait le reste: elle saute les operations qui lisent les pixels
+ * voisins (relief, nettete, voile, grain), les plus couteuses de toutes.
+ *
+ * L'export, lui, n'est pas concerne: il rend dans son propre canvas a la taille
+ * reelle (`useExport`), toujours en qualite 'high'.
+ */
+const INTERACTIVE_SCALE = 0.5;
+
 const capCanvasDimensions = ({ width, height }, maxMegapixels = MAX_INTERACTIVE_PREVIEW_MEGAPIXELS) => {
     const pixels = width * height;
     const maxPixels = maxMegapixels * 1000000;
@@ -311,7 +330,7 @@ export default function useCanvasRenderer({
             return;
         }
         const canvas = canvasRef.current;
-        const { width, height } = getPreviewCanvasDimensions();
+        let { width, height } = getPreviewCanvasDimensions();
         if (width === 0 || height === 0) {
             slotRects.current = [];
             if (setSlotRectsState) {
@@ -319,9 +338,50 @@ export default function useCanvasRenderer({
             }
             return;
         }
-        canvas.width = width;
-        canvas.height = height;
-        renderPipeline(canvas, width, height, true, (isDragging || isDraggingText) ? 'low' : 'high');
+
+        /*
+         * Geste en cours: on calcule moins de pixels, mais on FIGE d'abord la
+         * taille affichee. Le canvas etant dimensionne par sa resolution
+         * interne (`width: auto` cote CSS), baisser celle-ci ferait retrecir
+         * l'apercu a l'ecran a chaque prise en main d'un curseur.
+         */
+        const interacting = isDragging || isDraggingText;
+        const adaptive = view === 'vision-pro' || view === 'studio';
+        if (interacting && adaptive) {
+            if (!canvas.style.width && canvas.clientWidth > 0) {
+                canvas.style.width = `${canvas.clientWidth}px`;
+                canvas.style.height = `${canvas.clientHeight}px`;
+            }
+            width = Math.max(1, Math.round(width * INTERACTIVE_SCALE));
+            height = Math.max(1, Math.round(height * INTERACTIVE_SCALE));
+        } else if (canvas.style.width) {
+            canvas.style.width = '';
+            canvas.style.height = '';
+        }
+
+        /* Reaffecter `width` reinitialise tout le canvas: on ne le fait que si
+           la taille a reellement change, sinon c'est une realloc par frame. */
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+
+        /*
+         * QUALITE PENDANT LE GESTE, et ce choix a ete corrige apres coup.
+         *
+         * La qualite 'low' saute les operations qui lisent les pixels voisins:
+         * relief, nettete, voile et grain. Dans Layout, ou l'on fait glisser une
+         * image ou un texte, c'est le bon compromis — ces effets ne sont pas
+         * l'objet du geste.
+         *
+         * Dans Vision, c'est l'INVERSE: le geste porte precisement sur ces
+         * reglages. Passer en 'low' rendait « Relief » et « Grain » sans effet
+         * visible tant qu'on tenait le curseur, alors que « Vignettage », qui
+         * n'a pas de garde de qualite, reagissait — d'ou l'impression que deux
+         * curseurs sur trois ne faisaient rien. On garde donc 'high' ici, et la
+         * fluidite vient de la resolution divisee par deux (quatre fois moins de
+         * pixels), pas du saut d'etapes.
+         */
+        const quality = interacting && view !== 'vision-pro' ? 'low' : 'high';
+        renderPipeline(canvas, width, height, true, quality);
     }, [activeTemplate, images, getPreviewCanvasDimensions, renderPipeline, isDragging, isDraggingText, view, setSlotRectsState, slotRects, canvasRef, assets, layoutBgGradient, layoutLumenBackground?.image, layoutTextures, texts]);
 
     // Animation loop

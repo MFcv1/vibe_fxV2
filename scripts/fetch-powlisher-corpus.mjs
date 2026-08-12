@@ -75,13 +75,22 @@ const TWEETS = [
     ['2076283103580938629', 'exterieur', 'reference', 4, false],
 
     /*
-     * LA PAIRE AVANT/APRES, et c'est la piece la plus precieuse du corpus.
-     * Il y publie sa photo brute d'iPhone A COTE de son edit final. On connait
-     * donc son ENTREE et sa SORTIE sur la meme image — la seule facon de mesurer
-     * ce qu'il fait vraiment, au lieu de le deduire d'une photo finie.
-     * img47 = avant (brut), img48 = apres (son edit).
+     * ECARTEE le 2026-08-12: la « paire avant/apres » (tweet
+     * 1997328906508960039, ex-img47/48). Elle a longtemps servi de verite
+     * terrain — la seule ou on croyait connaitre son entree ET sa sortie.
+     *
+     * Elle ne vaut rien comme mesure: il dit lui-meme avoir fait passer l'image
+     * par une IA generative pour « booster la resolution et le traitement ».
+     * Ce qui separe les deux images n'est donc pas seulement sa colorimetrie,
+     * c'est aussi ce qu'une IA a invente — du spatial, hors de portee de toute
+     * table de couleurs. La dispersion le montrait deja: +/- 22,3/255 de sortie
+     * pour une meme couleur d'entree, contre 1,9 a 4,8 sur une vraie paire
+     * Lightroom.
+     *
+     * On ne construit pas un preset sur une source dont on ne sait pas ce
+     * qu'elle mesure. La reference, ce sont ses photos finies (dossier `ciel/`
+     * pour le ciel) et nos propres avant/apres, faits sur nos photos.
      */
-    ['1997328906508960039', 'PAIRE avant/apres', 'paire', 2, false],
 ];
 
 /*

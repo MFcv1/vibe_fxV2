@@ -43,7 +43,79 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'profileStrength',
 ];
 
+/*
+ * Les bornes des garde-fous smartphone, en UN SEUL endroit.
+ *
+ * Elles etaient ecrites en dur dans `normalizeVisionFilters`, et l'interface
+ * proposait ses propres bornes, plus larges. Resultat: un tiers de la course du
+ * curseur ne faisait RIEN — on poussait « Contraste » jusqu'a 180 alors que le
+ * moteur ramenait a 125, sans que rien ne l'indique. Ca se lit comme un bug, et
+ * c'en etait un.
+ *
+ * `neutre` est la valeur au repos: c'est elle que l'interface aligne au milieu
+ * de la course, pour que tous les curseurs a zero soient sur la meme verticale.
+ * Quand `neutre` vaut `min`, le reglage est additif (grain, nettete...) et sa
+ * position de repos est a gauche — c'est normal, et c'est visible.
+ */
+export const VISION_SAFE_BOUNDS = {
+    brightness: { min: 85, max: 115, neutre: 100 },
+    contrast: { min: 80, max: 125, monoMax: 145, neutre: 100 },
+    saturation: { min: 45, max: 120, neutre: 100 },
+    vibrance: { min: -45, max: 45, neutre: 0 },
+    skinSaturation: { min: -20, max: 15, neutre: 0 },
+    warmSaturation: { min: -35, max: 18, neutre: 0 },
+    skySaturation: { min: -35, max: 25, neutre: 0 },
+    foliageSaturation: { min: -35, max: 22, neutre: 0 },
+    temperature: { min: -22, max: 22, neutre: 0 },
+    highlights: { min: -45, max: 35, neutre: 0 },
+    shadows: { min: -35, max: 45, neutre: 0 },
+    clarity: { min: -25, max: 30, neutre: 0 },
+    sharpness: { min: 0, max: 35, neutre: 0 },
+    dehaze: { min: 0, max: 35, neutre: 0 },
+    grain: { min: 0, max: 42, monoMax: 55, neutre: 0 },
+    vignette: { min: 0, max: 30, neutre: 0 },
+};
+
+/*
+ * Bornes hors garde-fous. Plus larges, mais pas infinies: au-dela, le moteur ne
+ * produit plus une photo, il produit un artefact.
+ */
+export const VISION_FREE_BOUNDS = {
+    brightness: { min: 60, max: 140, neutre: 100 },
+    contrast: { min: 60, max: 180, neutre: 100 },
+    saturation: { min: 0, max: 180, neutre: 100 },
+    vibrance: { min: -50, max: 50, neutre: 0 },
+    skinSaturation: { min: -30, max: 30, neutre: 0 },
+    warmSaturation: { min: -40, max: 40, neutre: 0 },
+    skySaturation: { min: -40, max: 40, neutre: 0 },
+    foliageSaturation: { min: -40, max: 40, neutre: 0 },
+    temperature: { min: -30, max: 30, neutre: 0 },
+    highlights: { min: -50, max: 50, neutre: 0 },
+    shadows: { min: -50, max: 50, neutre: 0 },
+    clarity: { min: -30, max: 40, neutre: 0 },
+    sharpness: { min: 0, max: 50, neutre: 0 },
+    dehaze: { min: 0, max: 50, neutre: 0 },
+    grain: { min: 0, max: 80, neutre: 0 },
+    vignette: { min: 0, max: 60, neutre: 0 },
+};
+
+/* Les bornes qui s'appliquent vraiment, selon l'etat des garde-fous. */
+export function visionBoundsFor(key, { safe = true, mono = false } = {}) {
+    const table = safe ? VISION_SAFE_BOUNDS : VISION_FREE_BOUNDS;
+    const bounds = table[key];
+    if (!bounds) return null;
+    const max = mono && bounds.monoMax !== undefined ? bounds.monoMax : bounds.max;
+    return { min: bounds.min, max, neutre: bounds.neutre };
+}
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+/* Applique les bornes du tableau ci-dessus, pour qu'elles ne puissent pas
+   diverger de ce que l'interface affiche. */
+const clampSafe = (value, key, fallback, mono = false) => {
+    const bounds = VISION_SAFE_BOUNDS[key];
+    const max = mono && bounds.monoMax !== undefined ? bounds.monoMax : bounds.max;
+    return clamp(value ?? fallback, bounds.min, max);
+};
 const isIdentityCurve = (curve) => !curve || curve.every((value, index) => value === IDENTITY_CURVE[index]);
 const normalizeHexColor = (value, fallback) => HEX_COLOR_RE.test(value || '') ? value : fallback;
 const slugifyVisionId = (value) => String(value || '')
@@ -90,8 +162,8 @@ export function normalizeVisionFilters(filters = {}) {
     if (next.filterIntensity === undefined) next.filterIntensity = 100;
     if (!safe) return next;
 
-    next.brightness = clamp(next.brightness ?? 100, 85, 115);
-    next.contrast = clamp(next.contrast ?? 100, 80, isMono ? 145 : 125);
+    next.brightness = clampSafe(next.brightness, 'brightness', 100);
+    next.contrast = clampSafe(next.contrast, 'contrast', 100, isMono);
     next.sepia = clamp(next.sepia || 0, 0, isMono ? 25 : 12);
     next.blur = clamp(next.blur || 0, 0, 2);
     next.hueRotate = clamp(next.hueRotate || 0, -12, 12);
@@ -104,27 +176,27 @@ export function normalizeVisionFilters(filters = {}) {
         next.saturation = strength === 'experimental' ? Math.min(saturation, 130) : 120;
         next.vibrance = clamp((next.vibrance || 0) + excess * 0.35, -20, 35);
     } else {
-        next.saturation = clamp(saturation, 45, 120);
+        next.saturation = clampSafe(saturation, 'saturation', 100);
     }
 
-    next.vibrance = clamp(next.vibrance || 0, -45, 45);
-    next.skinSaturation = clamp(next.skinSaturation || 0, -20, 15);
-    next.warmSaturation = clamp(next.warmSaturation || 0, -35, 18);
-    next.skySaturation = clamp(next.skySaturation || 0, -35, 25);
-    next.foliageSaturation = clamp(next.foliageSaturation || 0, -35, 22);
-    next.temperature = clamp(next.temperature || 0, -22, 22);
-    next.highlights = clamp(next.highlights || 0, -45, 35);
-    next.shadows = clamp(next.shadows || 0, -35, 45);
-    next.clarity = clamp(next.clarity || 0, -25, 30);
-    next.sharpness = clamp(next.sharpness || 0, 0, 35);
-    next.dehaze = clamp(next.dehaze || 0, 0, 35);
+    next.vibrance = clampSafe(next.vibrance || 0, 'vibrance', 0);
+    next.skinSaturation = clampSafe(next.skinSaturation || 0, 'skinSaturation', 0);
+    next.warmSaturation = clampSafe(next.warmSaturation || 0, 'warmSaturation', 0);
+    next.skySaturation = clampSafe(next.skySaturation || 0, 'skySaturation', 0);
+    next.foliageSaturation = clampSafe(next.foliageSaturation || 0, 'foliageSaturation', 0);
+    next.temperature = clampSafe(next.temperature || 0, 'temperature', 0);
+    next.highlights = clampSafe(next.highlights || 0, 'highlights', 0);
+    next.shadows = clampSafe(next.shadows || 0, 'shadows', 0);
+    next.clarity = clampSafe(next.clarity || 0, 'clarity', 0);
+    next.sharpness = clampSafe(next.sharpness || 0, 'sharpness', 0);
+    next.dehaze = clampSafe(next.dehaze || 0, 'dehaze', 0);
     next.tintIntensity = clamp(next.tintIntensity || 0, 0, isMono ? 18 : 10);
     next.shadowTintIntensity = clamp(next.shadowTintIntensity || 0, 0, isMono ? 28 : 18);
     next.highlightTintIntensity = clamp(next.highlightTintIntensity || 0, 0, isMono ? 22 : 12);
     next.fadedBlacks = clamp(next.fadedBlacks || 0, 0, isMono ? 12 : 8);
     next.halation = clamp(next.halation || 0, 0, 32);
-    next.vignette = clamp(next.vignette || 0, 0, 30);
-    next.grain = clamp(next.grain || 0, 0, isMono ? 55 : 42);
+    next.vignette = clampSafe(next.vignette || 0, 'vignette', 0);
+    next.grain = clampSafe(next.grain || 0, 'grain', 0, isMono);
     next.tintColor = normalizeHexColor(next.tintColor, '#ffffff');
     next.shadowTint = next.shadowTint ? normalizeHexColor(next.shadowTint, '#000000') : next.shadowTint;
     next.highlightTint = next.highlightTint ? normalizeHexColor(next.highlightTint, '#ffffff') : next.highlightTint;

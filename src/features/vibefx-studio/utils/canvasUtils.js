@@ -12,6 +12,23 @@
 // ── Improved Noise Pattern (512px, Box-Muller Gaussian) ──
 import { normalizeVisionFilters } from './visionColorScience';
 
+/*
+ * La mire de grain.
+ *
+ * ELLE ETAIT INVISIBLE, et c'est mesure: a fond (grain 42), elle ajoutait
+ * +0,12/255 de bruit a une photo qui en porte deja 6,5 — cinquante fois moins
+ * que le bruit propre du capteur. Le curseur bougeait, l'image ne bougeait pas.
+ *
+ * Deux causes cumulees: le canal alpha de la mire etait tire au hasard entre 0
+ * et 70/255 (donc la mire etait deja transparente aux trois quarts), PUIS le
+ * rendu la posait avec un `globalAlpha` de grain/100 * 0,5. Les deux
+ * attenuations se multipliaient.
+ *
+ * La mire est desormais OPAQUE: c'est le rendu qui dose, en un seul endroit
+ * (voir `studioRenderer`, etage Grain). Le bruit reste gaussien d'ecart-type 50
+ * autour du gris moyen, ce qui donne un grain de film et non du bruit
+ * numerique.
+ */
 export const createNoisePattern = () => {
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
@@ -29,7 +46,7 @@ export const createNoisePattern = () => {
         data[i] = val;
         data[i + 1] = val;
         data[i + 2] = val;
-        data[i + 3] = Math.floor(Math.random() * 70);
+        data[i + 3] = 255;
     }
     ctx.putImageData(idata, 0, 0);
     return canvas;

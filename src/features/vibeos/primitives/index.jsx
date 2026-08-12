@@ -174,6 +174,25 @@ export function Collapsible({ title, value = null, defaultOpen = true, children,
 /*
  * Slider avec label + valeur numerique. Double-clic sur le label ou la valeur:
  * retour a `defaultValue` (convention VibeOS, documentee dans le plan §3.4).
+ *
+ * LA POSITION DE REPOS EST ALIGNEE, et ce n'est pas cosmetique.
+ *
+ * Les reglages n'ont pas des bornes symetriques: « Contraste » va de 80 a 125
+ * autour de 100, « Ombres » de -35 a +45 autour de 0. Avec un curseur natif, la
+ * pastille se place a (valeur - min) / (max - min): deux reglages tous les deux
+ * au repos se retrouvent donc a des hauteurs differentes, et on croit — a juste
+ * titre — que l'un d'eux n'est pas a zero.
+ *
+ * On coupe donc la course en deux moities EGALES: la gauche couvre min -> repos,
+ * la droite repos -> max. Toutes les pastilles au repos tombent alors sur la
+ * meme verticale, sans rien perdre de la plage disponible.
+ *
+ * Les reglages additifs (grain, nettete, vignetage: leur repos EST le minimum)
+ * gardent une pastille a gauche. C'est correct, et ca les distingue d'un coup
+ * d'oeil des reglages qui vont dans les deux sens.
+ *
+ * `accent` colore la piste: on s'en sert pour montrer qu'un preset pilote ce
+ * reglage-la.
  */
 export function Slider({
     label,
@@ -183,6 +202,11 @@ export function Slider({
     max = 100,
     step = 1,
     defaultValue = null,
+    neutral = null,
+    accent = false,
+    accentTitle = null,
+    onInteractStart = null,
+    onInteractEnd = null,
     formatValue = (v) => String(v),
     className,
 }) {
@@ -190,21 +214,58 @@ export function Slider({
     const handleReset = () => {
         if (defaultValue !== null) onChange?.(defaultValue);
     };
+
+    /* Le pivot n'a de sens qu'a l'interieur de la course: un reglage additif
+       (repos = min) reste en mapping direct. */
+    const pivot = neutral === null ? defaultValue : neutral;
+    const centered = pivot !== null && pivot > min && pivot < max;
+
+    /*
+     * COMMENT on recentre, et pourquoi pas autrement.
+     *
+     * Premiere idee, abandonnee: couper la course en deux moities egales et
+     * convertir position <-> valeur. Elle marche sur le papier et casse a
+     * l'usage — quand les deux cotes n'ont pas le meme nombre de crans, deux
+     * positions voisines retombent sur la meme valeur, et l'arrondi renvoie la
+     * pastille a sa position de depart. Le curseur se BLOQUE: le Relief refusait
+     * de descendre sous -2, quelle que soit la fleche.
+     *
+     * Ce qu'on fait a la place: on ELARGIT la course du champ pour qu'elle soit
+     * symetrique autour du repos, et on borne la valeur a la sortie. Le champ
+     * reste un curseur natif de bout en bout — un cran de fleche = un cran de
+     * reglage, aucune conversion, donc aucune zone morte possible. Le seul cout
+     * est visible et honnete: du cote le plus court, la pastille s'arrete un peu
+     * avant le bout de la piste.
+     */
+    const portee = centered ? Math.max(pivot - min, max - pivot) : 0;
+    const borne = (v) => Math.min(max, Math.max(min, v));
+
     return (
-        <div className={cx(styles.slider, className)}>
+        <div className={cx(styles.slider, accent && styles.sliderAccent, className)}>
             <div className={styles.sliderHead} onDoubleClick={handleReset}>
-                <label className={styles.sliderLabel} htmlFor={inputId}>{label}</label>
+                <label className={styles.sliderLabel} htmlFor={inputId}>
+                    {label}
+                    {accent ? (
+                        <span className={styles.sliderAccentDot} title={accentTitle || undefined} aria-hidden="true" />
+                    ) : null}
+                </label>
                 <span className={styles.sliderValue} data-numeric>{formatValue(value)}</span>
             </div>
             <input
                 id={inputId}
                 type="range"
                 className={styles.sliderInput}
-                min={min}
-                max={max}
+                min={centered ? pivot - portee : min}
+                max={centered ? pivot + portee : max}
                 step={step}
                 value={value}
-                onChange={(event) => onChange?.(Number(event.target.value))}
+                onChange={(event) => onChange?.(borne(Number(event.target.value)))}
+                onPointerDown={onInteractStart || undefined}
+                onPointerUp={onInteractEnd || undefined}
+                onPointerCancel={onInteractEnd || undefined}
+                onKeyDown={onInteractStart || undefined}
+                onKeyUp={onInteractEnd || undefined}
+                onBlur={onInteractEnd || undefined}
             />
         </div>
     );
