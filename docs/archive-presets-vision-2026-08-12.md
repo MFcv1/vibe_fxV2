@@ -13,6 +13,9 @@
 | H — Presets | 12 « looks » supprimés ; moteur LUT 3D + preset `powlisher` reconstruit par mesure | ✅ 2026-08-11 |
 | I — Import Lightroom | capture exacte par Hald CLUT + lecture du `.xmp` | ✅ 2026-08-11 |
 | J — Capture réelle CN11 / CN17 | chaîne validée sur un vrai Lightroom cloud | ✅ 2026-08-11 |
+| L — Powlisher V2 + doré | 3 presets bâtis sur une source biaisée | ❌ **supprimés** 2026-08-12 |
+| M — `powlisher-ciel` | le ciel **converge** au lieu d'être tourné d'un angle fixe | ✅ 2026-08-12 |
+| N — `powlisher-showcase` + interface | clair-obscur pour la voiture, et 4 bugs de réglages | ✅ 2026-08-12 |
 
 ---
 
@@ -74,3 +77,31 @@ Quatre choses apprises, toutes documentées et toutes codées :
 Procédure reproductible, chiffres, verdict, **question de licence** et le détail
 des trois erreurs de mesure commises en route : [docs/lightroom/](docs/lightroom/).
 
+
+
+---
+
+### Lots L, M, N — 2026-08-12
+
+Le détail chiffré est dans les **journaux datés de `map.md`** (entrées
+« lot M » et « lot N »), pas ici : c'est là qu'il a été écrit au moment du
+travail, avec les mesures. Ce qu'il faut en retenir tient en cinq points, tous
+déjà repris dans « Pièges connus » de `todo.md` :
+
+1. **Trois presets supprimés.** Ils passaient toutes leurs mesures et étaient
+   faux quand même : source biaisée (la « paire avant/après » du photographe est
+   passée par une IA générative) et **trait de contour** dans le ciel, invisible
+   dans les moyennes, évident à l'écran.
+2. **`powlisher-ciel`** : ses ciels francs atterrissent tous entre 190 et 199°
+   alors que leurs entrées n'ont aucune raison d'être groupées — ça décrit une
+   **convergence**, pas une rotation. Appliqué à ses propres photos, `powlisher`
+   leur retire encore 22,6° en moyenne, `powlisher-ciel` 5,5°.
+3. **`powlisher-showcase`** : un **creux de saturation** vide le décor et laisse
+   le sujet seul coloré (écart mesuré chez lui ×2,1 à ×3,8). Porte aussi des
+   effets non-LUT.
+4. **Quatre bugs d'interface** : bornes déclarées deux fois (un tiers de la
+   course ne faisait rien), curseurs au repos non alignés, aperçu qui calculait
+   1,9 Mpx par cran de curseur, et **grain qui plafonnait à 0,9/255** —
+   invisible.
+5. **La méthode** : mesurer, puis **regarder**. Les trois défauts qui ont coûté
+   le plus n'ont été vus qu'à l'écran.
