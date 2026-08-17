@@ -614,8 +614,26 @@ export const VISION_PRESETS = [
          * VOISINS ou de la POSITION dans l'image. C'est le mecanisme deja
          * utilise par les presets importes de Lightroom.
          *
-         *   grain 20    juge a l'oeil, apres avoir vise 35 sur la mesure — et
-         *               c'est la mesure qui avait tort de trancher seule.
+         *   grain 8     RECALE le 2026-08-15, quand l'echelle du grain est
+         *               devenue celle de Lightroom. La valeur d'avant etait 20
+         *               sur l'ancienne echelle, qui produisait un ecart-type de
+         *               2,76/255 au ton moyen; 8 sur la nouvelle en produit
+         *               2,94. C'est la MEME force au ton moyen.
+         *
+         *               Mais ce n'est pas le meme rendu, et il ne faut pas le
+         *               pretendre: l'ancien etage s'eteignait dans les noirs et
+         *               les blancs (une cloche), le nouveau pose un plat comme
+         *               Lightroom. Le grain apparait donc maintenant dans les
+         *               ciels et les ombres lisses, ou il n'y en avait pas.
+         *
+         *               REVALIDE A L'OEIL le 2026-08-16, a 1:1, sur quatre
+         *               photos de voiture: il tient de la tole lisse au noir du
+         *               pare-brise, sans tache ni bruit de couleur. Reserve
+         *               honnete: aucune de ces quatre n'a de grand ciel, qui
+         *               est justement le cas ou un grain plat se voit le plus.
+         *
+         *               Ce qui suit est le raisonnement d'origine, garde parce
+         *               qu'il dit pourquoi la valeur est basse :
          *
          *               Le raisonnement initial: ses photos portent un grain
          *               d'ecart-type ~2,5/255, et 35 en produit 2,39 dans
@@ -631,13 +649,35 @@ export const VISION_PRESETS = [
          *               un paysage, ou un grand ciel lisse ne masque rien. Un
          *               preset doit tenir sur les deux: 20 (1,05/255 mesure).
          *               Le curseur reste offert, en tete du panneau.
-         *   vignette 22 seul reglage pose au jugement: aucune surface uniforme
-         *               dans ses trois photos ne permet de separer le vignetage
-         *               de la scene elle-meme. Assez pour fermer le cadre, pas
-         *               assez pour se voir comme un effet.
-         *   clarity 14  le rendu « matiere » sur la tole et le beton.
+         *   vignette 3  RECALE le 2026-08-16, quand l'echelle du vignetage est
+         *               devenue celle de Lightroom. C'etait 22 sur l'ancienne
+         *               echelle — et la mesure a montre que ce 22 ne faisait
+         *               presque RIEN: un degrade circulaire multiplie en sRVB,
+         *               qui n'atteignait sa pleine force qu'au-dela du cadre.
+         *               Assombrissement moyen: 3,3/255. 3 sur la nouvelle
+         *               echelle reproduit exactement ca.
+         *
+         *               MONTE A 8 le 2026-08-16, apres l'avoir regarde. Ce 3
+         *               n'avait jamais ete juge a l'oeil pour ce qu'il FAIT,
+         *               mais pour ce qu'il ne faisait pas: il reproduisait
+         *               fidelement un reglage casse. Sur les quatre photos de
+         *               la planche, 8 assombrit le coin de 15/255 la ou le
+         *               fond est clair, et ne touche a rien la ou le coin est
+         *               deja noir — le vignetage MULTIPLIE la lumiere, donc il
+         *               n'a rien a retirer d'un noir. Le cadre se ferme sans
+         *               que ca se lise comme un effet.
+         *               Planche: `node scripts/planche-showcase.mjs`.
+         *
+         *               Le raisonnement d'origine: aucune surface uniforme dans
+         *               ses trois photos ne permet de separer le vignetage de la
+         *               scene elle-meme. Assez pour fermer le cadre, pas assez
+         *               pour se voir comme un effet.
+         *   clarity 14  le rendu « matiere » sur la tole et le beton. Revalide
+         *               a l'oeil le 2026-08-16 sur le nouveau rayon (4x plus
+         *               large): la matiere est la, aucun halo sur les contours
+         *               de la voiture, qui etait le risque du rayon elargi.
          */
-        spatialFilters: { grain: 20, vignette: 22, clarity: 14 },
+        spatialFilters: { grain: 8, vignette: 8, clarity: 14 },
         recommendedIntensity: 100,
         transform: powlisherShowcaseTransform,
     },

@@ -20,6 +20,7 @@ export const DEFAULT_FILTERS = {
     skySaturation: 0,
     foliageSaturation: 0,
     temperature: 0,
+    texture: 0,
     clarity: 0,
     sharpness: 0,
     dehaze: 0,

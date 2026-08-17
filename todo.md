@@ -1,6 +1,6 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-12.**
+> **Point d'étape : 2026-08-16.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
@@ -17,6 +17,9 @@
    procédure clic par clic, la méthode et ses pièges, le corpus de `powlisher`.
 5. [map.md](map.md) — arbre du projet. Ses journaux datés : **ne lis que la
    zone que tu touches**.
+
+Reprendre dans un chat neuf :
+[prompt de reprise du 2026-08-16](docs/prompt-reprise-2026-08-16.md).
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
 [VibeOS](docs/archive-vibeos-2026-08-11.md) ·
@@ -38,8 +41,8 @@ qui capture un preset Lightroom **exactement**, par Hald CLUT. Cinq presets :
 |---|---|---|
 | `powlisher` | le look de `@powl_d`, reconstruit par mesure sur 19 photos | — |
 | `powlisher-ciel` | le ciel **converge** vers sa teinte (190–199°) au lieu d'être tourné d'un angle fixe | — |
-| `powlisher-showcase` | clair-obscur : le décor est vidé, le sujet reste seul coloré | grain 20, vignetage 22, relief 14 |
-| `cn11`, `cn17` | captures **exactes** de Lightroom (pack Adobe « Cinéma II ») | — |
+| `powlisher-showcase` | clair-obscur : le décor est vidé, le sujet reste seul coloré | grain 8, vignetage 8, relief 14 |
+| `cn11`, `cn17` | captures **exactes** de Lightroom (pack Adobe « Cinéma II ») | netteté 40 ; `cn17` : grain 15 |
 
 **Les cinq sont dans [docs/presets-valides.md](docs/presets-valides.md) : ils ne
 se suppriment pas et ne se remplacent pas** — un variant s'ajoute à côté. Trois
@@ -47,7 +50,7 @@ autres ont été **supprimés** le 2026-08-12 (source biaisée, trait de contour
 le ciel).
 
 Un preset peut porter des **`spatialFilters`** (grain, vignetage, relief,
-netteté, voile) : ils dépendent des pixels voisins ou de la position, donc
+texture, netteté, voile) : ils dépendent des pixels voisins ou de la position, donc
 **aucune table de couleurs ne les contient**. Le panneau les affiche en couleur
 d'accent et les remonte en tête dans « Modifiés ».
 
@@ -63,98 +66,95 @@ résolution / 2 pendant le geste, **grain réparé** (il plafonnait à 0,9/255).
 
 ## Ce qui reste
 
-### LOT SUIVANT — synchroniser nos réglages avancés avec Lightroom
+### LOT ACTIF — finir de caler les réglages avancés sur Lightroom
 
-**C'est le prochain travail, et il passe AVANT tout nouvel import.**
+**Il passe AVANT tout nouvel import.** Le protocole, les mesures et les
+commandes : [docs/lightroom/4-synchro-effets.md](docs/lightroom/4-synchro-effets.md).
+Mires : `npm run preset:mire-effets`. Les exports Lightroom sont faits **à la
+main par Matthis** (dossiers prêts dans `~/Desktop/vibefx-lightroom/`) — l'agent
+ne peut ni lire ses panneaux ni exporter à sa place.
 
-La capture par Hald CLUT donne la **couleur** exactement. Elle ne peut pas donner
-les effets **spatiaux** (grain, vignetage, clarté, texture, netteté, voile) :
-ils dépendent des pixels voisins ou de la position. Ceux-là, on les recopie à la
-main dans `spatialFilters` — le mécanisme existe déjà.
-
-**Le problème : nos chiffres ne sont pas les siens.** Mesuré le 2026-08-12 sur la
-mire CN17 déjà exportée (la mire est faite de carrés de couleur unie : toute
-variation à l'intérieur d'un carré **est** le grain) :
-
-| | grain mesuré |
+| Réglage | État |
 |---|---|
-| notre mire d'origine, aucun traitement | **0,00/255** — la méthode est propre |
-| **mire passée dans CN17 (Grain 15 de Lightroom)** | **6,27/255** |
-| notre moteur à Grain 15 | ~0,8/255 |
-| notre moteur **à fond** (42, garde-fous actifs) | 2,84/255 |
+| **Grain** | **ALIGNÉ** — ×1,00 sur toute la plage tonale, à 15 / 50 / 100 |
+| **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
+| **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
+| **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
+| **Texture** | **ALIGNÉE côté positif** — ×1,176/1,120/1,096 contre ses ×1,175/1,120/1,096. **Négatif non implémenté** : ses 2 exports manquent |
+| Voile | mesuré, **pas capturable par une mire** : Lightroom l'estime depuis le contenu de l'image |
 
-Le grain de Lightroom est donc **~8× plus fort à chiffre égal**, et même à fond
-on n'atteint pas la moitié de son 15. Recopier « 15 » chez nous donnerait un
-grain invisible — et on croirait l'avoir reproduit.
+**Fait le 2026-08-16 — le lot est débloqué, on peut réimporter :**
 
-**Le travail, dans l'ordre :**
+1. `powlisher-showcase` **revalidé à l'œil** (`planche-showcase.mjs`, quatre
+   photos, vrai moteur) : grain 8 et relief 14 gardés, **vignetage 3 → 8**.
+2. `cn17` **validé sur une vraie photo** développée des deux côtés :
+   **1,73/255** d'écart moyen, « identique à l'œil ».
+3. Cette planche a révélé une **Netteté 40** que Lightroom pose sur toute photo
+   et que nos presets n'avaient pas — nous rendions 1,40× plus mou. `cn11` et
+   `cn17` la portent désormais.
+4. **Texture branchée** dans le moteur, calée sur ses mesures.
 
-1. **Fabriquer une mire d'EFFETS** (nouvelle, différente de la Hald) : aplats
-   unis pour le grain, dégradés pour le vignetage et les bandes, bords de
-   contraste varié pour clarté / texture / netteté, dégradé voilé pour le voile.
-2. **Faire passer cette mire dans Lightroom**, un seul curseur à la fois, à
-   valeurs connues (0, 25, 50, 75, 100). C'est Matthis qui l'exporte.
-3. **Mesurer les deux côtés** et en tirer, réglage par réglage, la table de
-   conversion.
-4. **Aligner notre moteur** pour qu'un même chiffre donne le même effet, plutôt
-   que de convertir à l'import — c'est le but : « Grain 15 » doit vouloir dire la
-   même chose des deux côtés. Réajuster les bornes des garde-fous en conséquence.
-5. **Vérifier sur une vraie photo** : la même image développée des deux côtés,
-   avec l'effet seul (`compare-preset-vs-lightroom.mjs`).
+**Ce qui reste sur ce lot :**
 
-> Conséquence à ne pas oublier : `powlisher-showcase` porte grain 20, vignetage
-> 22, relief 14, **calés sur l'échelle actuelle**. Après réétalonnage, ses
-> valeurs doivent être revues pour que son rendu ne change pas — et revalidées à
-> l'œil.
+1. **Texture négative** : les 2 exports (−50, −100) manquent encore — ceux qui
+   sont là sont le positif exporté deux fois, revérifié. L'import **refuse** un
+   `--texture` négatif tant que ce n'est pas mesuré.
+2. **Voile** : ne pas le mesurer sur mire. Cas à part, sur photo réelle.
+3. **Grain Taille 40** : CN17 la met à 40, tout est calibré pour 25. À mesurer
+   si l'aspect du grain d'un preset importé ne colle pas.
+
+**Pas bloquant pour importer** : les **sous-réglages** (Grain Taille 25 /
+Cassure 50, Vignette Milieu 50 / Arrondi 0 / Contour 50 / Hautes lumières 0)
+sont relevés mais non branchés. Tout est calibré **pour ces défauts**. Décision
+prise : on ne les branche que si un preset à importer les change vraiment — donc
+**les vérifier au relevé, à chaque import**.
+
+**Ce que ces quatre calages ont appris, et qui vaut pour les suivants :**
+
+- **Ne jamais mesurer un effet spatial sur la mire Hald.** Ses pastilles de 4×4 px
+  font baver les voisins : c'est ce qui avait produit le faux « ×8 » du grain
+  (le vrai écart était ×2,66).
+- **Chercher la loi, pas un coefficient.** Les quatre fois, le facteur d'échelle
+  n'était pas le vrai problème : cloche contre plat, sRVB contre linéaire, rayon
+  4× trop petit, linéaire contre saturant.
+- **Une mire peut mentir sur elle-même.** Le bord doux de la mire C est cerné par
+  ses zones voisines : au-delà d'un certain rayon de flou, la mesure lit ses
+  propres bords.
+- **Toute valeur déjà écrite est à convertir** quand une échelle bouge —
+  presets, ambiances et `constants.jsx` compris.
 
 ### Puis — importer d'autres presets Lightroom
 
-Élargir la bibliothèque avec les familles **paysage** (LN01–LN08), **architecture
-urbaine** (UA01–UA04), **voyage, cinéma, film**, par la méthode Hald CLUT.
+Familles **paysage** (LN01–LN08), **architecture urbaine** (UA01–UA04),
+**voyage, cinéma, film**, par la méthode Hald CLUT
+([1-procedure.md](docs/lightroom/1-procedure.md)).
 
-**Un preset Lightroom n'est pas que de la couleur.** Constaté sur « Cinéma II » :
-**CN11 n'a aucun effet, CN17 pose un Grain 15**, la Netteté reste à 40 sur les
-deux (défaut de Lightroom). D'autres familles bougent la texture, la clarté ou le
-noir et blanc.
+**Un preset Lightroom n'est pas que de la couleur.** À chaque import : relever
+les panneaux **Effets** et **Détail** (l'agent doit les **demander**), remettre
+le grain à 0 avant d'exporter la mire, puis passer les valeurs relevées à
+l'import — `--grain`, `--vignette`, `--clarity`, `--texture`, `--sharpness`,
+`--dehaze`. **Le
+nombre se recopie tel quel** : nos échelles sont les siennes.
 
-**Donc, à chaque import :** relever les panneaux **Effets** et **Détail** AVANT
-d'exporter la mire, remettre le grain à 0 pour que la table soit propre, puis
-redéclarer les valeurs dans `spatialFilters`. Le tableau des réglages à relever
-est dans [1-procedure.md](docs/lightroom/1-procedure.md), étape 1 bis.
+**Déjà capturé, à ne pas relever** : tout ce qui dépend de la seule couleur du
+pixel — exposition, contraste, hautes lumières, ombres, blancs, noirs, courbe,
+TSL, étalonnage, virage, N&B, et le **profil**.
 
-> **Lightroom n'est pas pilotable** : l'agent ne peut pas lire ces valeurs. Il
-> doit **les demander** — c'est une étape du protocole, à rappeler à chaque
-> import.
-
-**Ce qui est DÉJÀ capturé, et qu'on ne relève donc pas** : tout ce qui dépend de
-la seule couleur du pixel — exposition, contraste, hautes lumières, ombres,
-blancs, noirs, courbe, TSL, étalonnage, virage, N&B, et le **profil**. La mire
-capture le résultat, pas la liste des curseurs.
-
-**⚠️ Piège des réglages « Auto ».** Certains presets Premium affichent « Auto
-Blancs », « Auto Noirs » avec des valeurs non nulles (vu sur la famille FT :
-+14 / +35). Un « Auto » est calculé **à partir de la photo** : sur la mire, dont
-l'histogramme ne ressemble à aucune image, il calculerait tout autre chose — et
-la table serait fausse **sans que rien ne le signale**. Test : appliquer le
-preset à deux photos très différentes ; si ces nombres changent, le preset
-s'adapte et n'est pas capturable tel quel. À écarter, ou à capturer Auto remis
-à 0 (on fige alors une version qui ne s'adapte plus).
+**⚠️ Deux pièges qui rendent un preset non capturable**, sans que rien ne le
+signale : un réglage **« Auto »** non nul (calculé depuis la photo — le tester
+sur deux images très différentes), et un panneau **Masquage** non vide.
 
 ### Reste ouvert
 
-1. **Brancher la Netteté 40** que Lightroom applique par défaut
-   (`filters.sharpness`) — à traiter **avec** le lot de synchronisation
-   ci-dessus, c'est le même sujet.
-2. **Trancher la licence** : CN11 et CN17 sont dans le bundle sous leurs noms
+1. **Trancher la licence** : CN11 et CN17 sont dans le bundle sous leurs noms
    Adobe. À régler avant toute mise en ligne.
-3. **Construire nos propres looks**, calibrés sur CN11 qui est une référence
+2. **Construire nos propres looks**, calibrés sur CN11 qui est une référence
    exacte.
 
 **Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
-bibliothèque Midjourney (partis avec l'ancienne UI, routes et ledger intacts,
-cf. `src/config/aiLaunch.js`) ; synchro Google Drive de la photothèque (demandée,
-pas faite — la bibliothèque est locale en IndexedDB) ; couverture émulateurs du
-parcours publication, à réécrire sur `/publier`.
+bibliothèque Midjourney (routes et ledger intacts, cf. `src/config/aiLaunch.js`) ;
+synchro Google Drive de la photothèque (la bibliothèque est locale en IndexedDB) ;
+couverture émulateurs du parcours publication, à réécrire sur `/publier`.
 
 ---
 
@@ -172,7 +172,9 @@ parcours publication, à réécrire sur `/publier`.
 - **Photos de test : Unsplash**, parce qu'elles sont **peu retouchées**. Celles
   d'un corpus de référence sont déjà des édits finis : les repasser dans un
   preset étale deux fois le même traitement. Hors du dépôt
-  (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>`.
+  (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
+  couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
+  relief) — le premier ne montre que la LUT.
 - **Ne jamais se caler sur une source dont on ignore ce qu'elle mesure** (la
   « paire avant/après » est passée par une IA : écartée), et se méfier du **biais
   de sélection** quand on mesure un corpus.
@@ -241,14 +243,17 @@ npm run test:routes            # si tu touches aux routes (build + start)
 
 # outils des presets
 npm run preset:mire / preset:controle / preset:import          # capturer un preset Lightroom
-node scripts/planche-presets.mjs <photo...>                    # LA PLANCHE À REGARDER
+node scripts/planche-presets.mjs <photo...>                    # planche : LUT seule
+node scripts/planche-showcase.mjs                             # planche : EFFETS COMPRIS
 node scripts/mesure-ciel-powlisher.mjs [--photo <f>]           # où le ciel atterrit
 node scripts/audit-vision-presets.mjs                          # bandes, dominante, témoins
 node scripts/compare-vision-presets-on-photos.mjs <photo...>   # écrêtage et force
-node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id>   # fidélité réelle
+node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id> [--planche <png>]
+node scripts/rendu-mire-c.mjs --texture 50 --sortie <png>      # notre moteur sur la mire C
+node scripts/mesure-mire-c.mjs --reference <a> --lightroom <b> # netteté / texture / clarté
 ```
 
-Tous verts au 2026-08-12.
+Tous verts au 2026-08-16, `test:vibeos-vision` compris.
 
 **Échecs préexistants, hors chantier** : `smoke-vibecut-media-safety.spec.cjs`
 (3) et `test:vibecut-export-local-mp4` — fixtures manquantes, chemins Windows

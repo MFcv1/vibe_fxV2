@@ -55,6 +55,7 @@ const ADVANCED_GROUPS = [
         id: 'texture',
         title: 'Matière',
         controls: [
+            { key: 'texture', label: 'Texture' },
             { key: 'clarity', label: 'Relief' },
             { key: 'sharpness', label: 'Netteté' },
             { key: 'dehaze', label: 'Voile atmosphérique' },

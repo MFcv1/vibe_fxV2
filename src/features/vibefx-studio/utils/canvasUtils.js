@@ -54,6 +54,116 @@ export const createNoisePattern = () => {
 
 export const NOISE_PATTERN_CANVAS = createNoisePattern();
 
+// ═══════════════════════════════════════════════════════════
+//  GRAIN — additif, d'amplitude constante, cale sur Lightroom
+// ═══════════════════════════════════════════════════════════
+/*
+ * MESURE DU 2026-08-15, mire A (24 aplats unis de 220x220), Lightroom cloud.
+ *
+ * Ecart-type du grain de Lightroom, sur la luminance, en /255 :
+ *
+ *   valeur du curseur |  15   |  50   |  100
+ *   ------------------+-------+-------+-------
+ *   gris 24           |  5,50 | 16,84 | 28,81   (ecrete par le noir)
+ *   gris 72           |  5,53 | 18,40 | 35,92
+ *   gris 128          |  5,52 | 18,35 | 36,67
+ *   gris 192          |  5,58 | 18,54 | 35,66
+ *   gris 224          |  5,51 | 17,62 | 30,67   (ecrete par le blanc)
+ *
+ * Deux faits, et le second compte plus que le premier :
+ *
+ * 1. C'EST UNE DROITE. 5,52/15 = 0,368 ; 18,35/50 = 0,367 ; 36,67/100 = 0,367.
+ *    Son curseur est proportionnel, sans courbe cachee.
+ *
+ * 2. C'EST UN PLAT. L'amplitude ne bouge pas du noir au blanc. Les baisses aux
+ *    deux extremites ne sont pas un dosage: c'est l'ECRETAGE d'une gaussienne
+ *    contre 0 et contre 255 (une gaussienne d'ecart-type s tronquee a sa
+ *    moyenne rend ~0,63 s, et on mesure bien 3,48 pour 5,52).
+ *
+ * Notre ancien etage posait le bruit en fusion `overlay`, qui par construction
+ * n'a plus d'effet quand le pixel approche 0 ou 255 : notre grain valait 2,07
+ * au ton moyen mais 0,45 dans les ombres et 0,57 dans les hautes lumieres. Une
+ * CLOCHE, la ou Lightroom pose un PLAT. Le grain disparaissait donc exactement
+ * la ou un grain de film se voit — les ciels et les ombres lisses. Le facteur
+ * d'echelle (x2,66 au ton moyen) n'etait que la moitie visible du probleme.
+ *
+ * D'ou cet etage : un bruit gaussien monochrome ADDITIF, d'ecart-type
+ * GRAIN_SIGMA_PAR_UNITE x valeur, ecrete. Monochrome parce que c'est mesure :
+ * la correlation entre canaux vaut 1,00 chez Lightroom.
+ *
+ * RESERVE HONNETE : sur des couleurs tres saturees, Lightroom donne un peu plus
+ * que le plat (7,5 au lieu de 5,5 a valeur 15), et de facon inegale entre
+ * canaux — signe qu'il ajoute son bruit avant une transformation d'espace, pas
+ * en sortie. Sur les neutres, les peaux, les ciels et les betons — la matiere
+ * ou un grain se juge — le plat est exact au centieme.
+ */
+export const GRAIN_SIGMA_PAR_UNITE = 0.367;
+
+const GRAIN_NOISE_SIZE = 512;
+
+/* Table de deviations gaussiennes centrees (ecart-type 1), tiree une fois. */
+const GRAIN_NOISE_TABLE = (() => {
+    const table = new Float32Array(GRAIN_NOISE_SIZE * GRAIN_NOISE_SIZE);
+    for (let i = 0; i < table.length; i += 1) {
+        const u1 = Math.random() || 0.0001;
+        const u2 = Math.random();
+        table[i] = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+    return table;
+})();
+
+/*
+ * L'EXTINCTION AUX DEUX BOUTS, elle aussi mesuree.
+ *
+ * Le plat de Lightroom n'en est pas tout a fait un: au niveau 8 et au niveau
+ * 247, son grain ne vaut plus que 0,67 de sa valeur courante. Verifie que ce
+ * n'est PAS un simple ecretage: une gaussienne d'ecart-type 5,5 posee sur un
+ * niveau 8 et coupee a 0 rendrait 5,20, or on mesure 3,48. Et le rapport vaut
+ * 0,67 aux trois valeurs de curseur testees (15, 50, 100) comme aux deux bouts
+ * — c'est donc une attenuation qui depend du NIVEAU, pas de la force.
+ *
+ * C'est d'ailleurs sain: du grain dans un noir bouche ne ressemble a rien
+ * d'autre qu'a du bruit numerique.
+ *
+ * RESERVE: seuls les niveaux 8 (0,67) et 24 (1,00) ont ete mesures. L'exposant
+ * ci-dessous passe exactement par ces deux points et s'eteint a 0 sur le noir
+ * pur; la forme ENTRE les deux est une interpolation, pas une mesure.
+ */
+const GRAIN_BORD = 24; // au-dela, plus d'attenuation
+const GRAIN_BORD_EXPOSANT = 0.364; // (8/24)^0,364 = 0,67, le rapport mesure
+
+const GRAIN_ATTENUATION = (() => {
+    const table = new Float32Array(256);
+    for (let v = 0; v < 256; v += 1) {
+        const distance = Math.min(v, 255 - v);
+        table[v] = distance >= GRAIN_BORD ? 1 : (distance / GRAIN_BORD) ** GRAIN_BORD_EXPOSANT;
+    }
+    return table;
+})();
+
+export function applyFilmGrain(ctx, w, h, grain) {
+    if (!grain || grain <= 0) return;
+    const sigma = GRAIN_SIGMA_PAR_UNITE * grain;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    for (let y = 0; y < h; y += 1) {
+        const ligne = (y % GRAIN_NOISE_SIZE) * GRAIN_NOISE_SIZE;
+        for (let x = 0; x < w; x += 1) {
+            const i = (y * w + x) * 4;
+            // Attenuation lue sur la luminance, pour que le grain s'eteigne
+            // dans un noir bouche ou un blanc brule comme il le fait chez lui.
+            const luma = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+            // Le meme ecart sur les trois canaux : le grain est monochrome.
+            const delta = GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)] * sigma
+                * GRAIN_ATTENUATION[luma];
+            d[i] = Math.max(0, Math.min(255, d[i] + delta));
+            d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + delta));
+            d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + delta));
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
 // ── Tone Curve LUT Builder ───────────────────────────────
 export function buildCurveLUT(points) {
     if (!points || points.length !== 5) {
@@ -581,8 +691,193 @@ export function applyFusedPixelOps(ctx, w, h, filters) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  VIGNETAGE — multiplicatif EN LUMIERE LINEAIRE, cale sur Lightroom
+// ═══════════════════════════════════════════════════════════
+/*
+ * MESURE DU 2026-08-16, mire B (3 bandes unies plein cadre: 64, 128, 192).
+ *
+ * Trois bandes et pas un gris unique, pour trancher la question qui change tout
+ * dans le code: le vignetage MULTIPLIE-t-il la valeur du pixel, ou SOUSTRAIT-il
+ * une constante ? Reponse: il multiplie — mais pas la ou nous le faisions.
+ *
+ * A rayon egal, sous Vignette -100 :
+ *
+ *   bande |  ratio en sRVB  |  ratio en LINEAIRE
+ *   ------+-----------------+--------------------
+ *     64  |      0,291      |       0,123
+ *    128  |      0,351      |       0,121
+ *    192  |      0,430      |       0,162
+ *
+ * En sRVB les trois bandes donnent trois reponses differentes: ce n'est donc
+ * pas la que la multiplication a lieu. En lumiere LINEAIRE elles se rejoignent.
+ * C'est physique — un vignetage, c'est de la lumiere qui manque, et la lumiere
+ * s'additionne en lineaire, pas dans l'encodage d'affichage.
+ *
+ * Notre ancien etage multipliait en sRVB, avec un degrade radial de 0,3 a 0,85
+ * de la LARGEUR: assombrissement trop faible sur les bandes claires, trop fort
+ * sur les sombres, et une forme circulaire sur une image rectangulaire.
+ *
+ * LA COORDONNEE. Le rayon est ELLIPTIQUE, normalise par la demi-largeur et la
+ * demi-hauteur: r = sqrt((dx/(w/2))^2 + (dy/(h/2))^2). Le bord vaut donc 1 au
+ * milieu des cotes et sqrt(2) dans les coins. C'est ce qui fait qu'un vignetage
+ * suit le cadre au lieu de dessiner un cercle dans un rectangle.
+ *
+ * RESERVE: la bande 192 reste ~30 % au-dessus des deux autres. Le modele
+ * multiplicatif lineaire n'est donc pas toute l'histoire dans les hautes
+ * lumieres — Lightroom expose d'ailleurs un curseur « Hautes lumieres » qui
+ * etait a 0 ici. Non reproduit.
+ */
+
+/* Gain a Vignette -100, mesure, de r = 0 a r = 1,45 par pas de 0,05. */
+const VIGNETTE_GAIN_100 = [
+    1.0000, 1.0000, 1.0000, 0.9999, 0.9993, 0.9981,
+    0.9952, 0.9900, 0.9813, 0.9670, 0.9452, 0.9134,
+    0.8697, 0.8123, 0.7405, 0.6545, 0.5562, 0.4483,
+    0.3358, 0.2287, 0.1415, 0.0813, 0.0451, 0.0246,
+    0.0141, 0.0090, 0.0063, 0.0047, 0.0037, 0.0037,
+];
+const VIGNETTE_PAS = 0.05;
+
+/*
+ * Le dosage n'est PAS proportionnel: il agit comme un EXPOSANT sur ce gain.
+ * Mesure du rapport ln(gain a -50) / ln(gain a -100) entre r = 0,6 et r = 1,0 :
+ * 0,586 · 0,581 · 0,576 · 0,573 · 0,572 · 0,569 · 0,565 — constant a 0,57.
+ * L'exposant 0,81 ci-dessous passe exactement par ce point (0,5^0,81 = 0,570)
+ * et par 1 a fond. Deux valeurs de curseur seulement ont ete exportees: la
+ * courbe ENTRE les deux est une interpolation, pas une mesure.
+ */
+const VIGNETTE_DOSAGE_EXPOSANT = 0.81;
+
+const SRGB_VERS_LINEAIRE = (() => {
+    const table = new Float32Array(256);
+    for (let v = 0; v < 256; v += 1) {
+        const c = v / 255;
+        table[v] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    }
+    return table;
+})();
+
+/*
+ * Repasser en sRVB demande une puissance par canal et par pixel — trop cher en
+ * plein ecran. On precalcule donc une table par PALIER de gain: 128 paliers
+ * x 256 valeurs. L'erreur de quantification du gain est inferieure au 1/255
+ * d'un pixel, et le cout tombe a une simple lecture.
+ */
+/*
+ * LA PROTECTION DES HAUTES LUMIERES, elle aussi mesuree.
+ *
+ * Un gain purement multiplicatif laissait un ecart de 11,7/255 sur la bande
+ * CLAIRE (192), contre 0,7 sur la bande moyenne et 2,2 sur la sombre: Lightroom
+ * assombrit MOINS ce qui est deja clair. Ce n'est pas son curseur « Hautes
+ * lumieres » — il etait a 0.
+ *
+ * Mesure du supplement de gain sur la bande 192, a trois rayons:
+ *
+ *   gain nominal g | 0,857 | 0,526 | 0,121
+ *   supplement w   | 0,357 | 0,234 | 0,047
+ *
+ * w suit g: w = 0,42 x g reproduit les trois points (0,360 · 0,221 · 0,051).
+ * Le gain effectif devient donc g x (1 + 0,42 x (1 - g) x L), ou L pese le
+ * niveau du pixel: 0 jusqu'au ton moyen, 1 a partir du clair.
+ *
+ * RESERVE: une seule bande claire contraint ce terme. Sa progression entre le
+ * ton moyen et le clair est une droite choisie, pas une mesure, et il est
+ * plafonne au-dela faute de point.
+ */
+const VIGNETTE_HL_FORCE = 0.42;
+const VIGNETTE_HL_DEBUT = 0.216; // lumiere lineaire du gris 128
+const VIGNETTE_HL_FIN = 0.502; // lumiere lineaire du gris 192
+
+const VIGNETTE_PALIERS = 128;
+const VIGNETTE_LUT = (() => {
+    const luts = [];
+    for (let p = 0; p <= VIGNETTE_PALIERS; p += 1) {
+        const gain = p / VIGNETTE_PALIERS;
+        const lut = new Uint8Array(256);
+        for (let v = 0; v < 256; v += 1) {
+            const source = SRGB_VERS_LINEAIRE[v];
+            const poidsHL = Math.max(0, Math.min(1,
+                (source - VIGNETTE_HL_DEBUT) / (VIGNETTE_HL_FIN - VIGNETTE_HL_DEBUT)));
+            const effectif = gain * (1 + VIGNETTE_HL_FORCE * (1 - gain) * poidsHL);
+            const lin = source * effectif;
+            const srgb = lin <= 0.0031308 ? lin * 12.92 : 1.055 * lin ** (1 / 2.4) - 0.055;
+            lut[v] = Math.max(0, Math.min(255, Math.round(srgb * 255)));
+        }
+        luts.push(lut);
+    }
+    return luts;
+})();
+
+function gainVignette(r, dosage) {
+    const position = r / VIGNETTE_PAS;
+    const index = Math.floor(position);
+    let base;
+    if (index >= VIGNETTE_GAIN_100.length - 1) {
+        base = VIGNETTE_GAIN_100[VIGNETTE_GAIN_100.length - 1];
+    } else {
+        const t = position - index;
+        base = VIGNETTE_GAIN_100[index] * (1 - t) + VIGNETTE_GAIN_100[index + 1] * t;
+    }
+    return base ** dosage;
+}
+
+export function applyLightroomVignette(ctx, w, h, vignette) {
+    if (!vignette || vignette <= 0) return;
+    const dosage = (Math.min(100, vignette) / 100) ** VIGNETTE_DOSAGE_EXPOSANT;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    const cx = (w - 1) / 2;
+    const cy = (h - 1) / 2;
+    const demiW = w / 2;
+    const demiH = h / 2;
+
+    for (let y = 0; y < h; y += 1) {
+        const dy = (y - cy) / demiH;
+        const dy2 = dy * dy;
+        for (let x = 0; x < w; x += 1) {
+            const dx = (x - cx) / demiW;
+            const r = Math.sqrt(dx * dx + dy2);
+            const palier = Math.round(gainVignette(r, dosage) * VIGNETTE_PALIERS);
+            const lut = VIGNETTE_LUT[palier];
+            const i = (y * w + x) * 4;
+            d[i] = lut[d[i]];
+            d[i + 1] = lut[d[i + 1]];
+            d[i + 2] = lut[d[i + 2]];
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
 //  CLARITY — Spatial high-pass mid-frequency boost
 // ═══════════════════════════════════════════════════════════
+/*
+ * LE RAYON DE LA CLARTE, mesure le 2026-08-16 sur la mire C.
+ *
+ * Notre DOSAGE etait deja juste — sur les reseaux sinusoidaux, Clarte 50 donne
+ * 1,49 a 1,54 chez Lightroom et 1,50 chez nous; Clarte 100 donne 1,91 a 2,00
+ * chez lui et 2,00 chez nous. Rien a recalibrer de ce cote.
+ *
+ * C'est le RAYON qui etait faux. Sur le bord doux etale sur 120 px — la seule
+ * zone de la mire qui teste les GRANDES structures, celles que la clarte est
+ * censee creuser — Lightroom amplifie x1,79 et nous ne faisions x1,03. Rien.
+ * Avec un rayon de 2,5 % du petit cote (27 px a 1080), un bord de 120 px passe
+ * entierement dans le flou: il n'y a plus de difference a amplifier.
+ *
+ *   rayon | bord doux | ecart moyen aux 6 zones
+ *    27   |   1,03    |  0,213
+ *    50   |   1,10    |  0,182
+ *    80   |   1,22    |  0,155
+ *   120   |   1,40    |  0,125
+ *
+ * 11 % du petit cote (119 px a 1080) est retenu. La cible de 1,79 n'est pas
+ * atteinte, et il faut dire pourquoi plutot que de monter le rayon jusqu'a
+ * l'atteindre: au-dela, le flou deborde sur les zones VOISINES de la mire, et
+ * la mesure se met a lire ses propres bords. C'est un defaut de la mire, pas du
+ * moteur — une prochaine version isolerait le bord doux sur une image entiere.
+ */
+const CLARITY_RAYON_RELATIF = 0.11;
+
 export function applyClarity(ctx, canvas, w, h, clarity) {
     if (!clarity || clarity === 0) return;
 
@@ -590,7 +885,7 @@ export function applyClarity(ctx, canvas, w, h, clarity) {
     blurCanvas.width = w;
     blurCanvas.height = h;
     const blurCtx = blurCanvas.getContext('2d');
-    const radius = Math.max(15, Math.min(w, h) * 0.025);
+    const radius = Math.max(24, Math.min(w, h) * CLARITY_RAYON_RELATIF);
     blurCtx.filter = `blur(${radius}px)`;
     blurCtx.drawImage(canvas, 0, 0);
 
@@ -610,8 +905,182 @@ export function applyClarity(ctx, canvas, w, h, clarity) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  TEXTURE — le micro-contraste de Lightroom
+// ═══════════════════════════════════════════════════════════
+/*
+ * LA TEXTURE, calee le 2026-08-16 sur la mire C. Le reglage n'existait pas dans
+ * le moteur: un preset qui en portait rendait moins de matiere que chez lui,
+ * sans que rien ne le signale.
+ *
+ * CE QUE LA MESURE DIT. Amplification lue sur les trois reseaux sinusoidaux —
+ * chacun ne contient qu'une seule echelle, donc chaque ligne est propre :
+ *
+ *   curseur | 8 px  | 24 px | 64 px | bord doux 120 px
+ *     +50   | 1,175 | 1,120 | 1,096 |      1,174
+ *    +100   | 1,272 | 1,187 | 1,150 |      1,272
+ *
+ * Deux choses s'y lisent, et aucune n'est un simple facteur:
+ *
+ * 1. LA FORME NE BOUGE PAS ENTRE 50 ET 100. Le rapport entre 8 px et 64 px vaut
+ *    1,82 des deux cotes. C'est donc le meme filtre, plus ou moins dose.
+ *
+ * 2. CE N'EST PAS UN MASQUE FLOU A UN SEUL RAYON. Un unsharp mask classique
+ *    laisserait passer 8 px et 24 px presque a l'identique, puis s'effondrerait.
+ *    Ici l'exces d'amplification decroit LENTEMENT (0,175 -> 0,120 -> 0,096),
+ *    en gros comme P^-0,34: le signe d'un effet multi-echelle. D'ou DEUX passes,
+ *    une fine et une large, a gain egal — ce couple reproduit les six mesures a
+ *    mieux que 5 %.
+ *
+ * 3. SON DOSAGE SATURE, comme celui de la nettete: doubler le curseur ne double
+ *    pas l'effet (x1,56 seulement de 50 a 100), soit une loi en N^0,644.
+ *
+ * CE QUE LE MOTEUR DONNE APRES CALAGE, mesure par les memes scripts
+ * (`rendu-mire-c.mjs` puis `mesure-mire-c.mjs`) :
+ *
+ *   curseur |  8 px         | 24 px         | 64 px
+ *     50    | 1,176 / 1,175 | 1,120 / 1,120 | 1,096 / 1,096
+ *    100    | 1,283 / 1,272 | 1,183 / 1,187 | 1,146 / 1,150
+ *                                    (nous / Lightroom)
+ *
+ * RESIDU ASSUME, et il faut le dire: sur le bord doux etale sur 120 px, la
+ * seule zone qui teste les tres grandes structures, il raidit x1,03 a 50 et
+ * nous x1,07. On accentue donc un peu plus que lui ce qui est tres large —
+ * l'echelle ou la texture n'est justement pas censee travailler. C'est le prix
+ * du second rayon, celui qui permet de tenir les 64 px.
+ *
+ * Les rayons sont en PIXELS, pas en pourcentage du cadre: la texture de
+ * Lightroom travaille a une echelle fixe, et c'est a 1620x1080 qu'on l'a
+ * mesuree. (La clarte, elle, est en pourcentage — voir `applyClarity`. La
+ * difference est mesuree, pas choisie.)
+ *
+ * LE NEGATIF, mesure le 2026-08-17 (les exports manquaient jusque-la: les
+ * fichiers fournis etaient le positif exporte deux fois). Amplification lue par
+ * les memes trois reseaux:
+ *
+ *   curseur | 8 px  | 24 px | 64 px
+ *     -50   | 0,851 | 0,899 | 0,919
+ *    -100   | 0,752 | 0,832 | 0,866
+ *
+ * ON CRAIGNAIT UNE AUTRE LOI, C'EST LE MEME FILTRE. La crainte etait legitime —
+ * un adoucissement n'a aucune raison d'etre la symetrie d'un renforcement. Mais
+ * en resolvant le gain a partir de CHACUN des trois reseaux, avec les deux
+ * rayons deja en place, on retombe trois fois sur le meme nombre:
+ *
+ *   a(-50)  = -0,0765 | -0,0760 | -0,0762   (8 / 24 / 64 px)
+ *   a(-100) = -0,1272 | -0,1264 | -0,1261
+ *
+ * Trois echelles, 0,5 % d'ecart entre elles: la signature spatiale ne change
+ * pas de signe. Le couple 3 px / 40 px vaut donc pour les deux cotes, et seul
+ * le DOSAGE differe.
+ *
+ * ET IL DIFFERE VRAIMENT, on ne pouvait pas le deviner. A curseur egal, le
+ * negatif est plus FAIBLE que le positif (x0,84 a 50) mais il RATTRAPE en
+ * montant (x0,90 a 100): sa saturation est moins forte, N^0,733 contre N^0,644.
+ * Reprendre le dosage positif au signe pres aurait sur-adouci de 18 % a -50.
+ *
+ * Ce que le moteur donne, une fois cale, MESURE et non predit
+ * (`rendu-mire-c.mjs` puis `mesure-mire-c.mjs`) — nous / Lightroom:
+ *
+ *   -50  | 0,849 / 0,851 | 0,905 / 0,899 | 0,918 / 0,919
+ *  -100  | 0,742 / 0,752 | 0,836 / 0,832 | 0,867 / 0,866
+ *
+ * Ecart maximal 1,3 % (8 px a -100), du meme ordre que le 0,9 % deja assume au
+ * positif. Les trois echelles suivent, ce qui confirme le couple de rayons.
+ *
+ * DEUX RESIDUS, et le second est plus gros qu'on ne le croyait.
+ *
+ * 1. Le bord doux de 120 px, deja connu: Lightroom n'y adoucit quasiment pas
+ *    (0,995 a -50) la ou nous ne bougeons pas non plus (1,000). Cote negatif ce
+ *    residu est donc benin — c'est au positif qu'il coute (x1,07 contre x1,03).
+ *
+ * 2. LES CONTOURS FRANCS, et celui-la n'avait jamais ete releve. Lightroom
+ *    laisse les barres a fort contraste intactes des deux cotes (1,006 a +50,
+ *    0,995 a -50, 0,991 a -100) alors qu'il travaille franchement les barres a
+ *    faible contraste (1,146 / 0,881 / 0,804). Sa texture est donc EDGE-AWARE:
+ *    elle lisse la matiere sans raboter les aretes. La notre ne l'est pas, et
+ *    traite les deux pareil:
+ *
+ *      barres fort contraste | +50: 1,095 (lui 1,006) | -50: 0,916 (lui 0,995)
+ *
+ *    Ce n'est PAS une regression du negatif: le meme ecart existe au positif
+ *    depuis le premier calage, il n'avait simplement pas ete mesure sur cette
+ *    zone. Consequence concrete: sur une arete tres marquee — un toit sur le
+ *    ciel, un poteau — notre texture positive laisse un halo qu'il n'a pas, et
+ *    notre texture negative ramollit un contour qu'il garde net. C'est le
+ *    prochain vrai chantier de la texture, et il demande un masque de contours,
+ *    pas un coefficient.
+ */
+const TEXTURE_SIGMA_FIN = 3;
+const TEXTURE_SIGMA_LARGE = 40;
+const TEXTURE_K = 0.00727;
+const TEXTURE_EXPOSANT = 0.644;
+/* Cote negatif: meme couple de rayons, dosage propre (mesure du 2026-08-17). */
+const TEXTURE_K_NEG = 0.004339;
+const TEXTURE_EXPOSANT_NEG = 0.7325;
+
+export function applyTexture(ctx, canvas, w, h, texture) {
+    if (!texture) return;
+
+    const amount = texture > 0
+        ? TEXTURE_K * texture ** TEXTURE_EXPOSANT
+        : -TEXTURE_K_NEG * (-texture) ** TEXTURE_EXPOSANT_NEG;
+
+    /*
+     * Les deux flous sont calcules AVANT d'ecrire quoi que ce soit, et les deux
+     * ecarts se prennent sur l'image d'ORIGINE. Enchainer les passes ferait
+     * passer la seconde sur une image deja accentuee: l'amplification lue ne
+     * serait plus celle qu'on a ajustee sur la mire.
+     */
+    const flou = (sigma) => {
+        const blurCanvas = document.createElement('canvas');
+        blurCanvas.width = w;
+        blurCanvas.height = h;
+        const blurCtx = blurCanvas.getContext('2d');
+        blurCtx.filter = `blur(${sigma}px)`;
+        blurCtx.drawImage(canvas, 0, 0);
+        return blurCtx.getImageData(0, 0, w, h).data;
+    };
+    const fin = flou(TEXTURE_SIGMA_FIN);
+    const large = flou(TEXTURE_SIGMA_LARGE);
+
+    const origData = ctx.getImageData(0, 0, w, h);
+    const od = origData.data;
+    for (let i = 0; i < od.length; i += 4) {
+        for (let c = 0; c < 3; c += 1) {
+            const v = od[i + c];
+            const exces = (v - fin[i + c]) * amount + (v - large[i + c]) * amount;
+            od[i + c] = Math.max(0, Math.min(255, v + exces));
+        }
+    }
+
+    ctx.putImageData(origData, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
 //  SHARPNESS — Unsharp mask (small radius)
 // ═══════════════════════════════════════════════════════════
+/*
+ * LE DOSAGE DE LA NETTETE, cale le 2026-08-16 sur la mire C.
+ *
+ * L'echelle est celle de Lightroom: 0 a 150, et 40 est ce qu'il pose PAR DEFAUT
+ * sur tout preset. Amplification mesuree sur le reseau sinusoidal de periode
+ * 8 px, la ou la nettete travaille:
+ *
+ *   curseur | Lightroom | nous, avant (dosage = N / 50)
+ *      40   |   1,22    |  1,29
+ *     150   |   1,63    |  2,13
+ *
+ * Notre reponse etait donc trop forte, et de plus en plus a mesure qu'on monte:
+ * un dosage lineaire ne colle pas, le sien SATURE. D'ou la loi en puissance
+ * ci-dessous, qui passe par les deux points mesures (0,607 a 40, 1,672 a 150).
+ * Entre les deux, c'est une interpolation, pas une mesure.
+ *
+ * Le rayon, lui, etait bon: la selectivite en frequence se superpose a la
+ * sienne (1,12 contre 1,15 a 24 px, 1,02 contre 1,01 a 64 px).
+ */
+const SHARPNESS_K = 0.035;
+const SHARPNESS_EXPOSANT = 0.766;
+
 export function applySharpness(ctx, canvas, w, h, sharpness) {
     if (!sharpness || sharpness === 0) return;
 
@@ -626,7 +1095,7 @@ export function applySharpness(ctx, canvas, w, h, sharpness) {
     const blurData = blurCtx.getImageData(0, 0, w, h);
     const od = origData.data;
     const bd = blurData.data;
-    const amount = sharpness / 50;
+    const amount = SHARPNESS_K * sharpness ** SHARPNESS_EXPOSANT;
 
     for (let i = 0; i < od.length; i += 4) {
         od[i] = Math.max(0, Math.min(255, od[i] + (od[i] - bd[i]) * amount));

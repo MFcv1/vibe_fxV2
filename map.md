@@ -512,10 +512,16 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- audit-vision-presets.mjs        # Audit chiffre des presets Vision : BANDES (plus gros saut dans un degrade lisse, le risque n1 d'une LUT), dominante sur l'axe des gris, derive teinte/sat/lum sur des couleurs temoins
 |   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : la mire neutre reexportee sans preset doit revenir a l'identite (<=2/255). Attrape le piege Adobe RVB au lieu de sRVB, qui fausserait chaque preset sans rien signaler
 |   |-- make-hald-clut.mjs             # Genere la mire Hald. Depuis le lot J elle est en BLOCS de 4x4 pixels par couleur (2048x2048) avec profil sRGB explicite : une couleur par pixel faisait baver les couleurs entre voisines et virait les noirs au vert
+|   |-- mesure-grain-lightroom.mjs     # Combien vaut le grain de Lightroom, et combien vaut le notre, carre par carre sur la mire A. Lit le COEUR des aplats (marge de 30 px: tout effet spatial bave sur les bords) et extrait le grain EN QUADRATURE (sqrt(total^2 - base^2), jamais la difference brute). C'est lui qui a montre que le « x8 » etait faux (x2,66) et, surtout, que l'ecart n'etait pas un facteur mais une FORME: plat chez lui, cloche chez nous. `--planche` sort les trois versions cote a cote a l'echelle 1:1
+|   |-- planche-grain.mjs              # La planche du grain sur une VRAIE photo: sans grain / ancien moteur a 20 / nouveau a 8, a l'echelle 1:1 et jamais redimensionnee (reduire une image MOYENNE son grain, une planche reduite mentirait sur ce qu'elle montre). Repond a ce qu'aucun ecart-type ne dit: est-ce que le recalage abime le rendu
+|   |-- make-mire-effets.mjs           # Les mires d'EFFETS, l'exact oppose de la Hald : elles mesurent ce qui depend des pixels VOISINS (grain, clarte, texture, nettete) ou de la POSITION (vignetage), la ou une Hald est aveugle par construction. Quatre, parce que chaque effet a besoin d'un fond qui le rend lisible et que ces fonds s'excluent : A aplats unis (sur un aplat, toute variation EST le grain), B bandes unies plein cadre (le vignetage MULTIPLIE-t-il ou soustrait-il ?), C bords et reseaux SINUSOIDAUX 8/24/64 px (un bord net contient toutes les frequences a la fois, donc il ne separerait pas nettete/texture/clarte), D image delavee (le voile n'a rien a corriger sur une image nette). 1620x1080 = la taille ou l'on publie : le grain depend de la resolution. Protocole : docs/lightroom/4-synchro-effets.md
 |   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille
 |   |-- compare-vision-presets-on-photos.mjs # Comparaison des presets sur de vraies photos : ECRETAGE ajoute (matiere detruite), force du look, derive du ciel/vegetation/peau
 |   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
 |   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
+|   |-- planche-showcase.mjs          # LA PLANCHE AVEC LES EFFETS. `planche-presets.mjs` ne montre que la LUT, et le dit; or grain, vignetage et relief ne SONT pas dans la LUT. Celle-ci lance donc le VRAI moteur (studioRenderer) dans un Chromium, en servant src/ en statique: ce qu'on regarde est ce que l'app affiche. Sort deux planches — le cadre entier (vignetage, look) et un carre a 1:1 JAMAIS redimensionne (grain, relief), parce que reduire une image MOYENNE son grain. Imprime aussi l'assombrissement du vignetage en niveaux /255
+|   |-- mesure-mire-c.mjs             # L'instrument de la mire C: amplification zone par zone d'un export Lightroom (nettete, texture, clarte). Les trois reseaux SINUSOIDAUX font foi — un sinus ne contient qu'une echelle, une barre nette les contient toutes. Ne lit que le COEUR de chaque zone (marge 70 px). La raideur du bord doux se mesure sur profil LISSE: en brut, elle lisait le maximum du BRUIT (2,00 la ou la transition vaut 1,26) et faisait passer du bruit ajoute pour un bord raidi
+|   |-- rendu-mire-c.mjs              # Le symetrique du precedent: passe la mire C dans NOTRE moteur, dans un Chromium (les etages spatiaux s'appuient sur ctx.filter = blur(), qui n'existe pas en Node — les reimplementer donnerait un chiffre sur du code que personne n'execute). `--safeSmartphone false` pour mesurer au-dela des bornes sures
 |   |-- audit-vision-filters.mjs        # Audit statique des profils Vision et du branchement safe smartphone, incluant temperature/halation/tint global masques
 |   |-- firebase-deploy.mjs             # Wrapper cross-platform deploy backend/functions avec cible controlee, firebase-tools local et timeout discovery 60s
 |   |-- run-video-ui-test.mjs           # Lance un serveur Next local dedie puis les smokes Playwright Vibe_CUT fonctionnel + securite media/capacites avec SMOKE_BASE_URL controle
@@ -597,6 +603,217 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-16 (synchro Lightroom, fin : texture, nettete 40, revalidations)
+
+- **`powlisher-showcase` REVALIDE A L'OEIL**, ce qui bloquait la cloture du lot.
+  Quatre photos Unsplash peu retouchees, passees dans le VRAI moteur (nouvel
+  outil `scripts/planche-showcase.mjs`). Grain 8 et relief 14 gardes tels quels;
+  **vignetage 3 -> 8**. Le 3 reproduisait fidelement un reglage CASSE: il
+  n'assombrissait le coin que de 8/255 sur la seule photo a fond clair, et de
+  rien du tout ailleurs. A 8 il en retire 15/255. Choix d'oeil de Matthis, sur
+  planche.
+- **Un coin deja noir reste a 0,00**, quel que soit le vignetage: il MULTIPLIE
+  la lumiere, il n'a rien a retirer d'un noir. C'est pour ca que trois des
+  quatre photos ne bougent presque pas.
+- **`cn17` VALIDE SUR UNE VRAIE PHOTO** (plage, ciel, mer, roche, ecume,
+  5392x3032), developpee des deux cotes, grain eteint des deux cotes — deux
+  bruits aleatoires differents ne se comparent pas pixel a pixel. **Ecart moyen
+  1,73/255**, mediane 1, 99e centile 10: identique a l'oeil.
+- **Et la planche a trouve ce que la moyenne cachait.** `compare-preset-vs-lightroom.mjs`
+  gagne `--planche`: elle sort les trois images plus la CARTE DES ECARTS (x8) et
+  la zone du PIRE ecart a 1:1. Cette carte ne montrait ni zone ni bande mais
+  **les contours de la roche** — signature d'une difference de NETTETE, pas de
+  couleur. Mesure sur cette zone: luminance moyenne identique (132,84 contre
+  132,81), mais **x1,40 d'energie de contours chez lui**.
+- **NETTETE 40 AJOUTEE A `cn11` ET `cn17`.** C'est le defaut de Lightroom,
+  present avec ou sans preset — mais notre moteur n'a AUCUNE nettete de base, si
+  bien que le meme preset rendait plus mou chez nous. En rejouant la notre sur
+  la meme zone: x1,083 a 25, **x0,986 a 40**, x0,890 a 60. Notre loi, calibree
+  sur la mire C, tombe donc a 1,4 % de la sienne sur une photo reelle.
+- **Piege d'import trouve en route, et documente**: reimporter un preset sans le
+  bon `--lisser` REECRIT SA LUT en silence. `cn17` exige `--lisser 1` (capturee
+  avec son grain 15, donc bruitee), `cn11` exige de ne PAS lisser. Les deux
+  commandes exactes sont dans `docs/lightroom/1-procedure.md`, avec le controle
+  qui va avec: apres reimport, `LUT_BASE64` ne doit pas apparaitre dans le diff.
+- **TEXTURE BRANCHEE** — nouvel etage `applyTexture` (canvasUtils.js), etage
+  4 bis de studioRenderer.js, entre la clarte (large) et la nettete (fine).
+  Le reglage n'existait pas: un preset qui en portait rendait moins de matiere,
+  sans que rien ne le signale. Resultat mesure, nous / Lightroom:
+  a +50 **1,176 / 1,175**, **1,120 / 1,120**, **1,096 / 1,096** (8, 24, 64 px);
+  a +100 1,283 / 1,272, 1,183 / 1,187, 1,146 / 1,150.
+- **Ce que sa texture est vraiment.** Son exces d'amplification decroit LENTEMENT
+  avec l'echelle (~P^-0,34): un masque flou a un seul rayon ne peut pas faire ca,
+  il laisserait passer 8 et 24 px a l'identique puis s'effondrerait. D'ou DEUX
+  rayons, 3 px et 40 px, a gain egal. Et son dosage SATURE comme celui de la
+  nettete: doubler le curseur ne donne que x1,56, soit N^0,644.
+- **Texture NEGATIVE non implementee, volontairement.** Ses exports -50 et -100
+  manquent toujours: les fichiers presents sont le positif exporte deux fois
+  (revérifie — memes 1,175/1,120/1,096). Borne basse a 0, et l'import REFUSE un
+  `--texture` negatif plutot que de le clamper en silence.
+- **Deux instruments symetriques**, la ou tout etait fait a la main:
+  `scripts/mesure-mire-c.mjs` (son export) et `scripts/rendu-mire-c.mjs` (notre
+  moteur, dans un Chromium).
+- **Une mesure fausse corrigee au passage.** La raideur du bord doux se lisait
+  comme un maximum de difference pixel a pixel, donc comme un maximum de BRUIT:
+  2,00 sur la mire de reference la ou la transition n'en vaut que 1,26. Elle
+  faisait croire que sa texture raidissait le bord doux de x1,17; sur profil
+  lisse, c'est x1,03 (et x1,07 chez nous).
+- **`xmpPreset.js` ne convertit plus rien.** Il appliquait encore clarte x0,3,
+  nettete x0,35, grain x0,42, vignetage x0,5 — des facteurs d'un moteur dont les
+  echelles n'avaient rien a voir avec celles de Lightroom. Nos echelles SONT les
+  siennes depuis les 15 et 16 aout: le nombre se recopie tel quel. La texture y
+  a aussi sa propre cle, au lieu d'etre melangee a la clarte.
+- **Cablage complet de `texture`**: cle supportee et bornes (`visionColorScience.js`,
+  sure 0-50, libre 0-100), defaut (`useStudioFilters.js`), curseur du panneau
+  (`VisionScreen.jsx`), cles spatiales d'un preset (`useVisionEditor.js`), et
+  `--texture` a l'import.
+- **Gates**: lint (0 erreur, 5 warnings preexistants), build, test:vision-preset
+  (67), test:vision-filters, test:vibeos-vision — tous verts.
+
+## Journal — 2026-08-16 (synchro Lightroom : vignetage, nettete, clarte)
+
+- **VIGNETAGE ALIGNE.** Nouvel etage `applyLightroomVignette` (canvasUtils.js),
+  qui remplace le degrade radial multiplie en sRVB de l'etage 7 de
+  studioRenderer.js. Ecart final: **2,4/255** en moyenne.
+- **Ce que la mire B a tranche, et pourquoi elle avait trois bandes.** A rayon
+  egal sous Vignette -100, les trois bandes donnent trois ratios DIFFERENTS en
+  sRVB (0,291 / 0,351 / 0,430) et le MEME en LINEAIRE (0,123 / 0,121 / 0,162).
+  Un vignetage, c'est de la lumiere qui manque, et la lumiere s'additionne en
+  lineaire. Une seule bande de gris n'aurait jamais pu le montrer.
+- Trois autres faits mesures: le rayon est **elliptique** (normalise par la
+  demi-largeur et la demi-hauteur, donc il suit le cadre — le notre dessinait un
+  cercle dans un rectangle); le dosage agit comme un **exposant** et non comme un
+  facteur (ln(gain -50)/ln(gain -100) = 0,57, constant sur tout le rayon); et il
+  **protege les hautes lumieres** (la bande claire est assombrie ~30 % de moins
+  que la loi ne le voudrait, curseur « Hautes lumieres » a 0). Ce dernier terme
+  fait tomber l'ecart de la bande claire de 11,7 a 4,2/255.
+- **NOTRE VIGNETAGE NE FAISAIT PRESQUE RIEN**: mesure, `vignette: 22`
+  assombrissait l'image de 3,3/255 en moyenne, parce que son degrade circulaire
+  n'atteignait sa pleine force qu'AU-DELA du cadre. Toutes les valeurs
+  existantes sont converties dans ce rapport (5->1, 20->2, 30->4, 60->9);
+  `powlisher-showcase` passe de 22 a **3**. A REGARDER: maintenant que le
+  vignetage fonctionne, il vaut peut-etre la peine de le monter — choix d'oeil.
+- **CLARTE: le dosage etait deja juste, le RAYON etait 4x trop petit.** Sur les
+  reseaux sinusoidaux, Clarte 50 donne 1,49-1,54 chez lui et 1,50 chez nous;
+  Clarte 100, 1,91-2,00 contre 2,00. Mais sur le bord doux de 120 px — la seule
+  zone qui teste les GRANDES structures, celles que la clarte est censee creuser
+  — il amplifie x1,79 et nous ne faisions **x1,03**. Rayon porte de 2,5 % a 11 %
+  du petit cote. La cible n'est pas atteinte (x1,40) et c'est un defaut de la
+  MIRE: au-dela, le flou deborde sur les zones voisines et la mesure lit ses
+  propres bords.
+- **NETTETE: notre reponse etait trop forte, et de plus en plus haut.** Sur le
+  reseau de 8 px: 1,22 chez lui contre 1,29 chez nous a 40, mais 1,63 contre
+  **2,13** a 150 — son curseur SATURE, le notre etait lineaire. Dosage passe en
+  loi de puissance (0,035 x N^0,766, qui passe par les deux points mesures),
+  echelle portee a 0-150 comme la sienne, dont le **40 par defaut**. Le rayon,
+  lui, etait bon: la selectivite en frequence se superposait deja (1,12 contre
+  1,15 a 24 px, 1,02 contre 1,01 a 64 px).
+- **Bornes**: vignette 30 (sur) / 100 (libre), nettete 60 / 150, clarte
+  inchangee en sur et +-100 en libre — les maximums de Lightroom, pour qu'aucune
+  valeur d'un preset importe ne soit hors de portee.
+- **TEXTURE, pas finie**: les 4 exports fournis sont en fait 2 (les fichiers
+  « plus » et « moins » sont identiques PIXEL POUR PIXEL — le positif a ete
+  exporte deux fois). Le positif est mesure (x1,17 a 8 px, x1,12 a 24, x1,10 a
+  64 pour +50: plus fin et plus doux que la clarte), il manque les negatifs, et
+  notre moteur n'a de toute facon aucun reglage Texture.
+- **VOILE, mesure mais PAS CAPTURABLE par une mire**: c'est une expansion de
+  contraste et de saturation ancree sur le point clair (192 -> 187 -> 182 quand
+  148 -> 110 -> 53), et Lightroom l'estime A PARTIR DU CONTENU de l'image. Sur
+  une mire quasi uniforme on ne capture que la part globale. A traiter comme un
+  cas a part.
+- **Sous-reglages releves et NON branches**: Grain (Taille 25, Cassure 50),
+  Vignette (Milieu 50, Arrondi 0, Contour 50, Hautes lumieres 0). Tout est donc
+  calibre POUR CES DEFAUTS; un preset qui les change ne sera pas reproduit.
+- Gates: lint (0 erreur, 5 warnings preexistants), test:vision-preset (67),
+  test:vision-filters — verts.
+
+## Journal — 2026-08-15 (synchro Lightroom, etape 2 : le grain est ALIGNE)
+
+- **« Grain 15 » veut maintenant dire la meme chose des deux cotes.** Mesure sur
+  la mire A (24 aplats unis), trois valeurs de curseur exportees de Lightroom
+  par le porteur du projet (15, 50, 100). Apres correction, notre moteur donne
+  **x1,00 a x1,01** sur tous les gris, les peaux, le ciel, le feuillage et le
+  beton, aux trois valeurs.
+- **LE « x8 » ANNONCE ETAIT FAUX, et le doute du porteur du projet etait
+  justifie.** Il avait ete mesure sur la mire HALD, dont les pastilles font 4x4
+  px de couleurs sans rapport: la bavure entre voisins y etait comptee comme du
+  grain. Deux erreurs dans le meme sens — Lightroom gonfle (6,27 au lieu de
+  5,52) et nous ecrase (0,8 au lieu de 2,07). Vrai rapport: **x2,66**. Regle qui
+  en sort: **ne jamais mesurer un effet spatial sur la mire Hald**, c'est
+  precisement ce qu'elle ne peut pas voir.
+- **Le facteur d'echelle n'etait que la moitie visible du probleme.** Le grain de
+  Lightroom est **PLAT** du noir au blanc (5,52 partout). Le notre etait une
+  **CLOCHE**: 2,07 au ton moyen, 0,45 dans les ombres, 0,57 dans les hautes
+  lumieres — parce que la fusion `overlay` n'a plus d'effet quand le pixel
+  approche 0 ou 255. Notre grain disparaissait donc exactement la ou un grain de
+  film se voit: les ciels et les ombres lisses. Lecon pour les reglages suivants:
+  **chercher la loi, pas un coefficient**.
+- **Ce que la mesure a etabli** : son curseur est une DROITE (ecart-type = 0,367
+  x valeur, verifie a 15/50/100); son grain est MONOCHROME (correlation 1,00
+  entre canaux); il s'ETEINT aux deux bouts (x0,67 aux niveaux 8 et 247) et ce
+  n'est PAS de l'ecretage — une gaussienne d'ecart-type 5,5 sur un niveau 8
+  coupee a 0 rendrait 5,20, on mesure 3,48.
+- **Nouvel etage `applyFilmGrain`** (`canvasUtils.js`), qui remplace la fusion
+  `overlay` de l'etage 8 de `studioRenderer.js`: bruit gaussien monochrome
+  ADDITIF d'ecart-type `GRAIN_SIGMA_PAR_UNITE x valeur`, attenue pres du noir et
+  du blanc. `NOISE_PATTERN_CANVAS` reste exporte: les deux `layoutRenderer`
+  l'utilisent pour la texture de FOND, qui n'a rien a voir.
+- **Valeurs converties, parce que l'echelle a change sous elles** : `cn17` recoit
+  enfin son `grain: 15` (table de couleurs bit-a-bit identique, seul
+  `spatialFilters` bouge); `powlisher-showcase` passe de 20 a **8** (meme force
+  au ton moyen: 2,76 contre 2,94) — **a revalider a l'oeil**, car le rendu n'est
+  pas identique: le grain apparait maintenant dans les ciels et les ombres
+  lisses; les 57 profils de `constants.jsx` et les 4 ambiances de
+  `ambianceCatalog.js` divises par 2,663; bornes du grain a 40 (sur) et 100
+  (libre, le maximum de Lightroom, pour qu'aucune valeur importee ne soit hors
+  de portee).
+- **`import-lightroom-preset.mjs` accepte `--grain`, `--vignette`, `--clarity`,
+  `--sharpness`, `--dehaze`** — les reglages releves A LA MAIN dans les panneaux
+  Effets et Detail, seule source possible pour les presets Premium d'Adobe, qui
+  ne s'exportent pas en `.xmp`. Ils priment sur le `.xmp`: on a regarde l'ecran.
+- **Garde-fou** : `audit-vision-filters.mjs` exige desormais
+  `GRAIN_SIGMA_PAR_UNITE = 0.367` et `applyFilmGrain`. Un retour a la fusion
+  `overlay` ferait cesser silencieusement l'alignement, et aucun test ne serait
+  tombe.
+- **Reserve honnete** : sur des primaires tres saturees, Lightroom donne 1,1 a
+  1,4x le plat, inegalement entre canaux — signe qu'il ajoute son bruit avant une
+  transformation d'espace, pas en sortie. Non reproduit. Sur les neutres, les
+  peaux, les ciels et les betons — la matiere ou un grain se juge — l'ecart est
+  nul. Et seuls les niveaux 8 et 24 contraignent la courbe d'extinction: sa forme
+  ENTRE les deux est une interpolation, pas une mesure.
+- Gates: `npm run lint` (0 erreur, 5 warnings preexistants), `npm run build`,
+  `test:vision-preset` (67), `test:vision-filters` — tous verts.
+
+## Journal — 2026-08-15 (synchro Lightroom, etape 1 : les mires d'effets)
+
+- **`scripts/make-mire-effets.mjs` + `npm run preset:mire-effets`**, et
+  `docs/lightroom/4-synchro-effets.md` (le protocole). Premiere etape du lot
+  « synchroniser nos reglages avances avec Lightroom », qui passe AVANT tout
+  nouvel import de preset : nos chiffres ne veulent pas dire les siens. Mesure
+  qui declenche le lot : le Grain 15 de Lightroom vaut **6,27/255** d'ecart-type,
+  notre Grain 15 vaut **0,8**, et notre curseur **a fond** (42) ne monte qu'a
+  **2,84** — recopier « 15 » chez nous donne un grain invisible.
+- **Quatre mires et pas une**, parce que chaque effet a besoin d'un fond qui le
+  rend lisible et que ces fonds s'excluent : le grain ne se lit que sur un aplat
+  parfaitement uni, le vignetage que sur une image pleine et unie (sinon on ne
+  sait pas si un pixel est sombre a cause du coin ou du motif), la
+  clarte/texture/nettete que sur des BORDS, le voile que sur une image deja
+  delavee.
+- **Les reseaux sinusoidaux de la mire C (periodes 8, 24, 64 px)** ne sont pas
+  un ornement : une barre nette contient TOUTES les frequences a la fois, donc
+  elle confondrait nettete (rayon ~1 px), texture (quelques px) et clarte
+  (dizaines de px) — qui sont le meme geste a trois echelles. Un sinus n'en
+  contient qu'une : l'amplification lue est celle de cette echelle-la.
+- **1620x1080 et jamais redimensionne** : le grain et la nettete dependent de la
+  resolution (reduire une image MOYENNE son grain), donc on etalonne a la taille
+  ou l'on publie.
+- **Bloque cote Lightroom** : l'agent ne peut pas piloter Lightroom. Dossiers
+  d'export prets sur le bureau (`~/Desktop/vibefx-lightroom/`), un dossier par
+  valeur de curseur pour que le nom de fichier n'ait pas d'importance. Lot 1 =
+  grain + vignetage (10 exports), lot 2 = nettete/clarte/texture/voile (16).
+  Sous-reglages caches a relever en capture d'ecran : Grain (Taille, Rugosite)
+  et Vignette (Milieu, Rondeur, Contour, Hautes lumieres), plus ceux de CN17.
 
 ## Journal — 2026-08-12 (lot N — `powlisher-showcase`, et trois bugs d'interface)
 

@@ -184,6 +184,29 @@ if (args.xmp) {
 const label = args.label || xmp?.name || args.id;
 const hint = args.hint || (xmp?.group ? `Lightroom — ${xmp.group}` : 'Preset importé de Lightroom');
 const spatial = xmp?.spatialFilters || {};
+
+/*
+ * Les reglages spatiaux releves A LA MAIN dans les panneaux Effets et Detail.
+ *
+ * Ils existent parce que les presets Premium d'Adobe ne s'exportent PAS en
+ * `.xmp`: pour eux, le releve a l'ecran est la seule source. Sans ce relevé, un
+ * preset importe rend une couleur juste et un rendu INCOMPLET, sans que rien ne
+ * le signale — CN17 pose un Grain 15 qu'aucune table de couleurs ne peut
+ * porter.
+ *
+ * Ces valeurs sont a l'echelle de Lightroom, et notre moteur l'est aussi depuis
+ * le 2026-08-15 (mesure dans `docs/lightroom/4-synchro-effets.md`): on recopie
+ * le nombre affiche, sans le convertir.
+ *
+ * Ils priment sur le `.xmp` quand les deux existent: on a regarde l'ecran.
+ */
+['grain', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
+    const brut = args[cle];
+    if (brut === undefined || brut === true) return;
+    const valeur = Number(brut);
+    if (!Number.isFinite(valeur)) fail(`--${cle} attend un nombre, recu « ${brut} ».`);
+    spatial[cle] = valeur;
+});
 const presetDir = path.join('src', 'features', 'vibefx-studio', 'utils', 'presets');
 const modulePath = path.join(presetDir, `${args.id}.js`);
 

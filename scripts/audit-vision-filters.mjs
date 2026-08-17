@@ -153,6 +153,16 @@ const requiredCanvasSignals = [
     "applySelectiveSaturation(adjusted.r, adjusted.g, adjusted.b, skySat, 'sky'",
     "applySelectiveSaturation(adjusted.r, adjusted.g, adjusted.b, foliageSat, 'foliage'",
     'fitRgbToGamut',
+    /*
+     * L'echelle du grain est celle de LIGHTROOM (mesuree le 2026-08-15: un
+     * ecart-type de 0,367 x la valeur, constant du noir au blanc). Ces deux
+     * signaux gardent l'alignement: si quelqu'un revient a un grain pose en
+     * fusion `overlay`, « Grain 15 » cesse silencieusement de vouloir dire la
+     * meme chose des deux cotes, et les presets importes deviennent faux sans
+     * qu'aucun test ne tombe.
+     */
+    'GRAIN_SIGMA_PAR_UNITE = 0.367',
+    'export function applyFilmGrain',
 ];
 
 const requiredMetricsSignals = [

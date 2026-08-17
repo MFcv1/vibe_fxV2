@@ -1,7 +1,9 @@
 import {
-    NOISE_PATTERN_CANVAS,
+    applyFilmGrain,
+    applyLightroomVignette,
     applyFusedPixelOps,
     applyClarity,
+    applyTexture,
     applySharpness,
     applyHalation,
     applyPerceptualIntensityBlend,
@@ -160,6 +162,15 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
         // ── Stage 4: Clarity ─────────────────────────────
         applyClarity(ctx, targetCanvas, w, h, safeFilters.clarity);
 
+        // ── Stage 4 bis: Texture ─────────────────────────
+        /*
+         * Apres la clarte et avant la nettete: du plus large au plus fin, comme
+         * dans Lightroom. La texture est arrivee le 2026-08-16 — jusque-la un
+         * preset qui en portait rendait moins de matiere, en silence. Le detail
+         * de la mesure est dans `applyTexture`.
+         */
+        applyTexture(ctx, targetCanvas, w, h, safeFilters.texture);
+
         // ── Stage 5: Sharpness ───────────────────────────
         applySharpness(ctx, targetCanvas, w, h, safeFilters.sharpness);
 
@@ -168,35 +179,25 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
     }
 
     // ── Stage 7: Vignette ────────────────────────────────
+    /*
+     * Depuis le 2026-08-16, l'echelle du vignetage est celle de Lightroom, et
+     * la multiplication a lieu en lumiere LINEAIRE — pas en sRVB comme avant,
+     * ou les bandes claires et sombres ne recevaient pas le meme traitement.
+     * La mesure est dans `applyLightroomVignette`.
+     */
     if (safeFilters.vignette > 0) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        const gradient = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.85);
-        gradient.addColorStop(0, 'rgba(0,0,0,0)');
-        gradient.addColorStop(1, `rgba(0,0,0, ${safeFilters.vignette / 100})`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
+        applyLightroomVignette(ctx, w, h, safeFilters.vignette);
     }
 
     // ── Stage 8: Grain ───────────────────────────────────
+    /*
+     * Depuis le 2026-08-15, notre echelle EST celle de Lightroom: « Grain 15 »
+     * veut dire la meme chose des deux cotes (ecart-type 5,5/255). Le detail de
+     * la mesure et le pourquoi de l'abandon de la fusion `overlay` sont dans
+     * `applyFilmGrain`.
+     */
     if (safeFilters.grain > 0 && quality !== 'low') {
-        ctx.save();
-        const pattern = ctx.createPattern(NOISE_PATTERN_CANVAS, 'repeat');
-        if (pattern) {
-            ctx.globalCompositeOperation = 'overlay';
-            ctx.fillStyle = pattern;
-            /*
-             * Le SEUL endroit qui dose le grain (la mire, elle, est opaque).
-             * Le coefficient est cale sur une mesure: les photos de reference
-             * portent un grain d'ecart-type ~2,5/255, atteint ici vers 35.
-             * Avant, deux attenuations se multipliaient et le maximum donnait
-             * +0,12/255 — un curseur qui ne faisait rien.
-             */
-            ctx.globalAlpha = (safeFilters.grain / 100) * 0.28;
-            ctx.fillRect(0, 0, w, h);
-        }
-        ctx.restore();
+        applyFilmGrain(ctx, w, h, safeFilters.grain);
     }
 
     // ── Stage 9: Intensity Blend ─────────────────────────

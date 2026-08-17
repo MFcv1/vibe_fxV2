@@ -26,11 +26,12 @@ import { buildAutoEnhancement } from './autoEnhance';
 
 /* Cles que le preset s'approprie quand il en porte: elles ne peuvent pas vivre
    dans une LUT (elles dependent des pixels voisins ou de la position). */
-const PRESET_SPATIAL_KEYS = ['clarity', 'sharpness', 'dehaze', 'grain', 'vignette'];
+const PRESET_SPATIAL_KEYS = ['texture', 'clarity', 'sharpness', 'dehaze', 'grain', 'vignette'];
 
 /* Les memes noms que dans le panneau des reglages: on annonce ce que le preset
    pose avec les mots que l'utilisateur voit ensuite bouger. */
 const SPATIAL_LABELS = {
+    texture: 'texture',
     clarity: 'relief',
     sharpness: 'netteté',
     dehaze: 'voile atmosphérique',

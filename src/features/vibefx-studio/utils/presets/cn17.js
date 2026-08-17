@@ -12,7 +12,7 @@
  *   (aucun .xmp fourni : reglages Lightroom inconnus)
  *
  * Source Hald : cn17-bloc4.png (niveau 8, cube 64)
- * Importe le  : 2026-08-11
+ * Importe le  : 2026-08-16
  */
 
 import { lutFromBase64 } from '../haldClut.js';
@@ -31,7 +31,7 @@ export const preset = {
     recommendedIntensity: 100,
     /* Reglages que la table ne peut pas porter (ils dependent des pixels
        voisins ou de la position dans l'image), lus dans le .xmp. */
-    spatialFilters: {},
+    spatialFilters: {"grain":15,"sharpness":40},
     /* La table elle-meme, decodee au premier usage. */
     getLut() {
         if (!cached) cached = lutFromBase64(LUT_BASE64);

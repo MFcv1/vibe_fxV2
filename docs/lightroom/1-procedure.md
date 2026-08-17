@@ -121,6 +121,34 @@ fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quo
 > protocole, pas un détail — un preset importé sans ce relevé rend une couleur
 > juste et un rendu incomplet.
 
+#### La Netteté 40 : on la recopie, même si elle n'est pas « dans » le preset
+
+**Décision du 2026-08-16, et elle mérite d'être comprise avant d'être suivie.**
+La Netteté 40 du panneau Détail est le **défaut de Lightroom**, présent avec ou
+sans preset. On la recopie quand même dans `sharpness`, parce que notre moteur
+n'a **aucune** netteté de base : sans ça, le même preset rend plus mou chez nous
+que chez lui.
+
+Ce n'est pas une supposition, c'est mesuré sur une vraie photo (`cn17`, la roche
+de la plage — la zone où les deux versions s'écartaient le plus) :
+
+| | énergie de contours | rapport à Lightroom |
+|---|---|---|
+| nous, sans netteté | 17,41 | ×1,405 |
+| nous, netteté 25 | 22,58 | ×1,083 |
+| **nous, netteté 40** | **24,81** | **×0,986** |
+| nous, netteté 60 | 27,47 | ×0,890 |
+| Lightroom | 24,46 | — |
+
+La luminance moyenne est identique (132,84 contre 132,81) : c'est bien de la
+netteté, pas une couleur qui dérape. Et au passage, ça **valide notre loi de
+netteté sur photo** — elle avait été calibrée sur la mire C, elle tombe à 1,4 %
+de la sienne sur une image réelle.
+
+**Conséquence** : `cn11` et `cn17` portent `sharpness: 40` depuis le
+2026-08-16. Tout preset importé ensuite doit le porter aussi, sauf si son
+panneau Détail affiche autre chose.
+
 **Le `.xmp`, quand il est disponible**, porte déjà ces valeurs
 (`crs:GrainAmount`, `crs:Texture`, `crs:Clarity2012`, `crs:Dehaze`,
 `crs:PostCropVignetteAmount`, `crs:Sharpness`) et
@@ -188,6 +216,42 @@ Le preset apparaît immédiatement dans `/creer/vision`.
 - **rugosité** — au-dessus de **3/255**, le preset contient du **grain**.
   Réimporter en ajoutant `--lisser 1`, et récupérer le grain à sa vraie place
   (effet spatial) plutôt que figé dans la table.
+
+### Réimporter un preset déjà capturé — les commandes exactes
+
+**À recopier telles quelles.** Un preset se régénère régulièrement (un relevé
+qui arrive, une échelle qui bouge), et il faut alors que **seule** la ligne
+visée change. Or la table dépend de `--lisser` : le relancer sans le bon nombre
+de passes réécrit une LUT différente **d'un preset déjà validé**, en silence.
+
+```bash
+# CN11 — capture propre (aucun grain dans le preset) : PAS de --lisser
+npm run preset:import -- \
+  --hald presets-lightroom/cn11-bloc4.png --id cn11 --label "CN11" \
+  --hint "Ciel bleu profond, verts sobres" \
+  --bestFor "paysage, mer, ciel dégagé, architecture" \
+  --avoidFor "portrait rapproché, scène déjà très bleue" \
+  --sharpness 40 --force
+
+# CN17 — capturée AVEC son grain 15, donc bruitée : --lisser 1 obligatoire
+npm run preset:import -- \
+  --hald presets-lightroom/cn17-bloc4.png --id cn17 --label "CN17" \
+  --hint "Chaud, ciel teal, ombres douces" \
+  --bestFor "voyage, lumière du soir, pierre et bois, peau" \
+  --avoidFor "photos déjà très chaudes ou jaunies" \
+  --lisser 1 --grain 15 --sharpness 40 --force
+```
+
+**Le contrôle qui va avec**, après toute réimportation d'un preset validé :
+
+```bash
+git diff src/features/vibefx-studio/utils/presets/<id>.js
+```
+
+La ligne `LUT_BASE64` **ne doit pas apparaître**. Si elle bouge, ce n'est pas la
+même commande que l'import d'origine : ne pas commiter, retrouver les bons
+arguments (`git checkout` puis essayer `--lisser 0/1/2` jusqu'à ce que seule la
+date change).
 
 ---
 

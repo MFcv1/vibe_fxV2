@@ -24,6 +24,7 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'skySaturation',
     'foliageSaturation',
     'temperature',
+    'texture',
     'clarity',
     'sharpness',
     'dehaze',
@@ -69,10 +70,31 @@ export const VISION_SAFE_BOUNDS = {
     temperature: { min: -22, max: 22, neutre: 0 },
     highlights: { min: -45, max: 35, neutre: 0 },
     shadows: { min: -35, max: 45, neutre: 0 },
+    /*
+     * Clarte et nettete sont a l'echelle de Lightroom depuis le 2026-08-16.
+     * Pour la clarte, le dosage collait deja au sien; c'est le rayon qui a
+     * change, pas la signification du nombre. Pour la nettete, l'echelle va
+     * desormais jusqu'a 150 comme la sienne, et 40 est ce qu'il pose par defaut
+     * sur tout preset: le plafond « sur » doit donc au moins le permettre.
+     */
+    /*
+     * La texture est a l'echelle de Lightroom des DEUX cotes depuis le
+     * 2026-08-17: le negatif a enfin ete mesure, et il tourne sur le meme couple
+     * de rayons que le positif, avec son dosage propre (voir `applyTexture`).
+     * La borne basse s'ouvre donc, symetrique du plafond sur.
+     */
+    texture: { min: -50, max: 50, neutre: 0 },
     clarity: { min: -25, max: 30, neutre: 0 },
-    sharpness: { min: 0, max: 35, neutre: 0 },
+    sharpness: { min: 0, max: 60, neutre: 0 },
     dehaze: { min: 0, max: 35, neutre: 0 },
-    grain: { min: 0, max: 42, monoMax: 55, neutre: 0 },
+    /*
+     * L'echelle du grain est celle de LIGHTROOM depuis le 2026-08-15 (mesure:
+     * ecart-type = 0,367 x valeur, constant du noir au blanc). Un grain de film
+     * credible vit entre 8 et 25; 40 est deja tres marque, ce qui en fait le
+     * bon plafond « sur ». Le maximum libre est 100, celui de Lightroom, pour
+     * qu'aucune valeur d'un preset importe ne soit hors de portee.
+     */
+    grain: { min: 0, max: 40, monoMax: 55, neutre: 0 },
     vignette: { min: 0, max: 30, neutre: 0 },
 };
 
@@ -92,11 +114,12 @@ export const VISION_FREE_BOUNDS = {
     temperature: { min: -30, max: 30, neutre: 0 },
     highlights: { min: -50, max: 50, neutre: 0 },
     shadows: { min: -50, max: 50, neutre: 0 },
-    clarity: { min: -30, max: 40, neutre: 0 },
-    sharpness: { min: 0, max: 50, neutre: 0 },
+    texture: { min: -100, max: 100, neutre: 0 },
+    clarity: { min: -100, max: 100, neutre: 0 },
+    sharpness: { min: 0, max: 150, neutre: 0 },
     dehaze: { min: 0, max: 50, neutre: 0 },
-    grain: { min: 0, max: 80, neutre: 0 },
-    vignette: { min: 0, max: 60, neutre: 0 },
+    grain: { min: 0, max: 100, neutre: 0 },
+    vignette: { min: 0, max: 100, neutre: 0 },
 };
 
 /* Les bornes qui s'appliquent vraiment, selon l'etat des garde-fous. */
@@ -187,6 +210,7 @@ export function normalizeVisionFilters(filters = {}) {
     next.temperature = clampSafe(next.temperature || 0, 'temperature', 0);
     next.highlights = clampSafe(next.highlights || 0, 'highlights', 0);
     next.shadows = clampSafe(next.shadows || 0, 'shadows', 0);
+    next.texture = clampSafe(next.texture || 0, 'texture', 0);
     next.clarity = clampSafe(next.clarity || 0, 'clarity', 0);
     next.sharpness = clampSafe(next.sharpness || 0, 'sharpness', 0);
     next.dehaze = clampSafe(next.dehaze || 0, 'dehaze', 0);

@@ -67,31 +67,46 @@ const number = (values, key, fallback = 0) => {
 /*
  * Traduit les reglages spatiaux du `.xmp` vers les cles du moteur.
  *
- * Les echelles ne sont pas les memes: Lightroom va de -100 a +100 sur la
- * clarte, notre `clarity` est borne a [-25, 30] par `normalizeVisionFilters`.
- * On convertit proportionnellement puis on laisse le bornage faire son travail
- * — mieux vaut un effet un peu plus doux qu'un rendu casse.
+ * PLUS AUCUNE CONVERSION depuis le 2026-08-16, et c'est le changement important
+ * de cette fonction. Nos echelles SONT celles de Lightroom, mesure a l'appui
+ * (`docs/lightroom/4-synchro-effets.md`): grain, vignetage, clarte, nettete et
+ * texture veulent dire la meme chose des deux cotes. Le nombre du `.xmp` se
+ * recopie donc tel quel.
+ *
+ * Ce qui etait fait avant — clarte x0,3, nettete x0,35, grain x0,42, vignetage
+ * x0,5 — datait d'un moteur dont les echelles n'avaient rien a voir avec les
+ * siennes. Garder ces facteurs aujourd'hui rendrait chaque preset importe par
+ * `.xmp` trois fois trop doux, sans que rien ne le signale.
+ *
+ * Le bornage reste le garde-fou: `normalizeVisionFilters` ramene ce qui sort de
+ * la plage sure, et c'est lui qui decide, pas cette fonction.
  */
 function toSpatialFilters(values) {
-    const clarity = number(values, 'Clarity2012');
-    const texture = number(values, 'Texture');
-    const dehaze = number(values, 'Dehaze');
-    const sharpness = number(values, 'Sharpness');
-    const grain = number(values, 'GrainAmount');
-    const vignette = number(values, 'PostCropVignetteAmount');
-
     const filters = {};
-    /* Clarte et texture agissent toutes deux sur le micro-contraste; le moteur
-       n'a qu'un seul reglage, on les combine en ponderant la texture moitie
-       moins (elle est plus fine que la clarte). */
-    const microContrast = clarity + texture * 0.5;
-    if (microContrast) filters.clarity = Math.round(microContrast * 0.3);
-    if (dehaze > 0) filters.dehaze = Math.round(dehaze * 0.35);
-    if (sharpness) filters.sharpness = Math.round(sharpness * 0.35);
-    if (grain) filters.grain = Math.round(grain * 0.42);
+    const copier = (cle, xmpKey) => {
+        const valeur = number(values, xmpKey);
+        if (valeur) filters[cle] = valeur;
+    };
+
+    copier('clarity', 'Clarity2012');
+    /* La texture a son propre etage depuis le 2026-08-16. Avant, elle etait
+       melangee a la clarte faute de reglage dedie — deux effets d'echelles
+       differentes empiles sur un seul curseur. */
+    copier('texture', 'Texture');
+    copier('sharpness', 'Sharpness');
+    copier('grain', 'GrainAmount');
+
+    /* Le voile n'est PAS calibre: Lightroom l'estime a partir du contenu de
+       l'image, donc aucune mire ne le capture (cf. 4-synchro-effets.md). On
+       recopie le nombre faute de mieux, en sachant que c'est le seul de la
+       liste dont l'echelle n'a pas ete verifiee. */
+    const dehaze = number(values, 'Dehaze');
+    if (dehaze > 0) filters.dehaze = dehaze;
+
     /* Le vignetage Lightroom est signe (negatif = sombre). Le moteur n'assombrit
        que dans un sens: un vignetage clair n'est pas transposable. */
-    if (vignette < 0) filters.vignette = Math.round(Math.min(60, -vignette) * 0.5);
+    const vignette = number(values, 'PostCropVignetteAmount');
+    if (vignette < 0) filters.vignette = -vignette;
 
     return filters;
 }

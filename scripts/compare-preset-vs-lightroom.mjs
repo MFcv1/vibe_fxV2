@@ -24,11 +24,17 @@ import sharp from 'sharp';
 import { LUT_SIZE, applyLut3dToData } from '../src/features/vibefx-studio/utils/lut3d.js';
 import { getPresetLut, VISION_PRESET_BY_ID } from '../src/features/vibefx-studio/utils/visionPresets.js';
 
-const [source, reference, presetId] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const plancheIndex = argv.indexOf('--planche');
+const planche = plancheIndex === -1 ? null : argv[plancheIndex + 1];
+const [source, reference, presetId] = argv.filter((v, i) => (
+    !v.startsWith('--') && i !== plancheIndex + 1
+));
 
 if (!source || !reference || !presetId) {
     console.error(
-        '\nUsage: node scripts/compare-preset-vs-lightroom.mjs <origine> <version-lightroom> <presetId>\n',
+        '\nUsage: node scripts/compare-preset-vs-lightroom.mjs <origine> <version-lightroom> <presetId>'
+        + ' [--planche <sortie.png>]\n',
     );
     process.exit(1);
 }
@@ -122,3 +128,95 @@ const verdict = mean <= 2 ? 'identique a l\'oeil'
         : mean <= 10 ? 'meme look, ecart visible en comparant cote a cote'
             : 'CE N\'EST PLUS LE MEME RENDU';
 console.log(`\nVERDICT: ${verdict}.\n`);
+
+/*
+ * LA PLANCHE. Un ecart moyen est un resume, et un resume peut cacher un defaut
+ * localise: une bande dans un ciel, un contour, une teinte qui part sur une
+ * seule matiere. D'ou deux choses a regarder.
+ *
+ *   Ligne 1  les trois images entieres, plus la CARTE DES ECARTS (x8, pour
+ *            qu'un ecart de 3/255 soit visible). Un defaut de LUT s'y lit comme
+ *            une forme: une zone, une bande, un aplat — pas comme du bruit.
+ *   Ligne 2  la zone du PIRE ecart, a 1:1 et non redimensionnee, la ou il faut
+ *            aller voir si le chiffre moyen ment.
+ */
+if (planche) {
+    const { width: W, height: H } = srcMeta;
+
+    /* La carte, en niveaux de gris, avant tout redimensionnement. */
+    const carte = Buffer.alloc(W * H);
+    /* Et le pire bloc, pour savoir ou couper la ligne du bas. */
+    const BLOC = 128;
+    const blocsX = Math.ceil(W / BLOC);
+    const sommes = new Float64Array(blocsX * Math.ceil(H / BLOC));
+    for (let y = 0; y < H; y += 1) {
+        for (let x = 0; x < W; x += 1) {
+            const i = y * W + x;
+            const d = (Math.abs(ours[i * 4] - ref[i * 3])
+                + Math.abs(ours[i * 4 + 1] - ref[i * 3 + 1])
+                + Math.abs(ours[i * 4 + 2] - ref[i * 3 + 2])) / 3;
+            carte[i] = Math.min(255, Math.round(d * 8));
+            sommes[Math.floor(y / BLOC) * blocsX + Math.floor(x / BLOC)] += d;
+        }
+    }
+    let pire = 0;
+    for (let b = 1; b < sommes.length; b += 1) if (sommes[b] > sommes[pire]) pire = b;
+    const COTE = Math.min(560, W, H);
+    const centreX = (pire % blocsX) * BLOC + BLOC / 2;
+    const centreY = Math.floor(pire / blocsX) * BLOC + BLOC / 2;
+    const gauche = Math.max(0, Math.min(W - COTE, Math.round(centreX - COTE / 2)));
+    const haut = Math.max(0, Math.min(H - COTE, Math.round(centreY - COTE / 2)));
+
+    const notreRaw = Buffer.alloc(W * H * 3);
+    for (let i = 0; i < pixelCount; i += 1) {
+        notreRaw[i * 3] = ours[i * 4];
+        notreRaw[i * 3 + 1] = ours[i * 4 + 1];
+        notreRaw[i * 3 + 2] = ours[i * 4 + 2];
+    }
+
+    const brut = (data, channels = 3) => sharp(data, { raw: { width: W, height: H, channels } });
+    const LARGEUR = 520;
+    const reduire = (img) => img.resize({ width: LARGEUR, fit: 'inside' }).png().toBuffer();
+    const couper = (img) => img.extract({
+        left: gauche, top: haut, width: COTE, height: COTE,
+    }).png().toBuffer();
+
+    const haut1 = await Promise.all([
+        reduire(brut(src)), reduire(brut(notreRaw)), reduire(brut(ref)), reduire(brut(carte, 1)),
+    ]);
+    const bas = await Promise.all([
+        couper(brut(src)), couper(brut(notreRaw)), couper(brut(ref)), couper(brut(carte, 1)),
+    ]);
+
+    const MARGE = 10;
+    const BANDEAU = 30;
+    const hHaut = (await sharp(haut1[0]).metadata()).height;
+    const colonne = Math.max(LARGEUR, COTE);
+    const largeurTotale = 4 * (colonne + MARGE) - MARGE;
+    const titres = ['origine', 'notre rendu', 'Lightroom', `ecart x8 (moyen ${mean.toFixed(2)}/255)`];
+    const legende = Buffer.from(`<svg width="${largeurTotale}" height="${BANDEAU}">${
+        titres.map((t, i) => `<text x="${i * (colonne + MARGE) + 8}" y="20" font-family="sans-serif"
+            font-size="15" fill="#e8e8e8">${t}</text>`).join('')
+    }</svg>`);
+    const legende2 = Buffer.from(`<svg width="${largeurTotale}" height="${BANDEAU}"><text x="8" y="20"
+        font-family="sans-serif" font-size="15" fill="#e8e8e8">zone du PIRE ecart, a 1:1 (x=${gauche}, y=${haut})</text></svg>`);
+
+    await sharp({
+        create: {
+            width: largeurTotale,
+            height: BANDEAU + hHaut + MARGE + BANDEAU + COTE,
+            channels: 3,
+            background: '#0c0c0c',
+        },
+    }).composite([
+        { input: legende, top: 0, left: 0 },
+        ...haut1.map((b, i) => ({ input: b, top: BANDEAU, left: i * (colonne + MARGE) })),
+        { input: legende2, top: BANDEAU + hHaut + MARGE, left: 0 },
+        ...bas.map((b, i) => ({
+            input: b, top: BANDEAU + hHaut + MARGE + BANDEAU, left: i * (colonne + MARGE),
+        })),
+    ]).png().toFile(planche);
+
+    console.log(`Planche ecrite: ${planche}`);
+    console.log('La carte des ecarts est amplifiee x8: du NOIR = identique.\n');
+}
