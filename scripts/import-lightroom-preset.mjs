@@ -30,7 +30,7 @@ import {
     measureHaldRoughness,
     smoothHaldCube,
 } from '../src/features/vibefx-studio/utils/haldClut.js';
-import { parseXmpPreset } from '../src/features/vibefx-studio/utils/xmpPreset.js';
+import { parseXmpPreset, verifierDomaineSpatial } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 
 /* ---------- arguments ---------- */
 
@@ -325,5 +325,26 @@ if (xmp) {
     console.log('  .xmp          : non fourni — clarte, texture, nettete, grain et');
     console.log('                  vignetage du preset ne seront PAS reproduits.');
 }
+/*
+ * CE QUI NE SERA PAS REPRODUIT FIDELEMENT — ajoute le 2026-08-19.
+ *
+ * La couleur est exacte par construction (elle est mesuree sur la grille RVB).
+ * Les effets spatiaux, eux, sont recopies dans un moteur dont on connait
+ * maintenant les limites, reglage par reglage
+ * (`docs/lightroom/5-audit-fiabilite-2026-08-19.md`). Les taire reviendrait a
+ * livrer un preset faux qui a l'air juste: c'est le seul mode de panne que ce
+ * chantier n'a pas le droit de laisser passer.
+ *
+ * On verifie les valeurs FINALES, pas celles du `.xmp`: un relevé passé en
+ * ligne de commande (`--dehaze 40`) prime sur le fichier et compte autant.
+ */
+const alertes = verifierDomaineSpatial(spatial, xmp?.raw || null);
+if (alertes.length) {
+    console.log('\n  ATTENTION — ce que notre moteur ne rend PAS comme Lightroom :');
+    for (const alerte of alertes) console.log(`      - ${alerte}`);
+    console.log('  Juge ce preset a l\'oeil sur une vraie photo avant de t\'en servir :');
+    console.log('      node scripts/planche-showcase.mjs');
+}
+
 console.log(`\nPresets enregistres : ${sorted.join(', ')}`);
 console.log('\nVerifie avec :  npm run test:vision-preset\n');

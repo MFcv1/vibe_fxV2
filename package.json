@@ -67,6 +67,8 @@
     "preset:controle": "node scripts/check-hald-control.mjs",
     "test:vibeos-vision": "node scripts/smoke-vision-preset.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-vision.spec.cjs",
     "test:vibeos-studio": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-studio.spec.cjs",
+    "test:reglages-avances": "node scripts/run-video-ui-test.mjs scripts/smoke-reglages-avances.spec.cjs",
+    "audit:reglages-avances": "node scripts/audit-reglages-avances.mjs",
     "test:vibeos-soundtrack": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-soundtrack.spec.cjs",
     "test:vibeos-pipeline": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-pipeline.spec.cjs",
     "test:vibecut-slowmo": "playwright test scripts/smoke-vibecut-slowmo-samples.spec.cjs --reporter=line --workers=1",

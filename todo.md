@@ -19,7 +19,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[prompt de reprise du 2026-08-16](docs/prompt-reprise-2026-08-16.md).
+[prompt de reprise du 2026-08-19](docs/prompt-reprise-2026-08-19.md).
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
 [VibeOS](docs/archive-vibeos-2026-08-11.md) ·
@@ -80,28 +80,72 @@ ne peut ni lire ses panneaux ni exporter à sa place.
 | **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
 | **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
 | **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
-| **Texture** | **ALIGNÉE côté positif** — ×1,176/1,120/1,096 contre ses ×1,175/1,120/1,096. **Négatif non implémenté** : ses 2 exports manquent |
+| **Texture** | **ALIGNÉE des deux côtés** (négatif fait le 2026-08-17) — même couple de rayons, dosage propre en `N^0,733`. Écart max 1,3 % |
 | Voile | mesuré, **pas capturable par une mire** : Lightroom l'estime depuis le contenu de l'image |
 
-**Fait le 2026-08-16 — le lot est débloqué, on peut réimporter :**
+**Ce qui est fait, en une ligne chacun** — le détail chiffré vit dans les
+journaux datés de [map.md](map.md), pas ici :
 
-1. `powlisher-showcase` **revalidé à l'œil** (`planche-showcase.mjs`, quatre
-   photos, vrai moteur) : grain 8 et relief 14 gardés, **vignetage 3 → 8**.
-2. `cn17` **validé sur une vraie photo** développée des deux côtés :
-   **1,73/255** d'écart moyen, « identique à l'œil ».
-3. Cette planche a révélé une **Netteté 40** que Lightroom pose sur toute photo
-   et que nos presets n'avaient pas — nous rendions 1,40× plus mou. `cn11` et
-   `cn17` la portent désormais.
-4. **Texture branchée** dans le moteur, calée sur ses mesures.
+1. `powlisher-showcase` **revalidé à l'œil** sur le vrai moteur : vignetage 3 → 8.
+2. `cn17` **validé sur une vraie photo** développée des deux côtés : **1,95/255**.
+3. **Netteté 40** : Lightroom la pose sur toute photo, `cn11`/`cn17` la portent.
+4. **Texture branchée**, les deux côtés (le négatif a son propre dosage).
+5. **Instrument corrigé** : `compare-preset-vs-lightroom.mjs` convertit en sRVB
+   par ColorSync — les JPEG Samsung sont en P3, on annonçait 1,73 avec un
+   appareil décalé de 0,80.
+6. **Audit des réglages avancés (2026-08-17)** : les **17 réglages du panneau
+   Vision marchent tous**, vérifié dans le moteur ET en poussant les vrais
+   curseurs. Trois choses corrigées au passage :
+   - **Studio : la moitié de la course ne faisait rien** (Luminosité affichée
+     60–140 pour 85–115 retenus, Grain 0–100 pour 0–40…). Le nombre affiché
+     mentait — « la luminosité ne marche pas » était **juste**. Les bornes
+     écrites en dur dans `normalizeVisionFilters` ont rejoint
+     `VISION_SAFE_BOUNDS` ; Studio les lit, comme Vision le fait déjà.
+   - **L'image sautait au premier cran d'un réglage de couleur** :
+     `fitRgbToGamut` désaturait des couleurs valides (« Ciel » à 1 déplaçait
+     2,6 % de l'image). Corrigé : marge par canal, 0,00/255.
+   - **La halation n'est pas morte**, elle est locale et ne mord que sur une
+     haute lumière **colorée**. C'était la mire qui manquait de néon.
 
-**Ce qui reste sur ce lot :**
+**Ce qui reste sur ce lot** — tout remesuré le 2026-08-19 sur les vrais exports
+Lightroom : [audit de fiabilité](docs/lightroom/5-audit-fiabilite-2026-08-19.md).
+Grain, vignetage, texture (deux sens), clarté positive et netteté 40 sont
+confirmés à quelques pourcents. Les trous, par ordre d'importance :
 
-1. **Texture négative** : les 2 exports (−50, −100) manquent encore — ceux qui
-   sont là sont le positif exporté deux fois, revérifié. L'import **refuse** un
-   `--texture` négatif tant que ce n'est pas mesuré.
-2. **Voile** : ne pas le mesurer sur mire. Cas à part, sur photo réelle.
-3. **Grain Taille 40** : CN17 la met à 40, tout est calibré pour 25. À mesurer
+**Deux trous bouchés le 2026-08-19, dans la foulée de l'audit :**
+
+- **Clarté négative CALÉE.** Elle n'avait jamais été mesurée : notre dosage
+  linéaire donnait à −100 exactement l'image floue. Loi `0,01409 × N^0,777`
+  (le sien sature, comme sa texture négative). Mesuré après : **0,707 à −50**
+  et **0,494 à −100**, contre 0,695–0,723 et 0,476–0,526 chez lui. Le positif
+  n'a pas bougé. Borne sûre ouverte à −30, ambiances converties (−18 → −27,
+  −6 → −7).
+- **L'import ne jette plus rien en silence.** `verifierDomaineSpatial`
+  (`xmpPreset.js`) liste ce qui ne sera pas reproduit — vignetage positif et
+  voile négatif jetés, voile hors échelle, netteté ≥ 80, halo sur les arêtes —
+  et `preset:import` l'affiche. Gardé par `npm run test:vision-preset`.
+
+**Ce qui reste :**
+
+1. **Voile** : 11,8/255 d'écart à 50 — hors tolérance. Pas mesurable sur mire :
+   cas à part, sur photo réelle. Notre plafond est 50, le sien 100.
+2. **Texture ET clarté sur contours francs** : il épargne les arêtes marquées
+   (1,006 / 1,014 à +50), nous non (1,100 / 1,143). Demande un masque de
+   contours, pas un coefficient.
+3. **Notre netteté amplifie le bruit du JPEG** ×1,46 sur les zones plates
+   (mesuré sur `cn17`), là où Lightroom développe depuis du RAW et a un curseur
+   **Masquage** que nous n'avons pas. Sur les contours, la valeur relevée est la
+   bonne (0,874 sans netteté, 1,118 avec). Invisible sur la photo de plage ; à
+   surveiller sur une photo bruitée à grand ciel uni.
+4. **Netteté ≥ 80** : sur les larges structures il raidit ×1,58 à 150, nous
+   ×1,00. À 40 (la valeur par défaut, celle qui compte) l'écart est nul.
+5. **Grain Taille 40** : CN17 la met à 40, tout est calibré pour 25. À mesurer
    si l'aspect du grain d'un preset importé ne colle pas.
+6. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
+   réapparaît — ses 0,64/2,67 datent de l'ancien.
+7. **Une seule résolution vérifiée** (1620×1080) : notre texture et notre grain
+   ont un rayon en pixels fixes, notre clarté en % du cadre. Hypothèse non
+   mesurée sur une autre taille.
 
 **Pas bloquant pour importer** : les **sous-réglages** (Grain Taille 25 /
 Cassure 50, Vignette Milieu 50 / Arrondi 0 / Contour 50 / Hautes lumières 0)
@@ -203,7 +247,16 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
   : un preset peut ne modifier **aucune** clé de `filters`. Tester
   `vision.presetId` **séparément**, sinon l'étage Vision est sauté.
 - **Bornes des réglages : une seule source**, côté moteur. L'interface les lit,
-  jamais l'inverse.
+  jamais l'inverse. Une borne d'interface plus large que celle du moteur produit
+  exactement le symptôme « ce réglage ne marche pas » : la course ne fait rien
+  sur sa fin, et le nombre affiché ment. C'était le cas de Studio jusqu'au
+  2026-08-17. `npm run test:reglages-avances` le rattrape désormais.
+- **Un effet LOCAL ne se juge pas à sa moyenne.** Un halo pèse 0,13/255 sur
+  l'image entière et se voit très bien (26/255 sur 20 % du cadre). Juger à la
+  moyenne seule fait « réparer » un réglage qui marche.
+- **Un réglage à 1 doit faire un effet de 1.** Si le moteur a un étage qui ne
+  s'allume qu'au-delà du repos, l'image saute au premier cran et ne bouge plus
+  ensuite. C'était le cas du garde-fou de gamut.
 - **Un curseur recentré ne convertit JAMAIS position ↔ valeur** : l'arrondi crée
   une **zone morte** et le curseur se bloque. Course élargie symétriquement,
   valeur bornée à la sortie.
@@ -239,6 +292,8 @@ npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
 npm run test:vibeos-library / -layout / -studio / -soundtrack   # si tu y touches
+npm run audit:reglages-avances # chaque réglage fait-il quelque chose ? (moteur)
+npm run test:reglages-avances  # ...et en poussant les vrais curseurs (interface)
 npm run test:routes            # si tu touches aux routes (build + start)
 
 # outils des presets
@@ -248,13 +303,20 @@ node scripts/planche-showcase.mjs                             # planche : EFFETS
 node scripts/mesure-ciel-powlisher.mjs [--photo <f>]           # où le ciel atterrit
 node scripts/audit-vision-presets.mjs                          # bandes, dominante, témoins
 node scripts/compare-vision-presets-on-photos.mjs <photo...>   # écrêtage et force
-node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id> [--planche <png>]
+node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id> [--planche <p>] [--sortie <p>]
+#   -> rendu COMPLET (LUT + effets) dans le vrai moteur ; --sans-effets = couleur seule
 node scripts/rendu-mire-c.mjs --texture 50 --sortie <png>      # notre moteur sur la mire C
 node scripts/mesure-mire-c.mjs --reference <a> --lightroom <b> # netteté / texture / clarté
 ```
 
-Tous verts au 2026-08-16, `test:vibeos-vision` compris.
+Tous verts au 2026-08-17, les deux audits de réglages compris.
 
 **Échecs préexistants, hors chantier** : `smoke-vibecut-media-safety.spec.cjs`
 (3) et `test:vibecut-export-local-mp4` — fixtures manquantes, chemins Windows
 d'origine, pointeurs Git LFS ([archive](docs/archive-vibecut-2026-08-04.md#commandes)).
+
+**`npm run build` échoue depuis la machine, pas depuis le code** (vu le
+2026-08-19, reproduit sans aucune modification) : le code compile, mais la
+collecte de page casse sur `/api/catalog/[jobId]` parce que `better-sqlite3` a
+été compilé pour un autre Node (NODE_MODULE_VERSION 127 contre 147). Correctif :
+`npm rebuild better-sqlite3`.

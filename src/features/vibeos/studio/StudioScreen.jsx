@@ -10,44 +10,74 @@ import {
 import MeshSheet, { meshPreviewStyle } from '../shared/MeshSheet';
 import LumenSheet from '../shared/LumenSheet';
 import PipelineSourceNote from '../project/PipelineSourceNote';
+import { visionBoundsFor } from '../../vibefx-studio/utils/visionColorScience';
 import useStudioEditor, { CROP_RATIOS } from './useStudioEditor';
 import styles from './studio.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
 
-/* Reglages manuels: les memes cles que l'ancien StylePanel, regroupees par
-   intention plutot que par nom technique. */
+/*
+ * Reglages manuels: les memes cles que l'ancien StylePanel, regroupees par
+ * intention plutot que par nom technique.
+ *
+ * LES BORNES NE SONT PLUS ECRITES ICI, et ce n'est pas du rangement.
+ *
+ * Elles l'etaient, plus larges que celles du moteur, et la mesure du
+ * 2026-08-17 (`scripts/smoke-reglages-avances.spec.cjs`, qui pousse les vrais
+ * curseurs de la vraie page) a montre ce que ca donnait a l'ecran:
+ *
+ *   curseur     | course affichee | ce que le moteur retenait | image a fond
+ *   ------------+-----------------+---------------------------+--------------
+ *   Luminosité  |     60 – 140    |         85 – 115          | identique a 85
+ *   Sépia       |      0 – 100    |          0 – 12           | identique a 12
+ *   Flou        |      0 – 10     |          0 – 2            | identique a 2
+ *   Grain       |      0 – 100    |          0 – 40           | identique a 40
+ *   Vignettage  |      0 – 100    |          0 – 30           | identique a 30
+ *
+ * Autrement dit: la moitie de la course ne faisait rien, le nombre affiche
+ * mentait, et « la luminosite ne marche pas » etait une observation JUSTE. Le
+ * meme bug avait ete corrige sur /creer/vision le 2026-08-12; Studio etait
+ * reste en arriere.
+ *
+ * Les bornes viennent donc du moteur (`visionBoundsFor`), et elles suivent le
+ * mode creatif: garde-fous actifs, la course s'arrete la ou le moteur s'arrete;
+ * en creatif, elle s'ouvre pour de vrai.
+ */
 const ADVANCED_GROUPS = [
     {
         id: 'light',
         title: 'Lumière',
         controls: [
-            { key: 'brightness', label: 'Luminosité', min: 60, max: 140, defaultValue: 100, unit: '%' },
-            { key: 'contrast', label: 'Contraste', min: 60, max: 180, defaultValue: 100, unit: '%' },
-            { key: 'highlights', label: 'Hautes lumières', min: -50, max: 50, defaultValue: 0 },
-            { key: 'shadows', label: 'Ombres', min: -50, max: 50, defaultValue: 0 },
+            { key: 'brightness', label: 'Luminosité', unit: '%' },
+            { key: 'contrast', label: 'Contraste', unit: '%' },
+            { key: 'highlights', label: 'Hautes lumières' },
+            { key: 'shadows', label: 'Ombres' },
         ],
     },
     {
         id: 'color',
         title: 'Couleur',
         controls: [
-            { key: 'saturation', label: 'Saturation', min: 0, max: 180, defaultValue: 100, unit: '%' },
-            { key: 'vibrance', label: 'Éclat des couleurs', min: -50, max: 50, defaultValue: 0 },
-            { key: 'temperature', label: 'Température', min: -30, max: 30, defaultValue: 0 },
-            { key: 'sepia', label: 'Sépia', min: 0, max: 100, defaultValue: 0, unit: '%' },
+            { key: 'saturation', label: 'Saturation', unit: '%' },
+            { key: 'vibrance', label: 'Éclat des couleurs' },
+            { key: 'temperature', label: 'Température' },
+            { key: 'sepia', label: 'Sépia', unit: '%' },
         ],
     },
     {
         id: 'texture',
         title: 'Matière et effets',
         controls: [
-            { key: 'clarity', label: 'Relief', min: -30, max: 40, defaultValue: 0 },
-            { key: 'sharpness', label: 'Netteté', min: 0, max: 50, defaultValue: 0 },
-            { key: 'blur', label: 'Flou', min: 0, max: 10, defaultValue: 0, unit: ' px' },
-            { key: 'grain', label: 'Grain', min: 0, max: 100, defaultValue: 0 },
-            { key: 'vignette', label: 'Vignettage', min: 0, max: 100, defaultValue: 0 },
-            { key: 'halation', label: 'Halo des lumières', min: 0, max: 60, defaultValue: 0 },
+            { key: 'clarity', label: 'Relief' },
+            { key: 'sharpness', label: 'Netteté' },
+            { key: 'blur', label: 'Flou', unit: ' px' },
+            { key: 'grain', label: 'Grain' },
+            { key: 'vignette', label: 'Vignettage' },
+            /* Le halo ne se declenche que sur des hautes lumieres COLOREES —
+               un neon, un phare. Sur un blanc speculaire neutre son garde-fou
+               l'eteint volontairement (`getSafeHalationWeight`). Ce n'est pas
+               une panne, c'est ce qui evite les aureoles sur les nuages. */
+            { key: 'halation', label: 'Halo des lumières' },
         ],
     },
 ];
@@ -72,6 +102,16 @@ export default function StudioScreen() {
         undo, redo, canUndo, canRedo,
         exportController,
     } = editor;
+
+    /* Les bornes suivent le mode: « Créatif » coupe les garde-fous du moteur,
+       donc la course s'ouvre en meme temps qu'eux — jamais avant. Le
+       monochrome a ses propres plafonds (le grain et le contraste s'y voient
+       moins), le moteur les expose via `mono`. */
+    const isMono = (filters.saturation ?? 100) === 0;
+    const boundsOf = React.useCallback(
+        (key) => visionBoundsFor(key, { safe: !creativeMode, mono: isMono }),
+        [creativeMode, isMono],
+    );
 
     const [isComparing, setIsComparing] = useState(false);
     const [isMeshSheetOpen, setIsMeshSheetOpen] = useState(false);
@@ -406,18 +446,23 @@ export default function StudioScreen() {
                     {ADVANCED_GROUPS.map((group) => (
                         <section key={group.id} className={styles.block}>
                             <h3 className={styles.blockTitle}>{group.title}</h3>
-                            {group.controls.map((control) => (
-                                <Slider
-                                    key={control.key}
-                                    label={control.label}
-                                    value={filters[control.key] ?? control.defaultValue}
-                                    onChange={(value) => setFilter(control.key, value)}
-                                    min={control.min}
-                                    max={control.max}
-                                    defaultValue={control.defaultValue}
-                                    formatValue={(value) => `${value}${control.unit || ''}`}
-                                />
-                            ))}
+                            {group.controls.map((control) => {
+                                const bounds = boundsOf(control.key);
+                                if (!bounds) return null;
+                                return (
+                                    <Slider
+                                        key={control.key}
+                                        label={control.label}
+                                        value={filters[control.key] ?? bounds.neutre}
+                                        onChange={(value) => setFilter(control.key, value)}
+                                        min={bounds.min}
+                                        max={bounds.max}
+                                        neutral={bounds.neutre}
+                                        defaultValue={bounds.neutre}
+                                        formatValue={(value) => `${value}${control.unit || ''}`}
+                                    />
+                                );
+                            })}
                         </section>
                     ))}
 
@@ -436,8 +481,9 @@ export default function StudioScreen() {
                             label="Force de la teinte"
                             value={filters.tintIntensity || 0}
                             onChange={(value) => setFilter('tintIntensity', value)}
-                            min={0}
-                            max={100}
+                            min={boundsOf('tintIntensity').min}
+                            max={boundsOf('tintIntensity').max}
+                            neutral={0}
                             defaultValue={0}
                             formatValue={(value) => `${value}%`}
                         />

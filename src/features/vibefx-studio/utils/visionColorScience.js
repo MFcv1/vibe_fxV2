@@ -84,7 +84,15 @@ export const VISION_SAFE_BOUNDS = {
      * La borne basse s'ouvre donc, symetrique du plafond sur.
      */
     texture: { min: -50, max: 50, neutre: 0 },
-    clarity: { min: -25, max: 30, neutre: 0 },
+    /*
+     * La borne basse passe de -25 a -30 le 2026-08-19, en meme temps que le
+     * dosage negatif de la clarte est cale sur Lightroom (`applyClarity`). Le
+     * negatif est desormais BEAUCOUP plus doux a curseur egal — -25 adoucissait
+     * de moitie, il n'enleve plus que 17 % du detail — donc la course peut
+     * s'ouvrir jusqu'a -30 (0,80 d'amplification, soit un adoucissement franc
+     * mais sain) et devenir symetrique du plafond.
+     */
+    clarity: { min: -30, max: 30, neutre: 0 },
     sharpness: { min: 0, max: 60, neutre: 0 },
     dehaze: { min: 0, max: 35, neutre: 0 },
     /*
@@ -96,6 +104,24 @@ export const VISION_SAFE_BOUNDS = {
      */
     grain: { min: 0, max: 40, monoMax: 55, neutre: 0 },
     vignette: { min: 0, max: 30, neutre: 0 },
+    /*
+     * AJOUTES LE 2026-08-17. Ces huit bornes existaient deja, mais ECRITES EN
+     * DUR dans `normalizeVisionFilters` juste en dessous — donc invisibles pour
+     * une interface, qui proposait alors ses propres chiffres. Mesure faite ce
+     * jour-la sur /creer/studio: pousser « Sepia » a 100 rendait exactement la
+     * meme image qu'a 12, « Flou » a 10 la meme qu'a 2, « Grain » a 100 la meme
+     * qu'a 40, « Vignettage » a 100 la meme qu'a 30. Les valeurs sont donc
+     * inchangees: c'est leur EMPLACEMENT qui change, pour que le panneau puisse
+     * les lire au lieu de les inventer.
+     */
+    sepia: { min: 0, max: 12, monoMax: 25, neutre: 0 },
+    blur: { min: 0, max: 2, neutre: 0 },
+    hueRotate: { min: -12, max: 12, neutre: 0 },
+    fadedBlacks: { min: 0, max: 8, monoMax: 12, neutre: 0 },
+    halation: { min: 0, max: 32, neutre: 0 },
+    tintIntensity: { min: 0, max: 10, monoMax: 18, neutre: 0 },
+    shadowTintIntensity: { min: 0, max: 18, monoMax: 28, neutre: 0 },
+    highlightTintIntensity: { min: 0, max: 12, monoMax: 22, neutre: 0 },
 };
 
 /*
@@ -120,6 +146,20 @@ export const VISION_FREE_BOUNDS = {
     dehaze: { min: 0, max: 50, neutre: 0 },
     grain: { min: 0, max: 100, neutre: 0 },
     vignette: { min: 0, max: 100, neutre: 0 },
+    /*
+     * Hors garde-fous, `normalizeVisionFilters` ne borne RIEN (elle sort avant).
+     * Ces plafonds ne sont donc pas appliques par le moteur: ils disent a
+     * l'interface jusqu'ou il est raisonnable de laisser aller la course en
+     * mode creatif. Ils reprennent ce que le panneau Studio proposait deja.
+     */
+    sepia: { min: 0, max: 100, neutre: 0 },
+    blur: { min: 0, max: 10, neutre: 0 },
+    hueRotate: { min: -180, max: 180, neutre: 0 },
+    fadedBlacks: { min: 0, max: 40, neutre: 0 },
+    halation: { min: 0, max: 60, neutre: 0 },
+    tintIntensity: { min: 0, max: 100, neutre: 0 },
+    shadowTintIntensity: { min: 0, max: 100, neutre: 0 },
+    highlightTintIntensity: { min: 0, max: 100, neutre: 0 },
 };
 
 /* Les bornes qui s'appliquent vraiment, selon l'etat des garde-fous. */
@@ -187,9 +227,9 @@ export function normalizeVisionFilters(filters = {}) {
 
     next.brightness = clampSafe(next.brightness, 'brightness', 100);
     next.contrast = clampSafe(next.contrast, 'contrast', 100, isMono);
-    next.sepia = clamp(next.sepia || 0, 0, isMono ? 25 : 12);
-    next.blur = clamp(next.blur || 0, 0, 2);
-    next.hueRotate = clamp(next.hueRotate || 0, -12, 12);
+    next.sepia = clampSafe(next.sepia || 0, 'sepia', 0, isMono);
+    next.blur = clampSafe(next.blur || 0, 'blur', 0);
+    next.hueRotate = clampSafe(next.hueRotate || 0, 'hueRotate', 0);
 
     const saturation = next.saturation ?? 100;
     if (isMono) {
@@ -214,11 +254,11 @@ export function normalizeVisionFilters(filters = {}) {
     next.clarity = clampSafe(next.clarity || 0, 'clarity', 0);
     next.sharpness = clampSafe(next.sharpness || 0, 'sharpness', 0);
     next.dehaze = clampSafe(next.dehaze || 0, 'dehaze', 0);
-    next.tintIntensity = clamp(next.tintIntensity || 0, 0, isMono ? 18 : 10);
-    next.shadowTintIntensity = clamp(next.shadowTintIntensity || 0, 0, isMono ? 28 : 18);
-    next.highlightTintIntensity = clamp(next.highlightTintIntensity || 0, 0, isMono ? 22 : 12);
-    next.fadedBlacks = clamp(next.fadedBlacks || 0, 0, isMono ? 12 : 8);
-    next.halation = clamp(next.halation || 0, 0, 32);
+    next.tintIntensity = clampSafe(next.tintIntensity || 0, 'tintIntensity', 0, isMono);
+    next.shadowTintIntensity = clampSafe(next.shadowTintIntensity || 0, 'shadowTintIntensity', 0, isMono);
+    next.highlightTintIntensity = clampSafe(next.highlightTintIntensity || 0, 'highlightTintIntensity', 0, isMono);
+    next.fadedBlacks = clampSafe(next.fadedBlacks || 0, 'fadedBlacks', 0, isMono);
+    next.halation = clampSafe(next.halation || 0, 'halation', 0);
     next.vignette = clampSafe(next.vignette || 0, 'vignette', 0);
     next.grain = clampSafe(next.grain || 0, 'grain', 0, isMono);
     next.tintColor = normalizeHexColor(next.tintColor, '#ffffff');

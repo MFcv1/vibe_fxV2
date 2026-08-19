@@ -231,7 +231,10 @@ const DEFINITIONS = [
             highlights: 22,
             shadows: 24,
             fadedBlacks: 7,
-            clarity: -18,
+            /* -18 sur l'ancienne echelle lineaire, convertie le 2026-08-19 quand
+               le dosage negatif de la clarte est passe en loi de puissance:
+               meme adoucissement a l'ecran, nouveau nombre. */
+            clarity: -27,
             grain: 4,
             vignette: 1,
             highlightTint: '#fff3e0',
@@ -260,7 +263,7 @@ const DEFINITIONS = [
             temperature: -12,
             highlights: -8,
             shadows: 14,
-            clarity: -6,
+            clarity: -7,   /* -6 avant la conversion du 2026-08-19 (cf. « Aube laiteuse ») */
             dehaze: 0,
             fadedBlacks: 5,
             shadowTint: '#16222b',

@@ -111,6 +111,62 @@ function toSpatialFilters(values) {
     return filters;
 }
 
+/*
+ * CE QUE L'IMPORT NE SAIT PAS REPRODUIRE — et qu'il doit DIRE.
+ *
+ * Ajoutee le 2026-08-19, apres l'audit de fiabilite
+ * (`docs/lightroom/5-audit-fiabilite-2026-08-19.md`). Deux reglages du `.xmp`
+ * etaient jetes en silence par `toSpatialFilters`, et trois autres recopies
+ * dans des zones ou notre moteur s'ecarte du sien. Le preset s'installait, la
+ * couleur etait juste, et le rendu etait faux sans qu'aucune ligne ne le dise —
+ * c'est exactement le mode de panne que tout ce chantier cherche a eviter.
+ *
+ * Cette fonction ne corrige rien et ne borne rien: elle ECRIT ce qu'un humain
+ * doit savoir avant de juger le preset a l'oeil. Elle prend les valeurs FINALES
+ * (`.xmp` ou releve a l'ecran passe en ligne de commande), parce que c'est ce
+ * qui atterrit dans le preset qui compte, pas d'ou ca vient.
+ */
+export function verifierDomaineSpatial(spatial = {}, valeursXmp = null) {
+    const alertes = [];
+    const nombre = (v) => (Number.isFinite(v) ? v : 0);
+
+    if (valeursXmp) {
+        const vignette = number(valeursXmp, 'PostCropVignetteAmount');
+        if (vignette > 0) {
+            alertes.push(`vignetage POSITIF (+${vignette}) : il eclaircit les coins, notre moteur ne sait qu'assombrir. IGNORE.`);
+        }
+        const voile = number(valeursXmp, 'Dehaze');
+        if (voile < 0) {
+            alertes.push(`voile NEGATIF (${voile}) : notre moteur ne sait qu'en enlever, pas en ajouter. IGNORE.`);
+        }
+    }
+
+    const clarity = nombre(spatial.clarity);
+    if (clarity < 0) {
+        alertes.push(`clarte NEGATIVE (${clarity}) : calee sur Lightroom le 2026-08-19, mais notre masque flou a UN seul rayon est plat la ou le sien mord moins sur les grandes structures — jusqu'a 6 % d'ecart a -100. A regarder a l'oeil.`);
+    }
+
+    const dehaze = nombre(spatial.dehaze);
+    if (dehaze > 0) {
+        alertes.push(`voile ${dehaze} : le SEUL reglage dont l'echelle n'est pas calibree (11,8/255 d'ecart mesure a 50, ~18 % trop fort). Lightroom l'estime depuis le contenu de l'image; aucune mire ne le capture.`);
+    }
+    if (dehaze > 50) {
+        alertes.push(`voile ${dehaze} au-dela de notre plafond (50) : il sera ramene a 50.`);
+    }
+
+    const sharpness = nombre(spatial.sharpness);
+    if (sharpness >= 80) {
+        alertes.push(`nettete ${sharpness} : au-dela de 80 la sienne raidit aussi les LARGES structures (x1,58 a 150) et la notre non. A 40, la valeur qu'il pose par defaut, l'ecart est nul.`);
+    }
+
+    const texture = nombre(spatial.texture);
+    if (Math.abs(texture) > 0 || Math.abs(clarity) > 0) {
+        alertes.push('texture / clarte : nos deux effets de matiere touchent les ARETES FRANCHES que Lightroom epargne (1,10 contre 1,01 a +50). Visible sur un toit contre le ciel, un poteau, un cable.');
+    }
+
+    return alertes;
+}
+
 /* Resume lisible, pour la documentation du preset importe. */
 function toSummary(values, curves) {
     const lines = [];
@@ -215,6 +271,8 @@ export function parseXmpPreset(xml, { fallbackName = 'Preset importé' } = {}) {
         },
         /* Ce qui part vers le moteur tel quel. */
         spatialFilters: toSpatialFilters(values),
+        /* Ce que le moteur ne saura PAS reproduire, pour que l'import le dise. */
+        spatialAlertes: verifierDomaineSpatial(toSpatialFilters(values), values),
         /* Ce qu'on affiche a un humain. */
         summary: toSummary(values, curves),
         /* Tout le reste, brut, si on doit y revenir. */

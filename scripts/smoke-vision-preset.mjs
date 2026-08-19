@@ -15,6 +15,7 @@ import {
     getPresetLut,
     getPresetTransform,
 } from '../src/features/vibefx-studio/utils/visionPresets.js';
+import { readFileSync } from 'node:fs';
 import { LUT_SIZE, applyLut3dToData } from '../src/features/vibefx-studio/utils/lut3d.js';
 import {
     buildHaldIdentity,
@@ -24,7 +25,7 @@ import {
     lutToBase64,
     measureHaldDeviation,
 } from '../src/features/vibefx-studio/utils/haldClut.js';
-import { parseXmpPreset } from '../src/features/vibefx-studio/utils/xmpPreset.js';
+import { parseXmpPreset, verifierDomaineSpatial } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 import { visionBoundsFor } from '../src/features/vibefx-studio/utils/visionColorScience.js';
 
 let failures = 0;
@@ -295,6 +296,63 @@ try {
     rejected = 1;
 }
 check('.xmp : fichier invalide rejeté', rejected, 1, 1);
+
+/* ---------- ce que l'import doit AVOUER (2026-08-19) ----------
+ *
+ * Deux reglages du .xmp etaient jetes en silence et trois autres recopies dans
+ * des zones ou notre moteur s'ecarte du sien: un preset s'installait, la
+ * couleur etait juste, et le rendu etait faux sans qu'une ligne le dise. Ces
+ * verifications gardent l'aveu, pas la correction — le moteur, lui, n'a pas
+ * change.
+ */
+check(
+    'domaine : un preset sage ne declenche aucune alerte',
+    verifierDomaineSpatial({ grain: 15, sharpness: 40, vignette: 12 }).length, 0, 0,
+);
+check(
+    'domaine : vignetage POSITIF signale (il est jete)',
+    verifierDomaineSpatial({}, { PostCropVignetteAmount: '25' }).length, 1, 1,
+);
+check(
+    'domaine : voile NEGATIF signale (il est jete)',
+    verifierDomaineSpatial({}, { Dehaze: '-20' }).length, 1, 1,
+);
+check(
+    'domaine : voile positif signale (echelle non calibree)',
+    verifierDomaineSpatial({ dehaze: 30 }).length, 1, 1,
+);
+check(
+    'domaine : nettete >= 80 signalee',
+    verifierDomaineSpatial({ sharpness: 100 }).length, 1, 1,
+);
+check(
+    'domaine : texture signale le halo sur les aretes',
+    verifierDomaineSpatial({ texture: 25 }).length, 1, 1,
+);
+check(
+    'domaine : les alertes remontent par parseXmpPreset',
+    Array.isArray(parsed.spatialAlertes) ? 1 : 0, 1, 1,
+);
+
+/* ---------- la clarte NEGATIVE, calee le 2026-08-19 ----------
+ *
+ * Elle n'avait ete mesuree qu'au positif. Son dosage lineaire donnait a -100
+ * exactement l'image floue (amplification 0,012 contre 0,476 chez Lightroom).
+ * On garde ici la LOI, lue dans le moteur: une regression rendrait a nouveau
+ * un adoucissement destructeur, et aucune mesure de couleur ne le verrait.
+ */
+const canvasSource = readFileSync(
+    new URL('../src/features/vibefx-studio/utils/canvasUtils.js', import.meta.url), 'utf8',
+);
+const kNeg = Number(/CLARITY_K_NEG = ([\d.]+)/.exec(canvasSource)?.[1]);
+const expNeg = Number(/CLARITY_EXPOSANT_NEG = ([\d.]+)/.exec(canvasSource)?.[1]);
+check('clarté : le dosage négatif est une loi de puissance', Number.isFinite(kNeg) && Number.isFinite(expNeg) ? 1 : 0, 1, 1);
+check('clarté : amplification à -50 (Lightroom 0,706)', 1 - kNeg * 50 ** expNeg, 0.68, 0.73);
+check('clarté : amplification à -100 (Lightroom 0,496)', 1 - kNeg * 100 ** expNeg, 0.47, 0.53);
+check(
+    'clarté : le négatif applique bien la loi, pas la ligne',
+    /clarity > 0[\s\S]{0,120}CLARITY_K_NEG/.test(canvasSource) ? 1 : 0, 1, 1,
+);
 
 /* ---------- powlisher-ciel : le ciel converge au lieu d'etre tourne ----------
  *

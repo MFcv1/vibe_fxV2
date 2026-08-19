@@ -42,7 +42,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       |-- utilitarian/
 |       `-- vibrant-accents/
 |-- docs/
-|   |-- lightroom/                     # TOUT l'import de presets Lightroom. `README.md` = point d'entree ; `1-procedure.md` = la marche a suivre clic par clic plus une check-list (le seul dont on a besoin en pratique) ; `2-methode-et-pieges.md` = pourquoi la Hald CLUT marche, ce qu'elle ne peut pas capturer, et les pieges MESURES (mire en blocs 4x4, sRVB obligatoire, grain, intensite a 100) ; `3-cn11-cn17-mesures.md` = mesures de CN11/CN17/powlisher, verdict, licence Adobe et les trois erreurs de mesure commises en route
+|   |-- lightroom/                     # TOUT l'import de presets Lightroom. `README.md` = point d'entree ; `1-procedure.md` = la marche a suivre clic par clic plus une check-list (le seul dont on a besoin en pratique) ; `2-methode-et-pieges.md` = pourquoi la Hald CLUT marche, ce qu'elle ne peut pas capturer, et les pieges MESURES (mire en blocs 4x4, sRVB obligatoire, grain, intensite a 100) ; `3-cn11-cn17-mesures.md` = mesures de CN11/CN17/powlisher, verdict, licence Adobe et les trois erreurs de mesure commises en route ; `4-synchro-effets.md` = le protocole des effets NON captures par la Hald (grain, vignetage, nettete, clarte, texture, voile), mire par mire ; `5-audit-fiabilite-2026-08-19.md` = OU L'ON EN EST face a Lightroom, reglage par reglage, remesure sur les vrais exports : ce qui est fiable, les cinq trous, et quels presets sont importables sans correction
+|   |-- prompt-reprise-2026-08-19.md      # Prompt de reprise pour un chat neuf, apres l'audit de fiabilite du 2026-08-19 : etat du livre, gates, mission (clarte negative, avertissement a l'import, puis les nouveaux imports), interdits
 |   |-- plan-vibeos-redesign-2026-08-08.md # Plan maitre du redesign VibeOS « incubateur de creation » : decisions validees, inventaire des features a preserver, design system .vibeos (tokens copies de VibeCut), routes /creer/*, store projet commun, specs page par page (accueil, layout, vision, studio, soundtrack Spotify-like), phases A-F et bascule /studio -> /creer
 |   |-- archive-vibecut-2026-08-04.md   # ARCHIVE du chantier VibeCut clos le 2026-08-04, sortie de todo.md le 2026-08-08 : point situationnel, lots B1/B2/B3a/B3b, effets pendant le plan, glitch, bugs 1 a 59 avec causes reelles, problemes connus non resolus, lecons FFmpeg payees, commandes test:vibecut-*. Reference a relire avant toute reprise de /video ou render-service/
 |   |-- studio-ai-agents-megaprompt.md  # Prompt d'integration de la colonne d'agents IA contextualisee par onglet studio
@@ -515,13 +516,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- mesure-grain-lightroom.mjs     # Combien vaut le grain de Lightroom, et combien vaut le notre, carre par carre sur la mire A. Lit le COEUR des aplats (marge de 30 px: tout effet spatial bave sur les bords) et extrait le grain EN QUADRATURE (sqrt(total^2 - base^2), jamais la difference brute). C'est lui qui a montre que le « x8 » etait faux (x2,66) et, surtout, que l'ecart n'etait pas un facteur mais une FORME: plat chez lui, cloche chez nous. `--planche` sort les trois versions cote a cote a l'echelle 1:1
 |   |-- planche-grain.mjs              # La planche du grain sur une VRAIE photo: sans grain / ancien moteur a 20 / nouveau a 8, a l'echelle 1:1 et jamais redimensionnee (reduire une image MOYENNE son grain, une planche reduite mentirait sur ce qu'elle montre). Repond a ce qu'aucun ecart-type ne dit: est-ce que le recalage abime le rendu
 |   |-- make-mire-effets.mjs           # Les mires d'EFFETS, l'exact oppose de la Hald : elles mesurent ce qui depend des pixels VOISINS (grain, clarte, texture, nettete) ou de la POSITION (vignetage), la ou une Hald est aveugle par construction. Quatre, parce que chaque effet a besoin d'un fond qui le rend lisible et que ces fonds s'excluent : A aplats unis (sur un aplat, toute variation EST le grain), B bandes unies plein cadre (le vignetage MULTIPLIE-t-il ou soustrait-il ?), C bords et reseaux SINUSOIDAUX 8/24/64 px (un bord net contient toutes les frequences a la fois, donc il ne separerait pas nettete/texture/clarte), D image delavee (le voile n'a rien a corriger sur une image nette). 1620x1080 = la taille ou l'on publie : le grain depend de la resolution. Protocole : docs/lightroom/4-synchro-effets.md
-|   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille
+|   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille. Convertit les deux cotes en sRVB par ColorSync (les JPEG recents sont en P3 : sans ca l'instrument est decale de 0,80/255). Depuis le 2026-08-19 il rend DEUX fois — couleur seule (LUT, en Node) et rendu COMPLET (renderStudio dans un Chromium, effets spatiaux compris) — ce qui donne l'ATTRIBUTION de l'ecart ; et il mesure la MATIERE (gradient) en separant contours et zones plates, parce qu'un effet peut avoir la bonne force ET faire monter l'ecart pixel a pixel. Grain force a 0 : deux bruits aleatoires ne se comparent pas. `--sans-effets` revient au comportement d'avant, `--sortie` ecrit notre rendu
 |   |-- compare-vision-presets-on-photos.mjs # Comparaison des presets sur de vraies photos : ECRETAGE ajoute (matiere detruite), force du look, derive du ciel/vegetation/peau
 |   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
 |   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
 |   |-- planche-showcase.mjs          # LA PLANCHE AVEC LES EFFETS. `planche-presets.mjs` ne montre que la LUT, et le dit; or grain, vignetage et relief ne SONT pas dans la LUT. Celle-ci lance donc le VRAI moteur (studioRenderer) dans un Chromium, en servant src/ en statique: ce qu'on regarde est ce que l'app affiche. Sort deux planches — le cadre entier (vignetage, look) et un carre a 1:1 JAMAIS redimensionne (grain, relief), parce que reduire une image MOYENNE son grain. Imprime aussi l'assombrissement du vignetage en niveaux /255
 |   |-- mesure-mire-c.mjs             # L'instrument de la mire C: amplification zone par zone d'un export Lightroom (nettete, texture, clarte). Les trois reseaux SINUSOIDAUX font foi — un sinus ne contient qu'une echelle, une barre nette les contient toutes. Ne lit que le COEUR de chaque zone (marge 70 px). La raideur du bord doux se mesure sur profil LISSE: en brut, elle lisait le maximum du BRUIT (2,00 la ou la transition vaut 1,26) et faisait passer du bruit ajoute pour un bord raidi
 |   |-- rendu-mire-c.mjs              # Le symetrique du precedent: passe la mire C dans NOTRE moteur, dans un Chromium (les etages spatiaux s'appuient sur ctx.filter = blur(), qui n'existe pas en Node — les reimplementer donnerait un chiffre sur du code que personne n'execute). `--safeSmartphone false` pour mesurer au-dela des bornes sures
+|   |-- audit-reglages-avances.mjs     # LE BANC D'ESSAI DES REGLAGES: passe chacun des 31 reglages supportes dans le VRAI moteur (Chromium, renderStudio) a plusieurs valeurs, garde-fous actifs ET coupes, et mesure ce qui bouge a l'ecran. Repond a « ce reglage fait-il quelque chose », la question qu'aucun test statique ne pose. Mire batie expres: rampe de gris, peaux, ciel, feuillage, NEONS (sans haute lumiere COLOREE la halation parait morte alors qu'elle est faite pour ca), reseaux sinusoidaux, voile. Verdict a DEUX criteres — moyenne OU ecart franc sur une part du cadre — parce qu'un effet local a une moyenne minuscule sans etre invisible
 |   |-- audit-vision-filters.mjs        # Audit statique des profils Vision et du branchement safe smartphone, incluant temperature/halation/tint global masques
 |   |-- firebase-deploy.mjs             # Wrapper cross-platform deploy backend/functions avec cible controlee, firebase-tools local et timeout discovery 60s
 |   |-- run-video-ui-test.mjs           # Lance un serveur Next local dedie puis les smokes Playwright Vibe_CUT fonctionnel + securite media/capacites avec SMOKE_BASE_URL controle
@@ -556,6 +558,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-vibeos-layout-b1.spec.cjs # Smoke Playwright Layout VibeOS : import, canvas, formats, modeles, template thematique, export
 |   |-- smoke-vibeos-layout-b3.spec.cjs # Smoke Playwright Layout VibeOS : textures, zones custom, stickers, comparaison, apercu Insta, reprise du projet
 |   |-- smoke-vibeos-vision.spec.cjs   # Smoke Playwright Vision VibeOS : analyse, « Ameliorer ma photo », intensite, 12 looks surs sur 5 photos types
+|   |-- smoke-reglages-avances.spec.cjs # LE MEME AUDIT, MAIS PAR L'INTERFACE: saisit les vrais curseurs de /creer/vision et /creer/studio et relit le canvas de la page. Ce que le banc d'essai ne peut pas voir: une borne d'interface plus large que celle du moteur, un onChange qui ecrit la mauvaise cle, un rendu qui ne se redeclenche pas. C'est lui qui a trouve que la moitie de la course des curseurs de Studio ne faisait rien. Designe les curseurs par LEUR LABEL, jamais par leur rang: le panneau Vision remonte en tete ce qui n'est plus au repos, donc bouger un curseur DEPLACE les suivants
 |   |-- smoke-vibeos-studio.spec.cjs   # Smoke Playwright Studio VibeOS : ambiances rendues sur la vraie image, intensite, « Surprends-moi », variantes, avances, 10 ambiances distinctes
 |   |-- smoke-vibeos-soundtrack.spec.cjs # Smoke Playwright Soundtrack VibeOS : import, lecture qui survit au changement de page, recherche, mobile
 |   |-- smoke-vibeos-pipeline.spec.cjs # PHASE F : le pipeline bout en bout, pixels mesures a chaque etage (composition -> Vision -> Studio) puis publication, desktop et mobile
@@ -603,6 +606,254 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-19 (l'instrument de comparaison passe par le vrai moteur)
+
+**Le probleme**: `compare-preset-vs-lightroom.mjs` n'appliquait que la LUT. Il
+mesurait donc la COULEUR et rien d'autre, alors qu'un preset Lightroom porte
+aussi des effets qu'aucune table ne contient. L'ecart lu melangeait deux causes
+sans permettre de les separer — c'est comme ca que la Nettete 40 de `cn17` est
+restee invisible plusieurs jours, lue comme un vague ecart sur les contours de la
+roche. Or la strategie pour la vague d'imports qui vient est justement « on
+comparera les images en sortie »: il fallait que cette comparaison voie tout.
+
+**Ce qu'il fait maintenant.** Deux rendus: couleur seule (LUT, en Node) et rendu
+COMPLET (`renderStudio` dans un Chromium, avec les `spatialFilters` du preset,
+qualite `high` — la qualite `low` saute justement relief, nettete, voile et
+grain). Le GRAIN est force a 0 des deux cotes: deux bruits aleatoires ne se
+comparent pas pixel a pixel, et le laisser ferait passer un rendu juste pour un
+rendu faux. Cout: **9 s** sur 5392x3032. `--sans-effets` revient au comportement
+d'avant, `--sortie` ecrit notre rendu sur disque.
+
+**ET IL REPOND A DEUX QUESTIONS, pas une.** L'ecart pixel a pixel demande « nos
+pixels tombent-ils au meme endroit ». Il ne suffit pas: un effet spatial peut
+avoir exactement la bonne force et FAIRE MONTER cet ecart, parce qu'accentuer une
+arete deplace des pixels des deux cotes — un noyau legerement different coute
+quelques 1/255 la ou ne rien faire n'en coutait aucun, tout en laissant l'image
+plus molle que la sienne. On mesure donc aussi la MATIERE presente (gradient), et
+on separe les CONTOURS des ZONES PLATES: une moyenne globale melangerait la
+matiere qu'on veut reproduire et le BRUIT qu'un masque flou amplifie sans qu'on
+le lui demande. Le masque des contours (les 20 % de pixels au gradient le plus
+fort) vient de LIGHTROOM, jamais de notre rendu — sinon il bougerait avec ce
+qu'on mesure.
+
+**PREMIERE MESURE, et elle est neuve** (`cn17`, photo de plage 16 Mpx):
+
+  ecart pixel a pixel   couleur seule 1,95/255   avec les effets 2,18/255
+  matiere, CONTOURS     couleur seule x0,874     avec les effets x1,118
+  matiere, ZONES PLATES couleur seule x1,019     avec les effets x1,464
+
+Lecture: sans la Nettete 40 nous sommes **12,6 % trop mous** sur les contours,
+avec elle **11,8 % trop durs** — la valeur relevee dans son panneau est la bonne,
+c'est le NOYAU qui differe un peu. Et sur les zones plates, notre nettete
+**amplifie le bruit du JPEG x1,46**: sa nettete a un curseur **Masquage** et
+travaille sur du RAW ou il n'y a presque pas de bruit a amplifier, la notre n'a
+ni l'un ni l'autre. A l'oeil, sur la planche a 1:1, ca ne se voit pas sur cette
+photo; sur un grand ciel uni d'une photo bruitee, ca se verrait.
+
+Note honnete: la premiere version de la mesure de matiere ne separait pas
+contours et zones plates. Elle affichait x1,207 global et concluait « la force
+relevee est suspecte » — ce qui etait FAUX: la force est bonne, c'est le bruit
+qui gonflait la moyenne. Le meme piege que « juger un effet local a sa moyenne ».
+
+## Journal — 2026-08-19 (suite : la clarte negative calee, l'import qui avoue)
+
+Les deux trous que l'audit du matin avait ouverts et qui se fermaient sans
+attendre quoi que ce soit de Matthis (les exports Lightroom etaient deja sur le
+disque). Les trois autres — voile, masque de contours, nettete haute — restent
+ouverts: ils demandent soit un export, soit du vrai moteur.
+
+**1. LA CLARTE NEGATIVE, calee** (`applyClarity`, canvasUtils.js).
+
+Elle n'avait ete mesuree qu'au POSITIF le 2026-08-16. Le negatif gardait le
+dosage lineaire d'origine, `amount = clarity / 100`, qui donne a -100 exactement
+l'image floue: `pixel + (pixel - flou) x (-1) = flou`. Le curseur ne dosait pas
+un adoucissement, il effacait le detail.
+
+  curseur | Lightroom (8/24/64 px)      | nous AVANT | nous APRES
+    -50   | 0,695 / 0,699 / 0,723       |   0,502    | 0,707 / 0,706 / 0,706
+   -100   | 0,476 / 0,485 / 0,526       |   0,012    | 0,494 / 0,494 / 0,494
+
+Loi retenue: `CLARITY_K_NEG = 0,014088`, `CLARITY_EXPOSANT_NEG = 0,7769`, soit
+`0,01409 x N^0,777`. Le sien SATURE, comme sa texture negative (N^0,733) et
+comme sa nettete (N^0,766) — c'est la troisieme fois que la loi est une puissance
+et pas un facteur.
+
+RESIDU, et il est plus gros que celui de la texture negative: 5 % d'ecart entre
+le 8 px et le 64 px chez LUI (la texture tenait dans 0,5 %). Son adoucissement
+mord moins sur le tres large; notre masque flou a UN SEUL rayon est plat au-dessus
+de son rayon. Cale sur la moyenne des trois reseaux: +1,7 % / -2,4 % a -50,
++3,8 % / -6,1 % a -100. Un second rayon (comme la texture en a un) corrigerait
+ca mais remettrait en cause le POSITIF, lui valide a 1 % — controle refait apres
+la correction: 1,496 / 1,498 / 1,500, inchange.
+
+CONSEQUENCES SUR CE QUI ETAIT DEJA ECRIT (la regle « toute valeur ecrite est a
+convertir quand une echelle bouge »): les deux ambiances a clarte negative sont
+converties pour rendre PAREIL a l'ecran — « Aube laiteuse » -18 -> -27, « Brume
+matin » -6 -> -7 — et `VISION_SAFE_BOUNDS.clarity.min` passe de -25 a **-30**,
+symetrique du plafond, parce que le negatif est desormais bien plus doux a
+curseur egal (a -25 il n'enleve plus 25 % du detail mais 17 %).
+
+**2. L'IMPORT AVOUE CE QU'IL NE SAIT PAS FAIRE** (`verifierDomaineSpatial`,
+xmpPreset.js, affiche par `scripts/import-lightroom-preset.mjs`).
+
+`toSpatialFilters` jetait DEUX reglages en silence — vignetage positif (il
+eclaircit les coins, notre moteur ne sait qu'assombrir) et voile negatif — et en
+recopiait trois autres dans des zones ou notre moteur s'ecarte du sien. Le preset
+s'installait, la couleur etait juste, et le rendu etait faux sans qu'une ligne le
+dise: le seul mode de panne que ce chantier n'a pas le droit de laisser passer.
+
+La fonction ne corrige rien et ne borne rien (c'est `normalizeVisionFilters` qui
+borne): elle ECRIT ce qu'un humain doit savoir avant de juger le preset a l'oeil.
+Elle lit les valeurs FINALES, pas celles du `.xmp` — un releve passe en ligne de
+commande (`--dehaze 40`) prime sur le fichier et compte autant.
+
+**Gates**: `npm run test:vision-preset` passe de 67 a **78 verifications** (sept
+sur le domaine de l'import, quatre sur la loi de la clarte negative, lue dans le
+moteur pour qu'une regression ne puisse pas passer). Lint, `test:vision-filters`,
+`audit:reglages-avances`, `test:reglages-avances` et `test:vibeos-studio` verts.
+
+`npm run build` ECHOUE, et **pas a cause de ce lot**: verifie en remisant toutes
+les modifications, il echoue pareil sur `master`. Le code COMPILE (« Compiled
+successfully »); c'est la collecte des donnees de page qui casse sur
+`/api/catalog/[jobId]`, parce que **`better-sqlite3` a ete compile pour un autre
+Node** (NODE_MODULE_VERSION 127 contre 147 attendu par le Node installe). Un
+`npm rebuild better-sqlite3` le reglera — non fait ici, `node_modules/` etant
+hors perimetre.
+
+## Journal — 2026-08-19 (audit de fiabilite face a Lightroom, avant les imports)
+
+**La question posee**: avant d'importer d'autres presets, est-ce qu'un chiffre
+du panneau Effets/Detail de Lightroom fait la MEME chose chez nous ? Tout a ete
+**remesure** sur les vrais exports de `~/Desktop/vibefx-lightroom/`, en repassant
+les mires dans le VRAI moteur (Chromium, `renderStudio`) — sans faire confiance
+aux nombres deja ecrits dans les docs. Controle d'instrument: l'export « sans
+rien » de Lightroom est a **0,00/255** de la mire d'origine.
+
+**Confirme fiable** (chaque cote compare a SA propre reference):
+
+- **Grain** 15/50/100: x1,00 sur gris, peau, ciel, feuillage, beton.
+- **Vignetage** -50/-100: 2,45 et 2,62 /255 de moyenne.
+- **Texture** +50/+100 et -50/-100: ecart <= 1,3 % sur les trois echelles.
+- **Clarte positive** +50: <= 1 % ; +100: +4 a 5 %.
+- **Nettete 40** (la valeur que Lightroom pose par defaut): +5,3 % sur le fin.
+- **Couleur** sur vraie photo, `cn17`: **1,95/255**, 85,6 % de l'effet.
+
+**CINQ TROUS, dont un jamais vu**:
+
+1. **La clarte NEGATIVE est fausse.** Elle n'avait ete calee QUE du cote positif.
+   `applyClarity` melange lineairement (`amount = clarity / 100`), donc a -100 le
+   resultat EST l'image floue: amplification **0,012 contre 0,476** chez lui. A
+   -50: 0,502 contre 0,700 — 1,66x trop adouci. A -25 (plafond du panneau):
+   0,750. Le sien SATURE, exactement comme sa texture negative, calibree elle en
+   N^0,733 le 2026-08-17. Atteignable par l'utilisateur (mode creatif) et
+   recopiee telle quelle par l'import d'un `.xmp`.
+2. **Le voile n'est pas calibre** — chiffre pour la premiere fois: 11,76/255
+   d'ecart moyen a 50 (p90 29), force 33,2 contre 28,2 (+18 %), et sa loi n'est
+   pas lineaire (28,2 a 50, 71,3 a 100). Notre plafond libre est 50, le sien 100.
+3. **Nos effets de matiere halonnent les aretes franches** — connu pour la
+   texture, **jamais releve pour la clarte**: sur les barres a fort contraste, il
+   fait 1,014 a +50 et nous 1,143.
+4. **L'import jette en silence** le vignetage positif et le voile negatif
+   (`toSpatialFilters`), et recopie une clarte negative dans un moteur qui la
+   sur-applique. Rien ne s'affiche a l'ecran au moment de l'import.
+5. **Nettete >= 80**: sur les larges structures il raidit x1,58 a 150, nous
+   x1,00. Sans importance a 40.
+
+**Ce que l'audit N'A PAS trouve**: aucune regression. Les deux bancs d'essai des
+reglages (`audit:reglages-avances`, `test:reglages-avances`) sont verts — les 31
+reglages du moteur et les 17 du panneau bougent bien des pixels. « Ca marche » et
+« ca fait la meme chose que Lightroom » sont deux questions differentes: la
+premiere etait deja reglee le 2026-08-17, la seconde est ce lot.
+
+**Verdict pour les imports**: un preset dont les panneaux Effets et Detail ne
+portent que grain, vignetage negatif, texture (deux sens), clarte POSITIVE et
+nettete <= 60 s'importe des maintenant. Les autres demandent d'abord le calage de
+la clarte negative (une demi-journee: exports et methode existent) et
+l'avertissement a l'import.
+
+Ecrit dans **docs/lightroom/5-audit-fiabilite-2026-08-19.md** (avec les commandes
+pour rejouer l'audit) ; `todo.md` porte la liste ordonnee de ce qui reste.
+
+## Journal — 2026-08-17 (audit des reglages avances : ce qui marche, et trois pannes)
+
+Objectif: avant d'importer de nouveaux presets Lightroom, verifier que CHAQUE
+reglage avance fait vraiment quelque chose sur une image. Le doute etait fonde —
+« la luminosite ne marche pas » avait ete observe a l'usage.
+
+**Deux instruments neufs, et ils ne posent pas la meme question.**
+
+- `scripts/audit-reglages-avances.mjs` (`npm run audit:reglages-avances`) :
+  appelle `renderStudio` dans un Chromium sur une mire batie pour l'occasion, et
+  mesure les 31 reglages supportes a 2 a 5 valeurs chacun, garde-fous actifs et
+  coupes. Question: **le moteur sait-il faire ce reglage.**
+- `scripts/smoke-reglages-avances.spec.cjs` (`npm run test:reglages-avances`) :
+  saisit les VRAIS curseurs de `/creer/vision` et `/creer/studio` et relit le
+  canvas de la page. Question: **quand je pousse ce curseur, l'image change-t-elle.**
+
+**Resultat du moteur: les 17 reglages du panneau Vision marchent tous**, du plus
+gros (relief -30: 8,4/255) au plus discret (tons chauds: 1,2/255 mais 35 % du
+cadre touche). Aucun mort. Ce qui a casse, c'etait ailleurs.
+
+**Panne 1 — la moitie de la course des curseurs de Studio ne faisait RIEN.**
+`/creer/studio` ecrivait ses propres bornes, plus larges que celles du moteur.
+Mesure par l'interface, image poussee a fond:
+
+| curseur | course affichee | retenu par le moteur | image a fond |
+|---|---|---|---|
+| Luminosité | 60 – 140 | 85 – 115 | identique a 85 |
+| Sépia | 0 – 100 | 0 – 12 | identique a 12 |
+| Flou | 0 – 10 | 0 – 2 | identique a 2 |
+| Grain | 0 – 100 | 0 – 40 | identique a 40 |
+| Vignettage | 0 – 100 | 0 – 30 | identique a 30 |
+
+Le nombre affiche mentait, et **« la luminosite ne marche pas » etait une
+observation juste**: on la poussait de 100 vers 140 et rien ne se passait
+au-dela de 115. Le meme bug avait ete corrige sur Vision le 2026-08-12; Studio
+etait reste en arriere. Corrige de la seule facon qui empeche la rechute: les
+huit bornes qui vivaient EN DUR dans `normalizeVisionFilters` (sepia, blur,
+hueRotate, fadedBlacks, halation, et les trois teintes) rejoignent
+`VISION_SAFE_BOUNDS` / `VISION_FREE_BOUNDS`, valeurs inchangees, et le panneau
+Studio les LIT via `visionBoundsFor` — en suivant le mode creatif, qui ouvre la
+course en meme temps qu'il coupe les garde-fous.
+
+**Panne 2 — l'image SAUTAIT au premier cran d'un reglage de couleur.**
+`fitRgbToGamut` comparait la place disponible au plus grand ecart en valeur
+absolue, et exigeait qu'il tienne des DEUX cotes: une couleur parfaitement
+valide se faisait desaturer sans qu'aucun canal ne deborde. Sur un neon jaune
+`#fff05a`, R tombait de 255 a 229 alors que rien ne debordait. Et comme cet
+etage ne tourne que si un reglage de couleur n'est pas au repos
+(`applyFusedPixelOps` sort avant, sinon), mettre **« Ciel » a 1** — un geste que
+personne ne compte comme un reglage — deplacait **2,6 % de l'image, jusqu'a
+45/255**, sans rapport avec le ciel. Mesure apres correction (regle par canal,
+chacun n'a besoin que de SA marge): **0,00/255, 0,0 % de l'image**. Et les
+valeurs progressent enfin (0,22 a +12, 0,44 a +25) au lieu d'etre noyees sous ce
+socle.
+
+**Panne 3 — une fausse panne, et c'est l'instrument qui se trompait.** La
+halation a d'abord ete declaree morte (0,00 a 0,07/255 de moyenne). Deux erreurs
+de mesure, pas une:
+
+1. **La mire n'avait pas de neon.** `getSafeHalationWeight` eteint volontairement
+   le halo sur un blanc speculaire NEUTRE — il tombe a 0,014 sur du blanc pur,
+   et c'est ce qui evite les aureoles sur les nuages. Ce qu'il vise, c'est une
+   haute lumiere COLOREE. Mire corrigee des deux cotes (neon jaune, neon cyan).
+2. **Juger un effet local a sa moyenne.** Un halo pese 0,13/255 sur l'image
+   entiere et se voit tres bien: 26/255 sur 20 % du cadre. Les deux instruments
+   ont donc desormais le meme verdict a deux criteres — moyenne OU ecart franc
+   sur une part du cadre. Sans ca on « reparait » un reglage qui marche.
+
+**Un bug attrape dans l'instrument lui-meme**, et il vaut d'etre note: le smoke
+parcourait les curseurs par leur RANG. Or le panneau Vision remonte en tete ce
+qui n'est plus au repos: bouger le premier curseur deplace les suivants, et on
+lisait les bornes d'un curseur pour ecrire dans un autre. Symptome unique, un
+« Malformed value ». Les curseurs sont maintenant designes par leur label. Idem
+pour `curseur.max` (la borne) qui ecrasait `ecartMax` (la mesure) a l'affichage
+comme dans le verdict — un halo « max 32 » etait en fait la position du curseur.
+
+**Gates**: `lint` (0 erreur, 5 warnings preexistants), `build`, `test:scope`,
+`test:vision-preset` (67), `test:vision-filters`, `test:vibeos-vision`,
+`test:vibeos-studio`, `test:vibeos-pipeline`, et les deux nouveaux verts.
 
 ## Journal — 2026-08-16 (synchro Lightroom, fin : texture, nettete 40, revalidations)
 

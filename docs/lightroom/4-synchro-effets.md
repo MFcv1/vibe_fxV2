@@ -126,6 +126,14 @@ de la lumière qui manque.
 
 ## NETTETÉ et CLARTÉ — réglées le 2026-08-16
 
+> **Le côté NÉGATIF de la clarté a été calé le 2026-08-19**, et il était faux
+> jusque-là : notre dosage linéaire donnait à −100 exactement l'image floue
+> (0,012 d'amplification contre 0,476 chez lui), et à −50 il enlevait 50 % du
+> détail là où Lightroom en enlève 30 %. Le sien **sature**, comme sa texture
+> négative. Loi retenue, `0,01409 × N^0,777` — voir le tableau plus bas et
+> [l'audit du 2026-08-19](5-audit-fiabilite-2026-08-19.md).
+
+
 Mesurées sur la mire C, en lisant l'amplification zone par zone (l'intérêt des
 réseaux **sinusoïdaux** : chacun ne contient qu'une seule échelle).
 
@@ -134,6 +142,33 @@ réseaux **sinusoïdaux** : chacun ne contient qu'une seule échelle).
 C'est le **rayon** qui était faux : sur le bord doux de 120 px — la seule zone
 qui teste les grandes structures — il amplifie ×1,79 et nous ne faisions ×1,03.
 Rayon porté de 2,5 % à **11 % du petit côté**.
+
+**Clarté négative : réglée le 2026-08-19, huit jours après le positif.** Elle
+n'avait jamais été mesurée — le lot s'était arrêté au côté qui accentue.
+
+| curseur | 8 px | 24 px | 64 px |
+|---|---|---|---|
+| −50, Lightroom | 0,695 | 0,699 | 0,723 |
+| −50, **nous** | **0,707** | **0,706** | **0,706** |
+| −100, Lightroom | 0,476 | 0,485 | 0,526 |
+| −100, **nous** | **0,494** | **0,494** | **0,494** |
+
+*(avant correction : 0,502 à −50 et **0,012** à −100 — l'image devenait le flou
+pur, parce que `pixel + (pixel − flou) × (−1) = flou`.)*
+
+**Résidu assumé, plus gros que celui de la texture négative** : 5 % d'écart
+entre le 8 px et le 64 px chez lui, contre 0,5 % pour la texture. Son
+adoucissement mord un peu moins sur le très large, alors que notre masque flou à
+**un seul rayon est plat** au-dessus de son rayon. On cale sur la moyenne des
+trois réseaux : +1,7 % sur le fin, −2,4 % sur le large à −50 ; +3,8 % et −6,1 %
+à −100. Y toucher demanderait un second rayon, comme la texture en a un — ce qui
+remettrait en cause le positif, lui validé à 1 %. **Le positif n'a pas bougé**
+(1,496 / 1,498 / 1,500, contrôle refait après la correction).
+
+Conséquence sur les valeurs déjà écrites : les deux ambiances qui portaient une
+clarté négative ont été **converties** pour garder le même rendu à l'écran
+(« Aube laiteuse » −18 → −27, « Brume matin » −6 → −7), et la borne sûre passe de
+−25 à **−30** — le négatif est désormais beaucoup plus doux à curseur égal.
 
 **Netteté : notre réponse était trop forte, et de plus en plus haut.** Sur le
 réseau de 8 px : 1,22 chez lui contre 1,29 chez nous à 40, mais 1,63 contre
@@ -153,9 +188,22 @@ node scripts/compare-preset-vs-lightroom.mjs <origine> <version-LR> cn17 \
   --planche <sortie.png>
 ```
 
-**Écart moyen 1,73/255. Verdict : identique à l'œil.** Médiane 1, 90ᵉ centile 4,
-99ᵉ centile 10 — et le maximum (49) est dans l'écume brûlée, là où un JPEG n'a
-plus la matière qu'avait le RAW.
+**Écart moyen 1,95/255. Verdict : identique à l'œil.** Médiane 1, 90ᵉ centile 4,
+99ᵉ centile 11 — et le maximum (50) est dans l'écume brûlée, là où un JPEG n'a
+plus la matière qu'avait le RAW. Notre rendu reproduit **85,6 %** de l'effet du
+preset, qui pèse lui-même 13,54/255 sur cette photo.
+
+> **Ce chiffre valait 1,73 jusqu'au 2026-08-17, et c'était l'instrument qui se
+> trompait, pas le moteur.** Le script lisait les nombres bruts du JPEG, alors
+> que l'application les reçoit **convertis en sRVB** par le navigateur — les
+> JPEG du Galaxy S24 Ultra sont en « DCI-P3 D65 Gamut with sRGB Transfer ». Les
+> deux côtés appliquaient donc la même LUT à des entrées distantes de 0,80/255.
+> On annonçait une fidélité de 1,73 avec un appareil décalé de 0,80 : presque la
+> moitié de la précision annoncée était de l'incertitude d'instrument. Le script
+> convertit désormais par **ColorSync** (voir l'en-tête de
+> `compare-preset-vs-lightroom.mjs` : aucune des sept variantes de sharp
+> essayées ne fait la transformation ICC). **1,95 est le vrai chiffre**, mesuré
+> sur les mêmes fichiers.
 
 **Et la planche a trouvé ce que la moyenne cachait.** La carte des écarts (×8)
 ne montrait pas une zone ni une bande, mais **les contours de la roche** — la
@@ -173,6 +221,45 @@ sienne sur une photo réelle** — et `cn11`/`cn17` portent désormais
 > **Ce que ce test ne couvre toujours pas** : le grain (éteint des deux côtés,
 > par construction) et le vignetage (à 0 dans `cn17`). Les deux restent validés
 > sur mire, pas sur photo.
+
+## L'AUDIT DES RÉGLAGES — 2026-08-17
+
+Avant d'importer d'autres presets, une question qu'on n'avait jamais posée
+franchement : **est-ce que chaque réglage fait vraiment quelque chose ?** Caler
+un dosage sur Lightroom ne sert à rien si le curseur qui le porte est mort, et
+un réglage mort ne se signale pas — il rend juste une image un peu moins forte
+que prévu.
+
+```bash
+npm run audit:reglages-avances   # le moteur : renderStudio, 31 réglages
+npm run test:reglages-avances    # l'interface : les vrais curseurs des vraies pages
+```
+
+Les deux ne posent pas la même question, et il faut les deux. Le premier répond
+à « le moteur sait-il faire ce réglage ». Le second saisit le curseur de la page
+et relit son canvas : il attrape ce que le premier ne peut pas voir — une borne
+d'interface plus large que celle du moteur, un `onChange` qui écrit la mauvaise
+clé, un rendu qui ne se redéclenche pas.
+
+**Verdict : les 17 réglages du panneau Vision marchent tous.** Du plus gros
+(relief −30 : 8,4/255) au plus discret (tons chauds : 1,2/255 de moyenne, mais
+35 % du cadre touché). Ce qui était cassé était ailleurs.
+
+- **Studio proposait une course que le moteur n'honorait pas** : Luminosité
+  affichée 60–140 pour 85–115 retenus, Sépia 0–100 pour 0–12, Grain 0–100 pour
+  0–40. Poussée à 60, l'image était **identique** à 85. Corrigé en déplaçant les
+  bornes écrites en dur vers `VISION_SAFE_BOUNDS`, que le panneau lit.
+- **Le garde-fou de gamut désaturait des couleurs valides**, et seulement quand
+  un réglage de couleur n'était pas au repos : « Ciel » à 1 déplaçait 2,6 % de
+  l'image jusqu'à 45/255. Après correction : 0,00.
+- **La halation a été déclarée morte à tort**, deux fois : la mire n'avait pas
+  de haute lumière **colorée** (son garde-fou l'éteint sur un blanc neutre — 0,014
+  sur du blanc pur — et c'est voulu), et un halo se juge mal à la moyenne.
+
+> **Ce que ça change pour un import.** Les valeurs relevées dans les panneaux
+> Effets et Détail de Lightroom se recopient telles quelles, et on peut
+> maintenant affirmer qu'elles arrivent jusqu'aux pixels. À relancer après tout
+> changement du moteur ou d'un panneau.
 
 ## Ce qui reste
 

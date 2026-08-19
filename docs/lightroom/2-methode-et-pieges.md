@@ -270,6 +270,15 @@ restants sont de la haute fréquence : Lightroom applique par défaut une
 **Netteté de 40** à toute image, que par construction une table de couleurs ne
 peut pas porter.
 
+> ⚠️ **Ces trois chiffres datent de l'instrument NON corrigé** (avant le
+> 2026-08-17 : le script comparait les nombres bruts du JPEG au lieu de les
+> convertir en sRVB comme le fait le navigateur — voir
+> [4-synchro-effets.md](4-synchro-effets.md#la-validation-sur-une-vraie-photo--2026-08-16)).
+> Sur `cn17`, la correction a déplacé le résultat de 1,73 à **1,95/255**. CN11
+> n'a **pas** été remesuré : sa photo de terrasse n'est plus sur le disque. Le
+> vrai chiffre est donc probablement un peu moins bon que 0,64, sans que ça
+> change la conclusion. À refaire si la photo réapparaît.
+
 C'est aussi ce test qui a révélé que la mire à un pixel par couleur était
 fausse : l'écart y était de 4,53/255 au pixel, 1,70 sur la couleur, et **8,06
 dans les noirs** contre 1,32 aujourd'hui.

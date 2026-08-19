@@ -311,19 +311,58 @@ function getSelectiveSaturationMask(range, r, g, b, lum, chroma) {
     return 0;
 }
 
+/*
+ * RAMENER UNE COULEUR DANS LE CUBE RVB SANS L'ECRETER.
+ *
+ * Ce que ca doit faire: quand un etage a pousse un canal au-dela de 0 ou 255,
+ * reduire la CHROMA jusqu'a ce que tout rentre, plutot que de couper le canal
+ * qui deborde — un ecretage par canal fait virer la teinte (un rouge qui sature
+ * part vers l'orange).
+ *
+ * LE BUG CORRIGE LE 2026-08-17, et il ne se voyait pas dans les moyennes.
+ *
+ * L'ancienne version comparait la place disponible a `maxDelta`, le plus grand
+ * ecart EN VALEUR ABSOLUE, et elle exigeait que cet ecart tienne des DEUX cotes
+ * a la fois. Une couleur parfaitement valide pouvait donc etre desaturee sans
+ * qu'aucun canal ne deborde. Exemple mesure, un neon jaune #fff05a:
+ *
+ *   avg = 195 · dr = +60 · dg = +45 · db = -105
+ *   ancienne regle : min(60/105, 195/105) = 0,57  ->  R passe de 255 a 229
+ *   la verite      : R a besoin de 60 de marge et en a 60; B descend de 105 et
+ *                    en a 195. Rien ne deborde: il ne fallait RIEN faire.
+ *
+ * Consequence a l'ecran, et c'est la qu'elle etait vicieuse: cet etage ne
+ * tourne que si un reglage de couleur n'est pas au repos (`applyFusedPixelOps`
+ * sort avant, sinon). Mettre « Ciel » a 1 — un geste que personne ne considere
+ * comme un reglage — deplacait donc 2,6 % de l'image, jusqu'a 45/255 sur les
+ * couleurs vives, sans aucun rapport avec le ciel. L'image SAUTAIT au premier
+ * cran, puis ne bougeait presque plus.
+ *
+ * La regle juste est par canal: chacun n'a besoin que de SA marge, du cote ou
+ * il va. On garde `avg` comme pivot (c'est lui qui definit ce que « reduire la
+ * chroma » veut dire ici) et on ne touche a rien tant que tout tient.
+ */
 function fitRgbToGamut(r, g, b) {
+    if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
+        return { r, g, b };
+    }
     const avg = (r + g + b) / 3;
+    /* Le pivot lui-meme est hors du cube: aucune reduction de chroma ne peut
+       sauver la couleur, seule la coupe reste. */
     if (avg <= 0 || avg >= 255) {
         return { r: clampChannel(r), g: clampChannel(g), b: clampChannel(b) };
     }
     const dr = r - avg;
     const dg = g - avg;
     const db = b - avg;
-    const maxDelta = Math.max(Math.abs(dr), Math.abs(dg), Math.abs(db), 0.0001);
-    const positiveRoom = 255 - avg;
-    const negativeRoom = avg;
-    const scale = Math.max(0, Math.min(1, positiveRoom / maxDelta, negativeRoom / maxDelta));
-    if (scale >= 1) return { r, g, b };
+    /* Pour un canal donne: s'il monte, il lui faut (255 - avg) de marge; s'il
+       descend, avg. Le facteur retenu est le plus contraignant des trois. */
+    const marge = (delta) => {
+        if (delta > 0) return (255 - avg) / delta;
+        if (delta < 0) return avg / -delta;
+        return 1;
+    };
+    const scale = Math.max(0, Math.min(1, marge(dr), marge(dg), marge(db)));
     return {
         r: avg + dr * scale,
         g: avg + dg * scale,
@@ -878,6 +917,38 @@ export function applyLightroomVignette(ctx, w, h, vignette) {
  */
 const CLARITY_RAYON_RELATIF = 0.11;
 
+/*
+ * LE COTE NEGATIF DE LA CLARTE, mesure le 2026-08-19 — et il etait FAUX.
+ *
+ * La clarte n'avait ete calee qu'au POSITIF (2026-08-16). Le negatif, lui,
+ * gardait le dosage lineaire d'origine (`amount = clarty / 100`), ce qui donne
+ * a -100 exactement l'image floue: `pixel + (pixel - flou) x (-1) = flou`.
+ * Notre curseur ne dosait pas un adoucissement, il effacait le detail.
+ *
+ *   curseur | amplification du detail, Lightroom | nous, AVANT
+ *     -25   |         ~0,83 (interpole)          |    0,750
+ *     -50   |   0,695 / 0,699 / 0,723 (8/24/64)  |    0,502
+ *    -100   |   0,476 / 0,485 / 0,526            |    0,012
+ *
+ * Le sien SATURE, comme sa texture negative et comme sa nettete. En resolvant
+ * le gain necessaire a partir de chaque reseau, on lit -0,305 / -0,301 / -0,277
+ * a -50 et -0,524 / -0,515 / -0,474 a -100: la moyenne des trois donne une loi
+ * de puissance propre, `0,01409 x N^0,777`.
+ *
+ * L'ECART ENTRE ECHELLES EST PLUS GRAND QUE POUR LA TEXTURE, et il faut le
+ * dire: 5 % entre le 8 px et le 64 px (la texture negative tenait dans 0,5 %).
+ * Son adoucissement mord un peu moins sur le tres large, alors que notre masque
+ * flou a un seul rayon est PLAT au-dessus de son rayon. On cale donc sur la
+ * moyenne des trois: +1,5 % sur le fin, -1,5 % sur le large. Corriger ce
+ * residu-la demanderait un second rayon, comme la texture en a un — ce qui
+ * remettrait en cause le positif, lui deja valide a 1 %.
+ *
+ * Le POSITIF n'est pas touche: il est mesure a 1,49-1,54 chez lui contre 1,50
+ * chez nous, et son dosage lineaire n'a pas de raison de bouger.
+ */
+const CLARITY_K_NEG = 0.014088;
+const CLARITY_EXPOSANT_NEG = 0.7769;
+
 export function applyClarity(ctx, canvas, w, h, clarity) {
     if (!clarity || clarity === 0) return;
 
@@ -893,7 +964,11 @@ export function applyClarity(ctx, canvas, w, h, clarity) {
     const blurData = blurCtx.getImageData(0, 0, w, h);
     const od = origData.data;
     const bd = blurData.data;
-    const amount = clarity / 100;
+    /* Positif: dosage lineaire, valide sur mire le 2026-08-16. Negatif: loi de
+       puissance mesuree le 2026-08-19 (voir ci-dessus). */
+    const amount = clarity > 0
+        ? clarity / 100
+        : -CLARITY_K_NEG * (-clarity) ** CLARITY_EXPOSANT_NEG;
 
     for (let i = 0; i < od.length; i += 4) {
         od[i] = Math.max(0, Math.min(255, od[i] + (od[i] - bd[i]) * amount));
