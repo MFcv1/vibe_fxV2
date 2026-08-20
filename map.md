@@ -439,7 +439,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
 |   |   |   |-- haldClut.js            # Capture d'un preset externe par Hald CLUT : mire identite, relecture d'une mire traitee vers une LUT 33^3, detection d'une mire non traitee, base64. Depuis le lot J : `measureHaldRoughness` (une table BRUITEE = du grain dans le preset, qui corrompt chaque couleur de la mire) et `smoothHaldCube` (noyau [1,2,1] par axe ; ne deplace une table deja lisse que de 0,05/255). C'est ce qui permet d'importer un preset Lightroom EXACTEMENT, sans reimplementer Camera Raw
 |   |   |   |-- xmpPreset.js           # Lecture d'un .xmp Lightroom/Camera Raw : sert a recuperer les reglages SPATIAUX (clarte, texture, nettete, grain, vignetage) qu'une Hald CLUT ne peut pas capturer, et a produire un resume lisible. La couleur ne vient PAS d'ici
-|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Contient `cn11.js` et `cn17.js`, captures le 2026-08-11 sur un vrai Lightroom cloud — REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/lightroom/3-cn11-cn17-mesures.md)
+|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Contient `cn01.js`, `cn13.js`, `cn14.js` et `cn16.js` (2026-08-20), `cn11.js` et `cn17.js`, captures le 2026-08-11 sur un vrai Lightroom cloud — REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/lightroom/3-cn11-cn17-mesures.md)
 |   |   |   |-- lut3d.js                # Moteur LUT 3D : buildLut3d evalue une fonction de preset sur une grille 33^3, applyLut3d l'applique par interpolation trilineaire en UNE passe. Cout de rendu constant : ajouter un preset ne coute rien
 |   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). `powlisher`, reconstruit par mesure (cf docs/audit-preset-powlisher-2026-08-11.md), `powlisher-ciel` (le ciel CONVERGE vers la teinte ou atterrissent ses ciels, 190-199 deg, au lieu d etre tourne d un angle fixe) et `powlisher-showcase` (clair-obscur: creux de saturation qui vide le decor et laisse le sujet seul colore, plus des effets non-LUT via `spatialFilters`). La regle du ciel est partagee (`regleDuCiel`)
 |   |-- vibefx-shared/
@@ -606,6 +606,299 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-20 (premier import de la serie : CN01)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/presets/cn01.js`
+(genere), `presets-lightroom/cn01-bloc4.png` (mire source).
+
+**Circuit de travail cote utilisateur.** Un dossier `~/Desktop/📸 VIBEFX-IMPORTS/`
+sert de boite aux lettres : un sous-dossier par preset, avec quatre cases
+(`1-photos-des-panneaux`, `2-mire-exportee`, `3-photo-test-version-lightroom`,
+`4-resultat-claude`). Un dossier `0-A-IMPORTER-DANS-LIGHTROOM` porte la mire
+neutre et deux photos de test, importees une seule fois dans Lightroom. Les
+instructions ne vivent PAS dans des fichiers a lire : elles sont donnees dans le
+chat, les noms de dossiers portent le reste.
+
+**CN01, mesures.** Mire exportee : ecart 35,98/255, rugosite 0,70 (aucun grain).
+Panneaux releves : Texture 0, Clarte 0, Voile 0, Vignette 0 (sous-reglages aux
+defauts), Grain 0, Nettete 0, Masquage vide. Donc **aucun effet spatial** :
+`spatialFilters: {}`, la table capture 100 % du preset.
+
+Rendu compare a Lightroom sur **deux** photos developpees des deux cotes :
+**1,56/255** (90,5 % de l'effet reproduit) et **1,28/255** (95,6 %). Les deux
+photos etant tres differentes, la coherence des deux mesures ecarte aussi
+l'hypothese d'un reglage « Auto » cache. Verdict de l'instrument : « identique a
+l'oeil ». Ajoute a `docs/presets-valides.md`.
+
+**Question ouverte puis TRANCHEE le meme jour.** Le panneau Detail de CN01
+affiche **Nettete 0** alors que CN11/CN17 portent **40** : l'hypothese posee
+etait que 40 venait du FICHIER (defaut RAW) et non du preset. **Faux** — Matthis
+a verifie : la majorite des presets affichent bien 40, CN01 est l'exception qui
+pose 0. Rien a changer sur cn11/cn17. La regle reste : **on recopie ce que le
+panneau affiche, le preset applique**, sans interpreter.
+
+**Un manque du moteur repere au passage** : Lightroom a une **reduction du
+bruit** (vue a Luminance 20 / Couleur 50 sur un autre preset) que notre moteur
+n'a pas. Un preset qui en porte gardera chez nous un grain numerique que le sien
+lisse — invisible a bas ISO, visible sur une photo prise dans le sombre. A
+relever a l'import (c'est deja dans la capture du panneau Detail).
+
+**Regles de travail assouplies (AGENTS.md).** Le prompt de reprise ne s'ecrit
+plus dans le chat sauf demande explicite au debut de la session ; il reste ecrit
+dans `docs/prompt-reprise-<date>.md`. Nouvelle section « Economie de contexte et
+de quota » : lire par extraits, ne pas ouvrir les archives, pas de sous-agent
+sans demande, gates cibles plutot que tous les gates.
+
+## Journal — 2026-08-21 (zoom de l'apercu, et le grain verifie sur photo)
+
+**Un zoom dans l'apercu de Vision**, aux paliers de Lightroom: Adapter, 100 %,
+200 %, 400 %. Il ne recadre rien — `viewport { zoom, cx, cy }` traverse
+`useCanvasRenderer` puis `renderStudio`, qui l'ignore hors apercu: un export ne
+peut donc pas le recevoir par accident. Glisser deplace la loupe.
+
+Il existe parce qu'un effet de MATIERE ne se juge pas sur une image reduite: a
+« Adapter », une photo de 9180 px dessinee sur 800 montre un pixel sur onze, son
+grain est moyenne, et on croit que le reglage ne fait rien. C'est la reponse de
+Lightroom au meme probleme.
+
+Au passage, un bug que le zoom a revele: `renderStudio` confondait **la largeur
+de l'image finale** (qui fixe la grosseur du grain) et **la largeur de rendu**
+(qui dit ce que l'affichage en montre). Sans recadrage les deux coincidaient;
+des qu'on zoome, non. Elles sont desormais distinctes et nommees.
+
+Deux defauts d'interface trouves en mesurant, pas en relisant:
+- l'etiquette annoncait « 5 % » puis « 566 % » pour le meme geste — le canvas
+  n'avait pas fini de se dimensionner quand elle etait calculee. Un
+  `ResizeObserver` la tient a jour.
+- les paliers x2 depassaient le 1 pour 1 sans rien montrer de plus. Ils sont
+  desormais ancres sur le 100 % REEL, mesure sur le canvas.
+
+**LE GRAIN VERIFIE SUR UNE VRAIE PHOTO**, ce qui n'avait jamais ete fait: toutes
+nos comparaisons le mettaient a 0 des deux cotes (deux bruits aleatoires ne se
+comparent pas pixel a pixel). Methode: zone plate du ciel de `photo-test-2`
+(9180 px, CN14, grain 25 Taille 10), son grain retranche en quadrature du bruit
+de la photo elle-meme.
+
+| voisinage retire | son grain seul | ecart a notre loi (3,83) |
+|---|---|---|
+| 3 px | 3,81 | +0,4 % |
+| 6 px | 4,00 | −4,3 % |
+| 10 px | 4,05 | −5,5 % |
+| 16 px | 4,06 | −5,7 % |
+
+PIEGE DE MESURE, a retenir: un voisinage de 3 px SOUS-ESTIME un grain de 2,4 px
+— une partie du grain entre dans la moyenne locale et se retrouve soustraite. La
+mesure converge vers 4,05 quand le voisinage s'elargit. Un premier passage a 5x5
+annoncait « 10 % d'ecart » qui n'existait pas.
+
+Reste **5 % d'ecart, explique**: le ciel est teal sature, et son grain n'est pas
+monochrome — sur les aplats colores il pose 22 a 23/255 contre 18,4 sur les gris,
+la ou le notre pose la meme chose partout. Sur les gris, l'accord reste a x1,00.
+
+Fige par un test: `smoke-vibeos-vision` verifie qu'a 100 % la matiere est
+franchement plus presente qu'a « Adapter » (rapport, pas valeur absolue: une
+valeur absolue dependrait de la fenetre).
+
+## Journal — 2026-08-20 quinquies (deux corrections sur le grain, signalees a l'ecran)
+
+Matthis a vu, dans l'apercu de Vision, un ciel CN14 couvert de bruit la ou
+Lightroom est discret. Deux choses, dont une regression introduite le jour meme.
+
+**1. REGRESSION: le grain etait calcule pour la taille du CANVAS.**
+`applyFilmGrain` recevait la largeur du canvas de rendu. Or l'apercu de Vision
+dessine a ~800 px une photo qui en fait 9180: le moteur posait donc le grain
+d'une image de 800 px. Mesure a CN14 (grain 25, Taille 10):
+
+| largeur de rendu | notre ecart-type |
+|---|---|
+| 800 px (apercu) | **15,64/255** |
+| 9180 px (export) | 3,83/255 |
+
+Lightroom calcule TOUJOURS son grain sur l'image entiere; son ecran montre cette
+image reduite, donc un grain moyenne. C'est pour ca qu'en mode « Adapter » son
+grain se devine a peine.
+
+Corrige par `grainPourRendu(valeur, taille, largeurSource, largeurRendu)`: la
+grosseur et la force sont celles de l'image FINALE, puis on applique ce que la
+reduction leur fait — un bruit dont les grains sont plus petits que le facteur de
+reduction s'efface en proportion, des grains plus gros survivent en retrecissant.
+`studioRenderer` propage la largeur reellement echantillonnee (recadrage
+compris). L'apercu passe de 15,64 a **0,80/255**; l'export ne bouge pas.
+
+Consequence a connaitre: **un apercu montre desormais moins de grain qu'un
+export**, et c'est le comportement juste — c'est celui de son ecran a lui.
+
+**2. Le plafond du grain passe de 40 a 100**, l'echelle de Lightroom. Le 40
+venait d'un garde-fou (« un grain de film credible vit entre 8 et 25 »). Mais un
+garde-fou n'a de sens que contre un defaut qu'on ne peut pas rattraper — peau
+orange, ciel fluo, noirs bouches; du grain trop fort se voit et se retire d'un
+geste. Surtout, il ecretait EN SILENCE un preset importe qui aurait porte plus de
+40, ce que cette chaine d'import doit precisement eviter.
+
+## Journal — 2026-08-20 quater (CN16)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/presets/cn16.js`
+(genere), `presets-lightroom/cn16-bloc4.png`.
+
+**Releve** : Effets **tout a 0** (grain compris, Taille 25 / Cassure 50 aux
+defauts), Detail Nettete 40 et Reduction du bruit 20/50, Masquage vide, profil
+Couleur. Import sans `--lisser` (rugosite 0,66).
+
+**Le look** : ombres FROIDES et hautes lumieres CHAUDES — un virage partiel
+classique, lisible sur l'axe des gris (bleu −28 dans les gris sombres, −23 dans
+les clairs). Ciel bleu profond conserve, mers plus saturees (+47 %).
+
+**Mesures** : couleur **2,25** et **1,31/255** sur les deux photos, rendu complet
+2,47 et 1,55. Coherence des deux photos: pas de reglage « Auto » cache.
+
+**Un point regarde a l'oeil et pas seulement au chiffre** : l'audit annonce des
+bandes a **4/255** (« a surveiller ») sur son degrade de ciel synthetique. Sur le
+grand ciel reel de la photo 2 — un degrade bleu profond sur toute la hauteur du
+cadre, le pire cas — rien n'est visible, ni chez nous ni chez lui.
+
+## Journal — 2026-08-20 ter (le grain a enfin une GROSSEUR)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/grainField.js`
+(nouveau, porte toute la loi du grain), `scripts/mesure-taille-grain.mjs`
+(nouveau), `src/features/vibefx-studio/utils/presets/cn14.js` (nouveau, A VALIDER).
+
+**Le probleme, tel que Matthis l'a vu.** « Le grain de CN17 n'est pas le meme que
+sur Lightroom. » Deux hypotheses ont ete verifiees dans le code plutot que de
+memoire, et une seule tenait.
+
+FAUSSE PISTE, ecartee: le plafond 40 du curseur n'est PAS une echelle. Le nombre
+veut dire la meme chose des deux cotes (ecart-type 0,367 x la valeur); 40 est un
+garde-fou d'interface, le moteur va jusqu'a 100 comme lui. Un preset qui porterait
+plus de 40 serait ecrete en silence — aucun des favoris n'est concerne.
+
+VRAI PROBLEME: notre grain etait tire PIXEL PAR PIXEL, donc large de 1 px quelle
+que soit la photo. Celui de Lightroom grossit avec la taille de l'image, et il a
+un sous-reglage « Taille » (25 par defaut, **40 sur CN17**) qu'aucune mesure
+d'ecart-type ne voyait passer.
+
+**L'instrument.** `mesure-taille-grain.mjs` lit le bruit d'un aplat uni sans
+aucun filtre (sur un aplat, tout ce qui varie EST le grain) et en tire deux
+nombres: l'ecart-type et l'AUTOCORRELATION, qui donne la grosseur. Il sait
+mesurer les deux moteurs — « nous:<taille>:<largeur> » appelle le vrai code du
+rendu, jamais une copie.
+
+**Six mires exportees par Matthis** (Grain 50, Cassure 50 partout) :
+
+| Taille | image | ecart-type LR | grosseur LR |
+|---|---|---|---|
+| 0 | 1620x1080 | 22,91 | 1,05 px |
+| 25 | 1620x1080 | 18,37 | 1,02 px |
+| 50 | 1620x1080 | 14,08 | 1,27 px |
+| 100 | 1620x1080 | 9,37 | 1,96 px |
+| 25 | 3240x2160 | 12,64 | 1,44 px |
+| 25 | 6480x4320 | 8,15 | 2,44 px |
+
+**Ce que ces mesures disent**, et c'est le coeur de l'affaire : chez lui, la
+force et la grosseur sont LE MEME NOMBRE vu de deux cotes. L'echelle deduite de
+la force tombe sur la grosseur mesuree, ligne par ligne. Lightroom etale une
+quantite FIXE de grain sur des grains plus ou moins gros — un grain deux fois
+plus gros bruite deux fois moins chaque pixel. D'ou une seule loi :
+
+    e = taille(Taille) x (largeur / 1620) ^ 0,577
+    grains de `e` pixels, ecart-type 0,367 x valeur / e
+
+L'exposant est ajuste sur les TROIS tailles d'image (pris deux a deux il vaut
+0,539 puis 0,586); 0,577 est a 2,6 % du pire des trois points.
+
+**Un piege d'instrument, attrape en route.** La premiere serie donnait 6 %
+d'ecart de force entre nos deux moteurs, et la tentation etait de « corriger »
+la constante 0,367, qui est validee depuis le 2026-08-15. C'etait la MESURE qui
+etait fausse: elle moyennait les carres colores avec les gris, or Lightroom pose
+un grain plus fort sur les couleurs saturees (22 a 23/255 sur le rouge, le vert
+et le bleu, contre 18,4 sur les gris) la ou le notre est monochrome. Sur les gris
+seuls: 18,37 chez lui, 18,38 chez nous. Rien a corriger.
+
+**Un saut qu'il a fallu combler.** Interpoler un bruit ne sait pas produire de
+grains entre 1,0 et 1,66 px: au pas 1,00 les points du reseau tombent sur les
+pixels et rien ne s'interpole; des qu'on s'en ecarte, la grosseur SAUTE. Or c'est
+justement la zone la plus courante (Taille 50, et toute image entre 1620 et
+3240 px). Corrige par un MELANGE en quadrature de bruit d'un pixel et de bruit
+interpole, lus a deux endroits eloignes de la table pour etre independants.
+
+**Resultat, notre moteur face au sien sur les six cas** : force a **2,1 %** au
+pire, grosseur a **5 %** au pire. Avant, sur une photo pleine resolution, notre
+grain etait **2,3 fois trop fort et 2,4 fois trop fin**.
+
+**Effets de bord assumes** :
+
+- `cn17` reimporte avec `grainSize: 40`, sa vraie valeur. Table de couleurs
+  **identique a l'octet pres** (verifie au `git diff`), seule la ligne du grain
+  a bouge.
+- La table de bruit passe de `Math.random()` a un tirage DETERMINISTE: deux
+  rendus de la meme photo ont desormais le meme grain, et une mesure se rejoue.
+- `grainSize` est branche dans le moteur, les bornes, les defauts et l'import
+  (`--grainSize`), mais **PAS dans le panneau Vision**: un curseur qui ne fait
+  rien tant que le grain vaut 0 demande une decision d'interface, pas un
+  branchement en douce.
+- `mesure-grain-lightroom.mjs`, `planche-grain.mjs` et `audit-vision-filters.mjs`
+  lisent maintenant `grainField.js` au lieu de recopier le moteur ou de le lire
+  par expression reguliere.
+
+**Reserves** : la forme exacte de sa tache de grain n'est pas reproduite (son
+autocorrelation est plus courte et plus piquee que celle d'une bilineaire) — ca
+se verrait a la loupe, pas a l'oeil. La « Cassure » reste non mesuree. Rien n'est
+mesure au-dela de 6480 px.
+
+**CN14 : importe et VALIDE — apres une fausse piste qu'il faut raconter.**
+
+Premier diagnostic, FAUX: sa mire ayant ete exportee avec son Grain 25 dessus
+(rugosite 8,38 pour un seuil de 3), l'ecart de 6,74/255 sur photo a ete impute a
+une table bruitee. Une mire reexportee Grain a 0 a donne exactement le meme
+ecart: **6,72**. Le lissage avait donc parfaitement fait son travail, et la
+cause etait ailleurs.
+
+VRAIE CAUSE: **son grain est dans SES photos, et deux grains aleatoires ne
+tombent jamais aux memes endroits.** L'ecart pixel a pixel ne peut donc pas etre
+nul, meme avec une table parfaite. Mesure par blocs de 8x8 — qui divise ce bruit
+par 8 et laisse la couleur — l'ecart tombe a **1,49** et **1,48/255** sur les
+deux photos. Deux chiffres quasi identiques sur des photos tres differentes:
+la capture est bonne, et l'hypothese d'un reglage « Auto » est ecartee.
+
+Ce que ca change pour la suite: `compare-preset-vs-lightroom.mjs` affiche
+desormais une ligne « couleur seule, par blocs » des que le preset porte du
+grain. Sans elle, tout preset a grain aurait l'air rate. La lecon est inscrite
+dans `docs/presets-valides.md`.
+
+Releve complet de CN14: Effets tout a 0 sauf **Grain 25, Taille 10**,
+Cassure 50; Detail Nettete 40, Reduction du bruit 20/50; Masquage vide.
+
+## Journal — 2026-08-20 bis (deuxieme import de la serie : CN13)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/presets/cn13.js`
+(genere), `presets-lightroom/cn13-bloc4.png` (mire source).
+
+**Panneaux releves** (captures dans `~/Desktop/📸 VIBEFX-IMPORTS/CN13/1-photos-des-panneaux/`) :
+Effets **tout a 0** (Texture, Clarte, Voile, Vignette, Grain), Detail **Nettete 40**
+plus une **Reduction manuelle du bruit Luminance 20 / Couleur 50**, Masquage **vide**,
+profil **Couleur**, N&B non actif. Seul `sharpness: 40` est reproductible : la
+reduction du bruit n'existe pas dans notre moteur (limite deja notee).
+
+**Mesures.** Mire : ecart 23,62/255, rugosite 0,70 — aucun grain, donc import
+**sans `--lisser`**. Audit : bandes **3/255** (pire cas), invisible. Axe des gris
+chaud (B −22 a 128, −31 a 200), ciel tourne de **−20°** vers le teal et assombri
+de 21 %, verts assombris, peau a peine plus chaude (+4,8°, −7,3 % de luminosite).
+
+**Compare a Lightroom sur les deux photos**, developpees des deux cotes :
+**2,27/255** (86,6 % de l'effet reproduit ; couleur seule 2,08) et **1,67/255**
+(90,4 % ; couleur seule 1,47). Verdicts de l'instrument : « meme rendu, ecart
+invisible » et « identique a l'oeil ». Planches regardees a l'oeil, rangees dans
+`4-resultat-claude/` : les deux versions sont indiscernables, la carte d'ecart x8
+est quasi noire hors feuillage. La coherence des deux mesures sur des photos tres
+differentes ecarte l'hypothese d'un reglage « Auto » cache.
+
+**Ce que confirme cet import** : sur les zones plates, notre nettete 40 amplifie
+le bruit du JPEG (x1,25 a x1,36 la ou la cible est x1,00) — c'est le trou n°3 du
+lot en cours, pas une erreur de relevé. Sur les contours, la quantite de matiere
+est bonne (x1,10 / x1,16). L'ecart « couleur seule » reste sous 2,1/255 : c'est
+la ligne qui juge la capture, et elle est bonne.
+
+Ajoute a `docs/presets-valides.md`.
 
 ## Journal — 2026-08-19 (l'instrument de comparaison passe par le vrai moteur)
 

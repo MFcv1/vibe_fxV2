@@ -44,6 +44,13 @@ const PHOTOS = [
   { id: "saturee", file: "saturee.png", filter: "color=c=0xff1e00:s=600x400" },
 ];
 
+/*
+ * Un GRAND aplat, sans bruit ajoute: c'est la fixture du test de zoom. Il faut
+ * qu'elle soit large (4000 px) pour que l'apercu la REDUISE vraiment, et unie
+ * pour que tout ce qui varie a l'ecran soit du grain et rien d'autre.
+ */
+const APLAT_ZOOM = { file: "aplat-large.png", filter: "color=c=0x808080:s=4000x2600" };
+
 let fixtureDir = null;
 
 function getFixtures() {
@@ -60,6 +67,11 @@ function getFixtures() {
     ], { encoding: "utf8" });
     if (result.status !== 0) return null;
   }
+  const aplat = spawnSync(ffmpegPath, [
+    "-y", "-f", "lavfi", "-i", APLAT_ZOOM.filter,
+    "-frames:v", "1", path.join(dir, APLAT_ZOOM.file),
+  ], { encoding: "utf8" });
+  if (aplat.status !== 0) return null;
   fixtureDir = dir;
   return dir;
 }
@@ -279,4 +291,50 @@ test("vision VibeOS: presets surs sur 5 photos types", async ({ page }) => {
       expect(stats.stdDev, `${context}: image plate/grise`).toBeGreaterThan(1.5);
     }
   }
+});
+
+/*
+ * LE ZOOM MONTRE-T-IL LA MATIERE QUE « ADAPTER » MOYENNE ?
+ *
+ * Ce test existe parce que la question s'est posee deux fois le meme jour, dans
+ * les deux sens. D'abord le grain etait beaucoup TROP fort a l'apercu: il etait
+ * calcule pour la largeur du canvas (~800 px) au lieu de celle de la photo
+ * (9180), soit 15,6/255 la ou Lightroom en pose 3,8. Puis, une fois corrige, il
+ * a fallu un zoom pour pouvoir le VERIFIER a l'oeil — sur une photo reduite,
+ * l'ecran moyenne les grains et on croit que le reglage ne fait rien.
+ *
+ * Ce qui est fige ici, ce n'est pas une valeur, c'est un RAPPORT: a 100 %, la
+ * matiere doit etre franchement plus presente qu'a « Adapter ». Une valeur
+ * absolue dependrait de la fenetre du navigateur; ce rapport, non.
+ */
+test("vision VibeOS: le zoom montre le grain que « Adapter » moyenne", async ({ page }) => {
+  test.setTimeout(120_000);
+  const dir = getFixtures();
+  test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
+
+  await openVisionScreen(page);
+  await page.getByTestId("vibeos-vision-input").setInputFiles(path.join(dir, APLAT_ZOOM.file));
+  const canvas = page.locator("canvas").first();
+  await expect.poll(async () => canvas.evaluate((node) => node.width), { timeout: 20000 })
+    .toBeGreaterThan(0);
+
+  /* CN14 porte un grain 25 de Taille 10: c'est le preset qui a revele le bug. */
+  await page.getByRole("button", { name: /^CN14/ }).click();
+  await page.waitForTimeout(1500);
+
+  const etiquette = page.getByTestId("vibeos-vision-zoom-label");
+  await expect(etiquette).toHaveText("Adapter");
+  const adapte = await readCanvasStats(page);
+
+  /* L'etiquette est un bouton: au repos elle emmene au 1 pour 1. */
+  await etiquette.click();
+  await expect(etiquette).toHaveText("100 %");
+  await page.waitForTimeout(1500);
+  const zoome = await readCanvasStats(page);
+
+  expect(zoome.stdDev).toBeGreaterThan(adapte.stdDev * 1.2);
+
+  /* Et le retour: « Adapter » redonne la photo entiere. */
+  await etiquette.click();
+  await expect(etiquette).toHaveText("Adapter");
 });

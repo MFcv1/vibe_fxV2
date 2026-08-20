@@ -110,10 +110,25 @@ fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quo
 | **Effets** | Correction du voile | `dehaze` |
 | **Effets** | Vignette | `vignette` |
 | **Effets** | **Grain** | `grain` |
+| **Effets** | **Grain → Taille** (sous le triangle) | `grainSize` |
 | **Détail** | Netteté | `sharpness` |
 | **Détail** | Réduction du bruit | (pas branché) |
 | En-tête | **N&B** activé ? | `saturation: 0` |
 | En-tête | Profil (Couleur / autre) | — noter, ça change la base |
+
+#### Le sous-réglage « Taille » du grain — depuis le 2026-08-20
+
+Le curseur **Grain** est replié par défaut : un petit **triangle** à droite de sa
+valeur ouvre **Taille** et **Cassure**. Il faut les regarder à chaque preset qui
+porte du grain.
+
+- **Taille** : à relever et à passer en `--grainSize` **si elle s'écarte de 25**
+  (son défaut, celui sur lequel tout est calibré). Elle change la **grosseur**
+  des grains, donc aussi leur force apparente : un grain deux fois plus gros
+  bruite deux fois moins chaque pixel. `cn17` est à **40**.
+- **Cassure** : laissée à **50** partout, jamais mesurée. Si un preset la change,
+  il faut la mesurer avant de la recopier — la recopier sans mesure serait
+  inventer une échelle.
 
 > ⚠️ **Lightroom n'est pas pilotable** (pas d'AppleScript, pas de CLI sur la
 > version cloud). L'agent ne peut donc PAS lire ces valeurs lui-même : il doit

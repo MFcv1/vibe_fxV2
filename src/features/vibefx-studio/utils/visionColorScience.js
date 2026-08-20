@@ -12,6 +12,7 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'sepia',
     'blur',
     'grain',
+    'grainSize',
     'vignette',
     'tintColor',
     'tintIntensity',
@@ -97,12 +98,25 @@ export const VISION_SAFE_BOUNDS = {
     dehaze: { min: 0, max: 35, neutre: 0 },
     /*
      * L'echelle du grain est celle de LIGHTROOM depuis le 2026-08-15 (mesure:
-     * ecart-type = 0,367 x valeur, constant du noir au blanc). Un grain de film
-     * credible vit entre 8 et 25; 40 est deja tres marque, ce qui en fait le
-     * bon plafond « sur ». Le maximum libre est 100, celui de Lightroom, pour
-     * qu'aucune valeur d'un preset importe ne soit hors de portee.
+     * ecart-type = 0,367 x valeur, constant du noir au blanc).
+     *
+     * LE PLAFOND EST 100, LE SIEN, depuis le 2026-08-20. Il etait a 40 — « un
+     * grain de film credible vit entre 8 et 25 » — mais un garde-fou n'a de
+     * sens que contre un defaut qu'on ne peut pas rattraper: une peau orange,
+     * un ciel fluo, des noirs bouches. Du grain trop fort se voit tout de suite
+     * et se retire d'un geste. Surtout, le plafond ecretait EN SILENCE un
+     * preset importe qui aurait porte plus de 40, ce qui est exactement ce que
+     * cette chaine d'import doit eviter. La course du curseur est donc celle de
+     * son panneau, cran pour cran.
      */
-    grain: { min: 0, max: 40, monoMax: 55, neutre: 0 },
+    grain: { min: 0, max: 100, neutre: 0 },
+    /*
+     * La GROSSEUR des grains, a l'echelle de Lightroom (son sous-reglage
+     * « Taille », 25 par defaut). Elle ne fait rien tant que `grain` vaut 0:
+     * c'est un reglage DU grain, pas un reglage a part. La loi et les mesures
+     * sont dans `grainField.js`.
+     */
+    grainSize: { min: 0, max: 100, neutre: 25 },
     vignette: { min: 0, max: 30, neutre: 0 },
     /*
      * AJOUTES LE 2026-08-17. Ces huit bornes existaient deja, mais ECRITES EN
@@ -145,6 +159,7 @@ export const VISION_FREE_BOUNDS = {
     sharpness: { min: 0, max: 150, neutre: 0 },
     dehaze: { min: 0, max: 50, neutre: 0 },
     grain: { min: 0, max: 100, neutre: 0 },
+    grainSize: { min: 0, max: 100, neutre: 25 },
     vignette: { min: 0, max: 100, neutre: 0 },
     /*
      * Hors garde-fous, `normalizeVisionFilters` ne borne RIEN (elle sort avant).
@@ -261,6 +276,14 @@ export function normalizeVisionFilters(filters = {}) {
     next.halation = clampSafe(next.halation || 0, 'halation', 0);
     next.vignette = clampSafe(next.vignette || 0, 'vignette', 0);
     next.grain = clampSafe(next.grain || 0, 'grain', 0, isMono);
+    /* Au repos c'est 25, la valeur de Lightroom — pas 0, qui donnerait des
+       grains PLUS FINS qu'un pixel et un bruit plus fort. */
+    next.grainSize = clampSafe(
+        next.grainSize === undefined || next.grainSize === null ? 25 : next.grainSize,
+        'grainSize',
+        25,
+        isMono,
+    );
     next.tintColor = normalizeHexColor(next.tintColor, '#ffffff');
     next.shadowTint = next.shadowTint ? normalizeHexColor(next.shadowTint, '#000000') : next.shadowTint;
     next.highlightTint = next.highlightTint ? normalizeHexColor(next.highlightTint, '#ffffff') : next.highlightTint;

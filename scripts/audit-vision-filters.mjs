@@ -153,15 +153,6 @@ const requiredCanvasSignals = [
     "applySelectiveSaturation(adjusted.r, adjusted.g, adjusted.b, skySat, 'sky'",
     "applySelectiveSaturation(adjusted.r, adjusted.g, adjusted.b, foliageSat, 'foliage'",
     'fitRgbToGamut',
-    /*
-     * L'echelle du grain est celle de LIGHTROOM (mesuree le 2026-08-15: un
-     * ecart-type de 0,367 x la valeur, constant du noir au blanc). Ces deux
-     * signaux gardent l'alignement: si quelqu'un revient a un grain pose en
-     * fusion `overlay`, « Grain 15 » cesse silencieusement de vouloir dire la
-     * meme chose des deux cotes, et les presets importes deviennent faux sans
-     * qu'aucun test ne tombe.
-     */
-    'GRAIN_SIGMA_PAR_UNITE = 0.367',
     'export function applyFilmGrain',
 ];
 
@@ -199,6 +190,25 @@ if (!/if\s*\(\s*doPixelOps\s*\)\s*\{[\s\S]{0,120}applySmartphoneOutputGuards\(ct
     rendererRuntimeIssues.push('output guards must use doPixelOps');
 }
 const missingSupportedKeys = requiredSupportedFilterKeys.filter((key) => !supported.has(key));
+/*
+ * L'echelle du grain est celle de LIGHTROOM: un ecart-type de 0,367 x la valeur
+ * (mesure du 2026-08-15, reverifiee le 2026-08-20 a x1,00 sur les gris), et une
+ * GROSSEUR de grain qui suit la Taille du curseur et la largeur de l'image
+ * (mesure du 2026-08-20). Ces signaux gardent l'alignement: si quelqu'un revient
+ * a un grain pose en fusion `overlay`, ou retire la loi de grosseur, « Grain 15 »
+ * cesse silencieusement de vouloir dire la meme chose des deux cotes et les
+ * presets importes deviennent faux sans qu'aucun test ne tombe.
+ */
+const grainFieldPath = 'src/features/vibefx-studio/utils/grainField.js';
+const grainFieldSource = fs.readFileSync(grainFieldPath, 'utf8');
+const requiredGrainSignals = [
+    'GRAIN_SIGMA_PAR_UNITE = 0.367',
+    'export function grainEchelle',
+    'export function grainSigma',
+    'export function grainValeurEn',
+];
+const missingGrainSignals = requiredGrainSignals.filter((signal) => !grainFieldSource.includes(signal));
+
 const missingCanvasSignals = requiredCanvasSignals.filter((signal) => !canvasUtilsSource.includes(signal));
 const missingMetricsSignals = requiredMetricsSignals.filter((signal) => !visionMetricsSource.includes(signal));
 const missingCanvasRendererSignals = requiredCanvasRendererSignals.filter((signal) => !canvasRendererSource.includes(signal));
@@ -217,6 +227,7 @@ if (
     rendererRuntimeIssues.length ||
     missingSupportedKeys.length ||
     missingCanvasSignals.length ||
+    missingGrainSignals.length ||
     missingMetricsSignals.length ||
     missingCanvasRendererSignals.length ||
     missingDefaultSignals.length ||
@@ -230,6 +241,7 @@ if (
     if (rendererRuntimeIssues.length) console.error(`Renderer runtime issues:\n- ${rendererRuntimeIssues.join('\n- ')}`);
     if (missingSupportedKeys.length) console.error(`Supported filter keys missing: ${missingSupportedKeys.join(', ')}`);
     if (missingCanvasSignals.length) console.error(`Canvas selective/guard signals missing: ${missingCanvasSignals.join(', ')}`);
+    if (missingGrainSignals.length) console.error(`Grain law signals missing in grainField.js: ${missingGrainSignals.join(', ')}`);
     if (missingMetricsSignals.length) console.error(`Vision metrics signals missing: ${missingMetricsSignals.join(', ')}`);
     if (missingCanvasRendererSignals.length) console.error(`Canvas renderer preview cap signals missing: ${missingCanvasRendererSignals.join(', ')}`);
     if (missingDefaultSignals.length) console.error(`Default filter signals missing: ${missingDefaultSignals.join(', ')}`);

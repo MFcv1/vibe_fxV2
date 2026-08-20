@@ -11,6 +11,14 @@
 
 // ── Improved Noise Pattern (512px, Box-Muller Gaussian) ──
 import { normalizeVisionFilters } from './visionColorScience';
+import {
+    GRAIN_ATTENUATION,
+    GRAIN_NOISE_SIZE,
+    GRAIN_NOISE_TABLE,
+    GRAIN_TAILLE_DEFAUT,
+    grainPourRendu,
+    grainValeurEn,
+} from './grainField.js';
 
 /*
  * La mire de grain.
@@ -97,55 +105,35 @@ export const NOISE_PATTERN_CANVAS = createNoisePattern();
  * en sortie. Sur les neutres, les peaux, les ciels et les betons — la matiere
  * ou un grain se juge — le plat est exact au centieme.
  */
-export const GRAIN_SIGMA_PAR_UNITE = 0.367;
-
-const GRAIN_NOISE_SIZE = 512;
-
-/* Table de deviations gaussiennes centrees (ecart-type 1), tiree une fois. */
-const GRAIN_NOISE_TABLE = (() => {
-    const table = new Float32Array(GRAIN_NOISE_SIZE * GRAIN_NOISE_SIZE);
-    for (let i = 0; i < table.length; i += 1) {
-        const u1 = Math.random() || 0.0001;
-        const u2 = Math.random();
-        table[i] = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    }
-    return table;
-})();
+/*
+ * La loi du grain — sa force ET sa grosseur — vit dans `grainField.js`, qui
+ * n'importe rien et se charge donc aussi bien dans un navigateur que dans Node.
+ * C'est ce qui permet aux scripts de mesure d'appeler LE code du rendu au lieu
+ * d'en recopier une version qui derive en silence.
+ */
 
 /*
- * L'EXTINCTION AUX DEUX BOUTS, elle aussi mesuree.
- *
- * Le plat de Lightroom n'en est pas tout a fait un: au niveau 8 et au niveau
- * 247, son grain ne vaut plus que 0,67 de sa valeur courante. Verifie que ce
- * n'est PAS un simple ecretage: une gaussienne d'ecart-type 5,5 posee sur un
- * niveau 8 et coupee a 0 rendrait 5,20, or on mesure 3,48. Et le rapport vaut
- * 0,67 aux trois valeurs de curseur testees (15, 50, 100) comme aux deux bouts
- * — c'est donc une attenuation qui depend du NIVEAU, pas de la force.
- *
- * C'est d'ailleurs sain: du grain dans un noir bouche ne ressemble a rien
- * d'autre qu'a du bruit numerique.
- *
- * RESERVE: seuls les niveaux 8 (0,67) et 24 (1,00) ont ete mesures. L'exposant
- * ci-dessous passe exactement par ces deux points et s'eteint a 0 sur le noir
- * pur; la forme ENTRE les deux est une interpolation, pas une mesure.
+ * `taille` est le sous-reglage « Taille » de Lightroom (25 par defaut). Avec la
+ * largeur de l'IMAGE FINALE (`largeurSource`), il donne la grosseur des grains —
+ * et cette grosseur pilote a son tour l'ecart-type, parce qu'un grain deux fois
+ * plus gros bruite deux fois moins chaque pixel. Le detail des mesures, et la
+ * raison pour laquelle un apercu doit montrer MOINS de grain qu'un export, sont
+ * dans `grainField.js`.
  */
-const GRAIN_BORD = 24; // au-dela, plus d'attenuation
-const GRAIN_BORD_EXPOSANT = 0.364; // (8/24)^0,364 = 0,67, le rapport mesure
-
-const GRAIN_ATTENUATION = (() => {
-    const table = new Float32Array(256);
-    for (let v = 0; v < 256; v += 1) {
-        const distance = Math.min(v, 255 - v);
-        table[v] = distance >= GRAIN_BORD ? 1 : (distance / GRAIN_BORD) ** GRAIN_BORD_EXPOSANT;
-    }
-    return table;
-})();
-
-export function applyFilmGrain(ctx, w, h, grain) {
+export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
+    largeurImage = w, largeurRendu = w) {
     if (!grain || grain <= 0) return;
-    const sigma = GRAIN_SIGMA_PAR_UNITE * grain;
+    /* `largeurImage` est la largeur de l'image FINALE, `largeurRendu` celle a
+       laquelle on la dessine (zoom compris). Un apercu « Adapter » montre donc
+       le grain moyenne par la reduction, un zoom 100 % le montre entier —
+       exactement comme l'ecran de Lightroom. Voir `grainPourRendu`. */
+    const { echelle, sigma } = grainPourRendu(grain, taille, largeurImage, largeurRendu);
     const imageData = ctx.getImageData(0, 0, w, h);
     const d = imageData.data;
+    /* Sous le pixel il n'y a rien a interpoler: on garde le chemin direct, qui
+       est aussi le plus rapide, et qui reste celui des rendus a la taille de
+       reference. */
+    const grainsFins = echelle <= 1;
     for (let y = 0; y < h; y += 1) {
         const ligne = (y % GRAIN_NOISE_SIZE) * GRAIN_NOISE_SIZE;
         for (let x = 0; x < w; x += 1) {
@@ -153,9 +141,11 @@ export function applyFilmGrain(ctx, w, h, grain) {
             // Attenuation lue sur la luminance, pour que le grain s'eteigne
             // dans un noir bouche ou un blanc brule comme il le fait chez lui.
             const luma = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+            const bruit = grainsFins
+                ? GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)]
+                : grainValeurEn(x, y, echelle);
             // Le meme ecart sur les trois canaux : le grain est monochrome.
-            const delta = GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)] * sigma
-                * GRAIN_ATTENUATION[luma];
+            const delta = bruit * sigma * GRAIN_ATTENUATION[luma];
             d[i] = Math.max(0, Math.min(255, d[i] + delta));
             d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + delta));
             d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + delta));

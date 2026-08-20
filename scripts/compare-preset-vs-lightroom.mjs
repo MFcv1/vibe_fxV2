@@ -320,6 +320,51 @@ function mesurer(notre) {
 }
 
 /*
+ * LA COULEUR, LE GRAIN MIS DE COTE.
+ *
+ * Quand le preset porte du GRAIN, l'ecart pixel a pixel ne peut pas etre nul,
+ * meme si la couleur est parfaite: son grain et le notre sont deux tirages
+ * aleatoires qui ne tombent jamais aux memes endroits. Sur CN14 (grain 25) ca
+ * pesait a soi seul 4 a 5/255, assez pour faire croire a une capture ratee.
+ *
+ * Moyenner par blocs de 8x8 avant de comparer efface ce bruit — il se divise
+ * par 8 — et laisse la COULEUR, qui est justement ce qu'une Hald CLUT doit
+ * capturer au 1/255 pres. Un ecart qui reste ELEVE apres ce moyennage n'est
+ * plus imputable au grain: c'est la table qui est fausse, et la premiere
+ * suspecte est un reglage « Auto » dans le preset.
+ */
+const BLOC = 8;
+
+function mesureParBlocs(notre) {
+    const { width: W, height: H } = srcMeta;
+    const blocsX = Math.floor(W / BLOC);
+    const blocsY = Math.floor(H / BLOC);
+    let somme = 0;
+    let compte = 0;
+    let maximum = 0;
+    for (let by = 0; by < blocsY; by += 1) {
+        for (let bx = 0; bx < blocsX; bx += 1) {
+            for (let c = 0; c < 3; c += 1) {
+                let sNotre = 0;
+                let sRef = 0;
+                for (let y = 0; y < BLOC; y += 1) {
+                    for (let x = 0; x < BLOC; x += 1) {
+                        const i = (((by * BLOC + y) * W) + bx * BLOC + x) * 3 + c;
+                        sNotre += notre[i];
+                        sRef += ref[i];
+                    }
+                }
+                const d = Math.abs(sNotre - sRef) / (BLOC * BLOC);
+                somme += d;
+                if (d > maximum) maximum = d;
+                compte += 1;
+            }
+        }
+    }
+    return { mean: somme / compte, max: maximum };
+}
+
+/*
  * LA MATIERE PRESENTE — la deuxieme question, et elle n'est pas la meme.
  *
  * L'ecart pixel a pixel demande « nos pixels tombent-ils au meme endroit que
@@ -428,6 +473,14 @@ if (mesureComplet && Object.keys(effetsDuPreset).length) {
     console.log('\nD\'OU VIENT L\'ECART');
     console.log(`  couleur seule (LUT)      ${mesureCouleur.mean.toFixed(2)}/255`);
     console.log(`  avec les effets          ${mesureComplet.mean.toFixed(2)}/255`);
+    /* Le grain de Lightroom est dans SA photo et ne peut pas s'apparier au
+       notre: on le met de cote en moyennant par blocs. */
+    if (grainDuPreset) {
+        const parBlocs = mesureParBlocs(couleurSeule);
+        console.log(`  couleur seule, par blocs ${parBlocs.mean.toFixed(2)}/255  <- SON GRAIN MIS DE COTE`);
+        console.log(`     (blocs de ${BLOC}x${BLOC}: deux grains aleatoires ne tombent jamais aux memes`);
+        console.log('      endroits, moyenner les efface et laisse la couleur seule)');
+    }
     if (gain > 0.05) {
         console.log(`  -> les effets RAPPROCHENT de Lightroom (${gain.toFixed(2)}/255 gagnes):`);
         console.log('     les valeurs relevees dans ses panneaux sont les bonnes.');

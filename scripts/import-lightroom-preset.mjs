@@ -14,6 +14,12 @@
  *            recuperer clarte / texture / nettete / grain / vignetage, qu'une
  *            Hald CLUT ne peut pas capturer.
  *
+ * Les memes valeurs se passent a la main quand le preset n'a pas de `.xmp`
+ * (c'est le cas des presets Premium d'Adobe), avec le nombre lu a l'ecran:
+ * `--grain`, `--grainSize`, `--vignette`, `--clarity`, `--texture`,
+ * `--sharpness`, `--dehaze`. `--grainSize` est le sous-reglage « Taille » du
+ * grain: il ne se passe que si le preset s'ecarte de son defaut, 25.
+ *
  * Ecrit un module dans `src/features/vibefx-studio/utils/presets/<id>.js` et
  * l'enregistre dans `presets/index.js`.
  */
@@ -199,8 +205,14 @@ const spatial = xmp?.spatialFilters || {};
  * le nombre affiche, sans le convertir.
  *
  * Ils priment sur le `.xmp` quand les deux existent: on a regarde l'ecran.
+ *
+ * `--grainSize` est le sous-reglage « Taille » du grain, sous le triangle de son
+ * panneau Effets. Il ne se releve QUE si un preset s'ecarte de son defaut (25):
+ * c'est la valeur sur laquelle tout est calibre. Il change la GROSSEUR des
+ * grains, donc aussi leur force apparente — un grain deux fois plus gros bruite
+ * deux fois moins chaque pixel (mesures dans `grainField.js`).
  */
-['grain', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
+['grain', 'grainSize', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
     const brut = args[cle];
     if (brut === undefined || brut === true) return;
     const valeur = Number(brut);

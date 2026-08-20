@@ -19,7 +19,8 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[prompt de reprise du 2026-08-19](docs/prompt-reprise-2026-08-19.md).
+[**finir le grain** — prompt du 2026-08-21](docs/prompt-reprise-2026-08-21.md),
+[la série d'imports Lightroom — 2026-08-20](docs/prompt-reprise-2026-08-20.md).
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
 [VibeOS](docs/archive-vibeos-2026-08-11.md) ·
@@ -35,7 +36,7 @@ Le **redesign VibeOS** est livré : création sous `/creer`, publication sous
 
 **La colorimétrie de Vision** tourne sur un moteur de LUT 3D 33³
 ([lut3d.js](src/features/vibefx-studio/utils/lut3d.js)), plus une chaîne d'import
-qui capture un preset Lightroom **exactement**, par Hald CLUT. Cinq presets :
+qui capture un preset Lightroom **exactement**, par Hald CLUT. Neuf presets :
 
 | Preset | Ce qu'il est | Effets non-LUT |
 |---|---|---|
@@ -43,8 +44,12 @@ qui capture un preset Lightroom **exactement**, par Hald CLUT. Cinq presets :
 | `powlisher-ciel` | le ciel **converge** vers sa teinte (190–199°) au lieu d'être tourné d'un angle fixe | — |
 | `powlisher-showcase` | clair-obscur : le décor est vidé, le sujet reste seul coloré | grain 8, vignetage 8, relief 14 |
 | `cn11`, `cn17` | captures **exactes** de Lightroom (pack Adobe « Cinéma II ») | netteté 40 ; `cn17` : grain 15 |
+| `cn01` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 1,56 et 1,28/255) | — (tout à 0 dans Lightroom) |
+| `cn13` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 2,27 et 1,67/255) | netteté 40 |
+| `cn14` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 1,49 et 1,48/255 **par blocs**) | netteté 40, grain 25 grosseur 10 |
+| `cn16` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 2,25 et 1,31/255) | netteté 40 |
 
-**Les cinq sont dans [docs/presets-valides.md](docs/presets-valides.md) : ils ne
+**Les neuf sont dans [docs/presets-valides.md](docs/presets-valides.md) : ils ne
 se suppriment pas et ne se remplacent pas** — un variant s'ajoute à côté. Trois
 autres ont été **supprimés** le 2026-08-12 (source biaisée, trait de contour dans
 le ciel).
@@ -76,7 +81,7 @@ ne peut ni lire ses panneaux ni exporter à sa place.
 
 | Réglage | État |
 |---|---|
-| **Grain** | **ALIGNÉ** — ×1,00 sur toute la plage tonale, à 15 / 50 / 100 |
+| **Grain** | **ALIGNÉ, force ET grosseur** (2026-08-20) — ×1,00 sur la plage tonale ; la **grosseur** suit son sous-réglage *Taille* et la **largeur de l'image** (`grainField.js`). Écart max sur 6 cas : force 2,1 %, grosseur 5 % |
 | **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
 | **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
 | **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
@@ -88,7 +93,10 @@ journaux datés de [map.md](map.md), pas ici :
 
 1. `powlisher-showcase` **revalidé à l'œil** sur le vrai moteur : vignetage 3 → 8.
 2. `cn17` **validé sur une vraie photo** développée des deux côtés : **1,95/255**.
-3. **Netteté 40** : Lightroom la pose sur toute photo, `cn11`/`cn17` la portent.
+3. **Netteté 40** : la plupart des presets la portent, `cn11`/`cn17` compris.
+   `cn01` est une **exception** : il pose 0 (confirmé par Matthis le 2026-08-20).
+   Règle : **on recopie ce que le panneau affiche, le preset appliqué**, sans
+   interpréter.
 4. **Texture branchée**, les deux côtés (le négatif a son propre dosage).
 5. **Instrument corrigé** : `compare-preset-vs-lightroom.mjs` convertit en sRVB
    par ColorSync — les JPEG Samsung sont en P3, on annonçait 1,73 avec un
@@ -139,8 +147,9 @@ confirmés à quelques pourcents. Les trous, par ordre d'importance :
    surveiller sur une photo bruitée à grand ciel uni.
 4. **Netteté ≥ 80** : sur les larges structures il raidit ×1,58 à 150, nous
    ×1,00. À 40 (la valeur par défaut, celle qui compte) l'écart est nul.
-5. **Grain Taille 40** : CN17 la met à 40, tout est calibré pour 25. À mesurer
-   si l'aspect du grain d'un preset importé ne colle pas.
+5. **Grain Taille — RÉGLÉ le 2026-08-20.** `cn17` porte `grainSize: 40`, sa
+   vraie valeur. Reste non mesurée : la **Cassure** (50 partout), la forme exacte
+   de sa tache de grain, et tout ce qui dépasse 6480 px de large.
 6. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
    réapparaît — ses 0,64/2,67 datent de l'ancien.
 7. **Une seule résolution vérifiée** (1620×1080) : notre texture et notre grain
@@ -169,12 +178,24 @@ prise : on ne les branche que si un preset à importer les change vraiment — d
 
 ### Puis — importer d'autres presets Lightroom
 
+**Série en cours (favoris de Matthis)** : faits `cn01`, `cn11`, `cn13`, `cn14`,
+`cn16`, `cn17`. Restent CN18, FT01, FT11, LN02, LN05, LN06, TR04, TR13,
+TR14, TR15, VCR11, VCR12. Le circuit de dossiers est décrit dans le prompt de
+reprise.
+
+**À chaque preset qui porte du grain** : ouvrir le triangle du panneau Grain et
+relever la **Taille**. Elle ne se passe à l'import (`--grainSize`) que si elle
+s'écarte de 25.
+
 Familles **paysage** (LN01–LN08), **architecture urbaine** (UA01–UA04),
 **voyage, cinéma, film**, par la méthode Hald CLUT
 ([1-procedure.md](docs/lightroom/1-procedure.md)).
 
 **Un preset Lightroom n'est pas que de la couleur.** À chaque import : relever
-les panneaux **Effets** et **Détail** (l'agent doit les **demander**), remettre
+les panneaux **Effets** et **Détail** (l'agent doit les **demander**) — dont la
+**Réduction du bruit**, que notre moteur n'a pas : un preset qui en porte gardera
+chez nous un grain numérique que Lightroom lisse (invisible à bas ISO, visible
+sur une photo prise dans le sombre), remettre
 le grain à 0 avant d'exporter la mire, puis passer les valeurs relevées à
 l'import — `--grain`, `--vignette`, `--clarity`, `--texture`, `--sharpness`,
 `--dehaze`. **Le
@@ -227,6 +248,11 @@ couverture émulateurs du parcours publication, à réécrire sur `/publier`.
   corpus sont en **chroma `(max−min)/max`**.
 - **Ordre dans un preset écrit à la main** : le virage split vient **après** le
   mélangeur de teintes (ordre réel de Lightroom).
+- **Un preset qui porte du GRAIN ne se juge pas au pixel.** Son grain et le
+  nôtre sont deux tirages aléatoires : ils ne tombent jamais aux mêmes endroits,
+  et l'écart pixel à pixel ne peut pas être nul même avec une table parfaite.
+  Sur `cn14` ça pesait 4 à 5/255 — assez pour accuser la mire à tort. La ligne
+  « couleur seule, par blocs » du comparateur donne la vraie mesure.
 - **Le bruit s'ajoute en quadrature.** Pour mesurer un grain, extraire son
   écart-type (`√((total² − base²)/2)`), pas la différence brute.
 
@@ -260,6 +286,16 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
 - **Un curseur recentré ne convertit JAMAIS position ↔ valeur** : l'arrondi crée
   une **zone morte** et le curseur se bloque. Course élargie symétriquement,
   valeur bornée à la sortie.
+- **Un effet de matiere ne se juge pas sur une image reduite.** A « Adapter »,
+  l'ecran moyenne le grain et on croit que le reglage ne fait rien : Vision a un
+  **zoom** (Adapter / 100 % / 200 % / 400 %) pour ca, comme Lightroom. Et une
+  MESURE de grain a le meme piege : retirer un voisinage trop etroit sous-estime
+  un grain plus gros qu'un pixel.
+- **Le grain se calcule sur la taille de l'IMAGE, jamais du canvas.** Un aperçu
+  qui dessine à 800 px une photo de 9180 doit montrer le grain **réduit**, pas
+  le grain d'une image de 800 px — sinon le ciel part en bouillie (15,6/255 au
+  lieu de 0,8). C'est ce que fait l'écran de Lightroom. Corollaire : **un aperçu
+  montre moins de grain qu'un export**, et c'est normal.
 - **La qualité `low` saute relief, netteté, voile et grain.** Dans Vision le
   geste porte justement sur eux : Vision garde `high`.
 - **Jamais** recalculer une vignette depuis l'image pleine résolution.
@@ -276,7 +312,9 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
 - **Aucun déploiement** sans demande explicite : tout se vérifie en local.
 - **Fin de tranche** : gates ci-dessous, mise à jour de ce fichier (qui doit
   **rester court**) et de `map.md`, rapport honnête — puis, dans le chat, le
-  récap en langage simple **et** le prompt de reprise complet.
+  **récap en langage simple** seulement. Le prompt de reprise s'écrit dans
+  `docs/prompt-reprise-<date>.md` et n'est collé dans le chat **que sur
+  demande** (cf. AGENTS.md, « Économie de contexte et de quota »).
 
 ---
 

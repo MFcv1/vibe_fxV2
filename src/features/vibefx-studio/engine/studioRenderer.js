@@ -18,11 +18,35 @@ import { getPresetLut } from '../utils/visionPresets';
  * renderStudio - Rendu du mode Studio/Vision (crop et filtres).
  * Pipeline Vision Pro v3 - 10 etapes, fused pixel ops.
  */
+/*
+ * `viewport` est la LOUPE de l'apercu: { zoom, cx, cy }, cx/cy dans [0,1]. Elle
+ * ne recadre RIEN — l'export ne la recoit jamais — elle choisit seulement quelle
+ * portion de l'image on regarde, et a quelle echelle.
+ *
+ * Elle existe parce qu'un effet de matiere ne se juge pas sur une image reduite:
+ * a « Adapter », le grain d'une photo de 9180 px dessinee sur 800 px est moyenne
+ * par 11, donc invisible. Lightroom repond a ca par le zoom 100 %, ou chaque
+ * pixel de l'image vaut un pixel de l'ecran. On fait pareil.
+ */
 export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
     images, cropRatio, cropPos, cropScale, isCropping,
-    filters
+    filters, viewport
 }) {
     const img = images[0];
+    /*
+     * DEUX largeurs, et les confondre est un bug qu'on a deja fait.
+     *
+     * `largeurImage` est la largeur de l'image FINALE (recadrage compris): c'est
+     * elle qui fixe la grosseur et la force du grain, parce que c'est ce que
+     * Lightroom regarde.
+     *
+     * `largeurRendu` est la largeur a laquelle cette image ENTIERE serait
+     * dessinee au zoom courant. Le rapport des deux dit ce que l'affichage fait
+     * perdre. A « Adapter » elle vaut la largeur du canvas; a 100 % elle vaut
+     * `largeurImage`, et le grain apparait a sa vraie force.
+     */
+    let largeurImage = w;
+    let largeurRendu = w;
 
     if (img) {
         let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
@@ -48,6 +72,23 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
             sy = Math.max(0, Math.min(targetSy, maxSy));
         }
 
+        largeurImage = sWidth;
+        largeurRendu = w;
+
+        /* La loupe, apres le recadrage et seulement a l'apercu. */
+        const zoom = isPreview && viewport?.zoom > 1 ? viewport.zoom : 1;
+        if (zoom > 1) {
+            const zWidth = sWidth / zoom;
+            const zHeight = sHeight / zoom;
+            /* cx/cy disent OU on regarde, en fraction de la marge disponible:
+               0 = bord gauche/haut, 1 = bord droit/bas, 0,5 = centre. */
+            sx += (sWidth - zWidth) * Math.min(1, Math.max(0, viewport.cx ?? 0.5));
+            sy += (sHeight - zHeight) * Math.min(1, Math.max(0, viewport.cy ?? 0.5));
+            sWidth = zWidth;
+            sHeight = zHeight;
+            largeurRendu = w * zoom;
+        }
+
         ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, w, h);
 
         if (isPreview && isCropping) {
@@ -57,7 +98,7 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
 
 
     // ═══════════════════════════════════════════════════════
-    applyFiltersPro(ctx, targetCanvas, w, h, quality, filters);
+    applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, largeurImage, largeurRendu);
 }
 
 /**
@@ -98,7 +139,7 @@ function renderCropGrid(ctx, w, h) {
  *  8. Grain (noise pattern)
  *  9. Intensity Blend (original/filtered mix)
  */
-function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
+function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, largeurImage = w, largeurRendu = w) {
     const safeFilters = normalizeVisionFilters(filters);
     const intensity = safeFilters.filterIntensity !== undefined ? safeFilters.filterIntensity : 100;
     if (intensity === 0) return;
@@ -192,12 +233,16 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters) {
     // ── Stage 8: Grain ───────────────────────────────────
     /*
      * Depuis le 2026-08-15, notre echelle EST celle de Lightroom: « Grain 15 »
-     * veut dire la meme chose des deux cotes (ecart-type 5,5/255). Le detail de
-     * la mesure et le pourquoi de l'abandon de la fusion `overlay` sont dans
-     * `applyFilmGrain`.
+     * veut dire la meme chose des deux cotes (ecart-type 5,5/255).
+     *
+     * Depuis le 2026-08-20, la GROSSEUR des grains l'est aussi: elle suit son
+     * sous-reglage « Taille » ET la largeur de l'image, qui fait grossir son
+     * grain quand la photo est grande. Sans ca, la meme valeur rendait un grain
+     * jusqu'a 2,3 fois trop fort et trop fin sur une photo pleine resolution.
+     * Les mesures sont dans `grainField.js`.
      */
     if (safeFilters.grain > 0 && quality !== 'low') {
-        applyFilmGrain(ctx, w, h, safeFilters.grain);
+        applyFilmGrain(ctx, w, h, safeFilters.grain, safeFilters.grainSize, largeurImage, largeurRendu);
     }
 
     // ── Stage 9: Intensity Blend ─────────────────────────

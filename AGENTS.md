@@ -56,40 +56,52 @@ A la fin de chaque grande phase et de chaque module livre, avant de passer a la 
 - Ecrire un prompt de relance en fin de `todo.md` pour repartir dans un chat neuf sans rien relire.
 - Rapporter honnetement ce qui marche, ce qui est laisse de cote et pourquoi, et les echecs de tests preexistants.
 
-### Cloture de phase dans le chat (obligatoire, automatique)
+### Cloture de phase dans le chat
 
-A la fin de CHAQUE phase ou tranche livree, sans que l'utilisateur ait besoin de
-le demander, le dernier message du chat doit contenir, dans cet ordre :
+A la fin de CHAQUE phase ou tranche livree, le dernier message du chat contient
+**un recap en langage simple** : ce qui marche et se teste tout de suite (URL
+locale + commande), ce qui a ete laisse de cote et pourquoi, les bugs trouves et
+corriges en route, les echecs de tests preexistants. Court, sans jargon en tete.
 
-1. **Un recap en langage simple** : ce qui marche et se teste tout de suite (avec
-   l'URL locale et la commande), ce qui a ete laisse de cote et pourquoi, les
-   bugs trouves et corriges en route, les echecs de tests preexistants.
-2. **Le prompt de reprise, ecrit en entier dans le chat**, dans un bloc de code
-   pour qu'il se copie d'un geste. Pas un renvoi vers `todo.md` : le texte
-   complet, dans le message.
+**Le prompt de reprise ne s'ecrit dans le chat QUE si l'utilisateur l'a demande
+AU DEBUT de la session** ("je veux un prompt de reprise a la fin"). Sinon, jamais
+— ni en entier, ni en resume, ni "veux-tu que je te le donne ?".
 
-Ce prompt de reprise est destine a un chat NEUF, contexte a zero. Il doit donc
-se suffire a lui-meme et contenir :
+Raison : ca coute plusieurs milliers de tokens par fin de reponse, pour un texte
+que l'utilisateur ne recopie que lorsqu'il ouvre vraiment un chat neuf.
 
-- le chemin absolu du projet ;
-- l'ordre de lecture des documents (`AGENTS.md`, le plan maitre du chantier,
-  `todo.md`, `map.md`), et ce qu'il ne faut PAS lire (archives) ;
-- l'etat exact du livre : phases terminees, ce qui tourne, sur quelles routes,
-  dans quels fichiers ;
-- l'etat des gates au moment ou on s'arrete (lint, build, smokes) ;
-- la mission suivante, decoupee et ordonnee ;
-- les interdits du chantier ;
-- le rituel de fin de phase a rejouer.
+Regle actuelle :
 
-Le meme texte est conserve dans le depot, mais le chat fait foi : un lot n'est
-pas termine tant que le prompt de reprise n'a pas ete affiche dans la
-conversation.
+- l'agent ECRIT le fichier `docs/prompt-reprise-<date>.md` et met a jour le lien
+  dans `todo.md` — ca, ca reste obligatoire a chaque fin de lot ;
+- il ne colle le texte complet dans le chat que si la demande a ete faite au
+  debut de la session, ou si l'utilisateur le reclame explicitement ;
+- sinon il ne mentionne meme pas son existence.
 
-Ou le ranger : dans `docs/prompt-reprise-<date>.md`, avec un lien depuis
-`todo.md` — PAS colle en fin de `todo.md`. Raison : `todo.md` est relu a chaque
-session par chaque agent, alors que le prompt de reprise ne sert qu'une fois, et
-a quelqu'un qui l'a deja recu en entier. L'y laisser gonfle le contexte de tout
-le monde pour rien.
+Le contenu du fichier ne change pas : chemin absolu du projet, ordre de lecture
+des docs (et ce qu'il ne faut PAS lire), etat du livre, etat des gates, mission
+suivante ordonnee, interdits, rituel de fin de phase.
+
+### Economie de contexte et de quota
+
+Le projet est gros ; le budget de contexte est la vraie contrainte. Regles :
+
+- **Lire par extraits, pas par fichiers entiers.** `map.md` fait des milliers de
+  lignes : n'en lire que la zone touchee (`grep -n`, `sed -n '<a>,<b>p'`). Idem
+  pour les gros fichiers de code.
+- **Ne jamais ouvrir une archive** (`docs/archive-*`, `docs/prompt-reprise-*`)
+  sauf si on travaille exactement dans la zone concernee.
+- **Ne pas relire un fichier qu'on vient d'ecrire** pour verifier : l'outil
+  d'edition aurait echoue.
+- **Ne pas lancer de sous-agent** sauf demande explicite de l'utilisateur : un
+  sous-agent repart de zero et repaie tout le contexte.
+- **Gates cibles, pas tous les gates.** Ne jouer que les suites touchees par le
+  changement ; `npm run build` et les smokes navigateur sont lents et chers,
+  les garder pour une fin de lot reelle.
+- **Aucun deploiement** sans demande explicite (voir plus bas : ca coute de
+  l'argent reel, pas seulement du contexte).
+- **Ecrire court.** Pas de recapitulatif de ce qui vient d'etre dit, pas de
+  reformulation du plan a chaque message, pas de tableau decoratif.
 
 ### `todo.md` doit rester court
 

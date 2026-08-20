@@ -39,6 +39,43 @@
     min-height: 0;
 }
 
+.zoomGroup {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: var(--vo-space-1);
+}
+
+/* Le pourcentage est un BOUTON: il ramene a « Adapter » quand on est zoome, et
+   grossit quand on ne l'est pas. C'est le geste qu'on fait le plus souvent. */
+.zoomLabel {
+    min-width: 62px;
+    padding: 0 var(--vo-space-2);
+    height: 28px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    background: transparent;
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.zoomLabel:hover {
+    color: var(--vo-text);
+    border-color: var(--vo-line-strong);
+}
+
+/* Zoome, le canvas se deplace a la souris. */
+.canvasZoome {
+    cursor: grab;
+    touch-action: none;
+}
+
+.canvasZoome:active {
+    cursor: grabbing;
+}
+
 .canvas {
     display: block;
     width: auto;

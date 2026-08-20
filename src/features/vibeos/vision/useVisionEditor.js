@@ -26,7 +26,7 @@ import { buildAutoEnhancement } from './autoEnhance';
 
 /* Cles que le preset s'approprie quand il en porte: elles ne peuvent pas vivre
    dans une LUT (elles dependent des pixels voisins ou de la position). */
-const PRESET_SPATIAL_KEYS = ['texture', 'clarity', 'sharpness', 'dehaze', 'grain', 'vignette'];
+const PRESET_SPATIAL_KEYS = ['texture', 'clarity', 'sharpness', 'dehaze', 'grain', 'grainSize', 'vignette'];
 
 /* Les memes noms que dans le panneau des reglages: on annonce ce que le preset
    pose avec les mots que l'utilisateur voit ensuite bouger. */
@@ -36,6 +36,7 @@ const SPATIAL_LABELS = {
     sharpness: 'netteté',
     dehaze: 'voile atmosphérique',
     grain: 'grain',
+    grainSize: 'grosseur du grain',
     vignette: 'vignettage',
 };
 
@@ -94,6 +95,22 @@ export default function useVisionEditor() {
      */
     const [isAdjusting, setIsAdjusting] = useState(false);
 
+    /*
+     * LA LOUPE DE L'APERCU. Elle ne recadre rien: elle dit seulement quelle
+     * portion de la photo on regarde, et a quelle echelle.
+     *
+     * Elle existe pour une raison precise: un effet de MATIERE ne se juge pas
+     * sur une image reduite. A « Adapter », une photo de 9180 px dessinee sur
+     * 800 en montre un pixel sur onze — son grain est moyenne, donc invisible,
+     * et on croit que le reglage ne fait rien. Lightroom repond a ca par le zoom
+     * 100 %, ou un pixel de la photo vaut un pixel d'ecran. C'est la seule facon
+     * honnete de regarder un grain, une nettete ou une texture.
+     */
+    const [zoom, setZoom] = useState(1);
+    const [zoomCentre, setZoomCentre] = useState({ cx: 0.5, cy: 0.5 });
+    const viewport = useMemo(() => ({ zoom, cx: zoomCentre.cx, cy: zoomCentre.cy }),
+        [zoom, zoomCentre]);
+
     const canvasRef = useRef(null);
     const bgCanvasRef = useRef(null);
     const slotRects = useRef([]);
@@ -125,6 +142,7 @@ export default function useVisionEditor() {
         isDraggingText: false, activeGuides: [],
         cropRatio: 'original', cropPos: { x: 0, y: 0 }, cropScale: 1, isCropping: false,
         filters: appliedFilters,
+        viewport,
         isDragging: isAdjusting, requestRef,
         setSlotRectsState: null,
     });
@@ -466,7 +484,27 @@ export default function useVisionEditor() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters, intensity, activePresetId, image]);
 
+    /*
+     * Le hook ne connait qu'un MULTIPLICATEUR, pas un pourcentage. « 100 % » ne
+     * veut rien dire ici: il veut dire « un pixel de la photo pour un pixel du
+     * canvas », et ce rapport depend de la taille du canvas, donc de la fenetre.
+     * C'est l'ecran qui traduit les deux — lui seul mesure le canvas.
+     */
+    const resetZoom = useCallback(() => {
+        setZoom(1);
+        setZoomCentre({ cx: 0.5, cy: 0.5 });
+    }, []);
+    /* Deplacer la loupe. `dx`/`dy` sont en fraction du canvas: on divise par le
+       zoom, sinon le deplacement s'emballe des qu'on grossit. */
+    const panZoom = useCallback((dx, dy) => {
+        setZoomCentre((c) => ({
+            cx: Math.min(1, Math.max(0, c.cx - dx)),
+            cy: Math.min(1, Math.max(0, c.cy - dy)),
+        }));
+    }, []);
+
     return {
+        zoom, setZoom, viewport, resetZoom, panZoom,
         image, images, metrics, signals, sourceKind,
         filters, appliedFilters, setFilters: updateFilter,
         intensity, setIntensity,

@@ -23,6 +23,13 @@
  */
 
 import fs from 'node:fs';
+import {
+    GRAIN_ATTENUATION as ATTENUATION,
+    GRAIN_TAILLE_DEFAUT,
+    grainEchelle,
+    grainSigma,
+    grainValeurEn,
+} from '../src/features/vibefx-studio/utils/grainField.js';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -40,26 +47,11 @@ if (!photo) {
 const sortie = readArg('sortie', 'tmp-planche-grain.png');
 const COTE = 420;
 
-const CANVAS_UTILS = 'src/features/vibefx-studio/utils/canvasUtils.js';
-const source = fs.readFileSync(CANVAS_UTILS, 'utf8');
-const constante = (nom) => {
-    const trouve = source.match(new RegExp(`${nom}\\s*=\\s*([0-9.]+)`));
-    if (!trouve) {
-        console.error(`\nECHEC: ${nom} introuvable dans ${CANVAS_UTILS}.\n`);
-        process.exit(1);
-    }
-    return Number(trouve[1]);
-};
-const SIGMA = constante('GRAIN_SIGMA_PAR_UNITE');
-const BORD = constante('GRAIN_BORD');
-const EXPOSANT = constante('GRAIN_BORD_EXPOSANT');
-
-const ATTENUATION = new Float32Array(256);
-for (let v = 0; v < 256; v += 1) {
-    const d = Math.min(v, 255 - v);
-    ATTENUATION[v] = d >= BORD ? 1 : (d / BORD) ** EXPOSANT;
-}
-
+/*
+ * Le moteur est APPELE, pas recopie: `grainField.js` n'importe rien, donc Node
+ * le charge tel quel. L'ANCIEN etage, lui, garde son propre bruit plus bas —
+ * il n'existe plus dans le moteur et n'a rien a lire.
+ */
 function bruit(taille = 512, graine = 20260815) {
     let a = graine >>> 0;
     const random = () => {
@@ -79,14 +71,17 @@ function bruit(taille = 512, graine = 20260815) {
 
 const { buf, taille } = bruit();
 
-function nouveau(data, w, h, grain) {
+function nouveau(data, w, h, grain, tailleGrain = GRAIN_TAILLE_DEFAUT) {
     const out = Buffer.from(data);
-    const sigma = SIGMA * grain;
+    /* La grosseur des grains depend de la Taille du curseur ET de la largeur de
+       l'image; elle pilote a son tour l'ecart-type (voir `grainField.js`). */
+    const echelle = grainEchelle(tailleGrain, w);
+    const sigma = grainSigma(grain, tailleGrain, w);
     for (let y = 0; y < h; y += 1) {
         for (let x = 0; x < w; x += 1) {
             const i = (y * w + x) * 3;
             const luma = (out[i] * 77 + out[i + 1] * 150 + out[i + 2] * 29) >> 8;
-            const delta = buf[(y % taille) * taille + (x % taille)] * sigma * ATTENUATION[luma];
+            const delta = grainValeurEn(x, y, echelle) * sigma * ATTENUATION[luma];
             for (let c = 0; c < 3; c += 1) out[i + c] = Math.max(0, Math.min(255, Math.round(out[i + c] + delta)));
         }
     }

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
+    ZoomIn, ZoomOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -46,8 +47,8 @@ const ADVANCED_GROUPS = [
             { key: 'saturation', label: 'Saturation', unit: '%' },
             { key: 'vibrance', label: 'Éclat des couleurs' },
             { key: 'skinSaturation', label: 'Teintes de peau' },
-            { key: 'skySaturation', label: 'Ciel' },
-            { key: 'foliageSaturation', label: 'Verdure' },
+            { key: 'skySaturation', label: 'Ciel / Eau' },
+            { key: 'foliageSaturation', label: 'Végétation' },
             { key: 'warmSaturation', label: 'Tons chauds' },
         ],
     },
@@ -77,8 +78,76 @@ export default function VisionScreen() {
         autoEnhance, applyPreset, resetFilters,
         startAdjusting, stopAdjusting, isAdjusting, adjustBaseline, presetDrivenKeys, activePresetLabel,
         undo, redo, canUndo, canRedo,
+        zoom, setZoom, resetZoom, panZoom,
         exportController,
     } = editor;
+
+    /*
+     * LE ZOOM DE L'APERCU, et pourquoi il porte un pourcentage plutot qu'un « x2 ».
+     *
+     * « 100 % » veut dire une chose precise: un pixel de la PHOTO pour un pixel
+     * du canvas. C'est la seule echelle ou un grain, une nettete ou une texture
+     * se jugent — en dessous, l'image est reduite et la matiere est moyennee.
+     * Le multiplicateur qui y mene depend donc de la taille du canvas, donc de
+     * la fenetre: il se calcule ici, pas dans le moteur.
+     */
+
+    /*
+     * `unPourUn` est le multiplicateur qui met un pixel de la photo sur un pixel
+     * du canvas. Il se MESURE, et il change avec la fenetre: un premier jet le
+     * lisait une seule fois, au montage, et l'etiquette annoncait « 5 % » puis
+     * « 566 % » pour le meme geste — le canvas n'avait pas fini de se
+     * dimensionner. D'ou l'observateur de taille.
+     */
+    const [unPourUn, setUnPourUn] = useState(1);
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const largeurPhoto = image?.naturalWidth || image?.width;
+        if (!canvas || !largeurPhoto) return undefined;
+        const relire = () => {
+            if (!canvas.width) return;
+            setUnPourUn(Math.max(1, largeurPhoto / canvas.width));
+        };
+        relire();
+        const observateur = new ResizeObserver(relire);
+        observateur.observe(canvas);
+        return () => observateur.disconnect();
+    }, [canvasRef, image, isLoadingImage]);
+
+    /* Les paliers de Lightroom. « Adapter » montre la photo entiere; a partir de
+       100 %, un pixel de la photo vaut un pixel d'ecran — c'est la seule echelle
+       ou le grain et la nettete se jugent. */
+    const PALIERS = useMemo(() => [1, unPourUn, unPourUn * 2, unPourUn * 4], [unPourUn]);
+    const zoomPourCent = Math.round((zoom * 100) / unPourUn);
+    const paliersSuivant = useCallback((sens) => {
+        const index = PALIERS.findIndex((p) => p > zoom * 1.01);
+        if (sens > 0) setZoom(index === -1 ? PALIERS[PALIERS.length - 1] : PALIERS[index]);
+        else {
+            const avant = [...PALIERS].reverse().find((p) => p < zoom * 0.99);
+            setZoom(avant ?? 1);
+        }
+    }, [PALIERS, zoom, setZoom]);
+
+    /* Deplacer la loupe a la souris. Le deplacement est rapporte a la taille du
+       canvas ET au zoom: sans ca, un geste d'un centimetre traverse la photo des
+       qu'on grossit. */
+    const glisse = useRef(null);
+    const onPointerDown = useCallback((event) => {
+        if (zoom <= 1) return;
+        glisse.current = { x: event.clientX, y: event.clientY };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+    }, [zoom]);
+    const onPointerMove = useCallback((event) => {
+        if (!glisse.current || zoom <= 1) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const dx = (event.clientX - glisse.current.x) / rect.width / zoom;
+        const dy = (event.clientY - glisse.current.y) / rect.height / zoom;
+        glisse.current = { x: event.clientX, y: event.clientY };
+        panZoom(dx, dy);
+    }, [zoom, panZoom, canvasRef]);
+    const onPointerUp = useCallback(() => { glisse.current = null; }, []);
 
     /* Comparaison: elle reste allumee tant qu'on ne l'eteint pas, et le mode
        choisi (rideau / cote a cote / maintien) est un reglage a part entiere. */
@@ -185,6 +254,33 @@ export default function VisionScreen() {
                                     className={styles.compareModes}
                                 />
                             ) : null}
+                            <div className={styles.zoomGroup}>
+                                <IconButton
+                                    label="Réduire"
+                                    disabled={zoom <= 1}
+                                    onClick={() => paliersSuivant(-1)}
+                                    data-testid="vibeos-vision-zoom-out"
+                                >
+                                    <ZoomOut size={15} />
+                                </IconButton>
+                                <button
+                                    type="button"
+                                    className={styles.zoomLabel}
+                                    onClick={() => (zoom > 1 ? resetZoom() : setZoom(unPourUn))}
+                                    title="Voir la photo pixel pour pixel — c'est là que le grain et la netteté se jugent"
+                                    data-testid="vibeos-vision-zoom-label"
+                                >
+                                    {zoom <= 1 ? 'Adapter' : `${zoomPourCent} %`}
+                                </button>
+                                <IconButton
+                                    label="Agrandir"
+                                    disabled={zoom >= PALIERS[PALIERS.length - 1]}
+                                    onClick={() => paliersSuivant(1)}
+                                    data-testid="vibeos-vision-zoom-in"
+                                >
+                                    <ZoomIn size={15} />
+                                </IconButton>
+                            </div>
                             <IconButton label="Annuler" disabled={!canUndo} onClick={undo}>
                                 <Undo2 size={15} />
                             </IconButton>
@@ -219,7 +315,14 @@ export default function VisionScreen() {
                                 active={isComparing}
                                 testId="vibeos-vision-compare"
                             >
-                                <canvas ref={canvasRef} className={styles.canvas} />
+                                <canvas
+                                    ref={canvasRef}
+                                    className={cx(styles.canvas, zoom > 1 && styles.canvasZoome)}
+                                    onPointerDown={onPointerDown}
+                                    onPointerMove={onPointerMove}
+                                    onPointerUp={onPointerUp}
+                                    onPointerCancel={onPointerUp}
+                                />
                             </BeforeAfter>
                         </div>
                     </>

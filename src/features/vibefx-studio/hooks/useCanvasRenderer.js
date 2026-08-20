@@ -60,6 +60,9 @@ export default function useCanvasRenderer({
     // Studio
     cropRatio, cropPos, cropScale, isCropping,
     filters,
+    /* Loupe de l'apercu: { zoom, cx, cy }. Ne recadre rien, ne sort jamais a
+       l'export — voir `renderStudio`. */
+    viewport,
     // Animation
     isDragging, requestRef,
     setSlotRectsState,
@@ -305,13 +308,16 @@ export default function useCanvasRenderer({
             }
             renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
                 images, cropRatio, cropPos, cropScale, isCropping,
-                filters: overrides.filters || filters, view
+                filters: overrides.filters || filters, view,
+                /* La loupe de l'apercu. `renderStudio` l'ignore hors apercu, donc
+                   un export ne peut pas la recevoir par accident. */
+                viewport: overrides.viewport || viewport,
             });
         }
     }, [images, filters, view, activeFormat, activeTemplate, overlayMode, padding, gap, customLayoutGap, radius,
         layoutBgColor, layoutBgBlur, layoutBgGradient, layoutBgMeshColors, layoutLumenBackground, layoutBgTexture, layoutSmoothBlur, layoutTextures, activeTextureId, layoutTextureOpacity, selectedSlotIndex, slotConfigs,
         texts, activeTextId, isDraggingText, activeGuides, assets, activeAssetId,
-        cropRatio, cropPos, cropScale, isCropping, bgCanvasRef, setSlotRectsState, slotRects]);
+        cropRatio, cropPos, cropScale, isCropping, bgCanvasRef, setSlotRectsState, slotRects, viewport]);
 
     const renderCanvas = useCallback(() => {
         const canRenderEmpty = view === 'layout' && (

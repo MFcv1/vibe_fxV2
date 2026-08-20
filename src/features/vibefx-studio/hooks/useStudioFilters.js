@@ -7,6 +7,10 @@ export const DEFAULT_FILTERS = {
     sepia: 0,
     blur: 0,
     grain: 0,
+    /* La grosseur des grains, a l'echelle de Lightroom (son sous-reglage
+       « Taille »). 25 est SA valeur par defaut, et celle sur laquelle notre
+       grain a ete calibre: voir `grainField.js`. */
+    grainSize: 25,
     vignette: 0,
     tintColor: '#ffffff',
     tintIntensity: 0,

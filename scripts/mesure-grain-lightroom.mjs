@@ -45,28 +45,18 @@ import sharp from 'sharp';
  * le charger. Lire la source est laid mais fiable — si la constante disparait,
  * le script s'arrete au lieu de mesurer avec une valeur perimee.
  */
-const CANVAS_UTILS = 'src/features/vibefx-studio/utils/canvasUtils.js';
-const SOURCE_MOTEUR = fs.readFileSync(CANVAS_UTILS, 'utf8');
-const constanteDuMoteur = (nom) => {
-    const trouve = SOURCE_MOTEUR.match(new RegExp(`${nom}\\s*=\\s*([0-9.]+)`));
-    if (!trouve) {
-        console.error(`\nECHEC: ${nom} introuvable dans ${CANVAS_UTILS}.\n`);
-        process.exit(1);
-    }
-    return Number(trouve[1]);
-};
-const GRAIN_SIGMA_PAR_UNITE = constanteDuMoteur('GRAIN_SIGMA_PAR_UNITE');
-const GRAIN_BORD = constanteDuMoteur('GRAIN_BORD');
-const GRAIN_BORD_EXPOSANT = constanteDuMoteur('GRAIN_BORD_EXPOSANT');
-
-const ATTENUATION = (() => {
-    const table = new Float32Array(256);
-    for (let v = 0; v < 256; v += 1) {
-        const distance = Math.min(v, 255 - v);
-        table[v] = distance >= GRAIN_BORD ? 1 : (distance / GRAIN_BORD) ** GRAIN_BORD_EXPOSANT;
-    }
-    return table;
-})();
+/*
+ * Le moteur est APPELE, pas recopie. `grainField.js` n'importe rien, donc Node
+ * le charge tel quel — une copie qui derive serait une mesure qui ment.
+ */
+import {
+    GRAIN_ATTENUATION as ATTENUATION,
+    GRAIN_SIGMA_PAR_UNITE,
+    GRAIN_TAILLE_DEFAUT,
+    grainEchelle,
+    grainSigma,
+    grainValeurEn,
+} from '../src/features/vibefx-studio/utils/grainField.js';
 
 const args = process.argv.slice(2);
 const readArg = (name, fallback = null) => {
@@ -148,9 +138,34 @@ async function lireRaw(file) {
     return data;
 }
 
-// ── Notre moteur, etage Grain, reproduit ──────────────────────────────────
+// ── Notre moteur, etage Grain ─────────────────────────────────────────────
+function notreGrain(source, grain, taille = GRAIN_TAILLE_DEFAUT) {
+    const sortie = Buffer.from(source);
+    if (!grain) return sortie;
+    /* La GROSSEUR des grains depend de la Taille du curseur ET de la largeur de
+       l'image, et elle pilote a son tour l'ecart-type: voir `grainField.js`. */
+    const echelle = grainEchelle(taille, W);
+    const sigma = grainSigma(grain, taille, W);
+    for (let y = 0; y < H; y += 1) {
+        for (let x = 0; x < W; x += 1) {
+            const i = (y * W + x) * 3;
+            const luma = (sortie[i] * 77 + sortie[i + 1] * 150 + sortie[i + 2] * 29) >> 8;
+            // Le meme ecart sur les trois canaux : le grain est monochrome.
+            const delta = grainValeurEn(x, y, echelle) * sigma * ATTENUATION[luma];
+            for (let c = 0; c < 3; c += 1) {
+                sortie[i + c] = Math.max(0, Math.min(255, Math.round(sortie[i + c] + delta)));
+            }
+        }
+    }
+    return sortie;
+}
+
+/*
+ * Le bruit de l'ANCIEN etage, garde ici et nulle part ailleurs. Le moteur ne
+ * s'en sert plus depuis le 2026-08-15; il ne survit que pour la colonne de
+ * comparaison ci-dessous, qui montre ce que valait le grain d'avant.
+ */
 function mireDeBruit(taille = 512, graine = 20260815) {
-    // PRNG deterministe (mulberry32) : la mesure doit etre rejouable.
     let a = graine >>> 0;
     const random = () => {
         a += 0x6d2b79f5;
@@ -159,8 +174,6 @@ function mireDeBruit(taille = 512, graine = 20260815) {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    // Ecarts gaussiens centres, d'ecart-type 1: c'est la forme que prend la
-    // table du moteur (`GRAIN_NOISE_TABLE`), mise a l'echelle a l'usage.
     const buf = new Float32Array(taille * taille);
     for (let i = 0; i < buf.length; i += 1) {
         const u1 = random() || 0.0001;
@@ -168,25 +181,6 @@ function mireDeBruit(taille = 512, graine = 20260815) {
         buf[i] = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
     }
     return { buf, taille };
-}
-
-function notreGrain(source, grain) {
-    const sortie = Buffer.from(source);
-    if (!grain) return sortie;
-    const sigma = GRAIN_SIGMA_PAR_UNITE * grain;
-    const { buf, taille } = mireDeBruit();
-    for (let y = 0; y < H; y += 1) {
-        for (let x = 0; x < W; x += 1) {
-            const i = (y * W + x) * 3;
-            const luma = (sortie[i] * 77 + sortie[i + 1] * 150 + sortie[i + 2] * 29) >> 8;
-            // Le meme ecart sur les trois canaux : le grain est monochrome.
-            const delta = buf[(y % taille) * taille + (x % taille)] * sigma * ATTENUATION[luma];
-            for (let c = 0; c < 3; c += 1) {
-                sortie[i + c] = Math.max(0, Math.min(255, Math.round(sortie[i + c] + delta)));
-            }
-        }
-    }
-    return sortie;
 }
 
 /*
