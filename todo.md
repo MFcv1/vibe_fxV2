@@ -19,7 +19,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**finir le grain** — prompt du 2026-08-21](docs/prompt-reprise-2026-08-21.md),
+[**le grain, apres l'espace de travail** — prompt du 2026-08-22](docs/prompt-reprise-2026-08-22.md),
 [la série d'imports Lightroom — 2026-08-20](docs/prompt-reprise-2026-08-20.md).
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
@@ -81,7 +81,7 @@ ne peut ni lire ses panneaux ni exporter à sa place.
 
 | Réglage | État |
 |---|---|
-| **Grain** | **ALIGNÉ, force ET grosseur** (2026-08-20) — ×1,00 sur la plage tonale ; la **grosseur** suit son sous-réglage *Taille* et la **largeur de l'image** (`grainField.js`). Écart max sur 6 cas : force 2,1 %, grosseur 5 % |
+| **Grain** | **ALIGNÉ, force, grosseur ET couleur** (2026-08-22) — il pose son grain dans **son espace de travail** (ProPhoto), pas en sRVB : c'est ce qui le rend plus fort sur les couleurs saturées. Écart max sur mire, aux trois valeurs exportées : **0,7 % sur les gris, 1,2 % sur les couleurs**. Reste −5 % **uniformes** sur une vraie photo de 9180 px, non expliqués (voir ci-dessous) |
 | **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
 | **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
 | **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
@@ -147,9 +147,21 @@ confirmés à quelques pourcents. Les trous, par ordre d'importance :
    surveiller sur une photo bruitée à grand ciel uni.
 4. **Netteté ≥ 80** : sur les larges structures il raidit ×1,58 à 150, nous
    ×1,00. À 40 (la valeur par défaut, celle qui compte) l'écart est nul.
-5. **Grain Taille — RÉGLÉ le 2026-08-20.** `cn17` porte `grainSize: 40`, sa
-   vraie valeur. Reste non mesurée : la **Cassure** (50 partout), la forme exacte
-   de sa tache de grain, et tout ce qui dépasse 6480 px de large.
+5. **Grain — les 5 % de la vraie photo, et deux exports qui les trancheraient.**
+   Sur le ciel de `photo-test-2` en CN14, son grain vaut 4,84/4,07/4,07 et le
+   nôtre 4,57/3,85/3,84 : **−5 % identiques sur les trois canaux**. La forme est
+   donc juste (le rapport entre canaux colle à 0,1 %), et un écart uniforme
+   n'est pas un effet de couleur. Ce n'est pas non plus le bruit de sa chaîne
+   (0,23/0,51/0,58, mesuré sur la même photo en CN01, sans grain). Restent deux
+   suspects, **tous deux non mesurés** :
+   - la **Taille 10** que CN14 porte, interpolée entre la Taille 0 et la
+     Taille 25 → une mire 1620 px, Grain 50, **Taille 10** ;
+   - l'**exposant de largeur** 0,577, ajusté jusqu'à 6480 px et extrapolé à
+     9180 (0,549 fermerait l'écart, et il tombe dans l'intervalle des pentes
+     mesurées) → une mire **9180 px**, Grain 50, Taille 25.
+
+   Toujours non mesurées par ailleurs : la **Cassure** (50 partout), la
+   **Taille 40** de `cn17` (interpolée), et le **recadrage** (aucun test).
 6. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
    réapparaît — ses 0,64/2,67 datent de l'ancien.
 7. **Une seule résolution vérifiée** (1620×1080) : notre texture et notre grain
@@ -291,6 +303,13 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
   **zoom** (Adapter / 100 % / 200 % / 400 %) pour ca, comme Lightroom. Et une
   MESURE de grain a le meme piege : retirer un voisinage trop etroit sous-estime
   un grain plus gros qu'un pixel.
+- **Un écart UNIFORME sur les trois canaux n'est jamais un effet de couleur.**
+  Les 5 % qui restent sur une vraie photo étaient attribués au grain de couleur ;
+  une fois la couleur réparée, ils étaient toujours là, identiques sur R, G et B.
+- **Un rapport lu après écrêtage n'est pas la grandeur qu'on croit lire.**
+  L'exposant de l'atténuation du grain était calé sur un seul rapport mesuré à
+  faible force : il ne pouvait pas tenir aux fortes, où un quart des pixels
+  tombe à 0.
 - **Le grain se calcule sur la taille de l'IMAGE, jamais du canvas.** Un aperçu
   qui dessine à 800 px une photo de 9180 doit montrer le grain **réduit**, pas
   le grain d'une image de 800 px — sinon le ciel part en bouillie (15,6/255 au
@@ -325,7 +344,7 @@ npm run dev                    # http://localhost:3000 -> /creer
 npm run lint                   # 0 erreur (5 warnings préexistants)
 npm run build
 npm run test:scope
-npm run test:vision-preset     # 67 vérifications (Node, 1 s)
+npm run test:vision-preset     # 82 vérifications (Node, 2 s)
 npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
@@ -341,6 +360,10 @@ node scripts/planche-showcase.mjs                             # planche : EFFETS
 node scripts/mesure-ciel-powlisher.mjs [--photo <f>]           # où le ciel atterrit
 node scripts/audit-vision-presets.mjs                          # bandes, dominante, témoins
 node scripts/compare-vision-presets-on-photos.mjs <photo...>   # écrêtage et force
+node scripts/mesure-grain-canaux.mjs --reference <sans> --lightroom <avec> --valeur 50
+#   -> son grain CANAL PAR CANAL : corrélation entre canaux, et pixels écrêtés
+node scripts/mesure-grain-photo.mjs <sa-photo> --grain 25 --taille 10 --sansgrain <sans>
+#   -> le grain sur une VRAIE photo, même flou des deux côtés
 node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id> [--planche <p>] [--sortie <p>]
 #   -> rendu COMPLET (LUT + effets) dans le vrai moteur ; --sans-effets = couleur seule
 node scripts/rendu-mire-c.mjs --texture 50 --sortie <png>      # notre moteur sur la mire C

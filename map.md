@@ -1,6 +1,6 @@
 # map.md - Carte vivante Vibe_fx V2
 
-Derniere mise a jour : 2026-08-08
+Derniere mise a jour : 2026-08-22
 
 ## Regle
 
@@ -514,6 +514,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : la mire neutre reexportee sans preset doit revenir a l'identite (<=2/255). Attrape le piege Adobe RVB au lieu de sRVB, qui fausserait chaque preset sans rien signaler
 |   |-- make-hald-clut.mjs             # Genere la mire Hald. Depuis le lot J elle est en BLOCS de 4x4 pixels par couleur (2048x2048) avec profil sRGB explicite : une couleur par pixel faisait baver les couleurs entre voisines et virait les noirs au vert
 |   |-- mesure-grain-lightroom.mjs     # Combien vaut le grain de Lightroom, et combien vaut le notre, carre par carre sur la mire A. Lit le COEUR des aplats (marge de 30 px: tout effet spatial bave sur les bords) et extrait le grain EN QUADRATURE (sqrt(total^2 - base^2), jamais la difference brute). C'est lui qui a montre que le « x8 » etait faux (x2,66) et, surtout, que l'ecart n'etait pas un facteur mais une FORME: plat chez lui, cloche chez nous. `--planche` sort les trois versions cote a cote a l'echelle 1:1
+|   |-- mesure-grain-canaux.mjs        # Son grain CANAL PAR CANAL. Soustrait l'export SANS RIEN de l'export AVEC GRAIN pixel a pixel: la difference EST son champ de grain. Donne l'ecart-type de chaque canal, la CORRELATION entre canaux (1,00 = un seul bruit, 0,00 = trois bruits tires separement — c'est elle qui a tranche) et la proportion de pixels ECRETES, qui explique pourquoi deux canaux du meme aplat ne portent pas le meme grain
+|   |-- mesure-grain-photo.mjs         # Le grain sur une VRAIE photo. Floute large (12 px, jamais 3: un voisinage etroit sous-estime un grain de 2,4 px), choisit les blocs les plus PLATS, et compare son residu au notre — chaque cote moins SON PROPRE flou. `--sansgrain <photo>` retire en quadrature le bruit de fond de sa chaine, lu sur les MEMES blocs d'une version developpee sans grain
 |   |-- planche-grain.mjs              # La planche du grain sur une VRAIE photo: sans grain / ancien moteur a 20 / nouveau a 8, a l'echelle 1:1 et jamais redimensionnee (reduire une image MOYENNE son grain, une planche reduite mentirait sur ce qu'elle montre). Repond a ce qu'aucun ecart-type ne dit: est-ce que le recalage abime le rendu
 |   |-- make-mire-effets.mjs           # Les mires d'EFFETS, l'exact oppose de la Hald : elles mesurent ce qui depend des pixels VOISINS (grain, clarte, texture, nettete) ou de la POSITION (vignetage), la ou une Hald est aveugle par construction. Quatre, parce que chaque effet a besoin d'un fond qui le rend lisible et que ces fonds s'excluent : A aplats unis (sur un aplat, toute variation EST le grain), B bandes unies plein cadre (le vignetage MULTIPLIE-t-il ou soustrait-il ?), C bords et reseaux SINUSOIDAUX 8/24/64 px (un bord net contient toutes les frequences a la fois, donc il ne separerait pas nettete/texture/clarte), D image delavee (le voile n'a rien a corriger sur une image nette). 1620x1080 = la taille ou l'on publie : le grain depend de la resolution. Protocole : docs/lightroom/4-synchro-effets.md
 |   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille. Convertit les deux cotes en sRVB par ColorSync (les JPEG recents sont en P3 : sans ca l'instrument est decale de 0,80/255). Depuis le 2026-08-19 il rend DEUX fois — couleur seule (LUT, en Node) et rendu COMPLET (renderStudio dans un Chromium, effets spatiaux compris) — ce qui donne l'ATTRIBUTION de l'ecart ; et il mesure la MATIERE (gradient) en separant contours et zones plates, parce qu'un effet peut avoir la bonne force ET faire monter l'ecart pixel a pixel. Grain force a 0 : deux bruits aleatoires ne se comparent pas. `--sans-effets` revient au comportement d'avant, `--sortie` ecrit notre rendu
@@ -606,6 +608,71 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-22 (le grain, dans l'espace ou Lightroom le pose)
+
+**Ce qui a change dans l'arbre** : `scripts/mesure-grain-canaux.mjs` et
+`scripts/mesure-grain-photo.mjs` (nouveaux). Modifies :
+`src/features/vibefx-studio/utils/grainField.js` (la loi),
+`src/features/vibefx-studio/utils/canvasUtils.js` (`applyFilmGrain`),
+`scripts/mesure-grain-lightroom.mjs`, `scripts/smoke-vision-preset.mjs`.
+
+**Le trou qui restait.** Son grain posait 21,7 a 23,3/255 sur les aplats
+colores contre 18,4 sur les gris; le notre posait 18,4 partout. La piste
+inscrite dans le prompt de reprise — « trois bruits tires par canal » — etait
+la premiere a tester. Elle est FAUSSE : la correlation entre canaux de son
+champ de grain vaut 0,95 a 1,00 sur les 24 aplats. Trois bruits independants
+donneraient 0,00. Son grain est bien monochrome.
+
+**Ce qu'il fait vraiment.** Il pose son delta monochrome dans SON ESPACE DE
+TRAVAIL — primaires ProPhoto, courbe de transfert sRVB — puis l'image revient
+en sRVB. Tout le reste en decoule sans aucun parametre ajuste : l'amplification
+inegale entre canaux, et l'ecretage a 0 qui explique pourquoi deux canaux du
+meme carre ne portent pas le meme ecart-type. Le modele predit les 72
+ecarts-types mesures a 1,8 % pres, ET les taux d'ecretage a 0,5 point pres
+(cyan R : 28,9 % chez lui, 28,6 % predit).
+
+**Les gris ne bougent pas, et c'est demontre, pas espere** : les lignes des deux
+matrices somment a 1,000000000000, donc un pixel neutre est un point fixe. Le
+moteur prend d'ailleurs un raccourci explicite sur ce cas.
+
+**Resultat, mire A, trois valeurs de curseur exportees (15 / 50 / 100)** :
+
+| | avant | apres |
+|---|---|---|
+| ecart max sur les GRIS | 6,4 % | **0,7 %** |
+| ecart max sur les COULEURS | 27 % | **1,2 %** (5,5 % sur un seul cas, le cyan a Grain 100) |
+
+**Deuxieme correction, trouvee en route : l'attenuation aux deux bouts.** Son
+exposant etait cale sur UN seul rapport (0,67 au niveau 8, lu a la valeur 15).
+Or ce rapport se lit APRES ecretage, et l'ecretage ne se comporte pas pareil
+selon la force du grain : a Grain 50 un quart des pixels d'un gris 8 tombe a 0.
+Reajuste sur DOUZE mesures (4 carres de bord x 3 valeurs de curseur), il passe
+de 0,364 a **0,420**, et le pire ecart de 6,4 % a 0,68 %.
+
+**Le cout, et ce qu'on en a fait.** Le detour demande neuf exponentiations par
+pixel : 2,2 s pour 12 Mpx, soit dix secondes sur une photo de 9180 px. Deux
+tables lues par interpolation lineaire rendent la meme chose en **430 ms**
+(x5). `test:vision-preset` borne leur erreur a 0,01/255 contre les fonctions
+exactes, qui restent dans le fichier.
+
+**Ce que la vraie photo a appris, et qui corrige une conclusion precedente.**
+On croyait que les 5 % manquants sur le ciel de `photo-test-2` (CN14) venaient
+de la couleur. Non. La FORME est maintenant exacte — le rapport entre canaux
+colle a 0,1 % — mais il reste 5 % UNIFORMES sur les trois canaux, et un ecart
+uniforme n'est pas un effet de couleur. Ce n'est pas non plus le bruit de sa
+chaine : la meme photo en CN01 (sans grain), lue sur les memes blocs, ne porte
+que 0,23 / 0,51 / 0,58 de bruit de fond. Restent deux suspects, qui sont
+exactement les deux points non mesures de `grainField.js` : la **Taille 10**
+de CN14 (interpolee entre 0 et 25) et l'**exposant de largeur** (0,577, ajuste
+jusqu'a 6480 px, extrapole a 9180). Un exposant de 0,549 fermerait l'ecart, et
+0,549 tombe dans l'intervalle des pentes mesurees deux a deux. Aucun des deux
+ne se tranche sans un nouvel export de Lightroom.
+
+**Tests ajoutes** (`test:vision-preset`, 78 -> 82 verifications) : l'exactitude
+des tables de transfert, le point fixe des neutres au bit pres, et l'ecart a
+Lightroom sur les gris ET sur les couleurs — les nombres attendus venant de ses
+exports, jamais d'un rendu de reference fabrique par nous.
 
 ## Journal — 2026-08-20 (premier import de la serie : CN01)
 

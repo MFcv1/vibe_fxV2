@@ -54,6 +54,7 @@ import {
     GRAIN_SIGMA_PAR_UNITE,
     GRAIN_TAILLE_DEFAUT,
     grainEchelle,
+    grainPoserDelta,
     grainSigma,
     grainValeurEn,
 } from '../src/features/vibefx-studio/utils/grainField.js';
@@ -139,6 +140,8 @@ async function lireRaw(file) {
 }
 
 // ── Notre moteur, etage Grain ─────────────────────────────────────────────
+const PIXEL = new Float64Array(3);
+
 function notreGrain(source, grain, taille = GRAIN_TAILLE_DEFAUT) {
     const sortie = Buffer.from(source);
     if (!grain) return sortie;
@@ -150,11 +153,12 @@ function notreGrain(source, grain, taille = GRAIN_TAILLE_DEFAUT) {
         for (let x = 0; x < W; x += 1) {
             const i = (y * W + x) * 3;
             const luma = (sortie[i] * 77 + sortie[i + 1] * 150 + sortie[i + 2] * 29) >> 8;
-            // Le meme ecart sur les trois canaux : le grain est monochrome.
+            /* Meme ecart sur les trois canaux, mais pose dans SON espace de
+               travail: c'est ce detour qui donne plus de grain sur les couleurs
+               saturees, sans rien changer aux gris. */
             const delta = grainValeurEn(x, y, echelle) * sigma * ATTENUATION[luma];
-            for (let c = 0; c < 3; c += 1) {
-                sortie[i + c] = Math.max(0, Math.min(255, Math.round(sortie[i + c] + delta)));
-            }
+            grainPoserDelta(sortie[i], sortie[i + 1], sortie[i + 2], delta, PIXEL);
+            for (let c = 0; c < 3; c += 1) sortie[i + c] = Math.round(PIXEL[c]);
         }
     }
     return sortie;

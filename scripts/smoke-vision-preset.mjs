@@ -27,6 +27,14 @@ import {
 } from '../src/features/vibefx-studio/utils/haldClut.js';
 import { parseXmpPreset, verifierDomaineSpatial } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 import { visionBoundsFor } from '../src/features/vibefx-studio/utils/visionColorScience.js';
+import {
+    GRAIN_ATTENUATION,
+    GRAIN_NOISE_TABLE,
+    grainPoserDelta,
+    grainSigma,
+    grainTransfertDecode,
+    grainTransfertEncode,
+} from '../src/features/vibefx-studio/utils/grainField.js';
 
 let failures = 0;
 const results = [];
@@ -586,6 +594,107 @@ for (const preset of horsLut) {
     }
 }
 check('effets des presets dans les garde-fous', horsBornes, 0, 0);
+
+
+/* ---------- le grain, et l'espace ou Lightroom le pose ---------- */
+/*
+ * Ces verifications rejouent les mesures faites sur ses exports (mire A, 1620
+ * px, Grain 50, Taille 25 — `scripts/mesure-grain-canaux.mjs`, 2026-08-22).
+ * Chaque nombre attendu vient d'un fichier sorti de Lightroom, pas d'un rendu
+ * de reference fabrique par nous: si quelqu'un touche a la loi du grain, c'est
+ * a LUI que le resultat est compare.
+ */
+
+/* Les tables de transfert doivent rendre la fonction exacte. C'est ce qui
+   permet de remplacer neuf `Math.pow` par pixel sans y perdre. */
+{
+    let pireEnc = 0;
+    let pireDec = 0;
+    for (let i = 0; i <= 20000; i += 1) {
+        const l = i / 20000;
+        const attendu = grainTransfertEncode(l);
+        /* on passe par le meme chemin que le moteur: encode puis decode */
+        const aller = grainTransfertDecode(attendu);
+        pireEnc = Math.max(pireEnc, Math.abs(aller - l) * 255);
+        const c = -0.9 + (i / 20000) * 2.8;
+        pireDec = Math.max(pireDec, Math.abs(grainTransfertEncode(grainTransfertDecode(c)) - c) * 255);
+    }
+    check('grain : aller-retour de la courbe exact', Math.max(pireEnc, pireDec), 0, 0.01, '/255');
+}
+
+/*
+ * Un pixel NEUTRE doit ressortir a `valeur + delta`, au bit pres: les lignes
+ * des deux matrices somment a 1. C'est ce qui garantit que la calibration sur
+ * les gris — x1,00, verifiee deux fois — ne bouge pas d'un cheveu.
+ */
+{
+    const sortie = new Float64Array(3);
+    let pire = 0;
+    for (let v = 0; v <= 255; v += 1) {
+        for (const delta of [-40, -7.3, -0.4, 0.4, 7.3, 40]) {
+            grainPoserDelta(v, v, v, delta, sortie);
+            const attendu = Math.max(0, Math.min(255, v + delta));
+            for (let c = 0; c < 3; c += 1) pire = Math.max(pire, Math.abs(sortie[c] - attendu));
+        }
+    }
+    check('grain : les neutres sont un point fixe', pire, 0, 0, '/255');
+}
+
+/*
+ * Et la vraie mesure: sur les 24 aplats de la mire A, l'ecart-type que NOTRE
+ * grain pose, canal par canal, contre celui que LIGHTROOM pose. Le champ de
+ * bruit est le vrai (`GRAIN_NOISE_TABLE`), la force la vraie, l'attenuation la
+ * vraie: seule la geometrie de la mire est recopiee ici.
+ */
+{
+    const MIRE_A = [
+        // [nom, base RGB, sigma R/G/B mesures sur son export a Grain 50]
+        ['gris 8', [8, 8, 8], [9.27, 9.27, 9.27]],
+        ['gris 24', [24, 24, 24], [16.84, 16.84, 16.84]],
+        ['gris 128', [128, 128, 128], [18.35, 18.35, 18.35]],
+        ['gris 224', [224, 224, 224], [17.62, 17.62, 17.62]],
+        ['gris 247', [247, 247, 247], [9.22, 9.19, 9.21]],
+        ['rouge', [200, 40, 40], [21.21, 25.54, 19.69]],
+        ['vert', [40, 170, 60], [29.18, 18.54, 22.50]],
+        ['bleu', [40, 70, 200], [29.47, 18.60, 18.78]],
+        ['cyan', [40, 190, 200], [32.12, 18.45, 18.31]],
+        ['magenta', [200, 50, 190], [20.06, 26.15, 18.88]],
+        ['jaune', [220, 200, 40], [18.56, 18.22, 27.69]],
+        ['peau claire', [222, 176, 148], [17.94, 18.25, 18.29]],
+        ['peau mate', [166, 120, 94], [18.83, 18.33, 18.43]],
+        ['ciel', [92, 140, 186], [20.85, 18.37, 18.46]],
+        ['feuillage', [58, 96, 62], [19.80, 18.43, 18.67]],
+        ['beton', [176, 168, 150], [18.35, 18.30, 18.33]],
+    ];
+    const N = 65536; // un quart de la table de bruit: deterministe, et assez
+    const sigma = grainSigma(50, 25, 1620); // Grain 50, Taille 25, mire de 1620 px
+    const sortie = new Float64Array(3);
+    let pireGris = 0;
+    let pireCouleur = 0;
+    for (const [nom, base, attendu] of MIRE_A) {
+        const luma = (base[0] * 77 + base[1] * 150 + base[2] * 29) >> 8;
+        const force = sigma * GRAIN_ATTENUATION[luma];
+        const somme = [0, 0, 0];
+        const carres = [0, 0, 0];
+        for (let i = 0; i < N; i += 1) {
+            grainPoserDelta(base[0], base[1], base[2], GRAIN_NOISE_TABLE[i] * force, sortie);
+            for (let c = 0; c < 3; c += 1) {
+                const v = Math.round(sortie[c]);
+                somme[c] += v;
+                carres[c] += v * v;
+            }
+        }
+        for (let c = 0; c < 3; c += 1) {
+            const m = somme[c] / N;
+            const nous = Math.sqrt(Math.max(0, carres[c] / N - m * m));
+            const ecart = Math.abs(100 * (nous / attendu[c] - 1));
+            if (nom.startsWith('gris')) pireGris = Math.max(pireGris, ecart);
+            else pireCouleur = Math.max(pireCouleur, ecart);
+        }
+    }
+    check('grain : ecart a Lightroom sur les GRIS', pireGris, 0, 2.5, '%');
+    check('grain : ecart a Lightroom sur les COULEURS', pireCouleur, 0, 3, '%');
+}
 
 /* ---------- rapport ---------- */
 

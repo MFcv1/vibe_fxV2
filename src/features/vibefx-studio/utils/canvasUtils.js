@@ -16,6 +16,7 @@ import {
     GRAIN_NOISE_SIZE,
     GRAIN_NOISE_TABLE,
     GRAIN_TAILLE_DEFAUT,
+    grainPoserDelta,
     grainPourRendu,
     grainValeurEn,
 } from './grainField.js';
@@ -99,11 +100,11 @@ export const NOISE_PATTERN_CANVAS = createNoisePattern();
  * GRAIN_SIGMA_PAR_UNITE x valeur, ecrete. Monochrome parce que c'est mesure :
  * la correlation entre canaux vaut 1,00 chez Lightroom.
  *
- * RESERVE HONNETE : sur des couleurs tres saturees, Lightroom donne un peu plus
- * que le plat (7,5 au lieu de 5,5 a valeur 15), et de facon inegale entre
- * canaux — signe qu'il ajoute son bruit avant une transformation d'espace, pas
- * en sortie. Sur les neutres, les peaux, les ciels et les betons — la matiere
- * ou un grain se juge — le plat est exact au centieme.
+ * CE QUE « MONOCHROME » NE VEUT PAS DIRE : le meme ecart sur les trois canaux
+ * de SORTIE. Sur des couleurs saturees, Lightroom en donne davantage, et de
+ * facon inegale entre canaux — parce qu'il ajoute son bruit AVANT de revenir en
+ * sRVB. Depuis le 2026-08-22 on fait le meme detour (`grainPoserDelta`), et
+ * l'ecart tombe de 27 % a 1,8 % au pire sur les 24 aplats de la mire A.
  */
 /*
  * La loi du grain — sa force ET sa grosseur — vit dans `grainField.js`, qui
@@ -120,6 +121,10 @@ export const NOISE_PATTERN_CANVAS = createNoisePattern();
  * raison pour laquelle un apercu doit montrer MOINS de grain qu'un export, sont
  * dans `grainField.js`.
  */
+/* Un seul tampon de sortie, reutilise a chaque pixel: pas d'allocation dans
+   une boucle qui tourne des dizaines de millions de fois. */
+const PIXEL = new Float64Array(3);
+
 export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
     largeurImage = w, largeurRendu = w) {
     if (!grain || grain <= 0) return;
@@ -144,11 +149,17 @@ export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
             const bruit = grainsFins
                 ? GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)]
                 : grainValeurEn(x, y, echelle);
-            // Le meme ecart sur les trois canaux : le grain est monochrome.
+            /* Le meme ecart sur les trois canaux — le grain est monochrome,
+               c'est mesure — mais pose DANS SON ESPACE DE TRAVAIL, pas en
+               sRVB. C'est le detour qui rend le grain plus fort sur les
+               couleurs saturees, exactement comme chez lui, sans toucher aux
+               gris. Voir `grainField.js`, section « l'espace ou il pose son
+               grain ». */
             const delta = bruit * sigma * GRAIN_ATTENUATION[luma];
-            d[i] = Math.max(0, Math.min(255, d[i] + delta));
-            d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + delta));
-            d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + delta));
+            grainPoserDelta(d[i], d[i + 1], d[i + 2], delta, PIXEL);
+            d[i] = PIXEL[0];
+            d[i + 1] = PIXEL[1];
+            d[i + 2] = PIXEL[2];
         }
     }
     ctx.putImageData(imageData, 0, 0);
