@@ -81,7 +81,7 @@ ne peut ni lire ses panneaux ni exporter à sa place.
 
 | Réglage | État |
 |---|---|
-| **Grain** | **ALIGNÉ, force, grosseur ET couleur** (2026-08-22) — il pose son grain dans **son espace de travail** (ProPhoto), pas en sRVB : c'est ce qui le rend plus fort sur les couleurs saturées. Écart max sur mire, aux trois valeurs exportées : **0,7 % sur les gris, 1,2 % sur les couleurs**. Reste −5 % **uniformes** sur une vraie photo de 9180 px, non expliqués (voir ci-dessous) |
+| **Grain** | **ALIGNÉ : force, grosseur, couleur, et toutes tailles d'image** (2026-08-22). Il pose son grain dans **son espace de travail** (ProPhoto), pas en sRVB — d'où plus de grain sur les couleurs saturées. Mire : **0,7 % sur les gris, 1,2 % sur les couleurs**. Force : **0,4 %** à 1620/3240/6480/9720 px. Vraie photo : **−1 %** sur les trois canaux. Reste : ses grains sont un peu **plus gros** que les nôtres aux grandes tailles (voir ci-dessous) |
 | **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
 | **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
 | **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
@@ -147,26 +147,37 @@ confirmés à quelques pourcents. Les trous, par ordre d'importance :
    surveiller sur une photo bruitée à grand ciel uni.
 4. **Netteté ≥ 80** : sur les larges structures il raidit ×1,58 à 150, nous
    ×1,00. À 40 (la valeur par défaut, celle qui compte) l'écart est nul.
-5. **Grain — les 5 % de la vraie photo, et deux exports qui les trancheraient.**
-   Sur le ciel de `photo-test-2` en CN14, son grain vaut 4,84/4,07/4,07 et le
-   nôtre 4,57/3,85/3,84 : **−5 % identiques sur les trois canaux**. La forme est
-   donc juste (le rapport entre canaux colle à 0,1 %), et un écart uniforme
-   n'est pas un effet de couleur. Ce n'est pas non plus le bruit de sa chaîne
-   (0,23/0,51/0,58, mesuré sur la même photo en CN01, sans grain). Restent deux
-   suspects, **tous deux non mesurés** :
-   - la **Taille 10** que CN14 porte, interpolée entre la Taille 0 et la
-     Taille 25 → une mire 1620 px, Grain 50, **Taille 10** ;
-   - l'**exposant de largeur** 0,577, ajusté jusqu'à 6480 px et extrapolé à
-     9180 (0,549 fermerait l'écart, et il tombe dans l'intervalle des pentes
-     mesurées) → une mire **9180 px**, Grain 50, Taille 25.
+5. **Grain — les 5 % de la vraie photo : RÉGLÉ le 2026-08-22.** C'était
+   l'exposant de largeur, pas la couleur. L'ancienne loi `(largeur/1620)^0,577`
+   se trompait de 5,8 % dès qu'on sortait des trois tailles sur lesquelles elle
+   était ajustée. Remplacée par une **table mesurée** (1620 / 3240 / 6480 /
+   **9720**, ce dernier exporté le 2026-08-22), interpolée en log-log. Sur la
+   vraie photo : de −5 % à **−1 %**. La **Taille 40** est mesurée elle aussi
+   (1,1716, on l'interpolait à 1,183).
+6. **Grain — ce qui reste, et qui est nouveau.** Sa **force** et sa **grosseur**
+   cessent d'être le même nombre quand l'image grandit : à 9720 px sa force dit
+   « échelle 2,66 » et sa longueur de corrélation dit 3,35. Sa forme de grain
+   change avec l'échelle, pas seulement sa taille. Nous posons la bonne force
+   (0,4 %) et des grains un peu **trop fins** (2,92 contre 3,35 à 9720 px ;
+   2,21 contre 2,29 sur la photo). Corriger demande de remodeler le spectre du
+   bruit — deux points ne suffisent pas à le dessiner.
+7. **Grain — le trou du PETIT format, le plus gênant qui reste.** À 1620 px, sa
+   Taille 10 rend exactement sa Taille 25 : un grain ne se dessine pas plus fin
+   qu'un pixel, et il n'augmente pas sa force pour compenser. Nous, si — 13 %
+   de trop. Rien n'est mesuré **sous 1620 px**, et un export social fait
+   1080 px. **Prochain export à demander : la mire A réduite à 1080 px de
+   large, Grain 50, Taille 25.** (La Taille 0 échappe à cette règle et reste
+   inexpliquée : elle descend bien sous le pixel, avec une autocorrélation
+   négative — un autre mécanisme.)
 
-   Toujours non mesurées par ailleurs : la **Cassure** (50 partout), la
-   **Taille 40** de `cn17` (interpolée), et le **recadrage** (aucun test).
-6. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
+   Toujours non mesurées : la **Cassure** (50 partout) et le **recadrage**
+   (aucun test).
+8. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
    réapparaît — ses 0,64/2,67 datent de l'ancien.
-7. **Une seule résolution vérifiée** (1620×1080) : notre texture et notre grain
-   ont un rayon en pixels fixes, notre clarté en % du cadre. Hypothèse non
-   mesurée sur une autre taille.
+9. **Une seule résolution vérifiée** (1620×1080) **pour la texture et la
+   clarté** : leur rayon est en pixels fixes, la clarté en % du cadre.
+   Hypothèse non mesurée sur une autre taille. (Le **grain**, lui, est
+   désormais mesuré à quatre tailles.)
 
 **Pas bloquant pour importer** : les **sous-réglages** (Grain Taille 25 /
 Cassure 50, Vignette Milieu 50 / Arrondi 0 / Contour 50 / Hautes lumières 0)

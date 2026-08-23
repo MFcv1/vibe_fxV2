@@ -38,55 +38,70 @@ sur UN point lu apres ecretage. Reajuste sur 12 mesures, il passe de 0,364 a
 Deux tables interpolees le ramenent a **430 ms**, avec un test qui borne leur
 erreur a 0,01/255 contre les fonctions exactes.
 
-## LA MISSION SUIVANTE : les −5 % de la vraie photo
+## Les trois exports du 2026-08-22, et ce qu'ils ont donne
 
-Sur le ciel de `photo-test-2` en CN14 (9180 px), son grain vaut 4,84/4,07/4,07
-et le notre 4,57/3,85/3,84 : **−5 % IDENTIQUES sur les trois canaux**.
+Matthis a exporte la mire A en **Taille 10** et en **Taille 40** (1620 px), plus
+une mire agrandie x6 (**9720 px**) en Taille 25. Dossier de depot sur le
+Bureau : `GRAIN - 3 EXPORTS A FAIRE`.
 
-Ce qui est deja elimine, mesure a l'appui :
+**Les 5 % de la vraie photo etaient l'exposant de largeur.** `(largeur/1620)^0,577`
+etait ajuste sur 1620/3240/6480 et se trompait de 5,8 % a 9720. Remplace par une
+TABLE mesuree (1620 / 3240 / 6480 / 9720) interpolee en log-log. Sur le ciel de
+`photo-test-2` en CN14, bruit de fond de sa chaine retire en quadrature :
 
-- **ce n'est pas la couleur** : le rapport entre canaux colle a 0,1 %, et un
-  ecart uniforme n'est par definition pas un effet de couleur ;
-- **ce n'est pas le bruit de sa chaine** : la meme photo developpee en CN01
-  (aucun grain), lue sur les MEMES blocs, ne porte que 0,23 / 0,51 / 0,58.
+| | son grain seul | le notre | ecart |
+|---|---|---|---|
+| avant | 4,83 / 4,04 / 4,02 | 4,57 / 3,85 / 3,84 | -5 % |
+| apres | 4,83 / 4,04 / 4,02 | **4,77 / 4,01 / 4,00** | **-1 %** |
 
-Restent deux suspects, tous deux non mesures, et **aucun ne se tranche sans un
-export de Lightroom fait a la main par Matthis** :
+**La Taille 40 est mesuree** : echelle 1,1716 (on l'interpolait a 1,183).
 
-### Export 1 — la Taille 10
+## LA MISSION SUIVANTE : le PETIT format
 
-CN14 la porte, et notre echelle (0,881) est INTERPOLEE entre la Taille 0 (0,802)
-et la Taille 25 (1,000). Si la courbe est convexe, notre grain est trop faible
-d'a peu pres ce qu'on mesure.
+A 1620 px, sa **Taille 10 rend exactement sa Taille 25** — 18,37 et 1,01 px
+contre 18,37 et 1,02 — alors que les deux exports different sur 98 % de leurs
+pixels (ce sont bien deux tirages distincts, verifie). La vraie photo dit
+l'inverse a 9180 px.
 
-> mire `~/Desktop/📸 VIBEFX-IMPORTS/0-GRAIN-A-MESURER/A-IMPORTER-DANS-LIGHTROOM/mire-PETITE-1620px.png`
-> Grain **50**, Taille **10**, Cassure 50 -> `0-GRAIN-A-MESURER/taille-10/`
+Ce qui reconcilie les deux : **un grain ne se dessine pas plus fin qu'un
+pixel**, et Lightroom n'augmente PAS sa force pour compenser. Notre moteur, lui,
+le fait — 13 % de trop des que l'echelle passe sous 1.
 
-### Export 2 — la largeur au-dela de 6480 px
+Sans consequence sur une photo. Mais **un export social fait 1080 px de large**,
+et rien n'est mesure sous 1620. A cette taille notre grain est probablement
+25 % trop fort.
 
-L'exposant 0,577 est ajuste sur 1620 / 3240 / 6480. La photo fait 9180. Un
-exposant de **0,549** fermerait exactement l'ecart, et il tombe dans
-l'intervalle des pentes mesurees deux a deux (0,539 puis 0,586).
+> **L'export a demander** : la mire A **reduite a 1080 px de large** (a
+> fabriquer : `sharp(mire).resize(1080)` en plus proche voisin ne marche pas,
+> 1080 n'est pas un diviseur entier de 1620 — refaire la mire A directement a
+> 1080x720 en adaptant `scripts/make-mire-effets.mjs`), Grain **50**,
+> Taille **25**, Cassure 50. Puis
+> `node scripts/mesure-taille-grain.mjs <fichier> --valeur 50` — mais attention,
+> ce script n'accepte que des multiples ENTIERS de 1620x1080 : il faudra lui
+> apprendre les reductions, ou mesurer avec `mesure-grain-canaux.mjs`.
 
-> une mire de **9180 px** de large (a fabriquer : `npm run preset:mire-effets`
-> ne sort que 1620 / 3240 / 6480, il faut ajouter la taille dans
-> `scripts/make-mire-effets.mjs`), Grain **50**, Taille **25**, Cassure 50.
+(La **Taille 0** echappe a cette regle : elle descend bien sous le pixel, avec
+une autocorrelation au voisin NEGATIVE — signe d'une structure plus fine que le
+pixel qui se replie. C'est un autre mecanisme, laisse tel quel.)
 
-### Export 3 — la Taille 40 (CN17 et CN18 la portent)
+## L'AUTRE ECART, nouveau et non resolu
 
-Toujours interpolee, toujours pas mesuree.
+**Sa force et sa grosseur cessent d'etre le meme nombre quand l'image grandit.**
+A 9720 px sa force donne une echelle de 2,66 alors que sa longueur de
+correlation vaut 3,35 — 26 % d'ecart. A 1620 et 3240 px les deux coincidaient.
+Sa FORME de grain change avec l'echelle, pas seulement sa taille.
 
-> meme mire 1620 px, Grain **50**, Taille **40**, Cassure 50
-> -> `0-GRAIN-A-MESURER/taille-40/`
-
-Pour chacun : `node scripts/mesure-taille-grain.mjs <fichier> --valeur 50`, puis
-ajouter le point dans `GRAIN_TAILLE_MESUREE` (ou reajuster
-`GRAIN_EXPOSANT_LARGEUR`) dans `grainField.js`.
+Nous posons la bonne FORCE (0,4 % pres aux quatre tailles mesurees) et des
+grains un peu **trop fins** : 2,92 contre 3,35 a 9720 px, 2,21 contre 2,29 sur
+la photo. Corriger demande de remodeler le spectre du bruit
+(`GROSSEUR_PAR_PAS` dans `grainField.js`), et deux points de mesure ne
+suffisent pas a le dessiner. Il en faudrait un balayage.
 
 ## Les trous restants, par ordre
 
-1. Les deux exports ci-dessus (Taille 10, largeur 9180) — c'est le −5 %.
-2. La **Taille 40**, interpolee, portee par CN17/CN18.
+1. Le **petit format** (voir plus haut) : rien n'est mesure sous 1620 px, et
+   un export social en fait 1080.
+2. La **forme** de son grain aux grandes tailles (voir plus haut).
 3. La **Cassure**, jamais mesuree, laissee a 50 partout. **A verifier au releve
    de chaque import** : si un preset la change, la mesurer avant de la recopier.
 4. Le **recadrage** : `renderStudio` prend `largeurImage = sWidth`, ce qui est

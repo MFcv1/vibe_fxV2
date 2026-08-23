@@ -513,38 +513,32 @@ export const GRAIN_ATTENUATION = (() => {
  * 247); rien ne dit ou elle s'applique sur une couleur sombre saturee, et rien
  * dans la mire A ne permet de le trancher.
  *
- * ── ET CE QUE CA N'EXPLIQUE PAS ──────────────────────────────────────────
+ * ── LA VRAIE PHOTO, ET CE QUI RESTE ─────────────────────────────────────
  *
- * On croyait que les 5 % qui manquaient sur une VRAIE photo (son grain 4,05,
- * le notre 3,83 sur le ciel de `photo-test-2` en CN14) venaient de la couleur.
- * C'etait faux, et la mesure du 2026-08-22 le montre
- * (`scripts/mesure-grain-photo.mjs`, 40 blocs plats de 64 px):
+ * Sur le ciel de `photo-test-2` en CN14 (Taille 10, 9180 px de large), mesure
+ * du 2026-08-22 par `scripts/mesure-grain-photo.mjs`, 40 blocs plats de 64 px,
+ * bruit de fond de sa chaine retire en quadrature (lu sur la MEME photo
+ * developpee en CN01, qui ne pose aucun grain):
  *
- *      son grain    4,84  4,07  4,07   (R, G, B)
- *      le notre     4,57  3,85  3,84
- *      ecart         -5%   -5%   -5%
+ *      son grain seul   4,83  4,04  4,02   (R, G, B)
+ *      le notre         4,77  4,01  4,00
+ *      ecart             -1%   -1%   -1%
+ *      grosseur des grains: 2,29 px chez lui, 2,21 chez nous
  *
- * La FORME est desormais exacte — le rapport entre canaux colle a 0,1 % pres,
- * ce que la loi ci-dessus a corrige. Mais il reste 5 % UNIFORMES sur les trois
- * canaux, et un ecart uniforme n'est par definition pas un effet de couleur.
+ * On etait a -5 % UNIFORMES sur les trois canaux avant la table de largeur
+ * ci-dessus. Ce n'etait donc pas la couleur — un ecart uniforme n'est jamais un
+ * effet de couleur — mais bien l'extrapolation de l'ancienne loi de puissance
+ * au-dela de 6480 px.
  *
- * Ce n'est pas non plus le bruit de sa chaine: la MEME photo developpee avec un
- * preset sans grain (CN01), lue sur les MEMES blocs, ne porte que 0,23 / 0,51 /
- * 0,58 de bruit de fond — negligeable en quadrature.
- *
- * Il reste donc deux suspects, et ce sont exactement les deux points non
- * mesures de ce fichier. Aucun des deux ne peut etre tranche sans un nouvel
- * export de Lightroom:
- *
- *   1. LA TAILLE 10. CN14 la porte, et elle est INTERPOLEE entre la Taille 0
- *      et la Taille 25. Si la courbe est convexe entre les deux, notre echelle
- *      de 0,881 est trop grande, donc notre grain trop faible — de l'ordre de
- *      ce qu'on mesure. Une mire a 1620 px, Grain 50, Taille 10 le dirait.
- *   2. L'EXPOSANT DE LARGEUR. La photo fait 9180 px, or l'exposant 0,577 est
- *      ajuste sur 1620/3240/6480 et rien n'est mesure au-dela. Un exposant de
- *      0,549 fermerait exactement l'ecart — et 0,549 tombe DANS l'intervalle
- *      des pentes mesurees deux a deux (0,539 puis 0,586). Une mire a 9180 px
- *      le dirait.
+ * CE QUI RESTE, ET QUI EST NOUVEAU: sa FORCE et sa GROSSEUR cessent d'etre le
+ * meme nombre quand l'image grandit. Sur la mire de 9720 px, sa force donne une
+ * echelle de 2,66 alors que sa longueur de correlation vaut 3,35 — 26 % d'ecart.
+ * A 1620 et 3240 px les deux coincidaient (1,00/1,02 et 1,45/1,44). Autrement
+ * dit son grain ne se contente pas d'etre le meme bruit agrandi: sa FORME
+ * change avec l'echelle. Nous posons la bonne force (0,4 % pres a toutes les
+ * tailles mesurees) et des grains un peu trop fins (2,92 contre 3,35 a 9720 px,
+ * 2,21 contre 2,29 sur la photo). Corriger cela demanderait de remodeler le
+ * spectre du bruit, et deux points de mesure ne suffisent pas a le dessiner.
  */
 
 /* sRVB lineaire -> ProPhoto lineaire (les deux adaptes a D50, comme les

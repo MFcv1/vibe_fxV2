@@ -609,6 +609,60 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-22 bis (trois exports, et la loi de largeur qui tombe)
+
+**Ce qui a change dans l'arbre** : rien. Modifies :
+`src/features/vibefx-studio/utils/grainField.js`, `todo.md`,
+`scripts/mesure-grain-photo.mjs` (il mesure aussi la GROSSEUR des grains).
+
+**Trois exports Lightroom demandes et faits le meme jour** : mire A a 1620 px en
+Taille 10 et en Taille 40, et une mire A agrandie x6 (9720x6480) en Taille 25.
+Le dossier de depot vit sur le Bureau (`GRAIN - 3 EXPORTS A FAIRE`).
+
+**L'exposant de largeur etait faux hors de son intervalle.** `(largeur/1620)^0,577`
+etait ajuste sur 1620/3240/6480 et se trompait de **5,8 %** a 9720 px. Ce n'est
+pas une loi de puissance : les pentes locales valent 0,539 / 0,633 / 0,407.
+Remplace par une TABLE mesuree interpolee en log-log.
+
+| largeur | son ecart-type | echelle mesuree | l'ancienne loi |
+|---|---|---|---|
+| 1620 | 18,37 | 1,000 | 1,000 |
+| 3240 | 12,64 | 1,453 | 1,492 |
+| 6480 | 8,15 | 2,254 | 2,225 |
+| **9720** | **6,91** | **2,658** | **2,812** |
+
+**C'etait ca, les 5 % de la vraie photo** — pas la couleur. Sur le ciel de
+`photo-test-2` en CN14, apres retrait en quadrature du bruit de fond de sa
+chaine (lu sur la meme photo en CN01, sans grain) :
+
+| | son grain seul | le notre | ecart |
+|---|---|---|---|
+| avant | 4,83 / 4,04 / 4,02 | 4,57 / 3,85 / 3,84 | -5 % |
+| apres | 4,83 / 4,04 / 4,02 | **4,77 / 4,01 / 4,00** | **-1 %** |
+
+Et la force colle a **0,4 %** aux quatre tailles de mire mesurees.
+
+**La Taille 40 est mesuree** (echelle 1,1716 ; on l'interpolait a 1,183).
+
+**La Taille 10 a livre un fait inattendu.** A 1620 px elle rend EXACTEMENT la
+Taille 25 : 18,37 et 1,01 px contre 18,37 et 1,02. Les deux exports different
+pourtant sur 98 % de leurs pixels — ce sont bien deux tirages distincts. La
+vraie photo dit l'inverse (a 9180 px, la Taille 10 y demande une echelle de
+0,879, que l'interpolation donnait deja a 0,2 % pres). Ce qui reconcilie les
+deux : **un grain ne se dessine pas plus fin qu'un pixel**, et Lightroom
+n'augmente pas sa force pour compenser. Notre moteur, lui, le fait — 13 % de
+trop. Sans consequence sur une photo, mais un **export social fait 1080 px** et
+rien n'est mesure sous 1620. C'est le prochain export a demander. (La Taille 0
+echappe a la regle : elle descend bien sous le pixel, avec une autocorrelation
+au voisin NEGATIVE — un autre mecanisme, laisse tel quel.)
+
+**Un ecart nouveau, honnete a poser** : sa force et sa grosseur cessent d'etre le
+meme nombre quand l'image grandit. A 9720 px sa force dit « echelle 2,66 », sa
+longueur de correlation dit 3,35 — 26 % d'ecart, alors que les deux coincidaient
+a 1620 et 3240. Sa FORME de grain change avec l'echelle. Nous posons la bonne
+force et des grains un peu trop fins (2,92 contre 3,35 a 9720 ; 2,21 contre 2,29
+sur la photo). Remodeler le spectre demanderait plus de deux points.
+
 ## Journal — 2026-08-22 (le grain, dans l'espace ou Lightroom le pose)
 
 **Ce qui a change dans l'arbre** : `scripts/mesure-grain-canaux.mjs` et
