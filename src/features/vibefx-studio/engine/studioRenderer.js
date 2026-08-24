@@ -34,19 +34,25 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
 }) {
     const img = images[0];
     /*
-     * DEUX largeurs, et les confondre est un bug qu'on a deja fait.
+     * DEUX mesures, et les confondre est un bug qu'on a deja fait deux fois.
      *
-     * `largeurImage` est la largeur de l'image FINALE (recadrage compris): c'est
-     * elle qui fixe la grosseur et la force du grain, parce que c'est ce que
-     * Lightroom regarde.
+     * `grandCoteImage` est le GRAND COTE de l'image FINALE (recadrage compris):
+     * c'est lui qui fixe la grosseur et la force du grain.
      *
-     * `largeurRendu` est la largeur a laquelle cette image ENTIERE serait
+     * LE GRAND COTE, PAS LA LARGEUR — et c'est mesure. Une mire de 2160x3240
+     * exportee de Lightroom en PORTRAIT rend exactement le meme grain que la
+     * meme mire en paysage 3240x2160: 12,62 contre 12,64 (2026-08-22). Si
+     * Lightroom lisait la largeur, la version portrait aurait rendu 15,73. Une
+     * photo verticale de 9180x16320 compte donc comme une image de 16320, pas
+     * de 9180 — et l'ecart valait 47 % sur le grain.
+     *
+     * `grandCoteRendu` est le grand cote auquel cette image ENTIERE serait
      * dessinee au zoom courant. Le rapport des deux dit ce que l'affichage fait
-     * perdre. A « Adapter » elle vaut la largeur du canvas; a 100 % elle vaut
-     * `largeurImage`, et le grain apparait a sa vraie force.
+     * perdre. A « Adapter » il suit le canvas; a 100 % il vaut
+     * `grandCoteImage`, et le grain apparait a sa vraie force.
      */
-    let largeurImage = w;
-    let largeurRendu = w;
+    let grandCoteImage = Math.max(w, h);
+    let grandCoteRendu = Math.max(w, h);
 
     if (img) {
         let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
@@ -72,8 +78,8 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
             sy = Math.max(0, Math.min(targetSy, maxSy));
         }
 
-        largeurImage = sWidth;
-        largeurRendu = w;
+        grandCoteImage = Math.max(sWidth, sHeight);
+        grandCoteRendu = Math.max(w, h);
 
         /* La loupe, apres le recadrage et seulement a l'apercu. */
         const zoom = isPreview && viewport?.zoom > 1 ? viewport.zoom : 1;
@@ -86,7 +92,7 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
             sy += (sHeight - zHeight) * Math.min(1, Math.max(0, viewport.cy ?? 0.5));
             sWidth = zWidth;
             sHeight = zHeight;
-            largeurRendu = w * zoom;
+            grandCoteRendu = Math.max(w, h) * zoom;
         }
 
         ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, w, h);
@@ -98,7 +104,7 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
 
 
     // ═══════════════════════════════════════════════════════
-    applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, largeurImage, largeurRendu);
+    applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, grandCoteImage, grandCoteRendu);
 }
 
 /**
@@ -139,7 +145,8 @@ function renderCropGrid(ctx, w, h) {
  *  8. Grain (noise pattern)
  *  9. Intensity Blend (original/filtered mix)
  */
-function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, largeurImage = w, largeurRendu = w) {
+function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
+    grandCoteImage = Math.max(w, h), grandCoteRendu = Math.max(w, h)) {
     const safeFilters = normalizeVisionFilters(filters);
     const intensity = safeFilters.filterIntensity !== undefined ? safeFilters.filterIntensity : 100;
     if (intensity === 0) return;
@@ -242,7 +249,8 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, largeurImage
      * Les mesures sont dans `grainField.js`.
      */
     if (safeFilters.grain > 0 && quality !== 'low') {
-        applyFilmGrain(ctx, w, h, safeFilters.grain, safeFilters.grainSize, largeurImage, largeurRendu);
+        applyFilmGrain(ctx, w, h, safeFilters.grain, safeFilters.grainSize, grandCoteImage, grandCoteRendu,
+            safeFilters.grainRoughness);
     }
 
     // ── Stage 9: Intensity Blend ─────────────────────────

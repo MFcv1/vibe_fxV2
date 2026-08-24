@@ -31,8 +31,12 @@ import {
     GRAIN_ATTENUATION,
     GRAIN_NOISE_TABLE,
     grainPoserDelta,
+    grainEchelle,
+    grainGrosseurCible,
+    grainPourRendu,
     grainSigma,
     grainTransfertDecode,
+    grainValeurEn,
     grainTransfertEncode,
 } from '../src/features/vibefx-studio/utils/grainField.js';
 
@@ -694,6 +698,187 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
     }
     check('grain : ecart a Lightroom sur les GRIS', pireGris, 0, 2.5, '%');
     check('grain : ecart a Lightroom sur les COULEURS', pireCouleur, 0, 3, '%');
+}
+
+
+/*
+ * La FORCE du grain, a chaque couple (Taille, largeur) que Lightroom a
+ * reellement exporte. Chaque nombre attendu est l'ecart-type lu dans un de ses
+ * fichiers, jamais un rendu de reference fabrique par nous.
+ */
+{
+    const MESURES = [
+        // [Taille, largeur, son ecart-type a Grain 50] — un export Lightroom chacun
+        [25, 810, 21.73],
+        [10, 1080, 22.09], [25, 1080, 20.69], [40, 1080, 19.22], [100, 1080, 13.86],
+        [0, 1620, 22.91], [10, 1620, 18.37], [25, 1620, 18.37], [40, 1620, 15.68],
+        [50, 1620, 14.08], [100, 1620, 9.37],
+        [10, 3240, 18.50], [25, 3240, 12.64], [40, 3240, 9.53],
+        [10, 6480, 13.63], [25, 6480, 8.15], [40, 6480, 6.83],
+        [25, 9720, 6.91],
+    ];
+    let pire = 0;
+    for (const [taille, largeur, sien] of MESURES) {
+        pire = Math.max(pire, Math.abs(100 * (grainSigma(50, taille, largeur) / sien - 1)));
+    }
+    check('grain : force, 18 exports Lightroom', pire, 0, 0.5, '%');
+
+    /*
+     * La CASSURE, son troisieme curseur. Elle valait 50 partout et n'avait
+     * jamais ete mesuree — un preset qui l'aurait changee aurait fausse le
+     * grain de 72 % sans que rien ne le signale.
+     */
+    let pireCassure = 0;
+    for (const [cassure, sien] of [[0, 31.65], [50, 18.37], [100, 18.23]]) {
+        pireCassure = Math.max(pireCassure, Math.abs(100 * (grainSigma(50, 25, 1620, cassure) / sien - 1)));
+    }
+    check('grain : Cassure, 3 exports Lightroom', pireCassure, 0, 0.5, '%');
+    check('grain : Cassure 0 pose bien pres du double',
+        grainSigma(50, 25, 1620, 0) / grainSigma(50, 25, 1620, 50), 1.6, 1.8, '×');
+    check('grain : Cassure 100 grossit les grains',
+        grainGrosseurCible(1, 100) / grainGrosseurCible(1, 50), 1.4, 1.7, '×');
+
+    /*
+     * Le rapport entre deux Tailles GRANDIT avec l'image: sur une petite image
+     * les Tailles basses se confondent (elles butent sur le pixel), sur une
+     * grande elles s'ecartent. C'est ce qu'aucun PRODUIT ne peut rendre, et la
+     * raison d'etre de la surface. Fige ici pour qu'un retour au produit se
+     * voie tout de suite.
+     */
+    const rapport = (largeur) => grainSigma(50, 10, largeur) / grainSigma(50, 25, largeur);
+    check('grain : Tailles 10 et 25 confondues en petit format', rapport(1080), 1.0, 1.12, '×');
+    check('grain : ...et separees en grand format', rapport(6480), 1.5, 1.8, '×');
+
+    /*
+     * L'echelle ne doit pas RECULER quand l'image grandit: une image plus
+     * grande ne peut pas porter un grain plus fin. On tolere 1 %, parce que le
+     * rang Taille 10 mesure 18,37 a 1620 px et 18,50 a 3240 — un creux de
+     * 0,7 % qui est du bruit de mesure (son grain est un tirage aleatoire), et
+     * qu'on prefere garder la mesure plutot que de retoucher un fichier.
+     */
+    let pireRecul = 0;
+    for (const taille of [0, 10, 25, 40, 50, 100]) {
+        let avant = 0;
+        for (let largeur = 600; largeur <= 12000; largeur += 100) {
+            const e = grainEchelle(taille, largeur);
+            if (avant > 0) pireRecul = Math.max(pireRecul, 100 * (1 - e / avant));
+            avant = e;
+        }
+    }
+    check('grain : l\'echelle ne recule pas quand l\'image grandit', pireRecul, 0, 1, '%');
+}
+/*
+ * ── LE RECADRAGE ─────────────────────────────────────────────────────────
+ *
+ * Le grain se calcule sur la largeur de l'image FINALE, recadrage compris —
+ * pas sur celle du fichier d'origine, ni sur celle du canvas. Un recadrage
+ * serre rend donc l'image plus petite, donc le grain plus fin et plus fort,
+ * exactement comme chez lui.
+ *
+ * Ca n'avait jamais ete verifie. Deux choses le sont ici: la LOI, et le
+ * CABLAGE — c'est-a-dire que le moteur passe bien la largeur echantillonnee
+ * (`sWidth`) et non celle du canvas. Le cablage se lit dans la source parce que
+ * `studioRenderer.js` est du code navigateur que Node ne peut pas charger.
+ */
+{
+    /* La loi: recadrer de moitie doit donner exactement le grain d'une image
+       deux fois plus etroite. */
+    const pleine = grainSigma(25, 25, 6480);
+    const recadree = grainSigma(25, 25, 3240);
+    check('recadrage : un cadre 2x plus serre renforce le grain',
+        recadree / pleine, 1.5, 1.9, '×');
+    /* Et rendue 1:1, cette image recadree porte exactement ce grain-la — la
+       largeur du fichier d'origine n'entre nulle part. */
+    check('recadrage : rendu 1:1, c\'est bien ce grain',
+        Math.abs(grainPourRendu(25, 25, 3240, 3240).sigma - recadree), 0, 1e-12);
+    /* Reduite a l'ecran, elle en montre MOINS: c'est ce que montre son ecran a
+       lui, et c'est pour ca que Vision a un zoom. */
+    check('recadrage : reduite a l\'ecran, elle en montre moins',
+        grainPourRendu(25, 25, 3240, 800).sigma / recadree, 0.2, 0.95, '×');
+
+    /* Le cablage: `largeurImage` doit etre la portion ECHANTILLONNEE. */
+    const moteur = readFileSync(
+        new URL('../src/features/vibefx-studio/engine/studioRenderer.js', import.meta.url),
+        'utf8',
+    );
+    check('recadrage : le moteur prend le grand cote echantillonne',
+        /grandCoteImage\s*=\s*Math\.max\(sWidth,\s*sHeight\)/.test(moteur) ? 1 : 0, 1, 1);
+    /*
+     * LE GRAND COTE, PAS LA LARGEUR. Mesure: une mire de 2160x3240 exportee en
+     * PORTRAIT rend 12,62, exactement comme la meme mire en paysage 3240x2160
+     * (12,64). Si Lightroom lisait la largeur, elle aurait rendu 15,73. Une
+     * photo verticale de 9180x16320 compte donc comme une image de 16320 —
+     * l'ecart valait 47 % sur le grain.
+     */
+    check('portrait : une image verticale compte par son grand cote',
+        Math.abs(grainSigma(50, 25, 3240) - 12.64), 0, 0.1, '/255');
+    check('portrait : le moteur lit bien le grand cote',
+        /grandCoteImage\s*=\s*Math\.max\(w,\s*h\)/.test(moteur) ? 1 : 0, 1, 1);
+
+    check('recadrage : et il le transmet au grain',
+        /applyFilmGrain\([^)]*grandCoteImage,\s*grandCoteRendu\b/.test(moteur) ? 1 : 0, 1, 1);
+}
+
+
+/*
+ * La GROSSEUR de nos grains contre la sienne. La force et la grosseur ne sont
+ * pas le meme nombre au-dela de 2 px — c'est la mesure du 2026-08-22 — et ce
+ * test garde la table qui les separe. La metrique est celle de
+ * `mesure-taille-grain.mjs`: 1 + 2 x la somme des autocorrelations.
+ */
+{
+    const N = 256;
+    const longueurDuChamp = (echelle) => {
+        const v = new Float64Array(N * N);
+        for (let y = 0; y < N; y += 1) {
+            for (let x = 0; x < N; x += 1) v[y * N + x] = grainValeurEn(x, y, echelle);
+        }
+        let somme = 0;
+        for (let i = 0; i < v.length; i += 1) somme += v[i];
+        const m = somme / v.length;
+        for (let i = 0; i < v.length; i += 1) v[i] -= m;
+        let total = 0;
+        for (let dx = 1; dx <= 8; dx += 1) {
+            let sxy = 0;
+            let sxx = 0;
+            for (let y = 0; y < N; y += 1) {
+                for (let x = 0; x < N - dx; x += 1) {
+                    const a = v[y * N + x];
+                    sxy += a * v[y * N + x + dx];
+                    sxx += a * a;
+                }
+            }
+            total += Math.max(0, sxx > 0 ? sxy / sxx : 0);
+        }
+        return 1 + 2 * total;
+    };
+    /* [echelle, sa grosseur mesuree sur l'export Lightroom correspondant] */
+    const SIENNE = [[1.0, 1.02], [1.1716, 1.12], [1.4533, 1.44], [1.96, 1.96], [2.254, 2.44], [2.6585, 3.35]];
+    let pire = 0;
+    for (const [echelle, sienne] of SIENNE) {
+        pire = Math.max(pire, Math.abs(100 * (longueurDuChamp(echelle) / sienne - 1)));
+    }
+    check('grain : grosseur des grains, 6 exports', pire, 0, 6, '%');
+
+    /* Le champ doit garder un ecart-type de 1 QUEL QUE SOIT le pas: aux pas
+       entiers et demi-entiers le reseau se cale sur la grille des pixels et le
+       gonflait jusqu'a 13 %. C'est ce que `eviterResonance` empeche. */
+    let pireSigma = 0;
+    for (let echelle = 1.0; echelle <= 5.0; echelle += 0.05) {
+        let somme = 0;
+        let carres = 0;
+        for (let y = 0; y < N; y += 1) {
+            for (let x = 0; x < N; x += 1) {
+                const val = grainValeurEn(x, y, echelle);
+                somme += val;
+                carres += val * val;
+            }
+        }
+        const n = N * N;
+        const sigma = Math.sqrt(Math.max(0, carres / n - (somme / n) ** 2));
+        pireSigma = Math.max(pireSigma, Math.abs(100 * (sigma - 1)));
+    }
+    check('grain : le champ garde sa force a tous les pas', pireSigma, 0, 3, '%');
 }
 
 /* ---------- rapport ---------- */

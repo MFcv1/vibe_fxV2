@@ -514,6 +514,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : la mire neutre reexportee sans preset doit revenir a l'identite (<=2/255). Attrape le piege Adobe RVB au lieu de sRVB, qui fausserait chaque preset sans rien signaler
 |   |-- make-hald-clut.mjs             # Genere la mire Hald. Depuis le lot J elle est en BLOCS de 4x4 pixels par couleur (2048x2048) avec profil sRGB explicite : une couleur par pixel faisait baver les couleurs entre voisines et virait les noirs au vert
 |   |-- mesure-grain-lightroom.mjs     # Combien vaut le grain de Lightroom, et combien vaut le notre, carre par carre sur la mire A. Lit le COEUR des aplats (marge de 30 px: tout effet spatial bave sur les bords) et extrait le grain EN QUADRATURE (sqrt(total^2 - base^2), jamais la difference brute). C'est lui qui a montre que le « x8 » etait faux (x2,66) et, surtout, que l'ecart n'etait pas un facteur mais une FORME: plat chez lui, cloche chez nous. `--planche` sort les trois versions cote a cote a l'echelle 1:1
+|   |-- make-mire-largeur.mjs          # La mire A DESSINEE a n'importe quelle largeur. Dessinee, jamais redimensionnee: agrandir au plus proche voisin marche (les aplats restent unis), mais REDUIRE melange les bords des carres et fabrique des pixels qui n'existent dans aucun aplat. C'est elle qui a permis de mesurer le grain a 810 et 1080 px, la ou sortent les images sociales
 |   |-- mesure-grain-canaux.mjs        # Son grain CANAL PAR CANAL. Soustrait l'export SANS RIEN de l'export AVEC GRAIN pixel a pixel: la difference EST son champ de grain. Donne l'ecart-type de chaque canal, la CORRELATION entre canaux (1,00 = un seul bruit, 0,00 = trois bruits tires separement — c'est elle qui a tranche) et la proportion de pixels ECRETES, qui explique pourquoi deux canaux du meme aplat ne portent pas le meme grain
 |   |-- mesure-grain-photo.mjs         # Le grain sur une VRAIE photo. Floute large (12 px, jamais 3: un voisinage etroit sous-estime un grain de 2,4 px), choisit les blocs les plus PLATS, et compare son residu au notre — chaque cote moins SON PROPRE flou. `--sansgrain <photo>` retire en quadrature le bruit de fond de sa chaine, lu sur les MEMES blocs d'une version developpee sans grain
 |   |-- planche-grain.mjs              # La planche du grain sur une VRAIE photo: sans grain / ancien moteur a 20 / nouveau a 8, a l'echelle 1:1 et jamais redimensionnee (reduire une image MOYENNE son grain, une planche reduite mentirait sur ce qu'elle montre). Repond a ce qu'aucun ecart-type ne dit: est-ce que le recalage abime le rendu
@@ -609,6 +610,220 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-22 sexies (le grand cote, pas la largeur)
+
+**Ce qui a change dans l'arbre** : rien. Modifies :
+`engine/studioRenderer.js`, `utils/canvasUtils.js`, `utils/grainField.js`,
+`scripts/mesure-grain-photo.mjs`, `scripts/smoke-vision-preset.mjs`, `todo.md`.
+
+**UN SEUL EXPORT, ET IL TRANCHE.** Une mire de 2160x3240 exportee de Lightroom
+en PORTRAIT rend un grain de **12,62** — exactement celui de la MEME mire en
+paysage 3240x2160 (**12,64**). Si Lightroom lisait la LARGEUR, la version
+portrait aurait rendu 15,73.
+
+C'est donc le **GRAND COTE** de l'image qui fixe le grain, et l'orientation n'y
+change rien. Notre moteur lisait la largeur: une photo verticale de 9180x16320
+etait traitee comme une image de 9180 alors que Lightroom y voit 16320 —
+**47 % d'ecart sur le grain de toute photo verticale**.
+
+Corrige: `largeurImage`/`largeurRendu` deviennent `grandCoteImage`/
+`grandCoteRendu` (`Math.max(sWidth, sHeight)`), de `renderStudio` jusqu'a
+`applyFilmGrain`. Le nom dit desormais la verite, ce qui est la meilleure
+protection contre la troisieme occurrence du meme bug. Deux tests le gardent.
+
+**Sur la vraie photo**: l'ecart passe de **+47 % a +17 %**. La Taille de CN14 a
+ete VERIFIEE dans son panneau le meme jour — Grain 25, Taille 10, Cassure 50,
+le releve d'import etait juste. Reste donc la seule autre cause: l'extrapolation
+au-dela de 9720 px.
+
+**Et c'est confirme par la seconde photo.** `photo-test-1` fait 5392 de grand
+cote, DANS le domaine mesure: son grain 7,73, le notre 7,41 — **-4 %**.
+`photo-test-2` fait 16320, soit 150 Mpx et 1,7x au-dela de la plus grande mire:
+**+17 %**. C'est la seule difference entre les deux. Sur une photo normale, on y
+est; au-dela de 9720 px on extrapole, et ca se paie.
+
+**Tests** : `test:vision-preset` passe a **98 verifications**.
+
+## Journal — 2026-08-22 quinquies (le produit tombe, la surface le remplace)
+
+**Ce qui a change dans l'arbre** : rien. Modifies :
+`src/features/vibefx-studio/utils/grainField.js` (la loi),
+`visionColorScience.js` (borne `grainRoughness`), `canvasUtils.js`,
+`engine/studioRenderer.js`, `scripts/import-lightroom-preset.mjs`,
+`scripts/smoke-vision-preset.mjs`, `todo.md`.
+
+**Huit exports de plus** (dossier `🔴 GRAIN - A FAIRE (8 exports)` sur le
+Bureau): Tailles 10 et 40 a 1080/3240/6480 px, plus Cassure 0 et 100 a 1620 px.
+
+**LE MODELE EN PRODUIT EST MORT.** Il multipliait une echelle de Taille par une
+echelle de largeur. Il etait exact sur les DEUX AXES ou l'on avait mesure — la
+Taille a 1620 px, la Taille 25 a toutes les largeurs — et personne n'avait
+regarde ENTRE les deux. Les six exports du lot A donnent:
+
+| cas | lui | le produit | ecart |
+|---|---|---|---|
+| Taille 10, 1080 px | 22,09 | 21,56 | -2 % |
+| Taille 40, 1080 px | 19,22 | 18,99 | -1 % |
+| Taille 10, 3240 px | 18,50 | 14,42 | **-22 %** |
+| Taille 40, 3240 px | 9,53 | 10,79 | **+13 %** |
+| Taille 10, 6480 px | 13,63 | 9,28 | **-32 %** |
+| Taille 40, 6480 px | 6,83 | 6,96 | +2 % |
+
+L'effet du curseur Taille GRANDIT avec l'image: le rapport Taille 10 / Taille 25
+vaut 1,07 a 1080 px, 1,00 a 1620, 1,46 a 3240 et 1,67 a 6480. Sur une petite
+image les Tailles basses se confondent (elles butent sur le pixel), sur une
+grande elles s'ecartent. Aucun produit ne peut rendre ca — et le « repli sous le
+pixel » qu'on avait pose la veille n'en etait qu'une moitie.
+
+Remplace par une **SURFACE mesuree** (`GRAIN_SURFACE_MESUREE`): rangs Taille 10,
+25 et 40 mesures d'un bout a l'autre — ce sont ceux ou vivent tous les presets —
+plus deux points sur le rang 100, interpoles log-log sur la largeur et
+lineairement sur la Taille. **Pire ecart sur les 18 exports: 0,13 %.**
+
+**LA CASSURE N'ETAIT PAS NEGLIGEABLE.** Mesuree pour la premiere fois (mire
+1620 px, Grain 50, Taille 25):
+
+| Cassure | ecart-type | grosseur | |
+|---|---|---|---|
+| 0 | 31,65 | 1,02 px | **1,72x plus de grain**, meme finesse |
+| 50 | 18,37 | 1,02 px | la reference |
+| 100 | 18,23 | 1,58 px | meme force, grains 1,5x plus gros |
+
+C'etait le piege silencieux du projet: un preset qui l'aurait changee aurait
+fausse le grain de 72 % sans que rien ne le signale. Elle est desormais mesuree,
+branchee de bout en bout (`grainRoughness`: bornes du moteur, normalisation,
+`applyFilmGrain`, `studioRenderer`) et passable a l'import
+(`--grainRoughness`). Elle agit sur les deux axes SEPAREMENT — la force d'un
+cote, la grosseur de l'autre — ce qui confirme une derniere fois que ces deux
+grandeurs sont independantes chez lui.
+
+**UN BUG D'EXTRAPOLATION, trouve par le test.** La premiere version de la
+surface choisissait une PENTE du rang guide selon les points qui tombaient dans
+l'intervalle: elle changeait par sauts, et l'echelle RECULAIT de 6,7 % en
+franchissant 9720 px — une image plus grande recevait un grain plus fin.
+Remplacee par la croissance RELATIVE du guide, continue par construction. Un
+test balaye 600 a 12000 px pour l'interdire.
+
+**LA QUESTION QUI RESTE: LES IMAGES EN PORTRAIT.** `photo-test-2` fait
+9180x16320 a l'ecran mais son fichier source fait 16320x9180 — l'orientation
+EXIF la tourne. Lightroom voit donc un GRAND COTE de 16320 la ou notre moteur
+lit une largeur de 9180. Sur son grain mesure (4,03/255) la surface rend 5,91
+avec 9180 (+47 %) et 4,67 avec 16320 (+16 %). Toutes nos mires sont en paysage:
+aucune ne peut trancher. Il faut UNE mire tournee en portrait (2160x3240), plus
+une relecture du panneau Grain de CN14 (le releve dit Taille 10; au grand cote,
+12 a 13 collerait).
+
+**Tests** : `test:vision-preset` passe de 87 a **96 verifications**.
+
+## Journal — 2026-08-22 quater (la forme du grain, le recadrage, et la cloture)
+
+**Ce qui a change dans l'arbre** : rien. Modifies :
+`src/features/vibefx-studio/utils/grainField.js`,
+`scripts/smoke-vision-preset.mjs`, `todo.md`.
+
+**LA FORME. Trois choses etaient confondues en une.** L'ECHELLE pilote la
+FORCE. La GROSSEUR de ses grains n'est pas cette echelle — les deux coincident
+jusqu'a 2 px puis divergent. Et le PAS d'interpolation n'est ni l'une ni
+l'autre. Le code visait une grosseur egale a l'echelle: sur une mire de 9720 px
+ca donnait 2,92 px la ou il en fait 3,35.
+
+Table mesuree sur douze exports (echelle -> sa grosseur): 1,00 -> 1,02;
+1,17 -> 1,12; 1,31 -> 1,27; 1,45 -> 1,44; 1,96 -> 1,96; 2,25 -> 2,44;
+2,66 -> 3,35. Que la Taille 100 a 1080 px (1,33 -> 1,31) tombe pile dans cette
+serie n'etait pas acquis: ca dit que la grosseur est une fonction de la SEULE
+echelle, quel que soit le chemin qui y mene.
+
+**UN BUG TROUVE EN CHEMIN, et il coutait cher.** Aux pas ENTIERS et
+DEMI-ENTIERS, les points du reseau tombent sur la grille des pixels et le champ
+cesse d'avoir un ecart-type de 1:
+
+  pas 1,50 -> 1,057 ; 2,00 -> **1,127** ; 2,50 -> 1,021 ; 3,00 -> 1,054
+
+L'ancienne table `GROSSEUR_PAR_PAS` avait un point a **pas 2,00 exactement**:
+une image de la bonne taille recevait 13 % de grain en trop, sans que rien ne le
+dise. `eviterResonance` ecarte desormais le pas de ces valeurs, et un test
+balaye toute la plage pour que ca ne revienne pas.
+
+**Resultat, les dix exports Lightroom, force ET grosseur:**
+
+| largeur / Taille | sa force | la notre | sa grosseur | la notre |
+|---|---|---|---|---|
+| 810 px, T25 | 21,73 | 21,74 | 1,05 | 1,01 |
+| 1080 px, T25 | 20,69 | 20,69 | 1,04 | 1,01 |
+| 1620 px, T25 | 18,37 | 18,38 | 1,02 | 1,01 |
+| 3240 px, T25 | 12,64 | 12,69 | 1,44 | 1,43 |
+| 6480 px, T25 | 8,15 | 8,16 | 2,44 | 2,42 |
+| 9720 px, T25 | 6,91 | 6,92 | 3,35 | **3,35** |
+| 1620 px, T40 | 15,68 | 15,69 | 1,12 | 1,13 |
+| 1620 px, T100 | 9,37 | 9,37 | 1,96 | 1,96 |
+
+Vraie photo : **-1 / -0 / -0 %**, grosseur 2,35 contre 2,29 (elle etait a 2,19).
+
+**LE RECADRAGE est teste**, ce qui n'avait jamais ete fait: la LOI (un cadre 2x
+plus serre rend exactement le grain d'une image 2x plus etroite; rendu 1:1 c'est
+bien ce grain; reduit a l'ecran il en montre moins) et le CABLAGE (le moteur
+passe `sWidth` et le transmet au grain — lu dans la source, `studioRenderer.js`
+etant du code navigateur que Node ne charge pas).
+
+**LE GRAIN EST CLOS.** La regle de reouverture est ecrite dans `todo.md` et en
+tete de `grainField.js`: trois cas, pas un de plus (Cassure changee, Taille > 50
+sur un export social, image hors de 810–9720 px). La reduction du bruit de
+Lightroom, qui nous manque toujours, n'en fait PAS partie: ce n'est pas du
+grain, c'est un etage qui manque avant lui.
+
+**Tests** : `test:vision-preset` passe de 87 a **94 verifications**.
+
+## Journal — 2026-08-22 ter (le petit format, et le repli sous le pixel)
+
+**Ce qui a change dans l'arbre** : `scripts/make-mire-largeur.mjs` (nouveau).
+Modifies : `src/features/vibefx-studio/utils/grainField.js`,
+`scripts/mesure-taille-grain.mjs` (il accepte des mires non entieres),
+`scripts/smoke-vision-preset.mjs`, `todo.md`.
+
+**Trois exports de plus** (dossier `✅ FAIT - grain, petit format` sur le Bureau) : mire A
+dessinee a 1080 px en Taille 25 puis en Taille 100, et a 810 px en Taille 25.
+
+**Le trou du petit format.** Un grain ne se dessine pas plus fin qu'un pixel:
+sous 1 px son motif SE REPLIE sur la grille et son ecart-type monte MOINS VITE
+que 1/echelle. Nous suivions 1/echelle jusqu'en bas.
+
+| cas | echelle voulue | son ecart-type | le notre (avant) | ecart |
+|---|---|---|---|---|
+| Taille 25, 810 px | 0,688 | 21,73 | 26,70 | **+23 %** |
+| Taille 25, 1080 px | 0,804 | 20,69 | 22,86 | **+10 %** |
+| Taille 25, 1620 px | 1,000 | 18,37 | 18,37 | 0 % |
+
+1080 px, c'est la taille d'un export social: c'etait donc le trou le plus cher.
+Corrige par une table `GRAIN_REPLI_MESURE` qui n'agit QUE sous 1 — rien de ce
+qui etait cale sur les grandes images ne bouge.
+
+**La table des Tailles change d'unite.** Elle est desormais ecrite en echelles
+VOULUES et non effectives. La Taille 0 y vaut 0,5825 (choisie pour que le repli
+la ramene sur les 0,802 mesures a 1620) et la **Taille 10 y vaut 0,879**, lue
+sur la VRAIE photo a 9180 px — la seule facon de lire une Taille basse sans que
+le repli la contamine.
+
+**Le mystere de la Taille 10 est resolu.** A 1620 px elle rendait exactement la
+Taille 25 alors que les deux exports different sur 98 % de leurs pixels: leurs
+deux echelles voulues, 0,879 et 1,000, se replient presque au meme endroit. On
+en rend 0,932 la ou il en rend 1,000 — 7 % de trop, contre 13 % avant.
+
+**Resultat sur les DIX exports Lightroom** (6 largeurs x 5 Tailles): ecart le
+pire **0,13 %**. La vraie photo: **-1 / -0 / -0 %** sur les trois canaux.
+
+**Ce que le TEMOIN a appris, et qui n'etait pas prevu.** La mire de 1080 px a
+Taille 100 servait de controle: ses grains restent gros meme sur une petite
+image, donc hors du repli. Son ecart-type vaut 13,86 (echelle 1,325), le notre
+11,66 (echelle 1,575) — **-16 %**, alors que le produit `Taille x largeur`
+predit 1,575. Autrement dit **ses gros grains retrecissent PLUS que ses petits
+quand l'image retrecit**: la Taille et la largeur ne sont pas separables en
+petit format, et un modele en produit ne peut pas le rendre. Sans le temoin, on
+aurait mis cet ecart sur le dos du repli et « corrige » au mauvais endroit.
+
+**Tests** : `test:vision-preset` passe de 82 a 87 verifications. Les deux ecarts
+connus (Taille 10 a 1620, Taille 100 a 1080) sont BORNES par un test, pour
+qu'une derive se voie au lieu de passer pour normale.
+
 ## Journal — 2026-08-22 bis (trois exports, et la loi de largeur qui tombe)
 
 **Ce qui a change dans l'arbre** : rien. Modifies :
@@ -617,7 +832,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 **Trois exports Lightroom demandes et faits le meme jour** : mire A a 1620 px en
 Taille 10 et en Taille 40, et une mire A agrandie x6 (9720x6480) en Taille 25.
-Le dossier de depot vit sur le Bureau (`GRAIN - 3 EXPORTS A FAIRE`).
+Le dossier de depot vit sur le Bureau (`✅ FAIT - grain, exports du 22 aout`).
 
 **L'exposant de largeur etait faux hors de son intervalle.** `(largeur/1620)^0,577`
 etait ajuste sur 1620/3240/6480 et se trompait de **5,8 %** a 9720 px. Ce n'est

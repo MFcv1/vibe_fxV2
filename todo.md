@@ -81,7 +81,7 @@ ne peut ni lire ses panneaux ni exporter à sa place.
 
 | Réglage | État |
 |---|---|
-| **Grain** | **ALIGNÉ : force, grosseur, couleur, et toutes tailles d'image** (2026-08-22). Il pose son grain dans **son espace de travail** (ProPhoto), pas en sRVB — d'où plus de grain sur les couleurs saturées. Mire : **0,7 % sur les gris, 1,2 % sur les couleurs**. Force : **0,4 %** à 1620/3240/6480/9720 px. Vraie photo : **−1 %** sur les trois canaux. Reste : ses grains sont un peu **plus gros** que les nôtres aux grandes tailles (voir ci-dessous) |
+| **Grain** | **Force 0,13 % sur 18 exports** Lightroom (810 → 9720 px, Tailles 0 → 100), grosseur 2,2 %, Cassure 0,11 %, couleurs 1,2 %. Le grain se calcule sur le **GRAND CÔTÉ**, pas la largeur (mesuré). Vraie photo de taille normale : **−4 %**. Au-delà de 9720 px on extrapole (+17 % sur une image de 150 Mpx) |
 | **Vignetage** | **ALIGNÉ** — 2,4/255. Multiplie en lumière **linéaire**, rayon **elliptique**, dosage en **exposant**, protège les hautes lumières |
 | **Netteté** | **ALIGNÉE** — échelle 0–150 comme la sienne, dosage saturant. Revérifiée **sur photo** : ×0,986 à 40 |
 | **Clarté** | **ALIGNÉE** — le dosage collait déjà ; le **rayon** était 4× trop petit |
@@ -154,24 +154,63 @@ confirmés à quelques pourcents. Les trous, par ordre d'importance :
    **9720**, ce dernier exporté le 2026-08-22), interpolée en log-log. Sur la
    vraie photo : de −5 % à **−1 %**. La **Taille 40** est mesurée elle aussi
    (1,1716, on l'interpolait à 1,183).
-6. **Grain — ce qui reste, et qui est nouveau.** Sa **force** et sa **grosseur**
-   cessent d'être le même nombre quand l'image grandit : à 9720 px sa force dit
-   « échelle 2,66 » et sa longueur de corrélation dit 3,35. Sa forme de grain
-   change avec l'échelle, pas seulement sa taille. Nous posons la bonne force
-   (0,4 %) et des grains un peu **trop fins** (2,92 contre 3,35 à 9720 px ;
-   2,21 contre 2,29 sur la photo). Corriger demande de remodeler le spectre du
-   bruit — deux points ne suffisent pas à le dessiner.
-7. **Grain — le trou du PETIT format, le plus gênant qui reste.** À 1620 px, sa
-   Taille 10 rend exactement sa Taille 25 : un grain ne se dessine pas plus fin
-   qu'un pixel, et il n'augmente pas sa force pour compenser. Nous, si — 13 %
-   de trop. Rien n'est mesuré **sous 1620 px**, et un export social fait
-   1080 px. **Prochain export à demander : la mire A réduite à 1080 px de
-   large, Grain 50, Taille 25.** (La Taille 0 échappe à cette règle et reste
-   inexpliquée : elle descend bien sous le pixel, avec une autocorrélation
-   négative — un autre mécanisme.)
+6. **Grain — l'état après 21 exports Lightroom.** La journée a corrigé, dans
+   l'ordre : la **couleur** (il pose son grain dans son espace de travail
+   ProPhoto, pas en sRVB), la **loi de largeur**, le **repli sous le pixel**,
+   la **forme** (force et grosseur sont deux nombres, pas un), puis — le plus
+   gros — le fait que **la Taille et la largeur ne se multiplient pas**.
 
-   Toujours non mesurées : la **Cassure** (50 partout) et le **recadrage**
-   (aucun test).
+   | | écart |
+   |---|---|
+   | Force, **18 exports** (Tailles 0→100 × largeurs 810→9720) | **0,13 %** |
+   | Grosseur des grains, 6 exports | 2,2 % |
+   | Cassure, 3 exports | 0,11 % |
+   | Gris / couleurs (mire, 3 forces) | 0,7 % / 1,2 % |
+
+   **Le modèle en produit est mort.** Six exports (Tailles 10 et 40 à 1080,
+   3240, 6480 px) ont montré des écarts de **−32 % à +13 %** *entre* les deux
+   axes mesurés, là où personne n'avait regardé. Remplacé par une **surface**
+   mesurée, interpolée. Le rapport entre sa Taille 10 et sa Taille 25 vaut 1,07
+   à 1080 px et **1,67** à 6480 : sur une petite image les Tailles basses se
+   confondent, sur une grande elles s'écartent.
+
+   **La Cassure n'était pas négligeable** : à 0 elle pose **1,72×** plus de
+   grain, à 100 elle grossit les grains de moitié sans changer la force. C'était
+   le piège silencieux ; elle est mesurée, branchée (`grainRoughness`) et
+   passable à l'import (`--grainRoughness`).
+
+   Deux bugs trouvés en route : l'atténuation dans les noirs et les blancs était
+   calée sur **un seul** point lu après écrêtage (6,4 % → 0,68 %) ; et à certains
+   pas d'interpolation le bruit se calait sur la grille de pixels et gagnait
+   **13 % de force** — l'ancienne table avait un point sur l'un d'eux.
+
+7. **Grain — LE GRAND CÔTÉ, pas la largeur : RÉGLÉ le 2026-08-22.** Une mire de
+   2160×3240 exportée **en portrait** rend 12,62, exactement comme la même mire
+   en paysage 3240×2160 (12,64). Si Lightroom lisait la largeur elle aurait
+   rendu 15,73. Notre moteur lisait la largeur : **47 % d'écart sur le grain de
+   toute photo verticale**. Corrigé (`grandCoteImage` dans
+   [studioRenderer.js](src/features/vibefx-studio/engine/studioRenderer.js)),
+   gardé par un test.
+
+8. **Grain — sur de vraies photos, et ce qui reste.** Deux photos développées
+   des deux côtés en CN14 (**Grain 25, Taille 10, Cassure 50 — relevé confirmé
+   dans son panneau** le 2026-08-22), ciel, bruit de fond retiré en quadrature :
+
+   | photo | grand côté | son grain | le nôtre | écart |
+   |---|---|---|---|---|
+   | `photo-test-1` | 5 392 | 7,73 | 7,41 | **−4 %** |
+   | `photo-test-2` | 16 320 | 4,03 | 4,71 | **+17 %** |
+
+   La première est **dans** le domaine mesuré (810 → 9720 px), la seconde non :
+   elle fait 150 Mpx, 1,7× au-delà de notre plus grande mire. C'est la seule
+   différence entre les deux, et elle explique tout l'écart.
+
+   **Sur une photo normale, on y est.** Au-delà de 9720 px de grand côté on
+   extrapole, et ça coûte 17 % sur une image de 150 Mpx. Une mire de 16320 px,
+   à Taille 10 **et** Taille 25, le fermerait — 2 exports, seulement si une
+   photo de plus de 100 Mpx doit vraiment être servie.
+
+   Le **recadrage** est désormais testé (la loi et le câblage).
 8. **CN11 à remesurer** avec l'instrument corrigé si sa photo de validation
    réapparaît — ses 0,64/2,67 datent de l'ancien.
 9. **Une seule résolution vérifiée** (1620×1080) **pour la texture et la
@@ -314,6 +353,11 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
   **zoom** (Adapter / 100 % / 200 % / 400 %) pour ca, comme Lightroom. Et une
   MESURE de grain a le meme piege : retirer un voisinage trop etroit sous-estime
   un grain plus gros qu'un pixel.
+- **Toujours exporter un TÉMOIN avec la mesure.** Pour le petit format, la mire
+  à Taille 100 servait de contrôle : ses grains restent gros même sur une petite
+  image, donc **hors** du mécanisme suspecté. C'est elle qui a montré que la
+  Taille et la largeur ne sont pas séparables — sans elle, on aurait mis son
+  écart sur le dos du repli et « corrigé » au mauvais endroit.
 - **Un écart UNIFORME sur les trois canaux n'est jamais un effet de couleur.**
   Les 5 % qui restent sur une vraie photo étaient attribués au grain de couleur ;
   une fois la couleur réparée, ils étaient toujours là, identiques sur R, G et B.
@@ -355,7 +399,7 @@ npm run dev                    # http://localhost:3000 -> /creer
 npm run lint                   # 0 erreur (5 warnings préexistants)
 npm run build
 npm run test:scope
-npm run test:vision-preset     # 82 vérifications (Node, 2 s)
+npm run test:vision-preset     # 98 vérifications (Node, 3 s)
 npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
@@ -375,6 +419,8 @@ node scripts/mesure-grain-canaux.mjs --reference <sans> --lightroom <avec> --val
 #   -> son grain CANAL PAR CANAL : corrélation entre canaux, et pixels écrêtés
 node scripts/mesure-grain-photo.mjs <sa-photo> --grain 25 --taille 10 --sansgrain <sans>
 #   -> le grain sur une VRAIE photo, même flou des deux côtés
+node scripts/make-mire-largeur.mjs 1080 810 --sortie <dossier>
+#   -> la mire A DESSINÉE à une largeur (jamais réduite : ça ferait baver les bords)
 node scripts/compare-preset-vs-lightroom.mjs <src> <lr> <id> [--planche <p>] [--sortie <p>]
 #   -> rendu COMPLET (LUT + effets) dans le vrai moteur ; --sans-effets = couleur seule
 node scripts/rendu-mire-c.mjs --texture 50 --sortie <png>      # notre moteur sur la mire C

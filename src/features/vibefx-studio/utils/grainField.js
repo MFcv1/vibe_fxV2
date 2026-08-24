@@ -98,137 +98,226 @@ export const GRAIN_SIGMA_PAR_UNITE = 0.367;
 export const GRAIN_TAILLE_DEFAUT = 25;
 
 /*
- * ── LA LARGEUR DE L'IMAGE: UNE TABLE, PLUS UNE LOI DE PUISSANCE ──────────
+ * ── LA CASSURE ───────────────────────────────────────────────────────────
  *
- * C'etait un exposant unique, 0,577, ajuste sur trois tailles. Il tenait a
- * 2,6 % pres sur ces trois-la et se trompait de 5,8 % des qu'on sortait de
- * leur intervalle — ce qui est exactement le cas des vraies photos.
+ * Le troisieme curseur du panneau Grain, sous la Taille. Elle vaut 50 par
+ * defaut et TOUS les presets importes jusqu'ici la laissent la. Elle n'avait
+ * jamais ete mesuree, et toute la calibration la supposait a 50 — un piege
+ * silencieux: un preset qui la change aurait fausse le grain sans que rien ne
+ * le signale.
  *
- * Mesures (mire A, Grain 50, Taille 25, `scripts/mesure-taille-grain.mjs`;
- * le point 9720 est du 2026-08-22, les trois autres du 2026-08-20):
+ * Mesure du 2026-08-22, mire A a 1620 px, Grain 50, Taille 25:
  *
- *   largeur | ecart-type | echelle mesuree | l'ancienne loi | ecart
- *   --------+------------+-----------------+----------------+-------
- *     1620  |   18,37    |     1,000       |     1,000      |   0 %
- *     3240  |   12,64    |     1,453       |     1,492      | +2,6 %
- *     6480  |    8,15    |     2,254       |     2,225      | -1,3 %
- *     9720  |    6,91    |     2,658       |     2,812      | +5,8 %
+ *   Cassure |  ecart-type  |  grosseur  |  ce que ca veut dire
+ *   --------+--------------+------------+----------------------------------
+ *      0    |    31,65     |   1,02 px  | 1,72x PLUS de grain, meme finesse
+ *     50    |    18,37     |   1,02 px  | la reference
+ *    100    |    18,23     |   1,58 px  | meme force, grains 1,5x plus gros
  *
- * Ce n'est pas une loi de puissance: les pentes locales valent 0,539, puis
- * 0,633, puis 0,407. Aucun exposant unique ne passe par les quatre points, et
- * en inventer un revient a choisir ou se tromper. On interpole donc DROIT
- * ENTRE LES MESURES, en log-log — c'est-a-dire par la loi de puissance locale,
- * la seule qu'on ait le droit d'ecrire.
+ * Elle etait donc tout sauf negligeable: a 0 elle fait presque DOUBLER le
+ * grain. Et elle agit sur les deux axes separement — la force d'un cote, la
+ * grosseur de l'autre — ce qui confirme une derniere fois que ces deux
+ * grandeurs sont independantes chez lui.
  *
- * C'EST CE QUI FERMAIT LES 5 % DE LA VRAIE PHOTO. A 9180 px l'ancienne loi
- * donnait une echelle de 2,721 la ou la mesure interpolee donne 2,597: notre
- * grain etait etale 4,7 % trop large, donc 4,7 % trop faible. C'est, au dixieme
- * pres, l'ecart qu'on lisait sur le ciel de `photo-test-2`.
+ * RESERVE: mesuree a UNE seule largeur (1620 px) et UNE seule Taille (25).
+ * Elle est appliquee ici comme un facteur, c'est-a-dire avec l'hypothese de
+ * separabilite que la mesure a refutee pour la Taille. A prendre pour ce
+ * qu'elle est: bien mieux que de l'ignorer, pas une loi complete.
  */
-const GRAIN_LARGEUR_MESUREE = [
-    { largeur: 1620, echelle: 1.0000 },  // la reference
-    { largeur: 3240, echelle: 1.4533 },  // 18,37 / 12,64
-    { largeur: 6480, echelle: 2.2540 },  // 18,37 /  8,15
-    { largeur: 9720, echelle: 2.6585 },  // 18,37 /  6,91
+export const GRAIN_CASSURE_DEFAUT = 50;
+
+const GRAIN_CASSURE_MESUREE = [
+    { cassure: 0, force: 18.37 / 31.65, grosseur: 1.00 },   // 0,5804
+    { cassure: 50, force: 1.0000, grosseur: 1.00 },         // la reference
+    { cassure: 100, force: 18.37 / 18.23, grosseur: 1.55 }, // 1,0077 et 1,58/1,02
 ];
 
+function lireCassure(cassure, champ) {
+    const c = Math.max(0, Math.min(100, Number.isFinite(cassure) ? cassure : GRAIN_CASSURE_DEFAUT));
+    const points = GRAIN_CASSURE_MESUREE;
+    for (let i = 1; i < points.length; i += 1) {
+        if (c <= points[i].cassure) {
+            const a = points[i - 1];
+            const b = points[i];
+            const part = (c - a.cassure) / (b.cassure - a.cassure);
+            return a[champ] + part * (b[champ] - a[champ]);
+        }
+    }
+    return points[points.length - 1][champ];
+}
+
+/* Ce que la Cassure fait a la FORCE (via l'echelle) et a la GROSSEUR. */
+export const grainCassureForce = (cassure) => lireCassure(cassure, 'force');
+export const grainCassureGrosseur = (cassure) => lireCassure(cassure, 'grosseur');
+
 /*
- * L'echelle due a la seule largeur. Interpolation en log-log entre les points
- * mesures; au-dela du dernier, prolongee par sa pente finale (0,407).
+ * ── LA TAILLE ET LA LARGEUR NE SE MULTIPLIENT PAS ────────────────────────
  *
- * RESERVE: rien n'est mesure EN DESSOUS de 1620 px, et c'est le trou qui reste
- * le plus genant — un export social fait 1080 px de large, ou l'echelle
- * tomberait sous 1 (voir la note sur la Taille 10 plus bas).
+ * Le modele etait un PRODUIT: une echelle de Taille, multipliee par une echelle
+ * de largeur. Il etait exact sur les deux axes ou l'on avait mesure — la Taille
+ * a 1620 px, la Taille 25 a toutes les largeurs — et personne n'avait regarde
+ * ENTRE les deux.
+ *
+ * Six exports du 2026-08-22 (Tailles 10 et 40 a 1080, 3240 et 6480 px) ont
+ * montre l'ecart. A Grain 50, ecart-type de son grain contre celui que le
+ * produit predisait:
+ *
+ *   cas                 lui     le produit    ecart
+ *   --------------------+-------+-----------+--------
+ *   Taille 10, 1080 px  | 22,09 |   21,56   |  -2 %
+ *   Taille 40, 1080 px  | 19,22 |   18,99   |  -1 %
+ *   Taille 10, 3240 px  | 18,50 |   14,42   | -22 %
+ *   Taille 40, 3240 px  |  9,53 |   10,79   | +13 %
+ *   Taille 10, 6480 px  | 13,63 |    9,28   | -32 %
+ *   Taille 40, 6480 px  |  6,83 |    6,96   |  +2 %
+ *
+ * L'effet du curseur Taille GRANDIT avec l'image. Le rapport entre sa Taille 10
+ * et sa Taille 25 vaut 1,07 a 1080 px, 1,00 a 1620, 1,46 a 3240 et 1,67 a
+ * 6480: sur une petite image les Tailles basses se ressemblent toutes — elles
+ * butent sur le pixel — et sur une grande elles s'ecartent franchement. Aucun
+ * produit ne peut rendre ca, et le « repli sous le pixel » qui remplacait cette
+ * loi n'en etait qu'une moitie.
+ *
+ * D'ou une SURFACE mesuree, et non plus deux courbes multipliees. On interpole
+ * DROIT ENTRE LES MESURES — en log-log sur la largeur, lineairement sur la
+ * Taille — parce qu'entre deux mesures on ne sait rien de mieux.
+ *
+ * ── CE QUI EST MESURE, ET CE QUI EST DEDUIT ──────────────────────────────
+ *
+ * MESURE d'un bout a l'autre: les rangs Taille 10, 25 et 40 — ceux ou vivent
+ * TOUS les presets livres (CN14 a 10, CN17 et CN18 a 40, le reste au defaut de
+ * 25). Le rang Taille 100 a deux points mesures.
+ *
+ * DEDUIT: les rangs Taille 0 et Taille 50, qui n'ont qu'un point (a 1620 px) et
+ * empruntent la forme du rang voisin. RESERVE: c'est exactement l'hypothese de
+ * separabilite que la mesure vient de refuter — a prendre pour ce que c'est, un
+ * pis-aller hors du domaine utile.
  */
-export function grainEchelleDeLargeur(largeur) {
+const GRAIN_SURFACE_MESUREE = [
+    {
+        taille: 0,
+        deduitDe: { taille: 10, facteur: 0.8020 }, // 18,37 / 22,91 a 1620 px
+        points: [{ largeur: 1620, echelle: 0.8020 }],
+    },
+    {
+        taille: 10,
+        points: [
+            { largeur: 1080, echelle: 0.8316 }, // 22,09
+            { largeur: 1620, echelle: 1.0000 }, // 18,37
+            { largeur: 3240, echelle: 0.9930 }, // 18,50
+            { largeur: 6480, echelle: 1.3478 }, // 13,63
+        ],
+    },
+    {
+        taille: 25,
+        points: [
+            { largeur: 810, echelle: 0.8454 },  // 21,73
+            { largeur: 1080, echelle: 0.8879 }, // 20,69
+            { largeur: 1620, echelle: 1.0000 }, // 18,37 — la reference
+            { largeur: 3240, echelle: 1.4533 }, // 12,64
+            { largeur: 6480, echelle: 2.2540 }, //  8,15
+            { largeur: 9720, echelle: 2.6585 }, //  6,91
+        ],
+    },
+    {
+        taille: 40,
+        points: [
+            { largeur: 1080, echelle: 0.9558 }, // 19,22
+            { largeur: 1620, echelle: 1.1716 }, // 15,68
+            { largeur: 3240, echelle: 1.9276 }, //  9,53
+            { largeur: 6480, echelle: 2.6896 }, //  6,83
+        ],
+    },
+    {
+        taille: 50,
+        deduitDe: { taille: 40, facteur: 1.3050 / 1.1716 },
+        points: [{ largeur: 1620, echelle: 1.3050 }], // 14,08
+    },
+    {
+        taille: 100,
+        points: [
+            { largeur: 1080, echelle: 1.3254 }, // 13,86
+            { largeur: 1620, echelle: 1.9600 }, //  9,37
+        ],
+    },
+];
+
+/* Le rang guide: le seul mesure de 810 a 9720 px. C'est lui qui prete sa FORME
+   aux autres quand on sort de leur domaine. */
+const RANG_GUIDE = GRAIN_SURFACE_MESUREE.find((rang) => rang.taille === 25).points;
+
+const penteEntre = (a, b) => Math.log(b.echelle / a.echelle) / Math.log(b.largeur / a.largeur);
+
+/* Interpolation en log-log — la loi de puissance locale, la seule qu'on ait le
+   droit d'ecrire entre deux mesures. Au-dela des bornes, la pente du segment
+   terminal. */
+function lireCourbe(points, largeur) {
+    const lnL = Math.log(largeur);
+    const n = points.length;
+    if (n === 1) return points[0].echelle;
+    if (largeur <= points[0].largeur) {
+        const a = points[0];
+        return a.echelle * Math.exp(penteEntre(a, points[1]) * (lnL - Math.log(a.largeur)));
+    }
+    for (let i = 1; i < n; i += 1) {
+        if (largeur <= points[i].largeur) {
+            const a = points[i - 1];
+            return a.echelle * Math.exp(penteEntre(a, points[i]) * (lnL - Math.log(a.largeur)));
+        }
+    }
+    const b = points[n - 1];
+    return b.echelle * Math.exp(penteEntre(points[n - 2], b) * (lnL - Math.log(b.largeur)));
+}
+
+/*
+ * Hors du domaine mesure d'un rang, il grandit COMME LE RANG GUIDE — on
+ * applique la croissance relative du guide entre le bord du rang et la largeur
+ * voulue. C'est continu par construction: au bord exact, le rapport vaut 1.
+ *
+ * (La version d'avant prenait une PENTE du guide, choisie selon les points qui
+ * tombaient dans l'intervalle. Elle changeait par sauts des qu'un point de plus
+ * entrait dans le compte, et l'echelle RECULAIT de 6,7 % en franchissant
+ * 9720 px. Un test balaye desormais toute la plage pour l'interdire.)
+ */
+function echelleDansRang(points, largeur) {
+    const premier = points[0];
+    const dernier = points[points.length - 1];
+    if (largeur >= premier.largeur && largeur <= dernier.largeur) return lireCourbe(points, largeur);
+    const bord = largeur < premier.largeur ? premier : dernier;
+    return bord.echelle * (lireCourbe(RANG_GUIDE, largeur) / lireCourbe(RANG_GUIDE, bord.largeur));
+}
+
+function echelleDuRang(rang, largeur) {
+    if (!rang.deduitDe) return echelleDansRang(rang.points, largeur);
+    const porteur = GRAIN_SURFACE_MESUREE.find((r) => r.taille === rang.deduitDe.taille);
+    return echelleDansRang(porteur.points, largeur) * rang.deduitDe.facteur;
+}
+
+/*
+ * L'echelle complete: on LIT la surface. Lineaire sur la Taille entre deux
+ * rangs, log-log sur la largeur a l'interieur d'un rang.
+ */
+export function grainEchelle(taille, largeur, cassure = GRAIN_CASSURE_DEFAUT) {
     const l = Math.max(1, Number.isFinite(largeur) ? largeur : GRAIN_LARGEUR_REFERENCE);
-    const points = GRAIN_LARGEUR_MESUREE;
-    const lnL = Math.log(l);
-    for (let i = 1; i < points.length; i += 1) {
-        if (l <= points[i].largeur || i === points.length - 1) {
-            const a = points[i - 1];
-            const b = points[i];
-            const pente = Math.log(b.echelle / a.echelle) / Math.log(b.largeur / a.largeur);
-            return a.echelle * Math.exp(pente * (lnL - Math.log(a.largeur)));
-        }
-    }
-    return 1;
-}
-
-/*
- * La grosseur des grains selon le sous-reglage « Taille », a la largeur de
- * reference. Lue dans le tableau de mesures ci-dessus: chaque point est le
- * rapport de l'ecart-type de la Taille 25 a celui de la Taille voulue, ce qui
- * est la meme chose que le rapport des grosseurs (voir le fait « a. »).
- */
-const GRAIN_TAILLE_MESUREE = [
-    { taille: 0, echelle: 0.802 },    // 18,37 / 22,91  — regime a part, voir ci-dessous
-    { taille: 25, echelle: 1.000 },   // la reference
-    { taille: 40, echelle: 1.1716 },  // 18,37 / 15,68  — mesure le 2026-08-22
-    { taille: 50, echelle: 1.305 },   // 18,37 / 14,08
-    { taille: 100, echelle: 1.960 },  // 18,37 /  9,37
-];
-
-/*
- * ── LA TAILLE 10, ET LE PLANCHER D'UN PIXEL ──────────────────────────────
- *
- * Export du 2026-08-22, mire de 1620 px, Grain 50, Taille 10: ecart-type
- * 18,37 et grains de 1,01 px — soit EXACTEMENT la Taille 25 (18,37 et 1,02).
- * Les deux fichiers different pourtant sur 98 % de leurs pixels: ce sont bien
- * deux tirages distincts, pas le meme export en double.
- *
- * Et pourtant la vraie photo dit l'inverse. `photo-test-2` en CN14 (Taille 10,
- * 9180 px de large) porte un grain de 4,02/255 et de 2,29 px. Avec une echelle
- * de Taille de 1,000 on lui poserait 3,53 et 2,45 px; avec 0,879 on lui pose
- * 4,01 et 2,30. La photo tranche donc pour 0,879 — et l'interpolation lineaire
- * entre la Taille 0 et la Taille 25 donne 0,881, a 0,2 % pres.
- *
- * CE QUI RECONCILIE LES DEUX: un grain ne peut pas etre dessine plus fin qu'un
- * pixel. A 1620 px, la Taille 10 demande 0,88 px — Lightroom rend alors 1,00 px
- * et n'augmente PAS son ecart-type pour compenser. A 9180 px, la meme Taille 10
- * demande 2,29 px, largement au-dessus du plancher, et elle se distingue de la
- * Taille 25.
- *
- * CE QUI RESTE INEXPLIQUE: la Taille 0 au meme 1620 px NE se plafonne pas —
- * elle donne 22,91, donc 0,802 px, sous le plancher. Son autocorrelation au
- * pixel voisin est negative (-0,17 contre -0,05), signe d'une structure plus
- * fine que le pixel qui se replie: c'est un autre mecanisme, pas le meme
- * curseur pousse plus loin.
- *
- * DECISION: on garde la table telle quelle, sans plancher. Elle est juste
- * partout ou l'echelle depasse 1, c'est-a-dire sur toutes les images reelles.
- * En dessous, elle est probablement 13 % trop forte — mais RIEN n'est mesure
- * sous 1620 px de large, et un export social en fait 1080. C'est le prochain
- * export a demander: la mire A reduite a 1080 px, Grain 50, Taille 25.
- */
-
-/* Interpolation lineaire entre les points mesures. Entre deux mesures on ne
-   sait rien de mieux qu'une droite, et le dire vaut mieux qu'une courbe
-   inventee qui aurait l'air plus savante. */
-export function grainEchelleDeTaille(taille = GRAIN_TAILLE_DEFAUT) {
     const t = Math.max(0, Math.min(100, Number.isFinite(taille) ? taille : GRAIN_TAILLE_DEFAUT));
-    const points = GRAIN_TAILLE_MESUREE;
-    if (t <= points[0].taille) return points[0].echelle;
-    for (let i = 1; i < points.length; i += 1) {
-        if (t <= points[i].taille) {
-            const a = points[i - 1];
-            const b = points[i];
-            const part = (t - a.taille) / (b.taille - a.taille);
-            return a.echelle + part * (b.echelle - a.echelle);
+    const rangs = GRAIN_SURFACE_MESUREE;
+    const force = grainCassureForce(cassure);
+    if (t <= rangs[0].taille) return echelleDuRang(rangs[0], l) * force;
+    for (let i = 1; i < rangs.length; i += 1) {
+        if (t <= rangs[i].taille) {
+            const a = echelleDuRang(rangs[i - 1], l);
+            const b = echelleDuRang(rangs[i], l);
+            const part = (t - rangs[i - 1].taille) / (rangs[i].taille - rangs[i - 1].taille);
+            return (a + part * (b - a)) * force;
         }
     }
-    return points[points.length - 1].echelle;
-}
-
-/* L'echelle complete: la Taille du curseur, agrandie par la taille de l'image. */
-export function grainEchelle(taille, largeur) {
-    return grainEchelleDeTaille(taille) * grainEchelleDeLargeur(largeur);
+    return echelleDuRang(rangs[rangs.length - 1], l) * force;
 }
 
 /* L'ecart-type a poser, en /255. Il BAISSE quand les grains grossissent: la
    quantite de grain est la meme, elle est etalee sur plus de pixels. */
-export function grainSigma(valeur, taille, largeur) {
-    return (GRAIN_SIGMA_PAR_UNITE * valeur) / grainEchelle(taille, largeur);
+export function grainSigma(valeur, taille, largeur, cassure = GRAIN_CASSURE_DEFAUT) {
+    return (GRAIN_SIGMA_PAR_UNITE * valeur) / grainEchelle(taille, largeur, cassure);
 }
 
 /*
@@ -255,10 +344,10 @@ export function grainSigma(valeur, taille, largeur) {
  * retrecis. D'ou le `min(1, ...)` ci-dessous — et le fait qu'un apercu montre
  * peu de grain n'est pas un bug, c'est ce que montre son ecran a lui.
  */
-export function grainPourRendu(valeur, taille, largeurSource, largeurRendu) {
-    const source = Math.max(1, Number.isFinite(largeurSource) ? largeurSource : largeurRendu);
-    const rendu = Math.max(1, Number.isFinite(largeurRendu) ? largeurRendu : source);
-    const echelleSource = grainEchelle(taille, source);
+export function grainPourRendu(valeur, taille, grandCoteSource, grandCoteRendu, cassure = GRAIN_CASSURE_DEFAUT) {
+    const source = Math.max(1, Number.isFinite(grandCoteSource) ? grandCoteSource : grandCoteRendu);
+    const rendu = Math.max(1, Number.isFinite(grandCoteRendu) ? grandCoteRendu : source);
+    const echelleSource = grainEchelle(taille, source, cassure);
     const sigmaSource = (GRAIN_SIGMA_PAR_UNITE * valeur) / echelleSource;
     const reduction = source / rendu;
     if (reduction <= 1) return { echelle: echelleSource, sigma: sigmaSource };
@@ -308,64 +397,146 @@ export const GRAIN_NOISE_TABLE = (() => {
 const CORRECTION_BILINEAIRE = 1.5;
 
 /*
- * ET LE PAS D'INTERPOLATION N'EST PAS LA GROSSEUR.
+ * ── LA FORME DU GRAIN: TROIS CHOSES A NE PAS CONFONDRE ───────────────────
  *
- * Un bruit interpole sur un pas de `p` pixels ne rend pas des grains de `p`
- * pixels, et la relation n'est meme pas continue. Mesuree (balayage du
- * 2026-08-20):
+ * 1. L'ECHELLE (`grainEchelle`) pilote la FORCE, et elle seule. Elle est
+ *    mesuree sur dix exports, a 0,13 % pres. On n'y touche pas ici.
+ * 2. LA GROSSEUR de ses grains n'est PAS cette echelle. Les deux coincident
+ *    jusqu'a 2 px puis divergent — c'est mesure (voir la table ci-dessous).
+ * 3. LE PAS d'interpolation n'est pas la grosseur non plus: un bruit interpole
+ *    tous les `p` pixels ne rend pas des grains de `p` pixels.
  *
- *   pas       1,00   1,10   1,20   1,30   1,50   1,75   2,00   2,50   3,00
- *   grosseur  1,02   1,66   1,80   1,97   2,18   2,60   2,68   3,71   4,27
+ * Le code melangeait 1 et 2: il visait une grosseur egale a l'echelle. Sur une
+ * photo de 9180 px ca donnait des grains de 2,19 px la ou il en fait 2,29, et
+ * sur une mire de 9720 px 2,92 contre 3,35.
  *
- * A pas 1,00 les points du reseau tombent exactement sur les pixels: il n'y a
- * rien a interpoler, et le grain fait 1 pixel. Des qu'on s'en ecarte, chaque
- * pixel devient une moyenne de deux voisins du reseau et la grosseur SAUTE a
- * 1,66. Entre les deux, ce mecanisme seul ne sait rien produire.
+ * ── CE QU'IL FAIT, MESURE ────────────────────────────────────────────────
  *
- * Or c'est justement la que tombent les cas les plus courants: la Taille 50
- * (1,27) et toute image entre 1620 et 3240 px de large (1,44 a 3240). Sans
- * quoi notre grain y garderait la bonne force mais resterait trop fin — ce que
- * la mesure montrait: 1,01 contre 1,44 chez lui.
+ * Longueur de correlation de SON grain (metrique de `mesure-taille-grain.mjs`:
+ * 1 + 2 x la somme des autocorrelations), en face de l'echelle que sa FORCE
+ * implique. Douze exports, du 2026-08-20 au 2026-08-22:
  *
- * D'ou le MELANGE: sous 1,66, on additionne du bruit d'un pixel et du bruit
- * interpole au pas minimal, dans la proportion qui donne la grosseur voulue.
- * Les deux sont lus dans la meme table a des endroits eloignes, donc
- * independants, et les poids sont en RACINE pour que les variances s'ajoutent
- * a 1 (le bruit s'ajoute en quadrature, jamais en somme).
+ *   son echelle | sa grosseur | d'ou
+ *   ------------+-------------+------------------------------
+ *      0,80     |    1,05     | Taille 0 a 1620 px
+ *      0,85     |    1,05     | Taille 25 a 810 px
+ *      0,89     |    1,04     | Taille 25 a 1080 px
+ *      1,00     |    1,02     | Taille 25 a 1620 px
+ *      1,17     |    1,12     | Taille 40 a 1620 px
+ *      1,31     |    1,27     | Taille 50 a 1620 px
+ *      1,33     |    1,31     | Taille 100 a 1080 px
+ *      1,45     |    1,44     | Taille 25 a 3240 px
+ *      1,96     |    1,96     | Taille 100 a 1620 px
+ *      2,25     |    2,44     | Taille 25 a 6480 px
+ *      2,66     |    3,35     | Taille 25 a 9720 px
+ *
+ * Deux choses s'y lisent. Sous 1, la grosseur PLAFONNE a un pixel — c'est le
+ * repli, deja traite plus haut. Au-dessus de 2, elle DEPASSE l'echelle, et de
+ * plus en plus: sa forme de grain change avec la taille de l'image, elle ne
+ * fait pas que grandir.
+ *
+ * Que la Taille 100 a 1080 px (1,33 -> 1,31) tombe pile entre les points de la
+ * serie de largeur n'etait pas acquis: ca dit que la grosseur est bien une
+ * fonction de la seule echelle, quelle que soit la facon dont on y arrive.
  */
-const PAS_MIN = 1.1;
-const GROSSEUR_AU_PAS_MIN = 1.66;
-
-/* La courbe ci-dessus, lue a l'envers: quel pas donne la grosseur voulue. */
-const GROSSEUR_PAR_PAS = [
-    { pas: 1.10, grosseur: 1.66 },
-    { pas: 1.20, grosseur: 1.80 },
-    { pas: 1.30, grosseur: 1.97 },
-    { pas: 1.50, grosseur: 2.18 },
-    { pas: 1.75, grosseur: 2.60 },
-    { pas: 2.00, grosseur: 2.68 },
-    { pas: 2.50, grosseur: 3.71 },
-    { pas: 3.00, grosseur: 4.27 },
+const GRAIN_GROSSEUR_MESUREE = [
+    { echelle: 1.0000, grosseur: 1.02 },
+    { echelle: 1.1716, grosseur: 1.12 },
+    { echelle: 1.3050, grosseur: 1.27 },
+    { echelle: 1.4533, grosseur: 1.44 },
+    { echelle: 1.9600, grosseur: 1.96 },
+    { echelle: 2.2540, grosseur: 2.44 },
+    { echelle: 2.6585, grosseur: 3.35 },
 ];
+
+/*
+ * La grosseur a viser pour une echelle donnee. Sous 1, un pixel: on ne dessine
+ * pas plus fin, et c'est ce qu'il fait aussi.
+ *
+ * RESERVE: au-dela de 2,66 (soit une image de plus de 9720 px), on prolonge
+ * PROPORTIONNELLEMENT et non par la pente locale. Cette pente vaut 1,9 mais
+ * elle n'est ajustee que sur UN intervalle; la prolonger doublerait la grosseur
+ * a 12 000 px sur la foi de deux points. Le proportionnel est le choix prudent,
+ * et il est marque comme tel.
+ */
+export function grainGrosseurCible(echelle, cassure = GRAIN_CASSURE_DEFAUT) {
+    const parCassure = grainCassureGrosseur(cassure);
+    if (!(echelle > 1)) return parCassure;
+    const points = GRAIN_GROSSEUR_MESUREE;
+    const dernier = points[points.length - 1];
+    if (echelle >= dernier.echelle) return dernier.grosseur * (echelle / dernier.echelle) * parCassure;
+    for (let i = 1; i < points.length; i += 1) {
+        if (echelle <= points[i].echelle) {
+            const a = points[i - 1];
+            const b = points[i];
+            const part = (echelle - a.echelle) / (b.echelle - a.echelle);
+            return (a.grosseur + part * (b.grosseur - a.grosseur)) * parCassure;
+        }
+    }
+    return dernier.grosseur * parCassure;
+}
+
+/*
+ * ── LE PAS QUI DONNE UNE GROSSEUR, ET LES PAS INTERDITS ──────────────────
+ *
+ * Balayage du 2026-08-22 sur NOTRE champ, avec la metrique ci-dessus:
+ *
+ *   pas       1,10  1,30  1,55  1,80  2,05  2,30  2,55  2,80  3,05  3,30  3,80
+ *   grosseur  1,68  1,96  2,37  2,71  3,09  3,47  3,85  4,21  4,58  4,93  5,72
+ *
+ * PAS INTERDITS. Aux pas ENTIERS et DEMI-ENTIERS, les points du reseau tombent
+ * sur la grille des pixels et le champ cesse d'avoir un ecart-type de 1:
+ *
+ *   pas       1,50   2,00   2,50   3,00   4,00
+ *   ecart-type 1,057  1,127  1,021  1,054  1,027
+ *
+ * A pas 2,00 c'est 12,7 % de grain en trop — et l'ancienne table avait
+ * justement un point a pas 2,00 exactement. Une image de la bonne taille
+ * tombait dessus et recevait 13 % de grain de trop, sans que rien ne le dise.
+ * `eviterResonance` ecarte desormais le pas de ces valeurs.
+ */
+const PAS_MIN = 1.10;
+const GROSSEUR_AU_PAS_MIN = 1.678;
+
+const GROSSEUR_PAR_PAS = [
+    { pas: 1.10, grosseur: 1.678 },
+    { pas: 1.30, grosseur: 1.963 },
+    { pas: 1.55, grosseur: 2.371 },
+    { pas: 1.80, grosseur: 2.713 },
+    { pas: 2.05, grosseur: 3.086 },
+    { pas: 2.30, grosseur: 3.466 },
+    { pas: 2.55, grosseur: 3.849 },
+    { pas: 2.80, grosseur: 4.214 },
+    { pas: 3.05, grosseur: 4.577 },
+    { pas: 3.30, grosseur: 4.925 },
+    { pas: 3.80, grosseur: 5.719 },
+];
+
+/* Ecarte le pas des valeurs entieres et demi-entieres, ou le reseau se cale sur
+   la grille des pixels et gonfle l'ecart-type jusqu'a 13 %. */
+function eviterResonance(pas) {
+    const double = pas * 2;
+    const proche = Math.round(double);
+    return Math.abs(double - proche) < 0.12 ? (proche + 0.12) / 2 : pas;
+}
 
 export function grainPasInterpolation(grosseur) {
     const points = GROSSEUR_PAR_PAS;
-    if (grosseur <= points[0].grosseur) return PAS_MIN;
+    if (grosseur <= points[0].grosseur) return eviterResonance(PAS_MIN);
     for (let i = 1; i < points.length; i += 1) {
         if (grosseur <= points[i].grosseur) {
             const a = points[i - 1];
             const b = points[i];
             const part = (grosseur - a.grosseur) / (b.grosseur - a.grosseur);
-            return a.pas + part * (b.pas - a.pas);
+            return eviterResonance(a.pas + part * (b.pas - a.pas));
         }
     }
-    /* Au-dela du dernier point mesure, la courbe est prolongee par sa pente
-       finale. RESERVE: rien n'est mesure au-dessus d'une grosseur de 4,27 px,
-       ce qui demanderait une image de plus de 20 000 px de large. */
+    /* Au-dela du dernier point mesure, prolonge par sa pente finale. RESERVE:
+       rien n'est mesure au-dessus d'une grosseur de 5,72 px. */
     const dernier = points[points.length - 1];
     const avant = points[points.length - 2];
     const pente = (dernier.pas - avant.pas) / (dernier.grosseur - avant.grosseur);
-    return dernier.pas + (grosseur - dernier.grosseur) * pente;
+    return eviterResonance(dernier.pas + (grosseur - dernier.grosseur) * pente);
 }
 
 /* Un demi-tour de table: assez loin pour que les deux lectures soient
@@ -398,19 +569,24 @@ function bruitInterpole(x, y, pas) {
 
 /* Une deviation du champ, en (x, y), pour des grains de `echelle` pixels.
    Ecart-type 1, quelle que soit l'echelle. */
-export function grainValeurEn(x, y, echelle) {
+export function grainValeurEn(x, y, echelle, cassure = GRAIN_CASSURE_DEFAUT) {
+    /* La FORME vise sa grosseur a lui, pas l'echelle: les deux ne sont pas le
+       meme nombre au-dela de 2 px. La FORCE, elle, reste pilotee par
+       `grainSigma` a partir de l'echelle — et ce champ garde un ecart-type de
+       1 quel que soit le pas, c'est ce que `eviterResonance` protege. */
+    const grosseur = grainGrosseurCible(echelle, cassure);
     /* Un pixel est le plus fin qu'on puisse dessiner. C'est le cas de la
        Taille 0, dont les grains sont plus fins que ca et qui se manifeste
        alors uniquement par un ecart-type plus fort. */
-    if (echelle <= 1.02) return bruitBlanc(x, y, 0);
-    if (echelle < GROSSEUR_AU_PAS_MIN) {
-        /* Entre 1 et 1,66 px: melange, en quadrature, du bruit d'un pixel et du
+    if (grosseur <= 1.02) return bruitBlanc(x, y, 0);
+    if (grosseur < GROSSEUR_AU_PAS_MIN) {
+        /* Entre 1 et 1,68 px: melange, en quadrature, du bruit d'un pixel et du
            bruit interpole au pas minimal. */
-        const part = (echelle - 1) / (GROSSEUR_AU_PAS_MIN - 1);
+        const part = (grosseur - 1) / (GROSSEUR_AU_PAS_MIN - 1);
         return Math.sqrt(1 - part) * bruitBlanc(x, y, DECALAGE_INDEPENDANT)
             + Math.sqrt(part) * bruitInterpole(x, y, PAS_MIN);
     }
-    return bruitInterpole(x, y, grainPasInterpolation(echelle));
+    return bruitInterpole(x, y, grainPasInterpolation(grosseur));
 }
 
 /*
@@ -513,32 +689,38 @@ export const GRAIN_ATTENUATION = (() => {
  * 247); rien ne dit ou elle s'applique sur une couleur sombre saturee, et rien
  * dans la mire A ne permet de le trancher.
  *
- * ── LA VRAIE PHOTO, ET CE QUI RESTE ─────────────────────────────────────
+ * ── LE GRAND COTE, PAS LA LARGEUR ────────────────────────────────────────
  *
- * Sur le ciel de `photo-test-2` en CN14 (Taille 10, 9180 px de large), mesure
- * du 2026-08-22 par `scripts/mesure-grain-photo.mjs`, 40 blocs plats de 64 px,
- * bruit de fond de sa chaine retire en quadrature (lu sur la MEME photo
- * developpee en CN01, qui ne pose aucun grain):
+ * Mesure du 2026-08-22: une mire de 2160x3240 exportee de Lightroom en
+ * PORTRAIT rend un grain de 12,62 — exactement celui de la MEME mire en
+ * paysage 3240x2160 (12,64). Si Lightroom lisait la largeur, la version
+ * portrait aurait rendu 15,73.
  *
- *      son grain seul   4,83  4,04  4,02   (R, G, B)
- *      le notre         4,77  4,01  4,00
- *      ecart             -1%   -1%   -1%
- *      grosseur des grains: 2,29 px chez lui, 2,21 chez nous
+ * C'est donc le GRAND COTE de l'image qui compte, et l'orientation n'y change
+ * rien. Une photo verticale de 9180x16320 est pour lui une image de 16320.
+ * Notre moteur lisait 9180: 47 % d'ecart sur le grain de toute photo verticale.
+ * Corrige dans `studioRenderer.js` (`grandCoteImage`).
  *
- * On etait a -5 % UNIFORMES sur les trois canaux avant la table de largeur
- * ci-dessus. Ce n'etait donc pas la couleur — un ecart uniforme n'est jamais un
- * effet de couleur — mais bien l'extrapolation de l'ancienne loi de puissance
- * au-dela de 6480 px.
+ * ── LES VRAIES PHOTOS ────────────────────────────────────────────────────
  *
- * CE QUI RESTE, ET QUI EST NOUVEAU: sa FORCE et sa GROSSEUR cessent d'etre le
- * meme nombre quand l'image grandit. Sur la mire de 9720 px, sa force donne une
- * echelle de 2,66 alors que sa longueur de correlation vaut 3,35 — 26 % d'ecart.
- * A 1620 et 3240 px les deux coincidaient (1,00/1,02 et 1,45/1,44). Autrement
- * dit son grain ne se contente pas d'etre le meme bruit agrandi: sa FORME
- * change avec l'echelle. Nous posons la bonne force (0,4 % pres a toutes les
- * tailles mesurees) et des grains un peu trop fins (2,92 contre 3,35 a 9720 px,
- * 2,21 contre 2,29 sur la photo). Corriger cela demanderait de remodeler le
- * spectre du bruit, et deux points de mesure ne suffisent pas a le dessiner.
+ * Deux photos developpees des deux cotes en CN14 (Grain 25, Taille 10, Cassure
+ * 50 — releve CONFIRME dans son panneau le 2026-08-22). Ciel, 40 blocs plats,
+ * bruit de fond de sa chaine retire en quadrature (lu sur la MEME photo en
+ * CN13, qui porte la meme nettete et aucun grain):
+ *
+ *   photo             grand cote |  son grain  |  le notre  | ecart | grosseur
+ *   ------------------+----------+-------------+------------+-------+---------
+ *   photo-test-1      |   5 392  |    7,73     |    7,41    |  -4 % | 1,09/1,16
+ *   photo-test-2      |  16 320  |    4,03     |    4,71    | +17 % | 2,29/1,87
+ *
+ * LA PREMIERE EST DANS LE DOMAINE MESURE (810 a 9720 px), la seconde non: elle
+ * fait 150 Mpx, 1,68x au-dela de notre plus grande mire. C'est la seule
+ * difference entre les deux, et elle explique tout l'ecart.
+ *
+ * Autrement dit: sur une photo normale on y est. Au-dela de 9720 px de grand
+ * cote on EXTRAPOLE — le rang Taille 10 s'y prolonge par la croissance du rang
+ * guide, ce qui n'est pas une mesure — et ca coute 17 % sur une image de
+ * 150 Mpx. Une mire de 16320 px, a Taille 10 ET Taille 25, le fermerait.
  */
 
 /* sRVB lineaire -> ProPhoto lineaire (les deux adaptes a D50, comme les

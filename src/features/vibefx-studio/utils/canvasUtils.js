@@ -15,6 +15,7 @@ import {
     GRAIN_ATTENUATION,
     GRAIN_NOISE_SIZE,
     GRAIN_NOISE_TABLE,
+    GRAIN_CASSURE_DEFAUT,
     GRAIN_TAILLE_DEFAUT,
     grainPoserDelta,
     grainPourRendu,
@@ -114,8 +115,8 @@ export const NOISE_PATTERN_CANVAS = createNoisePattern();
  */
 
 /*
- * `taille` est le sous-reglage « Taille » de Lightroom (25 par defaut). Avec la
- * largeur de l'IMAGE FINALE (`largeurSource`), il donne la grosseur des grains —
+ * `taille` est le sous-reglage « Taille » de Lightroom (25 par defaut). Avec le
+ * GRAND COTE de l'IMAGE FINALE (`grandCoteImage`), il donne la grosseur des grains —
  * et cette grosseur pilote a son tour l'ecart-type, parce qu'un grain deux fois
  * plus gros bruite deux fois moins chaque pixel. Le detail des mesures, et la
  * raison pour laquelle un apercu doit montrer MOINS de grain qu'un export, sont
@@ -126,13 +127,15 @@ export const NOISE_PATTERN_CANVAS = createNoisePattern();
 const PIXEL = new Float64Array(3);
 
 export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
-    largeurImage = w, largeurRendu = w) {
+    grandCoteImage = Math.max(w, h), grandCoteRendu = Math.max(w, h), cassure = GRAIN_CASSURE_DEFAUT) {
     if (!grain || grain <= 0) return;
-    /* `largeurImage` est la largeur de l'image FINALE, `largeurRendu` celle a
-       laquelle on la dessine (zoom compris). Un apercu « Adapter » montre donc
+    /* `grandCoteImage` est le GRAND COTE de l'image FINALE — pas sa largeur:
+       une mire exportee en portrait rend le meme grain qu'en paysage, c'est
+       mesure (voir `studioRenderer.js`). `grandCoteRendu` est celui auquel on
+       la dessine (zoom compris). Un apercu « Adapter » montre donc
        le grain moyenne par la reduction, un zoom 100 % le montre entier —
        exactement comme l'ecran de Lightroom. Voir `grainPourRendu`. */
-    const { echelle, sigma } = grainPourRendu(grain, taille, largeurImage, largeurRendu);
+    const { echelle, sigma } = grainPourRendu(grain, taille, grandCoteImage, grandCoteRendu, cassure);
     const imageData = ctx.getImageData(0, 0, w, h);
     const d = imageData.data;
     /* Sous le pixel il n'y a rien a interpoler: on garde le chemin direct, qui
@@ -148,7 +151,7 @@ export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
             const luma = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
             const bruit = grainsFins
                 ? GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)]
-                : grainValeurEn(x, y, echelle);
+                : grainValeurEn(x, y, echelle, cassure);
             /* Le meme ecart sur les trois canaux — le grain est monochrome,
                c'est mesure — mais pose DANS SON ESPACE DE TRAVAIL, pas en
                sRVB. C'est le detour qui rend le grain plus fort sur les

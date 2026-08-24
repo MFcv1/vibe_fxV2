@@ -16,7 +16,7 @@
  *
  * Les memes valeurs se passent a la main quand le preset n'a pas de `.xmp`
  * (c'est le cas des presets Premium d'Adobe), avec le nombre lu a l'ecran:
- * `--grain`, `--grainSize`, `--vignette`, `--clarity`, `--texture`,
+ * `--grain`, `--grainSize`, `--grainRoughness`, `--vignette`, `--clarity`, `--texture`,
  * `--sharpness`, `--dehaze`. `--grainSize` est le sous-reglage « Taille » du
  * grain: il ne se passe que si le preset s'ecarte de son defaut, 25.
  *
@@ -206,13 +206,15 @@ const spatial = xmp?.spatialFilters || {};
  *
  * Ils priment sur le `.xmp` quand les deux existent: on a regarde l'ecran.
  *
+ * `--grainRoughness` est sa « Cassure » (50 par defaut; a 0 elle pose 1,72x plus
+ * de grain, a 100 elle grossit les grains de moitie — RELEVE-LA A CHAQUE IMPORT).
  * `--grainSize` est le sous-reglage « Taille » du grain, sous le triangle de son
  * panneau Effets. Il ne se releve QUE si un preset s'ecarte de son defaut (25):
  * c'est la valeur sur laquelle tout est calibre. Il change la GROSSEUR des
  * grains, donc aussi leur force apparente — un grain deux fois plus gros bruite
  * deux fois moins chaque pixel (mesures dans `grainField.js`).
  */
-['grain', 'grainSize', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
+['grain', 'grainSize', 'grainRoughness', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
     const brut = args[cle];
     if (brut === undefined || brut === true) return;
     const valeur = Number(brut);

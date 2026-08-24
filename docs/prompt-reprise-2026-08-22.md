@@ -42,7 +42,7 @@ erreur a 0,01/255 contre les fonctions exactes.
 
 Matthis a exporte la mire A en **Taille 10** et en **Taille 40** (1620 px), plus
 une mire agrandie x6 (**9720 px**) en Taille 25. Dossier de depot sur le
-Bureau : `GRAIN - 3 EXPORTS A FAIRE`.
+Bureau : `✅ FAIT - grain, exports du 22 aout`.
 
 **Les 5 % de la vraie photo etaient l'exposant de largeur.** `(largeur/1620)^0,577`
 etait ajuste sur 1620/3240/6480 et se trompait de 5,8 % a 9720. Remplace par une
@@ -56,62 +56,133 @@ TABLE mesuree (1620 / 3240 / 6480 / 9720) interpolee en log-log. Sur le ciel de
 
 **La Taille 40 est mesuree** : echelle 1,1716 (on l'interpolait a 1,183).
 
-## LA MISSION SUIVANTE : le PETIT format
+## Le PETIT format : REGLE le meme jour (3 exports de plus)
 
-A 1620 px, sa **Taille 10 rend exactement sa Taille 25** — 18,37 et 1,01 px
-contre 18,37 et 1,02 — alors que les deux exports different sur 98 % de leurs
-pixels (ce sont bien deux tirages distincts, verifie). La vraie photo dit
-l'inverse a 9180 px.
+Mires A **dessinees** a 1080 et 810 px (`scripts/make-mire-largeur.mjs` —
+dessinees, jamais reduites, sinon les bords des carres bavent), plus un temoin a
+Taille 100.
 
-Ce qui reconcilie les deux : **un grain ne se dessine pas plus fin qu'un
-pixel**, et Lightroom n'augmente PAS sa force pour compenser. Notre moteur, lui,
-le fait — 13 % de trop des que l'echelle passe sous 1.
+**Un grain ne se dessine pas plus fin qu'un pixel.** Sous 1 px son motif SE
+REPLIE sur la grille et son ecart-type monte MOINS VITE que 1/echelle. Nous
+suivions 1/echelle jusqu'en bas: **+23 % a 810 px, +10 % a 1080** — la taille
+d'un export social. Corrige par `GRAIN_REPLI_MESURE`, qui n'agit QUE sous 1.
 
-Sans consequence sur une photo. Mais **un export social fait 1080 px de large**,
-et rien n'est mesure sous 1620. A cette taille notre grain est probablement
-25 % trop fort.
+**La table des Tailles est desormais en echelles VOULUES**, pas effectives. La
+Taille 0 y vaut 0,5825 (pour que le repli la ramene sur ses 0,802 a 1620 px) et
+la Taille 10 y vaut 0,879 — lue sur la VRAIE photo a 9180 px, ou le repli ne
+s'applique pas. C'est la seule facon de lire une Taille basse proprement.
 
-> **L'export a demander** : la mire A **reduite a 1080 px de large** (a
-> fabriquer : `sharp(mire).resize(1080)` en plus proche voisin ne marche pas,
-> 1080 n'est pas un diviseur entier de 1620 — refaire la mire A directement a
-> 1080x720 en adaptant `scripts/make-mire-effets.mjs`), Grain **50**,
-> Taille **25**, Cassure 50. Puis
-> `node scripts/mesure-taille-grain.mjs <fichier> --valeur 50` — mais attention,
-> ce script n'accepte que des multiples ENTIERS de 1620x1080 : il faudra lui
-> apprendre les reductions, ou mesurer avec `mesure-grain-canaux.mjs`.
+**Etat des lieux, 10 exports Lightroom (6 largeurs x 5 Tailles) : 0,13 %
+d'ecart au pire.** La vraie photo : **-1 %**.
 
-(La **Taille 0** echappe a cette regle : elle descend bien sous le pixel, avec
-une autocorrelation au voisin NEGATIVE — signe d'une structure plus fine que le
-pixel qui se replie. C'est un autre mecanisme, laisse tel quel.)
+## LA FORME DU GRAIN : reglee le meme jour
 
-## L'AUTRE ECART, nouveau et non resolu
+Trois choses etaient confondues en une: l'ECHELLE (qui pilote la force), la
+GROSSEUR de ses grains (qui n'est pas cette echelle au-dela de 2 px), et le PAS
+d'interpolation (qui n'est ni l'une ni l'autre). Table mesuree sur douze
+exports, `GRAIN_GROSSEUR_MESUREE`.
 
-**Sa force et sa grosseur cessent d'etre le meme nombre quand l'image grandit.**
-A 9720 px sa force donne une echelle de 2,66 alors que sa longueur de
-correlation vaut 3,35 — 26 % d'ecart. A 1620 et 3240 px les deux coincidaient.
-Sa FORME de grain change avec l'echelle, pas seulement sa taille.
+**Un bug trouve en chemin, et il coutait cher.** Aux pas ENTIERS et
+DEMI-ENTIERS le reseau tombe sur la grille des pixels et le champ perd son
+ecart-type de 1: a pas 2,00 c'est **12,7 % de grain en trop**. L'ancienne table
+avait un point a pas 2,00 exactement. `eviterResonance` l'ecarte desormais, et
+un test balaye toute la plage.
 
-Nous posons la bonne FORCE (0,4 % pres aux quatre tailles mesurees) et des
-grains un peu **trop fins** : 2,92 contre 3,35 a 9720 px, 2,21 contre 2,29 sur
-la photo. Corriger demande de remodeler le spectre du bruit
-(`GROSSEUR_PAR_PAS` dans `grainField.js`), et deux points de mesure ne
-suffisent pas a le dessiner. Il en faudrait un balayage.
+**LE RECADRAGE est teste**, ce qui n'avait jamais ete fait: la loi et le
+cablage (le moteur passe `sWidth`, lu dans la source parce que
+`studioRenderer.js` est du code navigateur).
 
-## Les trous restants, par ordre
+## LE PRODUIT EST MORT, LA SURFACE LE REMPLACE (8 exports de plus)
 
-1. Le **petit format** (voir plus haut) : rien n'est mesure sous 1620 px, et
-   un export social en fait 1080.
-2. La **forme** de son grain aux grandes tailles (voir plus haut).
-3. La **Cassure**, jamais mesuree, laissee a 50 partout. **A verifier au releve
-   de chaque import** : si un preset la change, la mesurer avant de la recopier.
-4. Le **recadrage** : `renderStudio` prend `largeurImage = sWidth`, ce qui est
-   le bon choix, mais aucun test ne le verifie.
-5. L'**attenuation sur une couleur sombre saturee** : elle est lue sur la
-   luminance sRVB et n'a ete mesuree que sur des gris. Rien dans la mire A ne
-   permet de trancher.
-6. La **reduction du bruit** de Lightroom nous manque (ses presets Cinema II
-   posent Luminance 20 / Couleur 50). A traiter le jour ou un preset sert sur
-   une photo bruitee.
+Le modele multipliait une echelle de Taille par une echelle de largeur. Il etait
+exact sur les DEUX AXES mesures — la Taille a 1620 px, la Taille 25 a toutes les
+largeurs — et personne n'avait regarde ENTRE les deux. Six exports (Tailles 10
+et 40 a 1080/3240/6480 px) ont donne des ecarts de **-32 % a +13 %**.
+
+L'effet du curseur Taille GRANDIT avec l'image: le rapport Taille 10 / Taille 25
+vaut 1,07 a 1080 px et **1,67** a 6480. Sur une petite image les Tailles basses
+se confondent (elles butent sur le pixel), sur une grande elles s'ecartent.
+
+Remplace par `GRAIN_SURFACE_MESUREE`: rangs Taille 10, 25 et 40 mesures d'un
+bout a l'autre, deux points sur le rang 100, interpoles log-log sur la largeur
+et lineairement sur la Taille. **Pire ecart sur les 18 exports: 0,13 %.**
+
+**LA CASSURE ETAIT LE PIEGE SILENCIEUX, et elle est levee.** Mesuree (1620 px,
+Grain 50, Taille 25): a **0** elle pose **1,72x plus de grain**, a **100** elle
+grossit les grains de moitie sans changer la force. Un preset qui l'aurait
+changee aurait fausse le grain de 72 % sans que rien ne le signale. Elle est
+branchee de bout en bout (`grainRoughness`) et passable a l'import
+(`--grainRoughness`). **A relever a chaque import**, comme la Taille.
+
+## ETAT ACTUEL
+
+| | ecart avec Lightroom |
+|---|---|
+| Force, **18 exports** (Tailles 0->100 x largeurs 810->9720) | **0,13 %** |
+| Grosseur des grains, 6 exports | 2,2 % |
+| Cassure, 3 exports | 0,11 % |
+| Gris / couleurs sur mire, 3 forces | 0,7 % / 1,2 % |
+
+## LE GRAND COTE, PAS LA LARGEUR (regle — 1 export)
+
+Une mire de 2160x3240 exportee **en portrait** rend **12,62**, exactement comme
+la meme mire en paysage 3240x2160 (**12,64**). La largeur aurait donne 15,73.
+
+C'est donc le **GRAND COTE** qui fixe le grain, l'orientation n'y change rien.
+Notre moteur lisait la largeur: une photo verticale de 9180x16320 comptait pour
+9180 la ou Lightroom voit 16320 — **47 % d'ecart sur toute photo verticale**.
+Corrige (`grandCoteImage` dans `studioRenderer.js`), garde par deux tests.
+
+## LES VRAIES PHOTOS — ET POURQUOI LE GRAIN EST CLOS
+
+Deux photos developpees des deux cotes en CN14 (**Grain 25, Taille 10,
+Cassure 50 — releve CONFIRME dans son panneau**, le releve d'import etait
+juste). Ciel, 40 blocs plats, bruit de fond retire en quadrature (lu sur la
+MEME photo en CN13: meme nettete, aucun grain).
+
+| photo | grand cote | son grain | le notre | ecart |
+|---|---|---|---|---|
+| `photo-test-1` | 5 392 | 7,73 | 7,41 | **-4 %** |
+| `photo-test-2` | 16 320 | 4,03 | 4,71 | **+17 %** |
+
+La premiere est DANS le domaine mesure (810 -> 9720 px), la seconde non: elle
+fait 150 Mpx, 1,7x au-dela de la plus grande mire. C'est la SEULE difference
+entre les deux, et elle explique tout l'ecart.
+
+**Sur une photo normale, on y est.** Au-dela de 9720 px de grand cote on
+extrapole — le rang Taille 10 s'y prolonge par la croissance du rang guide, ce
+qui n'est pas une mesure — et ca coute 17 % sur une image de 150 Mpx.
+
+### LA REGLE DE REOUVERTURE
+
+Le grain est **clos**. On ne le rouvre que dans **deux** cas:
+
+1. une image sort **sous 810 px** ou **au-dela de 9720 px** de grand cote. Pour
+   le second, deux exports le fermeraient: une mire de **16320 px**
+   (`node scripts/make-mire-largeur.mjs 16320`) a Taille **10** et Taille
+   **25**, Grain 50 Cassure 50. A ne demander que si une photo de plus de
+   100 Mpx doit vraiment etre servie ;
+2. un preset porte une **Taille entre 50 et 100** sur une image loin de
+   1620 px: ces deux rangs n'ont qu'un ou deux points mesures.
+
+La **CASSURE** n'en fait plus partie — elle est mesuree et branchee. Elle reste
+a **RELEVER A CHAQUE IMPORT** pour etre recopiee (`--grainRoughness`), comme la
+Taille.
+
+## Ce qui reste ouvert AUTOUR du grain (mais pas dedans)
+
+1. La **REDUCTION DU BRUIT** de Lightroom nous manque (ses presets Cinema II
+   posent Luminance 20 / Couleur 50). **Chantier separe, pas du grain**: il part
+   du RAW et efface le bruit du capteur AVANT de poser son grain; nous partons
+   d'un JPEG ou ce bruit est deja cuit. Invisible a bas ISO, visible dans le
+   sombre. C'est le prochain vrai sujet si les photos sont prises en basse
+   lumiere.
+2. L'**attenuation aux deux bouts sur une COULEUR sombre saturee**: elle est lue
+   sur la luminance sRVB et n'a ete mesuree que sur des gris (niveaux 8 et 247).
+   Rien dans la mire A ne permet de trancher — il faudrait une mire portant des
+   couleurs saturees TRES sombres et TRES claires.
+3. Les rangs **Taille 50 et 100** loin de 1620 px: un ou deux points mesures
+   seulement. Sans effet sur les presets livres (tous entre 10 et 40).
 
 ## Les commandes
 
@@ -122,7 +193,8 @@ node scripts/mesure-grain-photo.mjs <sa-photo.png> --grain 25 --taille 10 \
   --clair 90 --sansgrain <meme-photo-sans-grain.png>
 node scripts/mesure-grain-lightroom.mjs --reference <a> --lightroom <b> --valeur 50
 node scripts/mesure-taille-grain.mjs <mire...> --valeur 50
-npm run test:vision-preset            # 82 verifications, ~2 s
+node scripts/make-mire-largeur.mjs 1080 810 --sortie <dossier>
+npm run test:vision-preset            # 98 verifications, ~3 s
 npm run test:vibeos-vision            # 3 tests navigateur, dont le zoom
 npm run lint                          # 0 erreur (5 warnings preexistants)
 ```
@@ -142,6 +214,11 @@ Les exports Lightroom disponibles :
 - **Faire subir exactement le meme geste aux deux cotes.** Soustraire le flou de
   SA photo a NOTRE image donne notre grain entier d'un cote et son grain ampute
   de l'autre.
+- **Toujours demander un TEMOIN avec la mesure**: un cas qui sort du mecanisme
+  suspecte. La mire de 1080 px a Taille 100 en etait un — ses grains restent
+  gros meme sur une petite image, donc hors du repli. C'est elle qui a montre
+  que Taille et largeur ne sont pas separables; sans elle, on aurait mis son
+  ecart sur le dos du repli et corrige au mauvais endroit.
 - **Un ecart UNIFORME sur les trois canaux n'est jamais un effet de couleur.**
   C'est ce qui a evite de chercher au mauvais endroit apres coup.
 - **Un rapport lu apres ecretage n'est pas la grandeur qu'on croit lire.** C'est

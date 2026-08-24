@@ -13,6 +13,7 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'blur',
     'grain',
     'grainSize',
+    'grainRoughness',
     'vignette',
     'tintColor',
     'tintIntensity',
@@ -117,6 +118,12 @@ export const VISION_SAFE_BOUNDS = {
      * sont dans `grainField.js`.
      */
     grainSize: { min: 0, max: 100, neutre: 25 },
+    /*
+     * La CASSURE, le troisieme curseur de son panneau Grain. A 0 elle pose
+     * 1,72x plus de grain, a 100 elle grossit les grains de moitie sans changer
+     * la force. Mesuree le 2026-08-22; la loi est dans `grainField.js`.
+     */
+    grainRoughness: { min: 0, max: 100, neutre: 50 },
     vignette: { min: 0, max: 30, neutre: 0 },
     /*
      * AJOUTES LE 2026-08-17. Ces huit bornes existaient deja, mais ECRITES EN
@@ -160,6 +167,7 @@ export const VISION_FREE_BOUNDS = {
     dehaze: { min: 0, max: 50, neutre: 0 },
     grain: { min: 0, max: 100, neutre: 0 },
     grainSize: { min: 0, max: 100, neutre: 25 },
+    grainRoughness: { min: 0, max: 100, neutre: 50 },
     vignette: { min: 0, max: 100, neutre: 0 },
     /*
      * Hors garde-fous, `normalizeVisionFilters` ne borne RIEN (elle sort avant).
@@ -282,6 +290,14 @@ export function normalizeVisionFilters(filters = {}) {
         next.grainSize === undefined || next.grainSize === null ? 25 : next.grainSize,
         'grainSize',
         25,
+        isMono,
+    );
+    /* Au repos c'est 50, sa valeur par defaut — pas 0, qui poserait 1,72x plus
+       de grain (mesure du 2026-08-22, voir `grainField.js`). */
+    next.grainRoughness = clampSafe(
+        next.grainRoughness === undefined || next.grainRoughness === null ? 50 : next.grainRoughness,
+        'grainRoughness',
+        50,
         isMono,
     );
     next.tintColor = normalizeHexColor(next.tintColor, '#ffffff');

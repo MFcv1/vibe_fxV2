@@ -79,8 +79,12 @@ const lisse = await sharp(photoPath).removeAlpha().blur(rayon).raw().toBuffer();
 const PIXEL = new Float64Array(3);
 const notre = Buffer.from(lisse);
 {
-    const echelle = grainEchelle(taille, W);
-    const sigma = grainSigma(grain, taille, W);
+    /* LE GRAND COTE, pas la largeur: une photo verticale de 9180x16320 compte
+       pour Lightroom comme une image de 16320. Mesure sur une mire exportee en
+       portrait — voir `studioRenderer.js`. */
+    const grandCote = Math.max(W, H);
+    const echelle = grainEchelle(taille, grandCote);
+    const sigma = grainSigma(grain, taille, grandCote);
     for (let y = 0; y < H; y += 1) {
         for (let x = 0; x < W; x += 1) {
             const i = (y * W + x) * 3;

@@ -128,9 +128,14 @@ async function lire(file) {
 
 /* Le coeur du carre `index`, a l'echelle de CETTE mire. */
 function coeur(index, echelle) {
-    const size = SIZE0 * echelle;
-    const gapX = Math.round((W0 - COLS * SIZE0) / (COLS + 1)) * echelle;
-    const gapY = Math.round((H0 - ROWS * SIZE0) / (ROWS + 1)) * echelle;
+    /* La geometrie est recalculee EXACTEMENT comme `make-mire-largeur.mjs` la
+       dessine — carre arrondi d'abord, ecarts deduits ensuite — sinon les deux
+       arrondis divergent d'un pixel ou deux sur une mire reduite. */
+    const W = Math.round(W0 * echelle);
+    const H = Math.round(H0 * echelle);
+    const size = Math.round(SIZE0 * echelle);
+    const gapX = Math.round((W - COLS * size) / (COLS + 1));
+    const gapY = Math.round((H - ROWS * size) / (ROWS + 1));
     const marge = MARGE0 * echelle;
     const col = index % COLS;
     const row = Math.floor(index / COLS);
@@ -220,9 +225,13 @@ for (const entree of fichiers) {
     } else {
         img = await lire(entree);
         etiquette = entree.split('/').pop().slice(0, 32);
-        const facteur = Math.round(img.w / W0) || 1;
-        if (img.w !== W0 * facteur || img.h !== H0 * facteur) {
-            console.log(`${pad(etiquette, 34)}IGNOREE — ${img.w}x${img.h} n'est pas la mire A (1620x1080) ni un de ses agrandissements entiers.`);
+        /* Le facteur n'a plus a etre entier: `make-mire-largeur.mjs` dessine la
+           mire A a n'importe quelle taille, et c'est ce qu'il faut pour
+           mesurer EN DESSOUS de 1620 px (un export social fait 1080). La
+           tolerance d'un pixel absorbe les arrondis de la geometrie. */
+        const facteur = img.w / W0;
+        if (Math.abs(img.h - H0 * facteur) > 1) {
+            console.log(`${pad(etiquette, 34)}IGNOREE — ${img.w}x${img.h} n'a pas les proportions de la mire A (3:2).`);
             continue;
         }
         zones = Array.from({ length: COLS * ROWS }, (_, i) => coeur(i, facteur));
