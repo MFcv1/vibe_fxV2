@@ -111,12 +111,13 @@ fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quo
 | **Effets** | Vignette | `vignette` |
 | **Effets** | **Grain** | `grain` |
 | **Effets** | **Grain → Taille** (sous le triangle) | `grainSize` |
+| **Effets** | **Grain → Cassure** (sous le triangle) | `grainRoughness` |
 | **Détail** | Netteté | `sharpness` |
 | **Détail** | Réduction du bruit | (pas branché) |
 | En-tête | **N&B** activé ? | `saturation: 0` |
 | En-tête | Profil (Couleur / autre) | — noter, ça change la base |
 
-#### Le sous-réglage « Taille » du grain — depuis le 2026-08-20
+#### Les DEUX sous-réglages du grain — Taille et Cassure
 
 Le curseur **Grain** est replié par défaut : un petit **triangle** à droite de sa
 valeur ouvre **Taille** et **Cassure**. Il faut les regarder à chaque preset qui
@@ -126,13 +127,20 @@ porte du grain.
   (son défaut, celui sur lequel tout est calibré). Elle change la **grosseur**
   des grains, donc aussi leur force apparente : un grain deux fois plus gros
   bruite deux fois moins chaque pixel. `cn17` est à **40**.
-- **Cassure** : laissée à **50** partout, jamais mesurée. Si un preset la change,
-  il faut la mesurer avant de la recopier — la recopier sans mesure serait
-  inventer une échelle.
+- **Cassure** : **mesurée le 2026-08-22, et elle fait beaucoup.** À **0** elle
+  pose **1,72× plus de grain** ; à **100** elle grossit les grains de moitié
+  sans changer la force. Elle vaut 50 par défaut, et tous les presets importés
+  jusqu'ici la laissent là — mais **rien ne signale qu'un preset l'a changée**.
+  À relever systématiquement et à passer en `--grainRoughness` si elle s'écarte
+  de 50. Un preset importé avec une Cassure ignorée rend un grain faux de
+  jusqu'à 72 %, avec une couleur parfaite : c'est le genre d'erreur qu'aucune
+  mesure de couleur ne rattrape.
 
 > ⚠️ **Lightroom n'est pas pilotable** (pas d'AppleScript, pas de CLI sur la
 > version cloud). L'agent ne peut donc PAS lire ces valeurs lui-même : il doit
-> **les demander**, capture d'écran des panneaux à l'appui. C'est une étape du
+> **les demander**, capture d'écran des panneaux à l'appui. Pour le grain, la
+> capture doit montrer **les trois curseurs** — Grain, Taille, Cassure — donc
+> le triangle ouvert. C'est une étape du
 > protocole, pas un détail — un preset importé sans ce relevé rend une couleur
 > juste et un rendu incomplet.
 
@@ -321,6 +329,35 @@ pixels sous CN11. Il faut comparer à Lightroom **sur la même photo**, sinon on
 
 ---
 
+## Vérifier un preset importé : DEUX mesures, jamais une
+
+C'est le piège de la vérification, et il a déjà fait accuser une table à tort.
+
+**Un preset qui porte du grain ne se juge pas au pixel.** Son grain et le nôtre
+sont deux tirages aléatoires : ils ne tombent jamais aux mêmes endroits, et
+l'écart pixel à pixel ne peut pas être nul même avec une couleur parfaite. Sur
+`cn14` ça pesait 4 à 5/255 — assez pour croire la capture ratée.
+
+Il faut donc mesurer **séparément** :
+
+| Ce qu'on vérifie | Avec quoi | Cible |
+|---|---|---|
+| **La couleur** | `compare-preset-vs-lightroom.mjs`, ligne « couleur seule, par blocs » | < 1/255 |
+| **La force du grain** | `mesure-grain-lightroom.mjs` sur la mire A | ×1,00 |
+| **Sa répartition par canal** | `mesure-grain-canaux.mjs` | < 2 % |
+| **Sa grosseur** | `mesure-taille-grain.mjs` | < 5 % |
+| **Sur une vraie photo** | `mesure-grain-photo.mjs --sansgrain <même photo sans grain>` | quelques % |
+
+La dernière ligne demande une deuxième version de la même photo, développée avec
+un preset **sans grain mais avec la même netteté** (CN13 fait ça pour CN14) :
+c'est ce qui permet de retirer en quadrature le bruit de fond de sa chaîne.
+
+**Et les trois réglages du grain doivent être vérifiés au relevé**, pas
+seulement deux : Grain, Taille **et Cassure**. Une Cassure ignorée fausse le
+grain de 72 % sans qu'aucune mesure de couleur ne bronche.
+
+---
+
 ## La check-list, en une page
 
 - [ ] `npm run preset:mire`
@@ -332,5 +369,6 @@ pixels sous CN11. Il faut comparer à Lightroom **sur la même photo**, sinon on
 - [ ] `npm run test:vision-preset` vert
 - [ ] `audit-vision-presets.mjs` — bandes ≤ 5/255
 - [ ] `compare-preset-vs-lightroom.mjs` sur une vraie photo — couleur < 1/255
+- [ ] **Le grain vérifié À PART**, si le preset en porte (voir ci-dessous)
 - [ ] `recommendedIntensity` laissé à **100**
 - [ ] Vignettes regardées dans `/creer/vision`, sur une photo avec grand ciel
