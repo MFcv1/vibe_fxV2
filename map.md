@@ -610,6 +610,110 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-25 (`powlisher-cine` : un preset entierement mesure)
+
+**Ce qui a change dans l'arbre** : `scripts/planche-duel.mjs`,
+`scripts/mesurer-etalonnage.mjs`, `scripts/variantes.mjs` ajoutes. Modifies :
+`visionPresets.js` (+1 preset, **aucune suppression**), `smoke-vision-preset.mjs`
+(+7 verifications), `docs/presets-valides.md`.
+
+**Le preset** : `powlisher-cine`. Trois etages, tous mesures.
+
+| | mesure | source |
+|---|---|---|
+| rotation TSL du bleu | -6,7° dans les ombres, -11,8° dans les clairs | ecart de teinte moyenne, secteur par secteur, entre ses 324 photos et 374 neutres |
+| jaune / vert / orange | +5,1° / +2,2° / +1,8° | idem |
+| etalonnage | a\* -2,3 partout, b\* +2,0 / +5,6 / +4,7 | teinte des quasi-gris, **en ecart au tas neutre** |
+| saturation par plage | 0,85 / 0,83 / 0,99 / 1,11 | rapport des chromas moyennes |
+| courbe de tonalite | appariement de quantiles | histogrammes des deux corpus |
+
+**Trois erreurs de fond, toutes vues a l'oeil avant d'etre comprises :**
+
+1. **Les attracteurs.** Premiere version : chaque teinte etait TIREE VERS une
+   cible mesuree. Ca passait toutes les mesures et c'etait faux — un attracteur
+   fait CONVERGER deux teintes voisines, donc un ciel en degrade sortait avec
+   une bande. Remplace par des rotations d'ANGLE FIXE, facon panneau TSL. La
+   raison de fond : aucun preset Lightroom ne contient d'attracteur, et ses
+   photos ont ete faites dans Lightroom.
+2. **L'extrapolation dans les blancs.** La mesure de l'etalonnage ecarte les
+   pixels au-dessus de L = 97 ; la prolonger jusqu'au blanc faisait virier au
+   **vert-gris** un grand ciel a contre-jour. Les tables retombent maintenant
+   vers zero au sommet.
+3. **L'appariement de quantiles comme angle de rotation.** Il rendait -125° et
+   +55°, ce qui n'a aucun sens pour un curseur TSL (Lightroom plafonne vers 30°).
+   Le bon estimateur est l'ecart de teinte MOYENNE par secteur, qui rend 2 a 12
+   degres.
+
+**Ce que dit le corpus elargi, et que 36 photos ne pouvaient pas dire :**
+
+- sa lumiere tire vers le **jaune-vert**, pas vers l'orange dore : a\* est
+  NEGATIF dans les douze familles. C'est ce qui separe son rendu d'un filtre
+  chaud ordinaire ;
+- ses reflets (le 1 % le plus lumineux) sont **jaunes**, b\* de +3 a +31, et
+  culminent entre 183 et 238 — jamais pres de 255 ;
+- ses photos forment un **nuage continu**, pas des reglages distincts : sur huit
+  familles assez fournies, aucune coupure ne separe les developpements mieux que
+  les sujets, sauf `auto`, `interieur` et `mer` — et la, ce sont toujours les
+  MEMES variables qui separent (`refletB`, `pointBlanc`, `contraste`). Il y a
+  donc **un seul axe de variation**, pas neuf sous-traitements.
+
+**Verdict a l'oeil du porteur du projet** : garde. Tres bien sur les images
+fades ou plates, reanime les verts, interessant sur les sujets sombres ; moins
+bien sur les tres forts contrastes, et la couleur d'un sujet jaune tourne un peu.
+
+## Journal — 2026-08-24 (une bibliotheque de 324 photos de @powl_d, rangee par sujet)
+
+**Ce qui a change dans l'arbre** : quatre scripts ajoutes dans `scripts/` —
+`profil-corpus.mjs`, `grouper-corpus.mjs`, `moissonner-powlisher.mjs`,
+`trier-biblio.mjs`, `categoriser.mjs`. Aucun preset touche, aucun code produit
+modifie : ce lot est de la MESURE, pas de la livraison.
+
+**Pourquoi** : les presets `powlisher*` ont ete deduits de 36 photos, et le
+porteur du projet trouve que le rendu n'atteint pas celui de la source. Le
+verrou n'etait pas la methode de mesure mais la TAILLE et la PURETE du corpus :
+36 photos tous sujets confondus ne permettent pas de distinguer « son
+developpement » de « son sujet ».
+
+**Ce qui a ete fait** : 807 posts recuperes (mai-aout 2026, donc son traitement
+actuel, aucun melange d'epoques), 1 587 photos telechargees en resolution
+d'origine, 464 ecartees comme non photographiques, 19 doublons, puis les 1 114
+restantes regardees une par une sur planches numerotees. **324 retenues**,
+classees en 12 familles : auto 67, interieur 48, architecture 37, mer 37,
+ville-nuit 30, rue 27, paysage 18, moto 17, aerien 13, avion 12, soiree 8,
+portrait 7.
+
+**Deux pieges attrapes, tous les deux du meme genre** — un indicateur qui prend
+sa signature pour un defaut :
+
+1. Le detecteur de captures d'ecran rejetait ses photos de cabine d'avion et ses
+   vues de ville de nuit, sur un « aplat d'une seule couleur exacte » de 10 a
+   41 %. Cet aplat, c'etait du noir bouche, c'est-a-dire la signature meme du
+   look. Corrige : un aplat ne compte que s'il est CLAIR (`dominanteLuma > 24`).
+2. Le test d'ecart au traitement dominant rejetait les gratte-ciels de Shanghai
+   au-dessus des nuages et un coucher de soleil sur mer, parce qu'il comparait
+   toutes les photos a une mediane TOUS SUJETS CONFONDUS. Retire du tri
+   automatique (`--ecarter-hors-cadre` pour le revoir) : cet ecart ne se mesure
+   qu'a l'interieur d'une famille.
+
+**Ce que le corpus elargi dit** (medianes par famille, `profils-par-sujet.json`) :
+
+- **aucune famille n'ecrete** : 0,00 % de pixels a 255 partout. Le point blanc
+  se pose entre 197 et 234 selon la famille, jamais a 255. C'est la regle la plus
+  ferme du look, et elle est maintenant verifiee sur 324 photos.
+- le pied est a 0-2 sur presque tout (11 sur les portraits) : noirs denses.
+- le ciel atterrit a **184-193°** sur les familles de jour. L'ancienne cible
+  (178-196°) avait ete deduite de DEUX photos ; elle est ici confirmee sur 44.
+- la chroma reste modeste : 11 a 17, et 6,9 en ville de nuit. Ce n'est pas un
+  look sature.
+- l'exposition, elle, varie enormement d'une famille a l'autre (luminance
+  mediane de 23 en ville-nuit a 124 en mer). **Ca, aucun preset ne le fait** :
+  c'est un reglage photo par photo, et c'est une part de l'ecart ressenti.
+
+**Ou vivent les fichiers** : `~/Desktop/powlisher-biblio/` (hors depot, ce ne
+sont pas nos photos) — `brut/` la moisson, `par-sujet/` la bibliotheque,
+`posts.txt` les 807 identifiants, `labels.txt` le classement a l'oeil,
+`PLANCHE-<famille>.jpg` et `CONTROLE-*.jpg` pour l'oeil.
+
 ## Journal — 2026-08-22 sexies (le grand cote, pas la largeur)
 
 **Ce qui a change dans l'arbre** : rien. Modifies :

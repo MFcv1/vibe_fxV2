@@ -19,7 +19,8 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**le grain, apres l'espace de travail** — prompt du 2026-08-22](docs/prompt-reprise-2026-08-22.md),
+[**les presets mesures sur corpus** — prompt du 2026-08-25](docs/prompt-reprise-2026-08-25.md),
+[le grain, apres l'espace de travail — 2026-08-22](docs/prompt-reprise-2026-08-22.md),
 [la série d'imports Lightroom — 2026-08-20](docs/prompt-reprise-2026-08-20.md).
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :

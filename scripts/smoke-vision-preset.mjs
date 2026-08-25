@@ -881,6 +881,106 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
     check('grain : le champ garde sa force a tous les pas', pireSigma, 0, 3, '%');
 }
 
+/* ---------- powlisher-cine : les mesures de 324 photos, figees ----------
+ *
+ * Ce preset n'a pas ete regle a la main: chaque nombre qu'il porte vient d'une
+ * mesure sur 324 photos de @powl_d rangees par sujet, comparees a 374 photos
+ * neutres des memes sujets (Wikimedia Commons). Ce qui est verifie ici, ce sont
+ * donc les MESURES, pas un gout.
+ *
+ * Les deux dernieres verifications sont des garde-fous poses apres des defauts
+ * reellement vus a l'ecran, pas des precautions theoriques:
+ *
+ *   - le blanc doit rester neutre. Une premiere version prolongeait la derive
+ *     verte de l'etalonnage jusque dans les blancs, et un grand ciel a
+ *     contre-jour virait au vert-gris.
+ *   - un degrade doit rester un degrade. La toute premiere version tirait les
+ *     teintes VERS des attracteurs, ce qui fait converger deux teintes voisines
+ *     et fabrique une bande visible dans un ciel. Le mecanisme a ete remplace
+ *     par des rotations d'angle fixe, facon panneau TSL de Lightroom, qui ne
+ *     peuvent pas croiser deux couleurs.
+ */
+
+const cine = getPresetTransform('powlisher-cine');
+if (!cine) {
+    console.error('ECHEC: preset « powlisher-cine » introuvable.');
+    process.exit(1);
+}
+
+function versLab(rgb) {
+    const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [R, G, B] = rgb.map(lin);
+    const X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+    const Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+    const Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+    const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const fx = f(X), fy = f(Y), fz = f(Z);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function teinteLab(rgb) {
+    const [, A, B] = versLab(rgb);
+    let h = Math.atan2(B, A) * 180 / Math.PI;
+    return h < 0 ? h + 360 : h;
+}
+
+{
+    /* Le bleu part vers le teal, ET l'effet S'EFFACE quand le bleu est franc.
+     *
+     * Une premiere version de ce smoke visait une valeur unique, -11,8 degres,
+     * qui est la rotation TSL mesuree. Elle echouait a -29,8: la rotation TOTALE
+     * d'un bleu, c'est la rotation TSL PLUS l'effet de l'etalonnage, et
+     * l'etalonnage est un decalage fixe en a et b. Son effet angulaire est donc
+     * inversement proportionnel a la chroma — enorme sur un bleu pale, negligeable
+     * sur un bleu franc:
+     *
+     *   ciel pale (chroma 27)     -47°
+     *   ciel moyen (chroma 37)    -30°
+     *   ciel franc (chroma 55)     -7°
+     *   bleu profond (chroma 66)   +4°
+     *
+     * Ce n'est pas un defaut, c'est ce que fait aussi l'etalonnage de Lightroom.
+     * Et c'est la propriete qu'on cherchait: un ciel DEJA bleu-cyan est presque
+     * intact, la ou l'ancien `powlisher` le poussait au menthe. On fige donc les
+     * deux bouts plutot qu'un chiffre au milieu. */
+    const cielMoyen = [0.42, 0.60, 0.85];
+    const rotPale = ((teinteLab(cine(cielMoyen)) - teinteLab(cielMoyen) + 540) % 360) - 180;
+    check('cine : un ciel pale part vers le teal', rotPale, -50, -12, '°');
+
+    const bleuFranc = [0.12, 0.30, 0.72];
+    const rotFranc = ((teinteLab(cine(bleuFranc)) - teinteLab(bleuFranc) + 540) % 360) - 180;
+    check('cine : un bleu franc est presque intact', Math.abs(rotFranc), 0, 10, '°');
+
+    /* L'etalonnage sur un gris moyen: derive verte (a* negatif) et jaune
+     * (b* positif). Mesure sur huit familles, toutes du meme signe. */
+    const [, aGris, bGris] = versLab(cine([0.5, 0.5, 0.5]));
+    check('cine : la lumiere derive au vert', aGris, -6, -0.5, ' a*');
+    check('cine : la lumiere derive au jaune', bGris, 2, 10, ' b*');
+
+    /* Les hautes lumieres n'ecretent jamais. Sur les 324 photos, la mediane de
+     * pixels a 255 est de 0,00 % dans les DOUZE familles. */
+    const blanc = cine([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('cine : le blanc ne monte pas a 255', Math.max(...blanc), 200, 250);
+
+    /* ... et il reste neutre: pas de ciel vert-gris. */
+    check('cine : le blanc reste neutre', Math.abs(blanc[0] - blanc[2]), 0, 5);
+
+    /* Un degrade de ciel reste un degrade: aucun pas de sortie ne doit depasser
+     * de beaucoup le pas d'entree. Une convergence de teintes se verrait ici
+     * comme un pic. */
+    let pireEntree = 0, pireSortie = 0, prevIn = null, prevOut = null;
+    for (let k = 0; k <= 40; k += 1) {
+        const f = k / 40;
+        const dedans = [0.15 + 0.55 * f, 0.35 + 0.45 * f, 0.65 + 0.30 * f];
+        const dehors = cine(dedans);
+        if (prevIn) {
+            pireEntree = Math.max(pireEntree, Math.max(...dedans.map((v, i) => Math.abs(v - prevIn[i]) * 255)));
+            pireSortie = Math.max(pireSortie, Math.max(...dehors.map((v, i) => Math.abs(v - prevOut[i]) * 255)));
+        }
+        prevIn = dedans; prevOut = dehors;
+    }
+    check('cine : un degrade de ciel ne fait pas de bande', pireSortie / pireEntree, 0, 1.7, '×');
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

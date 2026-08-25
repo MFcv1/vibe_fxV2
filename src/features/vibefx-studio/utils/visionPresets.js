@@ -560,7 +560,259 @@ function powlisherShowcaseTransform(input) {
  * Cote rendu, les deux sont indiscernables — d'ou le fait qu'ajouter un preset
  * importe ne coute rien au moteur.
  */
+/* ==========================================================================
+ * powlisher-cine — le tronc, mesure au lieu d'etre vise
+ * ==========================================================================
+ *
+ * Ce preset ne partage pas la methode des `powlisher*` qui le precedent. Ceux-la
+ * ont ete regles pour ATTEINDRE quelques cibles choisies a la main (le ciel a
+ * 195 degres, la peau entre 27 et 36). Celui-ci est la mediane d'un deplacement
+ * MESURE.
+ *
+ * Le materiau, le 2026-08-24: 324 photos de `@powl_d` publiees entre mai et
+ * aout 2026 — donc un seul et meme traitement, sans melange d'epoques —
+ * rangees a la main en douze familles de sujet. En face, 461 photos des MEMES
+ * sujets par des centaines d'auteurs differents (Wikimedia Commons).
+ *
+ * Pourquoi ce tas d'en face. On ne voit jamais ses fichiers de depart, donc on
+ * ne peut pas apprendre « entree -> sortie ». Mais en comparant sa densite de
+ * couleurs a celle d'un tas qui montre les memes scenes SANS porter son
+ * traitement, on obtient la direction du deplacement. « Neutre » ne veut pas
+ * dire « non retouche », ce qui serait introuvable: ca veut dire non correle a
+ * lui — des centaines de retouches individuelles qui s'annulent en moyenne.
+ *
+ * Et pourquoi douze familles plutot qu'un seul tas: ce qui survit a douze
+ * sujets sans rapport ne PEUT PAS etre du decor. Une cabine d'avion, un bord de
+ * mer et une facade n'ont aucune raison commune de rendre les memes gris. Ce
+ * qui se repete de l'un a l'autre est le traitement, et rien d'autre. C'est la
+ * seule raison pour laquelle les chiffres ci-dessous ont le droit d'exister.
+ *
+ * Mesures hors depot: ~/Desktop/powlisher-biblio/ (`transport.json`,
+ * `densites-lui.json`). Ce ne sont pas nos photos, elles ne sont pas versionnees.
+ */
+
+/* La courbe maitre, appariee quantile a quantile entre les deux tas.
+ *
+ * Elle assombrit tout le bas (64 -> 45, 128 -> 117), redevient neutre vers 170,
+ * puis RETIENT le haut (192 -> 184, 224 -> 203, 240 -> 218).
+ *
+ * Le dernier point est a nous, pas a la mesure: l'appariement de quantiles
+ * force 255 -> 255 parce que les deux fonctions de repartition finissent a 1,
+ * ce qui fabriquait un mur vertical entre 240 et 255. On le remplace par une
+ * epaule qui finit a 232 — dans la fourchette de ses points blancs reels
+ * (215 a 245 selon la famille, mediane 228), et surtout SANS ecretage, qui est
+ * la regle la plus ferme de tout le corpus: 0,00 % de pixels a 255 dans les
+ * douze familles. */
+/* En unites 0-1, comme toutes les courbes de ce fichier: `evalCurve` travaille
+ * dans l'espace du moteur, pas en 0-255. Les valeurs mesurees etaient en
+ * 0-255 (0 -> 0, 64 -> 45, 128 -> 117, 192 -> 184, 224 -> 203, 255 -> 232) et
+ * sont divisees par 255 ici. Ecrite d'abord en 0-255, elle sortait un blanc a
+ * 112 sur 255 — l'image entiere ecrasee d'un facteur 2,3. */
+const CINE_CURVE = [
+    [0.0000, 0.0000], [0.0627, 0.0275], [0.1255, 0.0745],
+    [0.1882, 0.1255], [0.2510, 0.1765], [0.3137, 0.2471],
+    [0.3765, 0.3059], [0.4392, 0.3765], [0.5020, 0.4588],
+    [0.5647, 0.5255], [0.6275, 0.6196], [0.6902, 0.6863],
+    [0.7529, 0.7216], [0.8157, 0.7529], [0.8784, 0.7961],
+    [0.9412, 0.8471], [1.0000, 0.9098],
+];
+
+/* --- sRGB <-> Lab (D65) ---------------------------------------------------
+ * Le travail de couleur se fait en Lab et pas en TSL, contrairement aux presets
+ * precedents. Raison: on veut agir sur la CHROMA et la teinte perceptives. En
+ * TSL, un jaune et un bleu de meme « saturation » n'ont pas du tout le meme
+ * poids visuel, et une regle unique appliquee aux deux en abime un pour servir
+ * l'autre. Toutes les mesures du corpus sont d'ailleurs en Lab. */
+const srgbToLin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const linToSrgb = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * (c ** (1 / 2.4)) - 0.055);
+
+function rgbToLab01(r, g, b) {
+    const R = srgbToLin(r), G = srgbToLin(g), B = srgbToLin(b);
+    const X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+    const Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+    const Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+    const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const fx = f(X), fy = f(Y), fz = f(Z);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+function lab01ToRgb(L, A, B) {
+    const fy = (L + 16) / 116, fx = fy + A / 500, fz = fy - B / 200;
+    const inv = (t) => (t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787);
+    const X = inv(fx) * 0.95047, Y = inv(fy), Z = inv(fz) * 1.08883;
+    return [
+        clamp01(linToSrgb(X * 3.2406 + Y * -1.5372 + Z * -0.4986)),
+        clamp01(linToSrgb(X * -0.9689 + Y * 1.8758 + Z * 0.0415)),
+        clamp01(linToSrgb(X * 0.0557 + Y * -0.2040 + Z * 1.0570)),
+    ];
+}
+
+/* Les attracteurs de teinte, par bande de luminosite, en degres Lab.
+ *
+ * Mesures dans `densites-lui.json`: dans la bande haute, les DOUZE familles
+ * posent leur pic entre 83 et 93 degres, avec un poids de 71 a 105 % — une mer,
+ * un interieur de cafe, une moto et une cabine d'avion. Un second pic revient
+ * vers 233-243 (le bleu) dans six familles.
+ *
+ * Les ombres, elles, sont vides ici volontairement: leurs pics vont de 23
+ * degres en mer a 263 en avion. Aucun accord, donc aucun droit a bouger quoi
+ * que ce soit — dans les ombres, ce qu'on mesure est de l'asphalte, de l'eau et
+ * du feuillage, c'est-a-dire le sujet. */
+/* --- LES ROTATIONS DE TEINTE, FACON PANNEAU TSL --------------------------
+ *
+ * POURQUOI CE MECANISME ET PAS L'AUTRE. La premiere version tirait chaque teinte
+ * VERS un attracteur mesure. Ca marchait sur les chiffres et c'etait faux: un
+ * attracteur fait CONVERGER deux teintes voisines, et sur un degrade lisse —
+ * un ciel — la convergence se voit comme une bande. Le defaut a ete vu tout de
+ * suite sur un ciel marocain.
+ *
+ * Aucun preset Lightroom ne peut produire ce defaut, parce qu'aucun ne contient
+ * cette operation. Un preset Lightroom, c'est une courbe, des rotations de
+ * bande d'un ANGLE FIXE, une saturation par plage et un etalonnage. Toutes ces
+ * operations preservent l'ordre des couleurs: un bleu un peu plus clair reste un
+ * bleu un peu plus clair. On s'y tient — d'autant que ses photos ont ete faites
+ * dans Lightroom.
+ *
+ * Les angles: ecart entre la teinte moyenne de son tas et celle du tas neutre,
+ * secteur par secteur, seulement la ou les huit familles s'accordent (mediane
+ * superieure a la dispersion). Tout le reste rend zero, et zero veut dire
+ * « il n'y touche pas ».
+ *
+ *   bleu    -6,7 degres dans les ombres, -11,3 puis -11,8 dans les clairs
+ *   jaune   +5,1 dans les hautes lumieres
+ *   vert    +2,2
+ *   orange  +1,8 dans les hauts medians
+ *
+ * C'est tout. Ce sont des valeurs de vrai preset — le panneau TSL de Lightroom
+ * plafonne vers 30 degres. L'ancien `powlisher` tournait le bleu bien plus fort,
+ * et c'est de la que vient son ciel menthe. */
+const CINE_ANCRES = [
+    { h: 45, angle: 1.8, bas: 0.4 },     // orange
+    { h: 75, angle: 5.1, bas: 0.2 },     // jaune
+    { h: 135, angle: 2.2, bas: 1.0 },    // vert
+    { h: 255, angle: -11.8, bas: 0.57 }, // bleu -> teal
+];
+/* Demi-largeur du fondu autour de chaque ancre. Un secteur a bord franc
+ * fabriquerait exactement la bande qu'on vient de retirer. */
+const CINE_LARGEUR = 45;
+
+/* `bas` est la part de la rotation deja appliquee dans les ombres; elle monte
+ * jusqu'a 1 dans les clairs, en fondu. */
+const CINE_RAMPE_L = [12, 62];
+
+/* Saturation par plage de luminosite (`transport.json`): il vide un peu les
+ * ombres et les bas medians, ne touche pas les hauts medians, laisse respirer
+ * les clairs. */
+const CINE_CHROMA = [0.85, 0.83, 0.99, 1.11];
+
+/* L'ETALONNAGE. Teinte posee sur ce qui devrait etre gris, mesuree en ECART au
+ * tas neutre — sinon on prendrait le vernis des vieilles photos et des
+ * peintures de Commons pour son geste. Huit familles, toutes du meme signe:
+ *
+ *            ombres   medians   clairs
+ *   a*        -2,3     -2,2     -2,3      (constant: une derive verte)
+ *   b*        +2,0     +5,6     +4,7      (jaune, maximal dans les medians)
+ *
+ * Ce n'est donc PAS un split-toning classique (ombres froides, clairs chauds):
+ * c'est un voile jaune-vert uniforme. C'est ce qui fait la difference entre son
+ * rendu et un filtre chaud ordinaire, qui lui partirait vers l'orange.
+ *
+ * LE DERNIER POINT DE CHAQUE TABLE N'EST PAS MESURE, il retombe vers zero.
+ * La mesure ecarte les pixels au-dessus de L = 97 (a ce niveau la teinte n'est
+ * plus fiable), donc on ne sait rien du sommet — et prolonger la derive verte
+ * jusque dans les blancs a fait virer AU VERT-GRIS un grand ciel presque blanc,
+ * vu tout de suite sur une photo a contre-jour. Un blanc reste blanc: c'est
+ * aussi ce que font le film et Lightroom, dont les hautes lumieres convergent
+ * vers le neutre.
+ *
+ * Les tables ont donc cinq points, poses a L = 0, 25, 50, 75 et 100. Les quatre
+ * premiers portent la mesure, le cinquieme est l'epaule. */
+const CINE_ETAL_A = [-2.3, -2.3, -2.2, -2.3, -0.3];
+const CINE_ETAL_B = [2.0, 2.8, 5.6, 4.7, 0.8];
+
+/* Fondu doux entre les valeurs d'une table, indexee par la luminosite Lab.
+ * L'interpolation lineaire casse la pente a chaque point de passage, et l'oeil
+ * voit ces cassures sur un grand degrade. */
+function fonduParL(table, L) {
+    const x = clamp01(L / 100) * (table.length - 1);
+    const i = Math.min(table.length - 2, Math.floor(x));
+    const t = x - i;
+    return table[i] + (table[i + 1] - table[i]) * (t * t * (3 - 2 * t));
+}
+
+/* Poids en cloche autour d'une ancre: 1 au centre, 0 au bord, derivee nulle aux
+ * deux bouts. */
+function poidsAncre(h, centre) {
+    const d = Math.abs(((h - centre + 540) % 360) - 180);
+    if (d >= CINE_LARGEUR) return 0;
+    return 0.5 * (1 + Math.cos(Math.PI * d / CINE_LARGEUR));
+}
+
+function rotationTeinte(h, L) {
+    const monte = smoothstep(CINE_RAMPE_L[0], CINE_RAMPE_L[1], L);
+    let rot = 0;
+    for (const a of CINE_ANCRES) {
+        const w = poidsAncre(h, a.h);
+        if (w > 0) rot += a.angle * w * (a.bas + (1 - a.bas) * monte);
+    }
+    return rot;
+}
+
+function powlisherCineTransform(input) {
+    /* 1. La tonalite, identique sur les trois canaux: la courbe dit ou il pose
+     *    ses niveaux, pas un virage — celui-ci vient apres. */
+    const r0 = evalCurve(CINE_CURVE, input[0]);
+    const g0 = evalCurve(CINE_CURVE, input[1]);
+    const b0 = evalCurve(CINE_CURVE, input[2]);
+
+    let [L, A, B] = rgbToLab01(r0, g0, b0);
+
+    /* 2. Saturation par plage de luminosite. */
+    const gain = fonduParL(CINE_CHROMA, L);
+    A *= gain;
+    B *= gain;
+
+    /* 3. Rotation de teinte, ponderee par la chroma. En dessous de quelques
+     *    unites, un pixel n'a pas de teinte definie: la tourner fabriquerait,
+     *    apres interpolation de la LUT, les bandes que ce projet a deja vues
+     *    sur un ciel voile. */
+    const chroma = Math.hypot(A, B);
+    const aUneTeinte = smoothstep(3, 14, chroma);
+    if (aUneTeinte > 0) {
+        let h = Math.atan2(B, A) * 180 / Math.PI;
+        if (h < 0) h += 360;
+        const hNeuf = (h + rotationTeinte(h, L) * aUneTeinte) * Math.PI / 180;
+        A = chroma * Math.cos(hNeuf);
+        B = chroma * Math.sin(hNeuf);
+    }
+
+    /* 4. L'etalonnage: une teinte constante par plage, ajoutee a tout le monde.
+     *    C'est ce que fait l'etalonnage de Lightroom, et c'est pour ca que ca ne
+     *    peut pas creer de discontinuite: un decalage constant ne change jamais
+     *    l'ordre de deux couleurs. */
+    A += fonduParL(CINE_ETAL_A, L);
+    B += fonduParL(CINE_ETAL_B, L);
+
+    return lab01ToRgb(L, A, B);
+}
+
 export const VISION_PRESETS = [
+    {
+        id: 'powlisher-cine',
+        label: 'Powlisher Ciné',
+        hint: 'Le tronc : lumière jaune-vert, reflets crème, blancs jamais brûlés',
+        description: 'Le fond commun à 324 de ses photos, rangées en douze familles '
+            + 'de sujet et comparées à 461 photos des mêmes sujets par d\'autres '
+            + 'auteurs. Ce qui reste vrai d\'une cabine d\'avion à un bord de mer ne '
+            + 'peut pas être du décor : lumière tirée vers le jaune-vert et non vers '
+            + 'l\'orange doré, reflets crème, noirs denses, hautes lumières retenues '
+            + 'et aucun écrêtage.',
+        bestFor: 'tout — c\'est le repère de la famille, les variantes s\'y ajoutent',
+        avoidFor: 'photos déjà écrêtées : la courbe retient les blancs, elle ne les '
+            + 'ressuscite pas',
+        recommendedIntensity: 100,
+        transform: powlisherCineTransform,
+    },
     {
         id: 'powlisher',
         label: 'Powlisher',
