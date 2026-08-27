@@ -17,9 +17,9 @@ et **attendent le regard du porteur du projet** :
 | `powlisher-chaud` | pôle chaud de l'axe des COULEURS : a\* à 0 dans les clairs, b\* +9,3 |
 | `powlisher-froid` | l'autre bout : étalonnage le plus vert, bleu tourné de 16° |
 | `powlisher-mer` | famille « mer » : teal le plus profond, plafond le plus haut (252) |
-| `powlisher-nuit` | famille « ville de nuit » : lampadaires tenus à 187 |
+| `powlisher-nuit-1` / `-2` | famille « ville de nuit » : lampadaires tenus à 187, à deux densités |
 | `ambre` | tiré d'un modèle de 10 photos désignées à la main : **split-tone**, b\* +1 dans les ombres → +8,2 dans les reflets |
-| `ambre-nuit` | même couleur, densité basse : blanc à 181, contraste 129 |
+| `ambre-nuit-1` / `-2` | même couleur, deux densités : blanc 209 et 181 |
 
 `powlisher-cine-doux` a été **construit puis retiré** le 2026-08-27 : il saturait.
 Les deux erreurs de mesure qu'il a révélées sont dans le journal `map.md` du
@@ -31,7 +31,7 @@ Tout est mesuré : `scripts/axe-developpement.mjs` (l'axe),
 (le portrait chiffré de chaque famille). Les mesures vivent hors dépôt dans
 `~/Desktop/powlisher-biblio/`.
 
-`npm run test:vision-preset` : **167 vérifications**, toutes passent.
+`npm run test:vision-preset` : **185 vérifications**, toutes passent.
 
 Deux instruments neufs, à utiliser avant tout nouveau preset :
 `scripts/voisins-du-modele.mjs` (étendre une poignée de photos-modèle à un tas

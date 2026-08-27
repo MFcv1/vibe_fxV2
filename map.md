@@ -610,6 +610,63 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-28 (les presets de nuit a deux densites)
+
+**Ce qui a change dans l'arbre** : rien d'ajoute. Modifies : `profil-corpus.mjs`
+(+ `p25`), `juger-vers-modele.mjs` (+ trois mesures de lisibilite du bas),
+`visionPresets.js` (**+2 presets, aucune suppression**), `smoke-vision-preset.mjs`
+(167 -> **185**), `todo.md`, les deux prompts de reprise.
+
+**RENOMMAGES** : `ambre-nuit` -> `ambre-nuit-2`, `powlisher-nuit` ->
+`powlisher-nuit-2`. Aucun des deux n'est dans `docs/presets-valides.md` — la
+regle tient. `ambre-nuit-1` et `powlisher-nuit-1` sont neufs.
+
+**LE SYMPTOME** : « le voile sombre donne un style mais il est un peu fort, on
+dirait une basse luminosite d'ecran de telephone ». Vu dans l'app sur un couchant
+et une rue de nuit, pas par les tests.
+
+**LA PREMIERE HYPOTHESE ETAIT FAUSSE, ET LA MESURE L'A DIT.** « Basse luminosite »
+fait penser a des ombres ecrasees. Trois mesures ont donc ete ajoutees a
+`juger-vers-modele.mjs` — `p05`, `p25` et la part de pixels tombes exactement a
+zero — et elles disent l'inverse :
+
+|  | tas neutre | modele | `ambre-nuit-2` |
+|---|---|---|---|
+| p05 | 21 | 5 | **17** |
+| p25 | 55 | 21 | **41** |
+| % bouche | 0,0 | 2,3 | **0,0** |
+
+Il ne creuse pas trop: il creuse deux fois MOINS que le modele et ne bouche
+aucun pixel. **Il ne casse rien, il pose trop bas.**
+
+**LA VRAIE CAUSE, deja ecrite dans `todo.md`** : une LUT n'a pas de memoire. Sa
+courbe est calee sur des scenes deja nocturnes; donnee a une photo correctement
+exposee, elle la descend d'une exposition entiere. C'est exactement le manque que
+l'etage de tonalite adaptatif doit combler, et qui n'existe pas encore.
+
+**LA CORRECTION** : un point milieu, en lumiere lineaire, entre le preset clair
+et le preset de nuit. Ce n'est pas un reglage au jugement — les deux bouts sont
+mesures, et une moyenne geometrique entre deux courbes monotones reste monotone.
+
+|  | clair | **milieu** | nuit |
+|---|---|---|---|
+| `ambre` gris moyen / plafond | 118 / 239 | **105 / 205** | 93 / 181 |
+| `powlisher` gris moyen / plafond | 117 / 232 | **98 / 213** | 81 / 195 |
+
+Pentes minimales 0,44 et 0,50, tres au-dessus du pas d'entree de la LUT.
+
+**LA COULEUR NE BOUGE PAS D'UN CHIFFRE.** C'est elle qui fait le style, et ce
+n'est pas elle qu'on corrige. Deux verifications neuves le figent: les deux
+densites d'une meme paire doivent poser le meme gris a moins de 1,5 unite Lab
+pres, et la version 1 doit tomber ENTRE les deux — sans quoi ce ne serait pas un
+point milieu mais un troisieme reglage.
+
+Mesure contre le modele de nuit: `ambre-nuit-1` parcourt **65 %** du chemin sur
+le point blanc et **59 %** sur le contraste, `ambre-nuit-2` **104 %** et **103 %**.
+
+**Verifie a l'oeil** : `NUIT-1-VS-2.jpg`. **Reste a valider par le porteur du
+projet.**
+
 ## Journal — 2026-08-27 bis (`ambre` : un preset tire d'un modele designe a la main)
 
 **Ce qui a change dans l'arbre** : `scripts/voisins-du-modele.mjs` et

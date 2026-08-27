@@ -15,10 +15,10 @@ N'ouvre ni les archives, ni les autres prompts de reprise, ni `map.md` en entier
 
 ## Où on en est
 
-Le moteur Vision porte **17 presets**. `npm run test:vision-preset` : **167
+Le moteur Vision porte **19 presets**. `npm run test:vision-preset` : **185
 vérifications**, toutes vertes.
 
-Les deux derniers livrés, `ambre` et `ambre-nuit`, ont été tirés d'un **modèle** :
+Les derniers livrés, `ambre` et ses deux densités, ont été tirés d'un **modèle** :
 le porteur du projet a posé dix photos dans un dossier, on a étendu ce modèle aux
 60 photos du corpus qui lui ressemblent le plus, et on a mesuré. C'est ce
 workflow qu'il faut refaire ici, pour le coucher de soleil.
@@ -152,8 +152,8 @@ Deux dangers propres à ce registre :
 
 Le complément exact du précédent : ciel bleu-magenta profond, lumières
 artificielles qui s'allument, chaleur réduite à des **points** dans un champ
-froid. **Vérifie d'abord qu'il ne double pas `ambre-nuit`** (blanc 181, contraste
-129, même étalonnage qu'`ambre`) — s'il n'en est pas mesurablement différent, ne
+froid. **Vérifie d'abord qu'il ne double pas `ambre-nuit-1` ou `-2`** (blancs 209 et
+181, même étalonnage qu'`ambre`) — s'il n'en est pas mesurablement différent, ne
 le construis pas.
 
 ### 4. `sunset-sobre` — le coucher retenu

@@ -241,6 +241,7 @@ export async function profil(fichier) {
         // --- LOOK ---
         pied: percentile(lumaHist, n, 0.01),
         p05: percentile(lumaHist, n, 0.05),
+        p25: percentile(lumaHist, n, 0.25),
         median: percentile(lumaHist, n, 0.5),
         p95: percentile(lumaHist, n, 0.95),
         pointBlanc: percentile(lumaHist, n, 0.99),

@@ -1059,15 +1059,32 @@ const powlisherMerTransform = construireCine({
     ancres: ancresCine({ orange: [0, 0.4], jaune: [3.89, 0.62], vert: [9.75, 0.71], bleu: [-15.94, 0.57] }),
 });
 
-/* --- `nuit` : l'autre bout du corpus -------------------------------------- */
-/* Trente photos de ville de nuit, contre quarante des memes villes par d'autres.
+/* --- `nuit` : l'autre bout du corpus, a deux densites --------------------
+ *
+ * Trente photos de ville de nuit, contre quarante des memes villes par d'autres.
  * Son point blanc est 99 niveaux plus bas que le leur et son contraste 75 points
  * plus faible: la ou tout le monde brule ses lampadaires, lui les retient a 187.
  *
  * Sa chroma d'ombres N'A PAS PU ETRE MESUREE — dans une nuit, les ombres n'ont
  * pas assez de pixels colores pour qu'un rapport teinte par teinte veuille dire
  * quelque chose. On y reporte donc la valeur des medians plutot que d'inventer:
- * une mesure absente n'autorise pas un geste. */
+ * une mesure absente n'autorise pas un geste.
+ *
+ * DEUX DENSITES, ET POURQUOI. `nuit 2` porte le transport mesure tel quel. Il
+ * est juste — sur une scene de nuit. Mais une LUT n'a pas de memoire: elle ne
+ * peut pas savoir que la photo qu'on lui donne est deja claire, et sur un
+ * couchant ou un interieur eclaire elle pose l'image une exposition trop bas.
+ * Le porteur du projet l'a decrit comme « une basse luminosite d'ecran de
+ * telephone », et il avait raison sur le symptome — mais la cause n'est pas un
+ * ecrasement des ombres: mesure contre son propre modele, `nuit 2` rend un p05
+ * de 17 la ou le modele est a 5, et ne bouche AUCUN pixel la ou le modele en
+ * bouche 2,3 %. Il ne creuse pas trop, il pose trop bas.
+ *
+ * `nuit 1` est donc le point milieu, en lumiere lineaire, entre le tronc et
+ * `nuit 2`. Ce n'est pas un reglage au jugement: les deux bouts sont mesures, et
+ * une moyenne geometrique entre deux courbes monotones reste monotone — sa
+ * pente ne tombe pas sous 0,50. La COULEUR ne bouge pas d'un chiffre: c'est ce
+ * qui fait le style, et ce n'est pas elle qu'on corrige. */
 const NUIT_COURBE = [
     [0.0000, 0.0000], [0.0627, 0.0392], [0.1255, 0.0745], [0.1882, 0.1098],
     [0.2510, 0.1451], [0.3137, 0.1843], [0.3765, 0.2275], [0.4392, 0.2706],
@@ -1075,13 +1092,25 @@ const NUIT_COURBE = [
     [0.7529, 0.5294], [0.8157, 0.5961], [0.8784, 0.6510], [0.9412, 0.6980],
     [0.9725, 0.7333], [1.0000, 0.7647],
 ];
-const powlisherNuitTransform = construireCine({
-    courbe: NUIT_COURBE,
+/* Gris moyen 98 contre 81, plafond 213 contre 195. */
+const NUIT_1_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0328], [0.1255, 0.0745], [0.1882, 0.1175],
+    [0.2510, 0.1602], [0.3137, 0.2139], [0.3765, 0.2643], [0.4392, 0.3198],
+    [0.5020, 0.3825], [0.5647, 0.4386], [0.6275, 0.5038], [0.6902, 0.5669],
+    [0.7529, 0.6187], [0.8157, 0.6703], [0.8784, 0.7202], [0.9412, 0.7692],
+    [0.9725, 0.8037], [1.0000, 0.8343],
+];
+const NUIT_COULEUR = {
     etalA: etalCine(-3.86, -4.32, -2.65),
     etalB: etalCine(1.26, 0.45, 5.28),
     chroma: [0.803, 0.803, 0.873],
+    /* Le vert part dans l'AUTRE sens que dans le reste de la famille: de nuit,
+     * « vert » veut dire tube fluorescent, et il le ramene au lieu de le
+     * pousser — mais une seule bande le retenait, donc il reste a zero. */
     ancres: ancresCine({ orange: [0, 0.4], jaune: [3.18, 0.2], vert: [0, 1.0], bleu: [-3.22, 0.57] }),
-});
+};
+const powlisherNuit2Transform = construireCine({ courbe: NUIT_COURBE, ...NUIT_COULEUR });
+const powlisherNuit1Transform = construireCine({ courbe: NUIT_1_COURBE, ...NUIT_COULEUR });
 
 /* ==========================================================================
  * AMBRE — la lumiere chaude posee sur une image qui reste propre
@@ -1291,10 +1320,191 @@ const AMBRE_NUIT_COURBE = [
     [0.9725, 0.6667], [1.0000, 0.6863],
 ];
 
+/* Le point milieu, en lumiere lineaire, entre `ambre` et `ambre-nuit-2`: gris
+ * moyen 105 contre 93 et 118, plafond 205 contre 181 et 239. Meme raison que
+ * pour `powlisher-nuit-1` — une LUT ne sait pas si la photo qu'on lui donne est
+ * deja claire, et le registre nuit, applique a un couchant, le pose trop bas.
+ * Une moyenne geometrique entre deux courbes monotones reste monotone: pente
+ * minimale 0,44. */
+const AMBRE_NUIT_1_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0588], [0.1255, 0.1019], [0.1882, 0.1469],
+    [0.2510, 0.2034], [0.3137, 0.2580], [0.3765, 0.3027], [0.4392, 0.3532],
+    [0.5020, 0.4111], [0.5647, 0.4809], [0.6275, 0.5370], [0.6902, 0.5948],
+    [0.7529, 0.6390], [0.8157, 0.6855], [0.8784, 0.7121], [0.9412, 0.7488],
+    [0.9725, 0.7778], [1.0000, 0.8027],
+];
+
+/* ======================================================================
+ * `couchant` — le coucher de soleil, mesure contre des couchants
+ * ======================================================================
+ *
+ * CE QUI REND CE PRESET POSSIBLE, et ce qui manquait au projet jusqu'ici: un
+ * TAS NEUTRE DE COUCHANTS. Les douze familles neutres etaient toutes diurnes.
+ * Comparer ses couchants a des plages de midi aurait mesure « couchant contre
+ * midi » — c'est-a-dire la scene — et rendu un preset qui rechauffe et sature
+ * tout ce qu'il touche. C'est l'erreur du 2026-08-27, reprise par l'autre bout.
+ *
+ * Quatre familles ont donc ete moissonnees le 2026-08-27 ter sur Wikimedia
+ * Commons: `coucher-mer` (35), `coucher-paysage` (42), `coucher-ville` (31),
+ * `heure-bleue` (43). Trois precautions les rendent utilisables:
+ *   - le titre doit nommer l'heure (l'auteur l'a ecrit, pas nous): Commons
+ *     indexe par LIEU, et `sunset landscape` rendait des rizieres de plein midi;
+ *   - les oeuvres d'art sont exclues: « sunset » y titre des centaines de
+ *     toiles, et une peinture n'a ni capteur ni courbe;
+ *   - AU PLUS TROIS PHOTOS PAR TELEVERSEUR. Une planche montrait vingt vues de
+ *     la meme ville depuis la meme colline. Le tas neutre ne tient que parce que
+ *     des retouches INDIVIDUELLES s'annulent; vingt fichiers d'une meme main
+ *     sont un seul vote compte vingt fois, et c'est son etalonnage a lui qui
+ *     devient le zero.
+ *
+ * SES PHOTOS: 23 couchants, choisis a l'oeil dans son corpus et ranges en trois
+ * sous-familles en face des trois neutres (`coucher-mer` 4, `coucher-paysage` 7,
+ * `coucher-ville` 12). Le choix a l'oeil est assume: aucun seuil ne separe
+ * « couchant » de « pas couchant » sans filtrer sur la chaleur, et filtrer sur
+ * la chaleur ce qu'on va ensuite mesurer en chaleur ne repond plus a rien.
+ *
+ * VINGT-TROIS PHOTOS, C'EST PEU, et c'est la reserve principale de ce preset.
+ * Le projet dit « dix photos ne se mesurent pas »; 23 reparties sur trois
+ * familles passent le test d'accord entre familles, mais de justesse. Trois
+ * autres registres etaient prevus et sont ABANDONNES faute de matiere — voir
+ * `docs/presets-valides.md`.
+ *
+ * CE QUE LA MESURE TROUVE:
+ *
+ *   etalonnage    ombres    medians   clairs    REFLETS
+ *   a*            -4,47     -2,11     -3,91     -5,55
+ *   b*            -0,27     +4,96     +6,10     +8,39
+ *
+ * Le b* monte de 0 a +8,4: c'est le meme split-tone qu'`ambre`, et c'est
+ * attendu — au couchant la lumiere principale est chaude et l'appoint est le
+ * ciel, donc bleu. Ce n'est pas un style, c'est ce que fait la scene.
+ *
+ * CE QUI LE SEPARE D'`AMBRE`, ET QUI EST LA VRAIE TROUVAILLE: le a*. Chez
+ * `ambre` il finit a -0,36, donc a zero. Ici il DESCEND vers les hautes
+ * lumieres, jusqu'a -5,55. Un couchant a un soleil orange (+a, +b); il en
+ * retire le magenta et ne garde que le jaune. C'est exactement l'ecart entre un
+ * couchant de cinema et un couchant de carte postale, et aucun preset du projet
+ * ne le faisait.
+ *
+ * LA COURBE EST LE TRANSPORT, ET C'EST LEGITIME ICI. Partout ailleurs dans ce
+ * fichier un transport de quantiles est refuse, parce qu'il emporte l'exposition
+ * du tas qui l'a produit. Cette objection TOMBE quand les deux tas montrent la
+ * meme scene: point blanc 215 chez les couchants neutres contre 207 chez lui,
+ * contraste 173 contre 182. L'ecart d'exposition a disparu — preuve, au passage,
+ * que ses couchants sont sombres a cause du contre-jour et non d'un reglage.
+ * On garde donc le transport tel quel; sa pente ne descend pas sous 0,563, soit
+ * quatre fois et demie le pas d'entree de la LUT.
+ *
+ * Le dernier point est a nous: l'appariement de quantiles force 255 -> 255, on
+ * le remplace par la pente locale prolongee, soit 236. Aucun ecretage. */
+const COUCHANT_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0353], [0.1255, 0.0706], [0.1882, 0.1098],
+    [0.2510, 0.1490], [0.3137, 0.2078], [0.3765, 0.2824], [0.4392, 0.3608],
+    [0.5020, 0.4353], [0.5647, 0.5176], [0.6275, 0.5922], [0.6902, 0.6431],
+    [0.7529, 0.6941], [0.8157, 0.7529], [0.8784, 0.8157], [0.9412, 0.8745],
+    [0.9725, 0.9020], [1.0000, 0.9255],
+];
+
+/* Douze secteurs, comme `ambre`. Zero veut dire « les familles ne s'accordent
+ * pas », donc « on n'y touche pas ». Le secteur du bleu (225) est tourne de
+ * -19,8 dans les clairs: c'est le ciel du zenith ramene vers le teal, la
+ * signature de toute la famille, et le releve la donne ici plus forte
+ * qu'ailleurs parce qu'un ciel de couchant est justement ce qui la montre. */
+const COUCHANT_ROT = [
+    /* ombres  */ [-3.02, 9.99, 3.43, 0, 3.32, 0, 0, 0, -15.06, 0, 0, 0],
+    /* medians */ [2.16, 3.78, 0, -1.49, 0, 0, 0, -10.52, 2.78, 0, 0, 0],
+    /* clairs  */ [3.38, 3.63, 5.05, 0, 2.86, 13.74, 0, -19.79, 0, 0, 0, 0],
+];
+
+function rotationCouchant(h, t) {
+    const x = ((h % 360) + 360) % 360 / 30 - 0.5;
+    const i = Math.floor(x);
+    const f = x - i;
+    const doux = f * f * (3 - 2 * f);
+    const lire = (table, k) => table[((k % 12) + 12) % 12];
+    const bande = (table) => lire(table, i) + (lire(table, i + 1) - lire(table, i)) * doux;
+    const u = t * 2;
+    return u <= 1
+        ? bande(COUCHANT_ROT[0]) + (bande(COUCHANT_ROT[1]) - bande(COUCHANT_ROT[0])) * u
+        : bande(COUCHANT_ROT[1]) + (bande(COUCHANT_ROT[2]) - bande(COUCHANT_ROT[1])) * (u - 1);
+}
+
+const COUCHANT_ETAL_A = [-4.47, -3.29, -2.11, -3.91, -5.55];
+const COUCHANT_ETAL_B = [-0.27, 2.35, 4.96, 6.10, 8.39];
+const COUCHANT_CHROMA = [0.837, 0.747, 0.930];
+
+function construireCouchant(courbe, etalA, etalB) {
+    const v = evalCurve(courbe, 1);
+    const Lblanc = rgbToLab01(v, v, v)[0];
+
+    return function transform(input) {
+        const r0 = evalCurve(courbe, input[0]);
+        const g0 = evalCurve(courbe, input[1]);
+        const b0 = evalCurve(courbe, input[2]);
+
+        let [L, A, B] = rgbToLab01(r0, g0, b0);
+        const t = clamp01(L / Lblanc) * 100;
+
+        const c = Math.hypot(A, B);
+        if (c > 1e-6) {
+            const gain = fonduParL(COUCHANT_CHROMA, t);
+            const cible = CINE_CHROMA_PLAFOND * (1 - Math.exp(-c * gain / CINE_CHROMA_PLAFOND));
+            A *= cible / c;
+            B *= cible / c;
+        }
+
+        const c2 = Math.hypot(A, B);
+        const aUneTeinte = smoothstep(3, 14, c2);
+        if (aUneTeinte > 0) {
+            let h = Math.atan2(B, A) * 180 / Math.PI;
+            if (h < 0) h += 360;
+            const hNeuf = (h + rotationCouchant(h, t / 100) * aUneTeinte) * Math.PI / 180;
+            A = c2 * Math.cos(hNeuf);
+            B = c2 * Math.sin(hNeuf);
+        }
+
+        A += fonduParL(etalA, t);
+        B += fonduParL(etalB, t);
+
+        return lab01ToRgb(L, A, B);
+    };
+}
+
+const couchantTransform = construireCouchant(COUCHANT_COURBE, COUCHANT_ETAL_A, COUCHANT_ETAL_B);
+
 const ambreTransform = construireAmbre(AMBRE_COURBE);
-const ambreNuitTransform = construireAmbre(AMBRE_NUIT_COURBE);
+const ambreNuit1Transform = construireAmbre(AMBRE_NUIT_1_COURBE);
+const ambreNuit2Transform = construireAmbre(AMBRE_NUIT_COURBE);
 
 export const VISION_PRESETS = [
+    {
+        id: 'couchant',
+        label: 'Couchant',
+        hint: 'Le soleil bas, sans la carte postale',
+        description: 'Le premier preset du projet mesuré contre des COUCHANTS et non '
+            + 'contre des scènes de plein jour : 23 de ses couchants, rangés en trois '
+            + 'sous-familles (mer, paysage, ville), face à 108 couchants neutres '
+            + 'moissonnés pour l\'occasion. Sa signature est un split-tone — le jaune '
+            + 'monte de 0 dans les ombres à +8,4 dans les hautes lumières — mais ce qui '
+            + 'le distingue vraiment d\'`Ambre`, c\'est le a* : il DESCEND vers les '
+            + 'hautes lumières, jusqu\'à −5,5. Un soleil couchant est orange ; ce '
+            + 'preset lui retire le magenta et ne garde que le jaune. C\'est l\'écart '
+            + 'entre un couchant de cinéma et un couchant de carte postale. La couleur '
+            + 'baisse partout (×0,75 à ×0,93) et le ciel du zénith part vers le teal '
+            + '(−19,8° dans les clairs). Sa courbe est le transport brut, ce que le '
+            + 'projet refuse partout ailleurs — et qui est légitime ici parce que les '
+            + 'deux tas montrent la même scène : le point blanc ne bouge que de 215 à '
+            + '207. RÉSERVE : 23 photos, c\'est peu, et trois registres voisins '
+            + '(contre-jour, heure bleue, heure dorée séparée) ont été abandonnés faute '
+            + 'de matière mesurable.',
+        bestFor: 'couchers de soleil, contre-jour, heure dorée, ciels de fin de journée, '
+            + 'silhouettes sur horizon',
+        avoidFor: 'photos de plein jour sans ciel chaud : son a* négatif est mesuré sur '
+            + 'des scènes qui ont un soleil orange à corriger, et n\'a rien à retirer '
+            + 'ailleurs',
+        recommendedIntensity: 100,
+        transform: couchantTransform,
+    },
     {
         id: 'ambre',
         label: 'Ambre',
@@ -1317,21 +1527,40 @@ export const VISION_PRESETS = [
         transform: ambreTransform,
     },
     {
-        id: 'ambre-nuit',
-        label: 'Ambre Nuit',
-        hint: 'Le même registre, posé bas : rien ne dépasse 175',
+        id: 'ambre-nuit-1',
+        label: 'Ambre Nuit 1',
+        hint: 'Le registre nuit, posé à mi-chemin : le détail reste lisible',
+        description: 'Le point milieu, en lumière linéaire, entre `Ambre` et '
+            + '`Ambre Nuit 2`. Sa couleur est celle d\'`Ambre` au chiffre près — c\'est '
+            + 'le style, et ce n\'est pas lui qu\'on corrige. Seule sa courbe bouge : '
+            + 'gris moyen 105 au lieu de 93, plafond 205 au lieu de 181. Une table de '
+            + 'couleurs n\'a pas de mémoire — elle ne peut pas savoir que la photo '
+            + 'qu\'on lui donne est déjà claire, et le registre nuit appliqué à un '
+            + 'coucher de soleil pose l\'image une exposition trop bas. Celui-ci en '
+            + 'reprend la moitié.',
+        bestFor: 'fin de journée, néons, intérieurs éclairés, contre-jours — quand on '
+            + 'veut la densité de la nuit sans perdre le détail',
+        avoidFor: 'photos déjà sombres : `Ambre Nuit 2` va plus loin et leur va mieux',
+        recommendedIntensity: 100,
+        transform: ambreNuit1Transform,
+    },
+    {
+        id: 'ambre-nuit-2',
+        label: 'Ambre Nuit 2',
+        hint: 'Le même registre, posé bas : rien ne dépasse 181',
         description: 'La déclinaison basse lumière du même modèle. Trois des dix '
             + 'photos forment un groupe à part, et elles se séparent sans ambiguïté : '
             + 'point blanc 161 contre 234, contraste 129 contre 208. Sa couleur est '
-            + 'celle d\'`ambre`, au mot près — c\'est un seul regard à deux densités, '
+            + 'celle d\'`Ambre`, au mot près — c\'est un seul regard à deux densités, '
             + 'pas deux presets sans rapport. Seule sa courbe change, calée sur ces '
-            + 'deux repères : le blanc pur y atterrit à 175, donc une lampe ou une '
+            + 'deux repères : le blanc pur y atterrit à 181, donc une lampe ou une '
             + 'vitrine garde sa forme au lieu de percer un trou blanc.',
-        bestFor: 'nuit, néons, vitrines, intérieurs sombres, contre-jours très durs — '
-            + 'tout ce qui a une source de lumière franche dans un cadre sombre',
-        avoidFor: 'plein jour : il pose l\'image bas, c\'est sa raison d\'être',
+        bestFor: 'nuit franche, néons, vitrines, intérieurs sombres — quand la scène '
+            + 'est déjà nocturne',
+        avoidFor: 'photos déjà claires : sa courbe est mesurée sur des scènes de nuit '
+            + 'et les pose une exposition plus bas. Prendre `Ambre Nuit 1`',
         recommendedIntensity: 100,
-        transform: ambreNuitTransform,
+        transform: ambreNuit2Transform,
     },
     {
         id: 'powlisher-cine',
@@ -1411,20 +1640,37 @@ export const VISION_PRESETS = [
         transform: powlisherMerTransform,
     },
     {
-        id: 'powlisher-nuit',
-        label: 'Powlisher Nuit',
+        id: 'powlisher-nuit-1',
+        label: 'Powlisher Nuit 1',
+        hint: 'Sa nuit, posée à mi-chemin : le détail reste lisible',
+        description: 'Le point milieu, en lumière linéaire, entre le tronc '
+            + '`Powlisher Ciné` et `Powlisher Nuit 2` : gris moyen 98 au lieu de 81, '
+            + 'plafond 213 au lieu de 195. Sa couleur ne bouge pas d\'un chiffre — '
+            + 'c\'est elle qui fait le style. Ce qui bouge, c\'est où l\'image se pose : '
+            + 'une table de couleurs ne sait pas si la photo qu\'on lui donne est déjà '
+            + 'claire, et le registre nuit appliqué à une scène éclairée la descend '
+            + 'd\'une exposition entière.',
+        bestFor: 'ville en soirée, néons, intérieurs sombres, fin de journée — quand '
+            + 'on veut sa nuit sans perdre les détails du bas',
+        avoidFor: 'plein jour : même à mi-chemin, il pose l\'image bas',
+        recommendedIntensity: 100,
+        transform: powlisherNuit1Transform,
+    },
+    {
+        id: 'powlisher-nuit-2',
+        label: 'Powlisher Nuit 2',
         hint: 'Lampadaires retenus, nuit lisible',
         description: 'Ses 30 photos de ville de nuit contre 40 des mêmes villes par '
             + 'd\'autres. Son point blanc est 99 niveaux sous le leur et son contraste '
             + '75 points plus faible : là où tout le monde brûle ses lampadaires, il '
             + 'les tient à 187. La couleur baisse partout (×0,80), ce qui rend la nuit '
             + 'lisible au lieu d\'être un confetti de néons.',
-        bestFor: 'ville de nuit, néons, intérieurs sombres, tout ce qui a des sources '
-            + 'de lumière ponctuelles dans un cadre noir',
-        avoidFor: 'plein jour : sa courbe est mesurée sur des scènes nocturnes et '
-            + 'coûte une exposition',
+        bestFor: 'nuit franche : ville, néons, intérieurs sombres, tout ce qui a des '
+            + 'sources de lumière ponctuelles dans un cadre noir',
+        avoidFor: 'plein jour ou scène déjà claire : sa courbe est mesurée sur des '
+            + 'scènes nocturnes et coûte une exposition. Prendre `Powlisher Nuit 1`',
         recommendedIntensity: 100,
-        transform: powlisherNuitTransform,
+        transform: powlisherNuit2Transform,
     },
     {
         id: 'powlisher',

@@ -994,7 +994,8 @@ function teinteLab(rgb) {
         'powlisher-chaud': { plafond: 226 },
         'powlisher-froid': { plafond: 235 },
         'powlisher-mer': { plafond: 252 },
-        'powlisher-nuit': { plafond: 195 },
+        'powlisher-nuit-1': { plafond: 213 },
+        'powlisher-nuit-2': { plafond: 195 },
     };
     const chroma = (rgb) => Math.hypot(...versLab(rgb).slice(1));
 
@@ -1092,8 +1093,20 @@ function teinteLab(rgb) {
      * neutre) — c'est ce qui rend une nuit lisible au lieu d'un confetti. */
     const ombreColoree = [0.22, 0.16, 0.26];
     check('nuit : les ombres perdent leur couleur',
-        chroma(getPresetTransform('powlisher-nuit')(ombreColoree)) / chroma(getPresetTransform('powlisher-cine')(ombreColoree)),
+        chroma(getPresetTransform('powlisher-nuit-2')(ombreColoree)) / chroma(getPresetTransform('powlisher-cine')(ombreColoree)),
         0, 1.0, '×');
+
+    /* LES DEUX DENSITES DE NUIT SONT ORDONNEES, ET LEUR COULEUR EST IDENTIQUE.
+     * C'est la definition de ce qui a ete corrige le 2026-08-28: `nuit 1` n'est
+     * pas un autre look, c'est le meme pose plus haut. Si un jour leur couleur
+     * divergeait, ce serait deux presets sans rapport portant le meme nom. */
+    const grisDe = (id, v) => versLab(getPresetTransform(id)([v, v, v]))[0];
+    check('nuit : la version 1 est posee plus haut que la 2',
+        grisDe('powlisher-nuit-1', 0.5) - grisDe('powlisher-nuit-2', 0.5), 4, 12, ' L');
+    const teinteGris = (id) => versLab(getPresetTransform(id)([0.5, 0.5, 0.5])).slice(1);
+    const [a1, b1] = teinteGris('powlisher-nuit-1');
+    const [a2, b2] = teinteGris('powlisher-nuit-2');
+    check('nuit : les deux densites portent la meme couleur', Math.hypot(a1 - a2, b1 - b2), 0, 1.5, ' Lab');
 }
 
 /* ---------- ambre : le modele designe a la main, mesure le 2026-08-27 --------
@@ -1105,10 +1118,11 @@ function teinteLab(rgb) {
  */
 {
     const ambre = getPresetTransform('ambre');
-    const nuit = getPresetTransform('ambre-nuit');
-    if (!ambre || !nuit) { console.error('ECHEC: presets ambre introuvables.'); process.exit(1); }
+    const nuit1 = getPresetTransform('ambre-nuit-1');
+    const nuit = getPresetTransform('ambre-nuit-2');
+    if (!ambre || !nuit || !nuit1) { console.error('ECHEC: presets ambre introuvables.'); process.exit(1); }
 
-    for (const [nom, f, plafond] of [['ambre', ambre, 245], ['ambre-nuit', nuit, 181]]) {
+    for (const [nom, f, plafond] of [['ambre', ambre, 245], ['ambre-nuit-1', nuit1, 209], ['ambre-nuit-2', nuit, 181]]) {
         const blanc = f([1, 1, 1]).map((v) => Math.round(v * 255));
         check(`${nom} : plafond mesure`, Math.max(...blanc), plafond - 4, plafond + 4);
         check(`${nom} : n'ecrete pas`, Math.max(...blanc), 0, 254);
@@ -1155,6 +1169,11 @@ function teinteLab(rgb) {
      * s'ecartent de 60 niveaux, leur couleur est la meme table. */
     check('ambre : les deux densites s\'ecartent',
         Math.max(...ambre([1, 1, 1])) * 255 - Math.max(...nuit([1, 1, 1])) * 255, 50, 80);
+    /* Et la version 1 tombe bien ENTRE les deux, sans quoi elle ne serait pas un
+     * point milieu mais un troisieme reglage. */
+    const grisAmbre = (f) => versLab(f([0.5, 0.5, 0.5]))[0];
+    check('ambre : la nuit 1 est entre ambre et la nuit 2',
+        (grisAmbre(nuit1) - grisAmbre(nuit)) / (grisAmbre(ambre) - grisAmbre(nuit)), 0.35, 0.65, '');
 }
 
 /* ---------- rapport ---------- */

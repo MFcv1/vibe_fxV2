@@ -58,6 +58,16 @@ const G = {
     'chroma': (p) => p.chromaMoy,
     'pt blanc': (p) => p.pointBlanc,
     'contraste': (p) => p.p95 - p.p05,
+    /* LA LISIBILITE DU BAS. Ajoutees le 2026-08-28: le porteur du projet trouvait
+     * les presets de nuit « en basse luminosite », sans pouvoir nommer quoi. Le
+     * plafond n'y est pour rien — c'est leur signature. Ce qui manquait, c'est
+     * le bas: `p05` et `p25` disent ou se posent les ombres, et `% bouche` la
+     * part de pixels tombes exactement a zero, c'est-a-dire le detail perdu
+     * pour de bon. Un preset qui bouche plus que le modele est trop sombre,
+     * meme si son point blanc tombe juste. */
+    'p05 (ombres)': (p) => p.p05,
+    'p25 (bas-med)': (p) => p.p25 ?? NaN,
+    '% bouche': (p) => p.partBouchee,
     'reflets b*': (p) => p.refletB,
     'ombres b*': (p) => p.ombresB,
 };

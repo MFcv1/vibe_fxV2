@@ -43,13 +43,15 @@ qui capture un preset Lightroom **exactement**, par Hald CLUT. Neuf presets :
 | Preset | Ce qu'il est | Effets non-LUT |
 |---|---|---|
 | `ambre` | tiré d'un **modèle de 10 photos désignées à la main** : split-tone, b\* +1 dans les ombres → +8,2 dans les reflets | — |
-| `ambre-nuit` | même couleur, densité basse : blanc à 181, contraste 129 | — |
+| `ambre-nuit-1` | le point milieu entre les deux : blanc 209, gris moyen 105 | — |
+| `ambre-nuit-2` | même couleur, densité basse : blanc à 181, contraste 129 | — |
 | `powlisher-cine` | **le tronc** : le fond commun à 324 de ses photos, aucun nombre choisi à la main | — |
 | `powlisher-cine-net` | pôle **ouvert** de l'axe des niveaux : lève tout, épaule à 245 | — |
 | `powlisher-chaud` | pôle **chaud** de l'axe des couleurs : a\* à 0 dans les clairs, b\* +9,3 | — |
 | `powlisher-froid` | l'autre bout : étalonnage le plus vert, bleu tourné de 16° | — |
 | `powlisher-mer` | la famille « mer » entière : teal le plus profond (−16°), plafond le plus haut (252) | — |
-| `powlisher-nuit` | la famille « ville de nuit » : lampadaires tenus à 187 | — |
+| `powlisher-nuit-1` | le point milieu entre le tronc et la nuit : blanc 213, gris moyen 98 | — |
+| `powlisher-nuit-2` | la famille « ville de nuit » : lampadaires tenus à 187 | — |
 | `powlisher` | le look de `@powl_d`, reconstruit par mesure sur 19 photos | — |
 | `powlisher-ciel` | le ciel **converge** vers sa teinte (190–199°) au lieu d'être tourné d'un angle fixe | — |
 | `powlisher-showcase` | clair-obscur : le décor est vidé, le sujet reste seul coloré | grain 8, vignetage 8, relief 14 |
@@ -108,7 +110,7 @@ node scripts/planche-duel.mjs --presets ambre,powlisher-cine --familles mer,auto
 Et vérifier qu'un preset tend vraiment vers un modèle :
 
 ```bash
-node scripts/juger-vers-modele.mjs --presets ambre,ambre-nuit --n 3
+node scripts/juger-vers-modele.mjs --presets ambre,ambre-nuit-1,ambre-nuit-2 --n 3
 ```
 
 ### Ensuite — l'étage de tonalité adaptatif (le vrai gros reste)
@@ -116,7 +118,7 @@ node scripts/juger-vers-modele.mjs --presets ambre,ambre-nuit --n 3
 Chez `@powl_d`, la luminance médiane va de **23 en ville de nuit à 124 en mer**.
 Aucune courbe fixe ne suit ça, et c'est la dernière part de l'écart ressenti
 entre nos presets et ses photos. C'est aussi la raison pour laquelle
-`powlisher-cine-doux` et `powlisher-nuit` coûtent une exposition : leur registre
+`powlisher-nuit-2` et `ambre-nuit-2` coûtent une exposition : leur registre
 est shooté sombre, et une LUT ne sait pas dire « sombre par rapport à cette
 photo-ci ».
 
