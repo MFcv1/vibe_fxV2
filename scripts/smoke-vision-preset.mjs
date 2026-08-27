@@ -981,6 +981,182 @@ function teinteLab(rgb) {
     check('cine : un degrade de ciel ne fait pas de bande', pireSortie / pireEntree, 0, 1.7, '×');
 }
 
+/* ---------- la famille cine : quatre variantes mesurees le 2026-08-26 -------
+ *
+ * Elles sortent du meme materiau que le tronc et des memes instruments. Ce qui
+ * est fige ici, ce sont les proprietes qui les rendent UTILISABLES, plus l'ordre
+ * de l'axe — parce qu'une variante qui doublerait le tronc ne servirait a rien,
+ * et qu'une variante qui ecreterait le degraderait.
+ */
+{
+    const famille = {
+        'powlisher-cine-net': { plafond: 245 },
+        'powlisher-chaud': { plafond: 226 },
+        'powlisher-froid': { plafond: 235 },
+        'powlisher-mer': { plafond: 252 },
+        'powlisher-nuit': { plafond: 195 },
+    };
+    const chroma = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+
+    for (const [id, attendu] of Object.entries(famille)) {
+        const f = getPresetTransform(id);
+        if (!f) { console.error(`ECHEC: preset « ${id} » introuvable.`); process.exit(1); }
+        const court = id.replace('powlisher-', '').replace('cine-', '');
+
+        /* Le point blanc de chaque variante, celui que son propre transport a
+         * mesure. C'est le nombre qui la distingue le plus des autres. */
+        const blanc = f([1, 1, 1]).map((v) => Math.round(v * 255));
+        check(`${court} : plafond mesure`, Math.max(...blanc), attendu.plafond - 4, attendu.plafond + 4);
+
+        /* Aucune n'ecrete: c'est la regle la plus ferme du corpus (0,00 % de
+         * pixels a 255 dans les douze familles). */
+        check(`${court} : n'ecrete pas`, Math.max(...blanc), 0, 254);
+
+        /* Le blanc ne vire pas au VERT-GRIS — le defaut vu sur un ciel a
+         * contre-jour. La creme de `doux` vit dans ses hautes lumieres, pas dans
+         * son blanc: un blanc reste blanc dans les quatre. */
+        check(`${court} : le blanc ne verdit pas`, blanc[1] - (blanc[0] + blanc[2]) / 2, -4, 2);
+        check(`${court} : le blanc reste blanc`, Math.abs(blanc[0] - blanc[2]), 0, 5);
+
+        /* Une rampe grise reste croissante: une courbe qui redescend, meme d'un
+         * niveau, fabrique un plat, et un plat bande. */
+        let monotone = true;
+        let precedent = -1;
+        for (let k = 0; k <= 255; k += 1) {
+            const y = versLab(f([k / 255, k / 255, k / 255]))[0];
+            if (y < precedent - 1e-9) monotone = false;
+            precedent = y;
+        }
+        check(`${court} : rampe grise croissante`, monotone ? 1 : 0, 1, 1);
+
+        /* Un degrade de ciel reste un degrade. */
+        let pireEntree = 0, pireSortie = 0, prevIn = null, prevOut = null;
+        for (let k = 0; k <= 40; k += 1) {
+            const t = k / 40;
+            const dedans = [0.15 + 0.55 * t, 0.35 + 0.45 * t, 0.65 + 0.30 * t];
+            const dehors = f(dedans);
+            if (prevIn) {
+                pireEntree = Math.max(pireEntree, Math.max(...dedans.map((v, i) => Math.abs(v - prevIn[i]) * 255)));
+                pireSortie = Math.max(pireSortie, Math.max(...dehors.map((v, i) => Math.abs(v - prevOut[i]) * 255)));
+            }
+            prevIn = dedans; prevOut = dehors;
+        }
+        check(`${court} : un degrade ne fait pas de bande`, pireSortie / pireEntree, 0, 1.7, '×');
+
+        /* Et aucune n'ajoute de contour dans un voile: meme borne que le reste
+         * du projet, le niveau de `powlisher` plus une demi-unite. */
+        check(`${court} : n'ajoute pas de contour`, amplificationVoile(f) - voileV1, -4, 0.6, '×');
+    }
+
+    /* AUCUNE VARIANTE N'AJOUTE DE SATURATION. C'est le garde-fou pose apres le
+     * preset rate du 2026-08-26: mesuree teinte par teinte, la chroma de ses
+     * cinq poles tombe entre 0,77 et 1,23, et le tronc lui-meme est a 0,85 /
+     * 0,83 / 0,99. Un jour ou quelqu'un relachera un gain a 2, ce test le dira
+     * avant qu'une cour marocaine ne parte au rouge.
+     *
+     * On mesure sur des couleurs de photo, pas sur les coins du cube: une ocre,
+     * un feuillage, un ciel, une peau. */
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    for (const id of Object.keys(famille)) {
+        const f = getPresetTransform(id);
+        const pire = Math.max(...echantillons.map((rgb) => chroma(f(rgb)) / chroma(rgb)));
+        /* 1,3 et pas 1,0: `mer` mesure 1,23 dans son tiers clair, et c'est la
+         * seule augmentation de tout le corpus — elle survit au test teinte par
+         * teinte sur trois tiers de photos independants. La borne laisse passer
+         * une mesure, pas un gain relache. */
+        check(`${id.replace('powlisher-', '')} : n'ajoute pas de saturation`, pire, 0, 1.3, '×');
+    }
+
+    /* L'AXE DES COULEURS EST ORDONNE. C'est la raison d'etre de `chaud` et
+     * `froid`: deux bouts d'une meme mesure, pas deux essais separes. Le jaune
+     * pose sur un gris clair les separe de plus de 5 unites b*. */
+    const jauneDe = (id) => versLab(getPresetTransform(id)([0.85, 0.85, 0.85]))[2];
+    check('axe couleur : chaud est plus jaune que le tronc',
+        jauneDe('powlisher-chaud') - jauneDe('powlisher-cine'), 1, 8, ' b*');
+    check('axe couleur : froid est moins jaune que le tronc',
+        jauneDe('powlisher-cine') - jauneDe('powlisher-froid'), 1, 8, ' b*');
+
+    /* Et leur lumiere ne tire pas au vert du meme tout: c'est l'autre moitie de
+     * ce que la mesure a trouve. */
+    const vertDe = (id) => versLab(getPresetTransform(id)([0.5, 0.5, 0.5]))[1];
+    check('axe couleur : froid est le plus vert de la famille',
+        vertDe('powlisher-chaud') - vertDe('powlisher-froid'), 1, 8, ' a*');
+
+    /* `mer` ouvre la ou les autres retiennent: c'est la seule famille du corpus
+     * dont le point blanc depasse celui du tas neutre. */
+    const blancDe = (id) => Math.max(...getPresetTransform(id)([1, 1, 1])) * 255;
+    check('mer : le plafond le plus haut de la famille',
+        blancDe('powlisher-mer') - blancDe('powlisher-cine-net'), 5, 25);
+
+    /* `nuit` vide les ombres de leur couleur (chroma mesuree a 0,54 du tas
+     * neutre) — c'est ce qui rend une nuit lisible au lieu d'un confetti. */
+    const ombreColoree = [0.22, 0.16, 0.26];
+    check('nuit : les ombres perdent leur couleur',
+        chroma(getPresetTransform('powlisher-nuit')(ombreColoree)) / chroma(getPresetTransform('powlisher-cine')(ombreColoree)),
+        0, 1.0, '×');
+}
+
+/* ---------- ambre : le modele designe a la main, mesure le 2026-08-27 --------
+ *
+ * `ambre` ne sort pas des poles du corpus mais d'un MODELE: dix photos choisies
+ * a la main, etendues aux 60 plus proches du corpus (dix familles de sujet).
+ * Ce qui est fige ici, c'est ce qui le distingue de tout le reste du fichier —
+ * le split-tone — plus les garde-fous communs.
+ */
+{
+    const ambre = getPresetTransform('ambre');
+    const nuit = getPresetTransform('ambre-nuit');
+    if (!ambre || !nuit) { console.error('ECHEC: presets ambre introuvables.'); process.exit(1); }
+
+    for (const [nom, f, plafond] of [['ambre', ambre, 245], ['ambre-nuit', nuit, 181]]) {
+        const blanc = f([1, 1, 1]).map((v) => Math.round(v * 255));
+        check(`${nom} : plafond mesure`, Math.max(...blanc), plafond - 4, plafond + 4);
+        check(`${nom} : n'ecrete pas`, Math.max(...blanc), 0, 254);
+
+        /* LE BLANC EST CREME, ET C'EST MESURE. Partout ailleurs dans ce fichier
+         * un blanc reste blanc; ici les 10 % de pixels les plus lumineux du
+         * modele portent b* +8,23 sur leurs quasi-gris (dispersion 1,27 sur six
+         * familles). Ce qui reste interdit, c'est le VERT — le defaut vu sur un
+         * ciel a contre-jour — et le a* mesure est a -0,36, donc neutre. */
+        const [, aBlanc, bBlanc] = versLab(f([1, 1, 1]));
+        check(`${nom} : le blanc est creme`, bBlanc, 6, 11, ' b*');
+        check(`${nom} : le blanc ne verdit pas`, aBlanc, -2, 1, ' a*');
+
+        let monotone = true;
+        let precedent = -1;
+        for (let k = 0; k <= 255; k += 1) {
+            const y = versLab(f([k / 255, k / 255, k / 255]))[0];
+            if (y < precedent - 1e-9) monotone = false;
+            precedent = y;
+        }
+        check(`${nom} : rampe grise croissante`, monotone ? 1 : 0, 1, 1);
+
+        /* Le split-tone ne peut pas creer de contour: une compression rapproche,
+         * une bande separe. Meme borne que tout le projet. */
+        check(`${nom} : n'ajoute pas de contour`, amplificationVoile(f) - voileV1, -4, 0.6, '×');
+
+        /* Aucune saturation ajoutee, comme le reste du projet. */
+        const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+        const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+        check(`${nom} : n'ajoute pas de saturation`,
+            Math.max(...echantillons.map((rgb) => chromaDe(f(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+    }
+
+    /* LA SIGNATURE. Le jaune monte du bas vers le haut — c'est ce qui separe ce
+     * preset du tronc, qui pose un voile a peu pres uniforme. Mesure sur trois
+     * gris, un par tiers. */
+    const b = (v) => versLab(ambre([v, v, v]))[2];
+    check('ambre : le jaune monte des ombres aux clairs', b(0.85) - b(0.2), 2, 8, ' b*');
+    const bTronc = (v) => versLab(cine([v, v, v]))[2];
+    check('ambre : plus creuse que le voile du tronc',
+        (b(0.85) - b(0.2)) - (bTronc(0.85) - bTronc(0.2)), 1, 8, ' b*');
+
+    /* Les deux densites sont bien deux densites, et rien d'autre: leurs blancs
+     * s'ecartent de 60 niveaux, leur couleur est la meme table. */
+    check('ambre : les deux densites s\'ecartent',
+        Math.max(...ambre([1, 1, 1])) * 255 - Math.max(...nuit([1, 1, 1])) * 255, 50, 80);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

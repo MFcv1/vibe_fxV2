@@ -610,6 +610,223 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-27 bis (`ambre` : un preset tire d'un modele designe a la main)
+
+**Ce qui a change dans l'arbre** : `scripts/voisins-du-modele.mjs` et
+`scripts/juger-vers-modele.mjs` ajoutes. Modifies : `mesurer-variante.mjs`
+(+ bande des reflets), `courbes-variantes.mjs`, `visionPresets.js` (**+2 presets,
+aucune suppression**), `smoke-vision-preset.mjs` (150 -> **167**).
+
+**LE POINT DE DEPART** : dix photos designees a la main
+(`~/Desktop/lumierejaune`), un registre precis — une source chaude posee dans un
+cadre qui reste sobre.
+
+**DIX PHOTOS NE SE MESURENT PAS**, mais elles designent une direction. Chaque
+photo du corpus est decrite par son ecart a la mediane de SA famille, et on garde
+les 60 plus proches du modele. Elles viennent de **dix familles** (auto 19,
+interieur 10, mer 8, architecture 5, ville-nuit 5, rue 5...): la ressemblance
+porte donc sur le traitement, pas sur le sujet.
+
+**CE QUE LA MESURE TROUVE, et qui n'etait dans aucun preset du projet** :
+
+| etalonnage | ombres | medians | clairs | **reflets** |
+|---|---|---|---|---|
+| a\* | -2,76 | -1,18 | -1,26 | **-0,36** |
+| b\* | +1,05 | +5,11 | +8,38 | **+8,23** |
+
+Le b\* monte de +1 a +8 du bas vers le haut: c'est un **split-tone**, la ou le
+tronc pose un voile a peu pres uniforme. La chaleur est DANS la lumiere.
+
+**LA BANDE DES REFLETS EST NEUVE.** Un tiers clair contient un mur au soleil;
+ses 10 % du haut contiennent la lampe, et les deux ne portent pas la meme teinte.
+Sans cette bande, le cinquieme point de la table retombait vers zero comme
+partout ailleurs, et le preset ne parcourait que **16 %** du chemin vers le
+modele sur la teinte des reflets. Avec, il en fait 37 %, et le blanc devient
+l'ivoire mesure (245, 239, 223) au lieu d'un blanc neutre. Le a\* est a -0,36,
+donc la regle « pas de vert dans les blancs » tient toujours.
+
+**UN INSTRUMENT NEUF : `juger-vers-modele.mjs`.** Il manquait au projet. On
+applique le preset a 36 photos neutres, on profile le resultat avec l'instrument
+qui a profile le modele, et on rapporte le CHEMIN PARCOURU: 0 % = rien fait,
+100 % = pile sur le modele, au-dela = depassement. C'est ce test qui a condamne
+la premiere courbe d'`ambre` (point blanc 170 %, contraste 273 %) et qui a
+mesure la reussite de la seconde (peau 101 %, point blanc 84 %, contraste
+118 %, ombres 108 %).
+
+Deux grandeurs en sortent explicitement: `reflets b*` et `chroma` sont menees par
+le CONTENU des scenes — des couchants et des lampes. Un preset qui les
+atteindrait poserait ce jaune sur tous les blancs.
+
+**LA COURBE EST CALEE, PAS TRANSPORTEE.** Le transport brut emportait encore
+l'exposition de ses soixante photos (sombres parce que shootees a contre-jour).
+On garde sa forme et on cale ses deux reperes avec **une seule puissance en
+lumiere lineaire**, `y = 1,11 x^0,865` — deux nombres, deux cibles mesurees. Une
+puissance ne peut ni s'inverser ni s'aplatir: pente minimale 0,56, contre les
+trois rattrapages par morceaux essayes avant, qui fabriquaient tous un plat.
+
+**DEUX DENSITES.** Le modele se coupe sans ambiguite sur le point blanc: 7 photos
+a 234 / contraste 208, et 3 photos a 161 / contraste 129. `ambre-nuit` reprend la
+couleur d'`ambre` au mot pres et ne change que sa courbe. Sur son propre
+registre il tombe a **97 % et 98 %** des deux reperes, la ou `ambre` n'en fait
+que 20 et 11.
+
+La cible de contraste du registre CLAIR (208) est, elle, **inatteignable sans
+ecreter**. On ne la poursuit pas: elle vient des scenes, pas d'un reglage.
+
+**UN REPLIEMENT DE TEINTE, ANALYSE PLUTOT QUE RATTRAPE.** A tres basse chroma, le
+decalage de split-tone est plus long que le rayon de teinte et COMPRIME les
+teintes voisines. Ce n'est pas le defaut deja vu deux fois: une compression
+rapproche, une bande separe. Le test du voile tranche — `ambre` amplifie les
+ecarts de **1,24×**, contre 1,58× pour le tronc et 3,03× pour `powlisher`, qui
+est le plancher du projet. Aucun contour.
+
+**Verifie a l'oeil** : `AMBRE-VS-MODELE.jpg`, `AMBRE-DEUX-DENSITES.jpg`.
+**Reste a valider par le porteur du projet.**
+
+## Journal — 2026-08-27 (le preset rate, et les deux erreurs de mesure qu'il cachait)
+
+**Ce qui a change dans l'arbre** : rien d'ajoute. Modifies :
+`scripts/mesurer-variante.mjs`, `scripts/axe-developpement.mjs`,
+`scripts/courbes-variantes.mjs`, `visionPresets.js`, `smoke-vision-preset.mjs`.
+**`powlisher-cine-doux` retire** (jamais valide, jamais entre dans
+`docs/presets-valides.md`). **`powlisher-chaud` et `powlisher-froid` ajoutes.**
+
+**LE SYMPTOME** : `powlisher-cine-doux` saturait les murs ocres d'une cour
+marocaine jusqu'au rouge. Vu par le porteur du projet dans l'app, pas par les
+tests — les 137 verifications passaient toutes.
+
+**ERREUR 1 — l'axe se mordait la queue.** Il etait calcule sur des variables de
+tonalite ET de couleur melangees (`refletA`, `refletB`, `hautesA`, `chroma`). Le
+pole etait donc DEFINI par « ses reflets sont chauds et colores », et mesurer
+ensuite la couleur de ce pole ne pouvait rendre qu'une chose: que ses reflets
+etaient chauds et colores. Corrige: l'axe se calcule sur la seule tonalite, et la
+couleur est une DECOUVERTE faite apres coup. La part de variance passe de 26 a
+**45 %** — un axe qui ne porte qu'une question est bien plus net.
+
+**ERREUR 2 — le rapport de chroma mesurait le decor.** Pris sur tous les pixels
+d'une bande claire, il repondait a « sa bande claire est-elle plus coloree que la
+leur ? ». La reponse etait oui, parce qu'il photographie des couchants la ou le
+tas neutre a des ciels blancs. Pris **teinte par teinte** puis median, il repond a
+« pour un jaune donne, le pose-t-il plus sature ? ».
+
+    pole chaud, bande claire :  2,03 en brut  ->  1,01 teinte par teinte
+
+Le ×2 etait entierement du contenu. **Aucun pole de son corpus n'augmente la
+saturation** : les cinq mesures tombent entre 0,77 et 1,23. C'est un look qui
+RETIRE de la couleur. Le tronc, mesure autrement des le depart, le disait deja
+(0,85 / 0,83 / 0,99) — c'est la variante qui avait tort, pas lui.
+
+Corrigee aussi au passage : les bandes etaient des tranches de L absolues. Ses
+photos etant plus sombres, sa « bande L 66-101 » ne contient que quelques
+speculaires la ou celle du tas neutre contient tout le ciel. Les bandes sont
+maintenant des **tiers de pixels de chaque tas** — l'appariement de quantiles,
+applique a la couleur.
+
+**LES DEUX AXES, MAINTENANT SEPARES.** Chacun centre par famille de sujet,
+chacun peuple aux deux poles par les DIX familles :
+
+| axe | variance | poles |
+|---|---|---|
+| niveaux (`pointBlanc`, `refletLuma`, `contraste`, `partOmbres`...) | 45,1 % | `-net` / tronc / (`-doux`, abandonne) |
+| couleurs (`hautesA/B`, `refletA/B`, `mediansA/B`, `lumiereA/B`) | 33,6 % | `froid` / tronc / `chaud` |
+
+Ce que l'axe des couleurs trouve, **sans que la couleur ait servi a le former** :
+
+|  | froid | tronc | chaud |
+|---|---|---|---|
+| a\* de la lumiere | -4,9 | -1,4 | -0,9 |
+| b\* des reflets | +2,0 | +9,5 | +29,7 |
+| a\* des hautes | -6,0 | +0,3 | +2,8 |
+| etalonnage a\*, clairs | -4,07 | -2,3 | **+0,06** |
+
+`chaud` est le seul membre de la famille dont la lumiere ne tire plus DU TOUT au
+vert. C'etait la demande — et elle etait deja dans ses photos.
+
+**`-doux` ABANDONNE, et pourquoi.** Son transport coute -1,79 EV au gris moyen
+meme apres la correction, et son pied ecrase plus de huit niveaux d'entree dans
+un seul niveau de sortie. Huit, c'est le pas d'entree de la LUT: en dessous, la
+difference n'existe plus et aucune interpolation ne la fait revenir. Trois
+facons de lui rendre son exposition ont ete construites puis jetees — les trois
+deplacent le plat du bas vers le haut au lieu de le supprimer.
+`courbes-variantes.mjs` verifie desormais cette pente minimale sur toutes les
+courbes.
+
+**Tests** : `test:vision-preset` passe a **150 verifications**, dont un garde-fou
+neuf — aucune variante ne doit multiplier la chroma d'une ocre, d'un feuillage,
+d'un ciel ou d'une peau par plus de 1,3.
+
+**Verifie a l'oeil** : `DUEL-COULEUR.jpg`. Plus rien ne brule ; `chaud` est
+chaud sans etre sature. **Reste a valider par le porteur du projet.**
+
+## Journal — 2026-08-26 (la famille cine : quatre variantes mesurees)
+
+**Ce qui a change dans l'arbre** : `scripts/mesurer-familles.mjs`,
+`scripts/mesurer-variante.mjs`, `scripts/axe-developpement.mjs`,
+`scripts/courbes-variantes.mjs` ajoutes. Modifies : `visionPresets.js`
+(+4 presets, **aucune suppression**), `smoke-vision-preset.mjs` (+32
+verifications, 105 -> 137), `todo.md`.
+
+**L'AXE.** Ses 309 photos (les dix familles d'au moins douze) ont ete projetees
+sur la direction principale de leur nuage, apres avoir retranche a chaque photo
+la mediane de SA famille de sujet. Sans ce centrage la premiere direction serait
+« jour contre nuit », c'est-a-dire le sujet. Avec, elle porte 26 % de ce qui
+varie a sujet egal, et elle se lit d'un coup :
+
+    + reflets jaunes, + hautes lumieres chaudes, + part d'ombre
+    - point blanc,    - luminance des reflets,   - contraste
+
+C'est exactement l'axe nomme a l'oeil par le porteur du projet. **Les DIX
+familles peuplent les deux poles** (`architecture` 12 et 11, `auto` 10 et 10,
+`interieur` 11 et 10, `mer` 6 et 6) : un pole qui serait un sujet deguise serait
+peuple par une famille ou deux.
+
+Mesure aux trois positions, en ecart a un tas neutre de meme composition :
+
+| | net | tronc | doux |
+|---|---|---|---|
+| point blanc | -9 | -19 | -61,5 |
+| luminance des reflets | -11 | -17 | -51,5 |
+| reflets b\* | +0,93 | +9,30 | +28,86 |
+| hautes a\* | -3,38 | -0,03 | +3,06 |
+| ombres a\* | -4,20 | -2,76 | -2,69 |
+
+Monotone sur les deux variables nommees. Et les ombres restent vertes aux trois
+positions : c'est la constante du look, elle ne bouge pas avec l'axe.
+
+**CE QUE L'AXE EST VRAIMENT, cote tonalite.** Une fois l'exposition retiree, les
+deux poles se ressemblent : `doux` coute -1,46 EV au gris moyen et `net` en gagne
++0,65, mais leur FORME de courbe differe peu. **L'axe est donc, tonalement, un
+axe d'exposition ; ce qui differe a exposition egale, c'est la COULEUR.** Trois
+facons de rendre son exposition a `doux` ont ete construites puis jetees — gain
+global, gain s'eteignant dans les clairs, epaule filmique en lumiere lineaire :
+les trois fabriquent un PLATEAU dans les hautes lumieres suivi d'un saut vers le
+plafond, parce qu'on demande a une courbe de monter au milieu et pas en haut. Un
+plateau comprime, et ce qui est comprime bande. On garde donc les transports tels
+qu'ils sont mesures, et le prix est annonce dans les `bestFor`.
+
+**Un defaut attrape par le smoke, et sa vraie cause.** Les tables d'etalonnage
+etaient indexees par L = 0..100 comme celles du tronc. Mais le tronc plafonne a
+232 (L = 92,6) et pose son epaule a L = 100, soit 108 % de son propre blanc ;
+`nuit` plafonne a 195 (L = 79) et se retrouvait avec -4,2 en a\* sur son propre
+blanc — **le blanc virait au vert de 7,5 niveaux**, exactement le defaut que
+l'epaule existe pour empecher. Les tables sont maintenant indexees par L rapporte
+au blanc de la variante. Ce n'est pas un rattrapage : la bande « clairs » de
+`nuit` a ete mesuree sur des photos dont le point blanc est a 149, donc sur le
+haut de SA plage, pas sur le haut de l'echelle.
+
+**Le limiteur de chroma.** `doux` mesure un rapport de 2,12 dans les clairs.
+Applique tel quel a une couleur deja franche, il la pousse hors du gamut ou elle
+s'ecrete canal par canal : la teinte tourne et la zone devient un aplat. Les
+quatre variantes passent donc par `c' = P (1 - exp(-c g / P))`, qui rend le gain
+mesure sur les couleurs discretes et sature vers P sur les franches — la
+Vibrance de Lightroom. **P = 87 n'est pas choisi** : c'est le 99,9e centile de la
+chroma Lab de ses 324 photos. Mesure sur 48 photos neutres : ecretage
+0,00-0,05 % contre 1,72 % dans les originales.
+
+**Verifie a l'oeil** (planches dans `~/Desktop/powlisher-biblio/`) : degrades de
+ciel a 1:1 sans bande dans les quatre, peau tenue, ciels francs non vires au
+menthe. **Reste a valider par le porteur du projet.**
+
 ## Journal — 2026-08-25 (`powlisher-cine` : un preset entierement mesure)
 
 **Ce qui a change dans l'arbre** : `scripts/planche-duel.mjs`,

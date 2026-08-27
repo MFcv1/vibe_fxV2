@@ -19,7 +19,8 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**les presets mesures sur corpus** — prompt du 2026-08-25](docs/prompt-reprise-2026-08-25.md),
+[**la famille cine et `ambre`** — prompt du 2026-08-27](docs/prompt-reprise-2026-08-27.md),
+[les presets mesures sur corpus — 2026-08-25](docs/prompt-reprise-2026-08-25.md),
 [le grain, apres l'espace de travail — 2026-08-22](docs/prompt-reprise-2026-08-22.md),
 [la série d'imports Lightroom — 2026-08-20](docs/prompt-reprise-2026-08-20.md).
 
@@ -41,6 +42,14 @@ qui capture un preset Lightroom **exactement**, par Hald CLUT. Neuf presets :
 
 | Preset | Ce qu'il est | Effets non-LUT |
 |---|---|---|
+| `ambre` | tiré d'un **modèle de 10 photos désignées à la main** : split-tone, b\* +1 dans les ombres → +8,2 dans les reflets | — |
+| `ambre-nuit` | même couleur, densité basse : blanc à 181, contraste 129 | — |
+| `powlisher-cine` | **le tronc** : le fond commun à 324 de ses photos, aucun nombre choisi à la main | — |
+| `powlisher-cine-net` | pôle **ouvert** de l'axe des niveaux : lève tout, épaule à 245 | — |
+| `powlisher-chaud` | pôle **chaud** de l'axe des couleurs : a\* à 0 dans les clairs, b\* +9,3 | — |
+| `powlisher-froid` | l'autre bout : étalonnage le plus vert, bleu tourné de 16° | — |
+| `powlisher-mer` | la famille « mer » entière : teal le plus profond (−16°), plafond le plus haut (252) | — |
+| `powlisher-nuit` | la famille « ville de nuit » : lampadaires tenus à 187 | — |
 | `powlisher` | le look de `@powl_d`, reconstruit par mesure sur 19 photos | — |
 | `powlisher-ciel` | le ciel **converge** vers sa teinte (190–199°) au lieu d'être tourné d'un angle fixe | — |
 | `powlisher-showcase` | clair-obscur : le décor est vidé, le sujet reste seul coloré | grain 8, vignetage 8, relief 14 |
@@ -50,10 +59,22 @@ qui capture un preset Lightroom **exactement**, par Hald CLUT. Neuf presets :
 | `cn14` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 1,49 et 1,48/255 **par blocs**) | netteté 40, grain 25 grosseur 10 |
 | `cn16` | capture **exacte** (importée le 2026-08-20, validée sur 2 photos : 2,25 et 1,31/255) | netteté 40 |
 
-**Les neuf sont dans [docs/presets-valides.md](docs/presets-valides.md) : ils ne
-se suppriment pas et ne se remplacent pas** — un variant s'ajoute à côté. Trois
-autres ont été **supprimés** le 2026-08-12 (source biaisée, trait de contour dans
-le ciel).
+**Les dix validés sont dans [docs/presets-valides.md](docs/presets-valides.md) :
+ils ne se suppriment pas et ne se remplacent pas** — un variant s'ajoute à côté.
+Trois autres ont été **supprimés** le 2026-08-12 (source biaisée, trait de contour
+dans le ciel).
+
+> **Les six presets du 2026-08-27 attendent le regard du porteur du projet.**
+> Ils ont leurs mesures, leurs 62 vérifications dans `npm run test:vision-preset`,
+> et ont été regardés sur des photos neutres — mais c'est lui qui décide de leur
+> entrée dans la liste des validés. Planches dans `~/Desktop/powlisher-biblio/` :
+> `AMBRE-VS-MODELE.jpg`, `AMBRE-DEUX-DENSITES.jpg`, `DUEL-COULEUR.jpg`,
+> `DUEL-SUJETS.jpg`, `CIEL-1-1.jpg`.
+>
+> **`powlisher-cine-doux` a été construit puis retiré** le 2026-08-27 : il
+> saturait les murs ocres d'une cour marocaine. Les deux erreurs de mesure qu'il
+> a révélées sont dans le journal `map.md` du 2026-08-27 — **à relire avant de
+> mesurer quoi que ce soit de nouveau.**
 
 Un preset peut porter des **`spatialFilters`** (grain, vignetage, relief,
 texture, netteté, voile) : ils dépendent des pixels voisins ou de la position, donc
@@ -71,6 +92,41 @@ résolution / 2 pendant le geste, **grain réparé** (il plafonnait à 0,9/255).
 ---
 
 ## Ce qui reste
+
+### D'ABORD — regarder les six presets du 2026-08-27
+
+Ils sont livrés et testés, il manque **le regard** : ouvrir les planches de
+`~/Desktop/powlisher-biblio/` et dire, un par un, gardé ou pas. Ceux qui sont
+gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
+
+Refaire une planche à volonté :
+
+```bash
+node scripts/planche-duel.mjs --presets ambre,powlisher-cine --familles mer,auto --par-famille 2
+```
+
+Et vérifier qu'un preset tend vraiment vers un modèle :
+
+```bash
+node scripts/juger-vers-modele.mjs --presets ambre,ambre-nuit --n 3
+```
+
+### Ensuite — l'étage de tonalité adaptatif (le vrai gros reste)
+
+Chez `@powl_d`, la luminance médiane va de **23 en ville de nuit à 124 en mer**.
+Aucune courbe fixe ne suit ça, et c'est la dernière part de l'écart ressenti
+entre nos presets et ses photos. C'est aussi la raison pour laquelle
+`powlisher-cine-doux` et `powlisher-nuit` coûtent une exposition : leur registre
+est shooté sombre, et une LUT ne sait pas dire « sombre par rapport à cette
+photo-ci ».
+
+**Ce n'est pas une modification de preset, c'est une modification de moteur.** Un
+preset est compilé en LUT 3D (`getPresetLut`), c'est-à-dire une table sans
+mémoire : elle ne peut pas savoir ce qu'il y a dans l'image. Il faut un étage
+AVANT la LUT, qui mesure l'histogramme de la photo et l'amène sur l'exposition de
+référence du preset — exactement ce que fait le curseur Exposition de Lightroom,
+réglé photo par photo. Points à trancher : où il vit dans `studioRenderer.js`,
+comment il se désactive, et comment le figer dans un smoke.
 
 ### LOT ACTIF — finir de caler les réglages avancés sur Lightroom
 

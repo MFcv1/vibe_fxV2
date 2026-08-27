@@ -796,7 +796,543 @@ function powlisherCineTransform(input) {
     return lab01ToRgb(L, A, B);
 }
 
+/* ==========================================================================
+ * LA FAMILLE CINE — deux axes, mesures separement
+ * ==========================================================================
+ *
+ * `powlisher-cine` est la MEDIANE de ses 324 photos. Une mediane n'est pas un
+ * look: c'est le point ou tous ses looks se rejoignent. Les presets ci-dessous
+ * sont des points ailleurs sur le meme nuage.
+ *
+ * DEUX AXES, ET IL FAUT LES CHERCHER SEPAREMENT. Ses photos varient dans deux
+ * directions independantes: ou il pose ses NIVEAUX, et quelle TEMPERATURE il
+ * donne a sa lumiere. On peut poser ses noirs haut ou bas sans rien changer a
+ * la couleur, et inversement. Chercher les deux dans un seul calcul demande a
+ * une seule direction de porter deux questions, et rend un axe illisible.
+ *
+ * Chaque axe est calcule sur ses seules variables, apres avoir retranche a
+ * chaque photo la mediane de SA famille de sujet — sans ce centrage, la
+ * premiere direction serait « jour contre nuit », c'est-a-dire le sujet.
+ *
+ *   axe des NIVEAUX    45,1 % de la variation intra-famille   -> `-net`
+ *   axe des COULEURS   33,6 %                                 -> `chaud`, `froid`
+ *
+ * LA VERIFICATION QUI COMPTE, sur les deux: les DIX familles peuplent les deux
+ * poles. Un pole qui serait un sujet deguise serait peuple par une famille ou
+ * deux; peuple par dix sujets sans rapport, il ne peut etre qu'un choix de
+ * developpement.
+ *
+ * ------------------------------------------------------------------------
+ * LE PRESET RATE DU 2026-08-26, ET LES DEUX ERREURS DE MESURE QU'IL A REVELEES
+ * ------------------------------------------------------------------------
+ *
+ * Une premiere version de `-doux` saturait les murs ocres d'une cour marocaine
+ * jusqu'au rouge. Le defaut n'etait pas dans le preset, il etait dans les deux
+ * mesures qui l'avaient produit.
+ *
+ * 1. L'AXE SE MORDAIT LA QUEUE. Il etait calcule sur des variables de tonalite
+ *    ET de couleur melangees — reflets a*, reflets b*, hautes a*, chroma. Le
+ *    pole etait donc DEFINI par « ses reflets sont chauds et colores », et
+ *    mesurer ensuite la couleur de ce pole ne pouvait rendre qu'une chose: que
+ *    ses reflets etaient chauds et colores. L'axe se definit maintenant sur la
+ *    seule tonalite, et la couleur est une DECOUVERTE faite apres coup.
+ *
+ * 2. LE RAPPORT DE CHROMA MESURAIT LE DECOR. Pris sur tous les pixels d'une
+ *    bande claire, il repondait a « sa bande claire est-elle plus coloree que
+ *    la leur ? » — et la reponse etait oui, parce qu'il photographie des
+ *    couchants la ou le tas neutre a des ciels blancs. Pris TEINTE PAR TEINTE
+ *    puis median, il repond a « pour un jaune donne, le pose-t-il plus
+ *    sature ? », qui est la question qu'un preset peut executer.
+ *
+ *      pole `chaud`, bande claire:  2,03 en brut  ->  1,01 teinte par teinte
+ *
+ *    Le ×2 etait entierement du decor. **Aucun pole de son corpus n'augmente la
+ *    saturation**: les cinq mesures tombent entre 0,77 et 1,23. C'est un look
+ *    qui RETIRE de la couleur, jamais qui en ajoute — et le tronc, mesure
+ *    autrement des le depart, disait deja la meme chose (0,85 / 0,83 / 0,99).
+ *
+ * 3. `-doux` A ETE ABANDONNE. Son transport coute -1,79 EV au gris moyen meme
+ *    apres correction, et son pied ecrase plus de huit niveaux d'entree dans un
+ *    seul niveau de sortie: le bas de l'image y perd une information qu'aucune
+ *    interpolation ne fait revenir. Le registre chaud qu'il visait est rendu,
+ *    lui, par `powlisher-chaud`, qui vient de l'axe des couleurs et ne coute
+ *    que -0,77 EV.
+ */
+
+/* Le limiteur de chroma. Les gains mesures sont tous proches de 1 depuis la
+ * correction, donc il n'agit presque jamais — mais il reste, parce qu'il est la
+ * garantie qu'aucun reglage futur ne pourra pousser une couleur hors du gamut
+ * sRGB, ou elle s'ecreterait canal par canal et deviendrait un aplat.
+ * `c' = P (1 - exp(-c g / P))` rend le gain mesure sur les couleurs discretes
+ * et sature vers P sur les franches — la Vibrance de Lightroom.
+ *
+ * P = 87 n'est pas choisi: c'est le 99,9e centile de la chroma Lab de ses 324
+ * photos (mediane 11, 99e centile 58). Au-dela, il ne pose jamais de couleur. */
+const CINE_CHROMA_PLAFOND = 87;
+
+/* Les quatre secteurs de teinte que le tronc tourne — orange, jaune, vert,
+ * bleu. Les variantes tournent LES MEMES, d'angles differents: un secteur
+ * retenu pour l'une et pas pour l'autre viendrait de la difference de contenu
+ * entre deux sous-ensembles, pas d'une difference de traitement.
+ *
+ * `bas` est la part de l'angle deja appliquee dans les ombres; elle monte a 1
+ * dans les clairs. Elle vaut la mesure des ombres divisee par celle des clairs
+ * quand les deux ont ete retenues, celle du tronc sinon. Un secteur dont deux
+ * bandes se contredisent EN SIGNE est mis a zero: il decrit le cadre. */
+function ancresCine(angles) {
+    return [
+        { h: 45, angle: angles.orange[0], bas: angles.orange[1] },
+        { h: 75, angle: angles.jaune[0], bas: angles.jaune[1] },
+        { h: 135, angle: angles.vert[0], bas: angles.vert[1] },
+        { h: 255, angle: angles.bleu[0], bas: angles.bleu[1] },
+    ];
+}
+
+/* L'etalonnage d'une variante: trois valeurs mesurees (ombres, medians, clairs)
+ * etalees sur les cinq points du tronc, avec le meme cinquieme point qui
+ * retombe vers zero — la mesure ecarte les pixels au-dessus de L = 97, et
+ * prolonger une derive verte jusque dans les blancs a deja fait virer au
+ * vert-gris un grand ciel a contre-jour. Le tronc pose ce point a un sixieme de
+ * la valeur des clairs; on fait pareil. */
+const etalCine = (ombres, medians, clairs) => [
+    ombres, (ombres + medians) / 2, medians, clairs, +(clairs / 6).toFixed(2),
+];
+
+/* LES TABLES SONT INDEXEES PAR LE BLANC DE LA VARIANTE, PAS PAR L = 100.
+ *
+ * Le tronc plafonne a 232, soit L = 92,6, et pose son point d'epaule a L = 100:
+ * l'epaule est donc a 108 % de son propre blanc, et un blanc reste blanc. Les
+ * variantes plafonnent ailleurs — `nuit` a 195, soit L = 79. Indexee comme le
+ * tronc, sa table lui donnait encore -2,7 en a* sur son propre blanc: le smoke
+ * a vu le blanc virer au vert, exactement le defaut que l'epaule existe pour
+ * empecher.
+ *
+ * Ce n'est pas un rattrapage: c'est ce que la mesure voulait dire. Les bandes
+ * sont des TIERS DE PIXELS de chaque tas, pas des tranches de L — le tiers
+ * clair de `nuit` a ete mesure sur des photos dont le point blanc est a 149,
+ * donc sur le haut de SA plage, pas sur le haut de l'echelle. */
+function construireCine({ courbe, ancres, chroma, etalA, etalB }) {
+    const blanc = evalCurve(courbe, 1);
+    const Lblanc = rgbToLab01(blanc, blanc, blanc)[0];
+    const parRapportAuBlanc = (table, L) => fonduParL(table, L * 100 / Lblanc);
+
+    return function transform(input) {
+        const r0 = evalCurve(courbe, input[0]);
+        const g0 = evalCurve(courbe, input[1]);
+        const b0 = evalCurve(courbe, input[2]);
+
+        let [L, A, B] = rgbToLab01(r0, g0, b0);
+
+        /* 1. La chroma, par plage, avec son limiteur. */
+        const c = Math.hypot(A, B);
+        if (c > 1e-6) {
+            const gain = parRapportAuBlanc(chroma, L);
+            const cible = CINE_CHROMA_PLAFOND * (1 - Math.exp(-c * gain / CINE_CHROMA_PLAFOND));
+            A *= cible / c;
+            B *= cible / c;
+        }
+
+        /* 2. La rotation de teinte, ponderee par la chroma: en dessous de
+         *    quelques unites un pixel n'a pas de teinte, et la tourner fabrique
+         *    des bandes apres interpolation de la LUT. */
+        const c2 = Math.hypot(A, B);
+        const aUneTeinte = smoothstep(3, 14, c2);
+        if (aUneTeinte > 0) {
+            let h = Math.atan2(B, A) * 180 / Math.PI;
+            if (h < 0) h += 360;
+            let rot = 0;
+            const monte = smoothstep(CINE_RAMPE_L[0], CINE_RAMPE_L[1], L);
+            for (const a of ancres) {
+                const w = poidsAncre(h, a.h);
+                if (w > 0) rot += a.angle * w * (a.bas + (1 - a.bas) * monte);
+            }
+            const hNeuf = (h + rot * aUneTeinte) * Math.PI / 180;
+            A = c2 * Math.cos(hNeuf);
+            B = c2 * Math.sin(hNeuf);
+        }
+
+        /* 3. L'etalonnage: un decalage constant par plage, qui ne change jamais
+         *    l'ordre de deux couleurs et ne peut donc pas creer de rupture. */
+        A += parRapportAuBlanc(etalA, L);
+        B += parRapportAuBlanc(etalB, L);
+
+        return lab01ToRgb(L, A, B);
+    };
+}
+
+/* Toutes les courbes portent la meme correction, et une seule: l'appariement de
+ * quantiles force 255 -> 255 parce que les deux fonctions de repartition
+ * finissent a 1, ce qui fabrique un mur vertical entre le dernier point mesure
+ * et le blanc. On le remplace par le PLAFOND de la variante — la ou son propre
+ * transport pose deja le tres clair (entree 248), prolonge d'un pas.
+ * `scripts/courbes-variantes.mjs` les fabrique et verifie qu'aucune pente ne
+ * tombe sous 1/8, le pas d'entree de la LUT. */
+
+/* --- `-net` : le pole ouvert de l'axe des NIVEAUX ------------------------- */
+/* Il leve tout (+0,88 EV au gris moyen) et retient le tres haut a 245. C'est la
+ * reponse mesuree au seul defaut connu du tronc — « moins bon sur les tres forts
+ * contrastes »: la ou le tronc ferme (192 -> 184, 224 -> 203), lui ouvre
+ * (192 -> 214) puis pose une vraie epaule (224 -> 229, 248 -> 241). */
+const NET_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0745], [0.1255, 0.1451], [0.1882, 0.2157],
+    [0.2510, 0.2980], [0.3137, 0.3725], [0.3765, 0.4510], [0.4392, 0.5294],
+    [0.5020, 0.6078], [0.5647, 0.6784], [0.6275, 0.7373], [0.6902, 0.7922],
+    [0.7529, 0.8392], [0.8157, 0.8745], [0.8784, 0.8980], [0.9412, 0.9255],
+    [0.9725, 0.9451], [1.0000, 0.9608],
+];
+const powlisherCineNetTransform = construireCine({
+    courbe: NET_COURBE,
+    etalA: etalCine(-1.47, -2.71, -1.56),
+    etalB: etalCine(2.68, 3.34, 3.26),
+    chroma: [0.959, 0.926, 0.987],
+    /* Le vert est a zero: une seule bande le retenait, et dans l'autre sens que
+     * le reste de la famille. Une bande seule ne suffit pas. */
+    ancres: ancresCine({ orange: [1.92, 0.4], jaune: [4.18, 0.27], vert: [0, 1.0], bleu: [-12.07, 0.62] }),
+});
+
+/* --- `chaud` : le pole chaud de l'axe des COULEURS ------------------------ */
+/* Le registre dore, mesure sur les 46 photos qui s'y posent — cinq familles de
+ * sujet. Son etalonnage est le seul de toute la famille dont le a* atteigne
+ * ZERO dans les clairs (+0,06): sa lumiere ne tire plus du tout au vert, la ou
+ * le tronc est a -2,3 et `froid` a -4,1. Et son b* monte a +9,3, contre +4,7
+ * pour le tronc. C'est la reponse mesuree a « je veux des couleurs plus
+ * chaudes ».
+ *
+ * Sa chroma, elle, ne monte pas: 0,82 / 0,83 / 1,01. Chaud ne veut pas dire
+ * sature — c'est precisement l'erreur qui avait ete commise. */
+const CHAUD_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0078], [0.1255, 0.0353], [0.1882, 0.0706],
+    [0.2510, 0.1137], [0.3137, 0.1608], [0.3765, 0.2235], [0.4392, 0.2863],
+    [0.5020, 0.3569], [0.5647, 0.4392], [0.6275, 0.5098], [0.6902, 0.5765],
+    [0.7529, 0.6353], [0.8157, 0.7020], [0.8784, 0.7569], [0.9412, 0.8118],
+    [0.9725, 0.8510], [1.0000, 0.8863],
+];
+const powlisherChaudTransform = construireCine({
+    courbe: CHAUD_COURBE,
+    etalA: etalCine(-2.0, -0.72, 0.06),
+    etalB: etalCine(0.81, 4.4, 9.31),
+    chroma: [0.822, 0.827, 1.014],
+    /* Le jaune est a zero: ses ombres disent +3,1 et ses medians -2,7. Deux
+     * bandes qui se contredisent en signe decrivent le cadre, pas le geste. */
+    ancres: ancresCine({ orange: [2.27, 0.4], jaune: [0, 0.2], vert: [5.8, 0.6], bleu: [-11.92, 0.51] }),
+});
+
+/* --- `froid` : l'autre bout du meme axe ----------------------------------- */
+/* Sa courbe est la plus proche de l'identite de toute la famille (128 -> 128) et
+ * son etalonnage le plus vert (-4,3 / -3,4 / -4,1 en a*), avec un b* qui passe
+ * SOUS zero dans les ombres. Son bleu tourne de 16 degres. C'est le versant
+ * mineral du look — celui que le tronc melange avec l'autre. */
+const FROID_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0235], [0.1255, 0.0784], [0.1882, 0.1412],
+    [0.2510, 0.2196], [0.3137, 0.2863], [0.3765, 0.3569], [0.4392, 0.4275],
+    [0.5020, 0.5020], [0.5647, 0.5725], [0.6275, 0.6392], [0.6902, 0.6902],
+    [0.7529, 0.7333], [0.8157, 0.7765], [0.8784, 0.8157], [0.9412, 0.8627],
+    [0.9725, 0.8941], [1.0000, 0.9216],
+];
+const powlisherFroidTransform = construireCine({
+    courbe: FROID_COURBE,
+    etalA: etalCine(-4.28, -3.38, -4.07),
+    etalB: etalCine(-1.0, 3.75, 0.6),
+    chroma: [0.955, 0.772, 0.824],
+    ancres: ancresCine({ orange: [0, 0.4], jaune: [0.89, 1.0], vert: [7.36, 1.0], bleu: [-15.97, 0.2] }),
+});
+
+/* --- `mer` : une famille de sujet entiere --------------------------------- */
+/* La SEULE famille ou son point blanc est PLUS HAUT que celui du tas neutre
+ * (+6). Sa courbe ouvre partout et plafonne a 252, et son bleu tourne de 15,9
+ * degres contre 11,8 pour le tronc: le teal le plus profond de la famille. */
+const MER_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0431], [0.1255, 0.0863], [0.1882, 0.1451],
+    [0.2510, 0.2078], [0.3137, 0.2627], [0.3765, 0.3137], [0.4392, 0.3725],
+    [0.5020, 0.4627], [0.5647, 0.5451], [0.6275, 0.6157], [0.6902, 0.6980],
+    [0.7529, 0.7765], [0.8157, 0.8392], [0.8784, 0.8980], [0.9412, 0.9373],
+    [0.9725, 0.9647], [1.0000, 0.9882],
+];
+const powlisherMerTransform = construireCine({
+    courbe: MER_COURBE,
+    etalA: etalCine(-3.17, -4.21, -2.21),
+    etalB: etalCine(1.96, 4.95, 7.1),
+    chroma: [0.828, 0.987, 1.227],
+    /* L'orange est a zero: ses trois tiers se contredisent dessus (+1,9 dans les
+     * medians, -5,4 dans les clairs). Un secteur qui se contredit decrit le
+     * cadre, pas le traitement — et l'orange, c'est la peau. */
+    ancres: ancresCine({ orange: [0, 0.4], jaune: [3.89, 0.62], vert: [9.75, 0.71], bleu: [-15.94, 0.57] }),
+});
+
+/* --- `nuit` : l'autre bout du corpus -------------------------------------- */
+/* Trente photos de ville de nuit, contre quarante des memes villes par d'autres.
+ * Son point blanc est 99 niveaux plus bas que le leur et son contraste 75 points
+ * plus faible: la ou tout le monde brule ses lampadaires, lui les retient a 187.
+ *
+ * Sa chroma d'ombres N'A PAS PU ETRE MESUREE — dans une nuit, les ombres n'ont
+ * pas assez de pixels colores pour qu'un rapport teinte par teinte veuille dire
+ * quelque chose. On y reporte donc la valeur des medians plutot que d'inventer:
+ * une mesure absente n'autorise pas un geste. */
+const NUIT_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0392], [0.1255, 0.0745], [0.1882, 0.1098],
+    [0.2510, 0.1451], [0.3137, 0.1843], [0.3765, 0.2275], [0.4392, 0.2706],
+    [0.5020, 0.3176], [0.5647, 0.3647], [0.6275, 0.4078], [0.6902, 0.4667],
+    [0.7529, 0.5294], [0.8157, 0.5961], [0.8784, 0.6510], [0.9412, 0.6980],
+    [0.9725, 0.7333], [1.0000, 0.7647],
+];
+const powlisherNuitTransform = construireCine({
+    courbe: NUIT_COURBE,
+    etalA: etalCine(-3.86, -4.32, -2.65),
+    etalB: etalCine(1.26, 0.45, 5.28),
+    chroma: [0.803, 0.803, 0.873],
+    ancres: ancresCine({ orange: [0, 0.4], jaune: [3.18, 0.2], vert: [0, 1.0], bleu: [-3.22, 0.57] }),
+});
+
+/* ==========================================================================
+ * AMBRE — la lumiere chaude posee sur une image qui reste propre
+ * ==========================================================================
+ *
+ * Ce preset ne vient pas des memes poles que la famille cine. Il vient d'un
+ * MODELE: dix photos designees a la main par le porteur du projet
+ * (~/Desktop/lumierejaune), toutes du meme registre — une source chaude
+ * (couchant, lampe, vitrine) posee dans un cadre qui, lui, reste sobre.
+ *
+ * DIX PHOTOS NE SE MESURENT PAS. Un etalonnage tire de dix images est du bruit.
+ * Mais dix images suffisent a designer une DIRECTION. On s'en est donc servi
+ * comme d'une requete (`scripts/voisins-du-modele.mjs`): chaque photo du corpus
+ * est decrite par son ecart a la mediane de SA famille de sujet — sans ce
+ * centrage, « ressembler au modele » voudrait dire « etre une photo de
+ * voiture », puisque la moitie du modele en est — et on garde les 60 plus
+ * proches. Ils viennent de DIX familles (auto 19, interieur 10, mer 8,
+ * architecture 5, ville-nuit 5, rue 5, moto 3, avion 2, paysage 2, portrait 1):
+ * la ressemblance porte donc sur le traitement, pas sur le sujet.
+ *
+ * CE QUE LA MESURE A TROUVE, et qui n'est dans aucun autre preset du projet:
+ *
+ *   etalonnage    ombres      medians     clairs
+ *   a*            -2,76       -1,18       -1,26
+ *   b*            +1,05       +5,11       +8,38
+ *
+ * Le b* monte de +1 a +8 du bas vers le haut. C'est un SPLIT-TONE — ombres
+ * neutres et legerement vertes, hautes lumieres franchement jaunes — la ou le
+ * tronc `powlisher-cine` pose un voile jaune-vert a peu pres uniforme. C'est
+ * exactement ce qu'on voit sur les dix photos: la chaleur est DANS la lumiere,
+ * pas sur toute l'image.
+ *
+ * Et la chroma descend partout (0,91 / 0,81 / 0,89, mesuree teinte par teinte).
+ * Le registre est sobre: ce qui donne l'impression de couleur, c'est le
+ * contraste entre des ombres videes et une lumiere chaude, pas de la saturation.
+ */
+
+/* LA COURBE EST CALEE SUR LE MODELE, PAS SUR LE TRANSPORT.
+ *
+ * Le transport brut des 60 voisins coute -0,54 EV et plafonne a 225. Applique a
+ * des photos ordinaires, il rendait un point blanc de 205 et un contraste de
+ * 172, la ou le modele est a 218,5 et 181,5 — il DEPASSAIT la cible de 70 et
+ * 173 % (`scripts/juger-vers-modele.mjs`). La raison est celle qu'on a deja
+ * rencontree deux fois: un transport de quantiles emporte l'exposition du tas
+ * qui l'a produit, et ces soixante photos sont sombres parce qu'elles sont
+ * shootees a contre-jour, pas parce qu'un reglage les assombrit.
+ *
+ * On garde donc du transport sa FORME, et on cale ses deux reperes sur ce que
+ * le modele fait vraiment: une seule puissance en lumiere lineaire,
+ * `y = 1,11 x^0,865`, ajustee pour que le rendu de 36 photos neutres tombe sur
+ * le point blanc ET le contraste du modele. Deux nombres, deux cibles mesurees,
+ * aucun degre de liberte qui reste.
+ *
+ * Une puissance en lumiere lineaire ne peut ni s'inverser ni s'aplatir: sa pente
+ * ne descend jamais sous 0,56 ici, quatre fois le pas d'entree de la LUT. C'est
+ * ce qui la separe des trois rattrapages par morceaux essayes avant elle, qui
+ * fabriquaient tous un plat quelque part.
+ *
+ * Le dernier point est a nous: l'appariement de quantiles force 255 -> 255, on
+ * le remplace par la pente locale prolongee, soit 239 — donc aucun ecretage,
+ * la regle la plus ferme du corpus. */
+const AMBRE_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0588], [0.1255, 0.1059], [0.1882, 0.1569],
+    [0.2510, 0.2196], [0.3137, 0.2824], [0.3765, 0.3333], [0.4392, 0.3922],
+    [0.5020, 0.4627], [0.5647, 0.5451], [0.6275, 0.6118], [0.6902, 0.6824],
+    [0.7529, 0.7373], [0.8157, 0.7922], [0.8784, 0.8275], [0.9412, 0.8706],
+    [0.9725, 0.9059], [1.0000, 0.9373],
+];
+
+/* LES ROTATIONS: LES DOUZE SECTEURS, PAS QUATRE ANCRES.
+ *
+ * La famille cine tourne quatre secteurs, ceux que le tronc avait retenus. Ici
+ * le releve parle dans neuf secteurs sur douze, et les reduire a quatre
+ * reviendrait a jeter la moitie de ce qu'on a mesure — notamment le rouge
+ * (+7,3 dans les clairs, ce qui est ce qui rend une brique et une peau chaudes
+ * sans les rendre orange) et le jaune-vert a 105 degres (-3,8, ce qui EMPECHE
+ * un feuillage eclaire de virer au citron).
+ *
+ * Douze valeurs fixes reparties sur le cercle, c'est le panneau Teinte de
+ * Lightroom, qui en a huit. Rien d'exotique.
+ *
+ * Une table par bande de luminosite; zero veut dire « les bandes ne s'accordent
+ * pas sur ce secteur », donc « on n'y touche pas ».
+ * Secteurs centres sur 15, 45, 75 ... 345 degres Lab. */
+const AMBRE_ROT = [
+    /* ombres  */ [0, 0.98, 2.82, 0, 4.77, 3.45, 1.43, -10.89, -1.36, 0, 0, 0],
+    /* medians */ [4.03, 3.45, 3.98, -5.74, 2.40, 2.98, 0, -6.64, -13.13, -1.78, 0, 0],
+    /* clairs  */ [7.32, 3.30, 2.72, -3.83, 0, 0, 0, -7.44, -10.25, 1.10, 0, 0],
+];
+
+/* Interpolation periodique douce entre les douze valeurs. Le fondu en cosinus
+ * sur deux secteurs voisins garde la derivee continue: une table a bord franc
+ * fabriquerait la bande que ce projet a deja vue deux fois. */
+function rotationAmbre(h, t) {
+    const x = ((h % 360) + 360) % 360 / 30 - 0.5;
+    const i = Math.floor(x);
+    const f = x - i;
+    const doux = f * f * (3 - 2 * f);
+    const lire = (table, k) => table[((k % 12) + 12) % 12];
+    const bande = (table) => lire(table, i) + (lire(table, i + 1) - lire(table, i)) * doux;
+    /* `t` va de 0 dans les ombres a 1 dans les clairs; les medians sont au
+     * milieu, comme les trois tiers de pixels qui les ont mesures. */
+    const u = t * 2;
+    return u <= 1
+        ? bande(AMBRE_ROT[0]) + (bande(AMBRE_ROT[1]) - bande(AMBRE_ROT[0])) * u
+        : bande(AMBRE_ROT[1]) + (bande(AMBRE_ROT[2]) - bande(AMBRE_ROT[1])) * (u - 1);
+}
+
+/* LE CINQUIEME POINT N'EST PAS UNE EPAULE ICI, IL EST MESURE.
+ *
+ * Partout ailleurs dans ce fichier, le point du haut retombe vers zero: la
+ * mesure ecarte les pixels au-dessus de L = 97, on ne sait rien du sommet, et
+ * prolonger une derive verte jusque dans les blancs a deja fait virer au
+ * vert-gris un grand ciel a contre-jour.
+ *
+ * Ici on SAIT, parce qu'on est alle mesurer exprès: les 10 % de pixels les plus
+ * lumineux, sur leurs seuls quasi-gris, portent a* -0,36 et b* +8,23 (dispersion
+ * 1,01 et 1,27 sur six familles). Le a* est a zero — donc pas de vert dans les
+ * blancs, la regle tient — mais le b* NE retombe pas: chez lui, un reflet est
+ * creme, pas blanc. C'etait le defaut principal de la premiere version, qui
+ * ramenait ce point a +1,4 et ne parcourait que 16 % du chemin vers le modele
+ * sur la teinte des reflets.
+ *
+ * Un tiers clair contient un mur au soleil; ses 10 % du haut contiennent la
+ * lampe. Les deux ne portent pas la meme teinte, et c'est la seconde qui fait
+ * le rendu. */
+const AMBRE_ETAL_A = [-2.76, -1.97, -1.18, -1.26, -0.36];
+const AMBRE_ETAL_B = [1.05, 3.08, 5.11, 8.38, 8.23];
+const AMBRE_CHROMA = [0.91, 0.805, 0.893];
+
+/* Le meme etage de couleur sert aux deux densites: c'est un seul registre, pas
+ * deux presets sans rapport. Seule la courbe change. */
+function construireAmbre(courbe) {
+    const v = evalCurve(courbe, 1);
+    const Lblanc = rgbToLab01(v, v, v)[0];
+
+    return function transform(input) {
+        const r0 = evalCurve(courbe, input[0]);
+        const g0 = evalCurve(courbe, input[1]);
+        const b0 = evalCurve(courbe, input[2]);
+
+        let [L, A, B] = rgbToLab01(r0, g0, b0);
+        /* Comme toute la famille: les tables sont indexees par L rapporte au
+         * blanc DE CE PRESET, parce que leurs bandes sont des tiers de pixels de
+         * son propre tas et non des tranches de L absolues. */
+        const t = clamp01(L / Lblanc) * 100;
+
+        /* 1. Chroma, avec le meme limiteur doux que la famille cine. */
+        const c = Math.hypot(A, B);
+        if (c > 1e-6) {
+            const gain = fonduParL(AMBRE_CHROMA, t);
+            const cible = CINE_CHROMA_PLAFOND * (1 - Math.exp(-c * gain / CINE_CHROMA_PLAFOND));
+            A *= cible / c;
+            B *= cible / c;
+        }
+
+        /* 2. Rotation de teinte, ponderee par la chroma. */
+        const c2 = Math.hypot(A, B);
+        const aUneTeinte = smoothstep(3, 14, c2);
+        if (aUneTeinte > 0) {
+            let h = Math.atan2(B, A) * 180 / Math.PI;
+            if (h < 0) h += 360;
+            const hNeuf = (h + rotationAmbre(h, t / 100) * aUneTeinte) * Math.PI / 180;
+            A = c2 * Math.cos(hNeuf);
+            B = c2 * Math.sin(hNeuf);
+        }
+
+        /* 3. Le split-tone. C'est la signature: un decalage qui CHANGE avec la
+         *    luminosite, la ou le tronc en pose un a peu pres constant.
+         *
+         *    A tres basse chroma, un decalage plus long que le rayon de teinte
+         *    COMPRIME les teintes voisines vers sa propre direction. Ce n'est
+         *    pas le defaut que ce projet a deja vu deux fois: une compression
+         *    rapproche, une bande separe. Le test du voile le confirme —
+         *    `ambre` amplifie les ecarts de 1,24x, contre 1,58x pour le tronc et
+         *    3,03x pour `powlisher`, qui est le plancher du projet. Il ne
+         *    dessine donc aucun contour, il fond. */
+        A += fonduParL(AMBRE_ETAL_A, t);
+        B += fonduParL(AMBRE_ETAL_B, t);
+
+        return lab01ToRgb(L, A, B);
+    };
+}
+
+/* LA SECONDE DENSITE. Le modele contient deux registres que la meme courbe ne
+ * peut pas servir, et ils se separent sans ambiguite sur le point blanc:
+ *
+ *              photos   point blanc   contraste   chroma
+ *   clair         7         234          208       13,9
+ *   basse lumiere 3         161          129        8,4
+ *
+ * Trois photos ne suffisent pas a mesurer une recette de couleur — elle est
+ * donc reprise telle quelle des 60 voisins, qui contiennent deja les familles
+ * `interieur` et `ville-nuit`. Elles suffisent en revanche a fixer DEUX reperes
+ * tonals, et c'est tout ce qu'on leur demande.
+ *
+ * Note: la cible de contraste du registre CLAIR (208) est, elle, inatteignable
+ * sans pousser le blanc a 255. On ne la poursuit pas: l'ecretage est la regle
+ * la plus ferme du corpus, et ce contraste-la vient des scenes — des
+ * contre-jours — pas d'un reglage. `ambre` reste donc cale sur le modele
+ * entier, ou les deux reperes tombent juste. */
+const AMBRE_NUIT_COURBE = [
+    [0.0000, 0.0000], [0.0627, 0.0588], [0.1255, 0.0980], [0.1882, 0.1373],
+    [0.2510, 0.1882], [0.3137, 0.2353], [0.3765, 0.2745], [0.4392, 0.3176],
+    [0.5020, 0.3647], [0.5647, 0.4235], [0.6275, 0.4706], [0.6902, 0.5176],
+    [0.7529, 0.5529], [0.8157, 0.5922], [0.8784, 0.6118], [0.9412, 0.6431],
+    [0.9725, 0.6667], [1.0000, 0.6863],
+];
+
+const ambreTransform = construireAmbre(AMBRE_COURBE);
+const ambreNuitTransform = construireAmbre(AMBRE_NUIT_COURBE);
+
 export const VISION_PRESETS = [
+    {
+        id: 'ambre',
+        label: 'Ambre',
+        hint: 'La lumière est chaude, le reste ne bouge pas',
+        description: 'Tiré d\'un modèle de dix photos, étendu aux 60 plus proches de '
+            + 'son corpus — dix familles de sujet, donc un traitement et non un sujet. '
+            + 'Sa signature est un SPLIT-TONE : le jaune monte de +1 dans les ombres à '
+            + '+8,4 dans les hautes lumières, au lieu du voile à peu près uniforme du '
+            + 'tronc. La chaleur reste donc dans la lumière et ne déteint pas sur le '
+            + 'reste du cadre. La couleur baisse partout (×0,81 à ×0,91) : ce qui donne '
+            + 'l\'impression de richesse, c\'est l\'écart entre des ombres sobres et une '
+            + 'lumière chaude, pas de la saturation. Douze secteurs de teinte réglés '
+            + 'un par un, dont le rouge (+7,3 dans les clairs) et le jaune-vert (−3,8, '
+            + 'qui empêche un feuillage éclairé de virer au citron).',
+        bestFor: 'fin de journée, contre-jour, lampes et vitrines, intérieurs éclairés, '
+            + 'peau — et toute photo propre qu\'on veut poser sans la déguiser',
+        avoidFor: 'photos déjà écrêtées : sa courbe retient les blancs, elle ne les '
+            + 'ressuscite pas',
+        recommendedIntensity: 100,
+        transform: ambreTransform,
+    },
+    {
+        id: 'ambre-nuit',
+        label: 'Ambre Nuit',
+        hint: 'Le même registre, posé bas : rien ne dépasse 175',
+        description: 'La déclinaison basse lumière du même modèle. Trois des dix '
+            + 'photos forment un groupe à part, et elles se séparent sans ambiguïté : '
+            + 'point blanc 161 contre 234, contraste 129 contre 208. Sa couleur est '
+            + 'celle d\'`ambre`, au mot près — c\'est un seul regard à deux densités, '
+            + 'pas deux presets sans rapport. Seule sa courbe change, calée sur ces '
+            + 'deux repères : le blanc pur y atterrit à 175, donc une lampe ou une '
+            + 'vitrine garde sa forme au lieu de percer un trou blanc.',
+        bestFor: 'nuit, néons, vitrines, intérieurs sombres, contre-jours très durs — '
+            + 'tout ce qui a une source de lumière franche dans un cadre sombre',
+        avoidFor: 'plein jour : il pose l\'image bas, c\'est sa raison d\'être',
+        recommendedIntensity: 100,
+        transform: ambreNuitTransform,
+    },
     {
         id: 'powlisher-cine',
         label: 'Powlisher Ciné',
@@ -812,6 +1348,83 @@ export const VISION_PRESETS = [
             + 'ressuscite pas',
         recommendedIntensity: 100,
         transform: powlisherCineTransform,
+    },
+    {
+        id: 'powlisher-cine-net',
+        label: 'Powlisher Ciné Net',
+        hint: 'Les deux bouts ouverts : ombres levées, blancs tenus',
+        description: 'Le pôle OUVERT de son axe de niveaux, mesuré sur les 51 photos '
+            + 'qui s\'y posent — dix familles de sujet, donc un choix de développement '
+            + 'et pas un sujet. Il lève tout de presque une exposition et pose une '
+            + 'vraie épaule à 245 : là où le tronc ferme, lui garde de la matière aux '
+            + 'deux bouts.',
+        bestFor: 'contre-jours, forts contrastes, photos sombres ou bouchées — c\'est '
+            + 'le membre de la famille qui ne ferme rien',
+        avoidFor: 'photos déjà claires et plates : il ouvre encore, il ne referme pas',
+        recommendedIntensity: 100,
+        transform: powlisherCineNetTransform,
+    },
+    {
+        id: 'powlisher-chaud',
+        label: 'Powlisher Chaud',
+        hint: 'Le registre doré : lumière chaude, sans une once de saturation en plus',
+        description: 'Le pôle chaud de son axe de couleurs, mesuré sur les 46 photos '
+            + 'qui s\'y posent. C\'est le seul membre de la famille dont la lumière ne '
+            + 'tire plus du tout au vert (a* à 0,06 dans les clairs, contre −2,3 pour '
+            + 'le tronc) et dont le jaune monte à +9,3. Sa saturation, elle, ne monte '
+            + 'pas : mesurée teinte par teinte, elle vaut 1,01 — chaud ne veut pas dire '
+            + 'saturé.',
+        bestFor: 'fin de journée, pierre et terre, intérieurs éclairés, peau — tout ce '
+            + 'qu\'on veut voir doré plutôt que minéral',
+        avoidFor: 'scènes déjà très jaunes : il ajoute du jaune, il n\'en enlève pas',
+        recommendedIntensity: 100,
+        transform: powlisherChaudTransform,
+    },
+    {
+        id: 'powlisher-froid',
+        label: 'Powlisher Froid',
+        hint: 'Le versant minéral : vert dense, bleu profond, ombres froides',
+        description: 'L\'autre bout du même axe, sur 51 photos. Sa courbe est la plus '
+            + 'proche de l\'identité de toute la famille — elle ne déplace presque pas '
+            + 'les niveaux — et tout son caractère est dans la couleur : l\'étalonnage '
+            + 'le plus vert du lot, un jaune qui passe sous zéro dans les ombres, et un '
+            + 'bleu tourné de 16 degrés vers le teal.',
+        bestFor: 'béton, métal, forêt, brume, ciel — et toute photo trop jaune qu\'on '
+            + 'veut refroidir sans la vider',
+        avoidFor: 'portraits en lumière froide : il refroidit encore',
+        recommendedIntensity: 100,
+        transform: powlisherFroidTransform,
+    },
+    {
+        id: 'powlisher-mer',
+        label: 'Powlisher Mer',
+        hint: 'Le teal le plus profond de la famille, et rien de bouché',
+        description: 'Ses 37 photos de bord de mer contre 40 des mêmes rivages par '
+            + 'd\'autres auteurs. La seule famille où son point blanc est PLUS HAUT '
+            + 'que celui d\'en face : ici il ouvre au lieu de retenir, jusqu\'à 252. Son '
+            + 'bleu tourne de 16 degrés vers le teal — le tronc n\'en tourne que 12 — '
+            + 'et ses verts de 10.',
+        bestFor: 'mer, piscine, ciel, tout ce qui est bleu et lumineux',
+        avoidFor: 'portraits serrés : son secteur orange est laissé à zéro, il ne '
+            + 'protège pas la peau, il l\'ignore',
+        recommendedIntensity: 100,
+        transform: powlisherMerTransform,
+    },
+    {
+        id: 'powlisher-nuit',
+        label: 'Powlisher Nuit',
+        hint: 'Lampadaires retenus, nuit lisible',
+        description: 'Ses 30 photos de ville de nuit contre 40 des mêmes villes par '
+            + 'd\'autres. Son point blanc est 99 niveaux sous le leur et son contraste '
+            + '75 points plus faible : là où tout le monde brûle ses lampadaires, il '
+            + 'les tient à 187. La couleur baisse partout (×0,80), ce qui rend la nuit '
+            + 'lisible au lieu d\'être un confetti de néons.',
+        bestFor: 'ville de nuit, néons, intérieurs sombres, tout ce qui a des sources '
+            + 'de lumière ponctuelles dans un cadre noir',
+        avoidFor: 'plein jour : sa courbe est mesurée sur des scènes nocturnes et '
+            + 'coûte une exposition',
+        recommendedIntensity: 100,
+        transform: powlisherNuitTransform,
     },
     {
         id: 'powlisher',
