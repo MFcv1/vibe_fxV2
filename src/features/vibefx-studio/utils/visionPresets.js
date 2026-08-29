@@ -2327,6 +2327,66 @@ const powV9Transform = construirePowV2(V7_COURBE, {
     cielChroma: 0.828,
 });
 
+/* ==========================================================================
+ * POWV10 — les blancs des enseignes, et les fissures qu'on y voyait
+ *
+ * Deux defauts de `powV9`, vus a l'oeil sur les enseignes de la station:
+ *   - le blanc des lettres virait au GRIS;
+ *   - autour du panneau ESSO apparaissaient des « fissures » — de la matiere
+ *     qui n'existe pas dans son rendu a lui.
+ *
+ * Les deux ont la MEME cause, et une seule mesure la montre. Sur les pixels
+ * clairs de la photo (L d'entree > 72, 13 247 points):
+ *
+ *                 L median   energie de haute frequence
+ *     la source      76,5              6,82
+ *     son rendu      61,0              8,14
+ *     powV9          52,9              9,43
+ *
+ * `powV9` posait ses blancs 8 L* trop bas ET amplifiait le detail 1,38 fois la
+ * source quand lui ne l'amplifie que 1,19 fois. Les deux sortent de la meme
+ * ligne de sa courbe: son releve des hautes lumieres arrivait TROP TARD et TROP
+ * VITE — pente 1,83 a L 75-80. Une pente de p amplifie le bruit de p, et le
+ * bruit d'un JPEG de capture d'ecran autour d'une enseigne blanche, c'est
+ * exactement une fissure.
+ *
+ * ET IL Y AVAIT UNE ERREUR DE MESURE DERRIERE, la quatrieme de la meme famille:
+ * la correspondance de niveaux sur laquelle la courbe s'ajuste etait comparee a
+ * son image TELLE QUELLE, degrade compris. Or le degrade est notre etage a nous:
+ * il fallait le retirer de sa cible avant d'ajuster la courbe, sinon la courbe
+ * essaie de rattraper un assombrissement qu'on applique nous-memes ensuite.
+ *
+ * Une fois la cible corrigee, l'optimum n'a plus besoin d'etre raide: sa pente
+ * maximale tombe a 1,52 TOUTE SEULE — la borne de 2,2 ne mord meme plus. Sa
+ * correspondance de niveaux est meilleure (0,88 L* d'ecart moyen contre 0,97),
+ * ses blancs montent a 57,5, et l'energie de haute frequence tombe a 7,67 —
+ * SOUS la sienne. Il n'y a plus d'amplification du tout.
+ *
+ * Ce qui reste: 3,5 L* sur les blancs. C'est encore son masque — il eclaircit
+ * le sujet, et les enseignes en font partie.
+ *
+ * Le dE76 median par pixel passe de 2,71 a 2,91. C'est la troisieme fois de la
+ * serie qu'une mediane bouge dans le mauvais sens pendant que l'image
+ * s'ameliore, et c'est toujours pour la meme raison: les enseignes pesent 3,5 %
+ * des pixels et l'oeil ne regarde qu'elles.
+ *
+ * Seule la COURBE change: le virage, le melangeur et la regle du ciel sont ceux
+ * de `powV9` au chiffre pres.
+ * ======================================================================= */
+
+const V10_COURBE = [
+    0, 3.54, 5.65, 7.85, 10.13, 12.47, 14.84, 17.26, 19.71, 22.18, 24.69,
+    28.44, 34.15, 41.10, 48.66, 56.27, 63.42, 69.70, 74.77, 78.37, 80.32,
+];
+
+const powV10Transform = construirePowV2(V10_COURBE, {
+    virageA: V9_VIRAGE_A,
+    virageB: V9_VIRAGE_B,
+    melangeur: V9_MELANGEUR,
+    cielCible: 228,
+    cielChroma: 0.828,
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -2832,6 +2892,37 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 80 },
         recommendedIntensity: 100,
         transform: powV9Transform,
+    },
+    {
+        id: 'powV10',
+        label: 'PowV10',
+        hint: 'Les blancs des enseignes, sans les fissures',
+        description: 'Deux défauts de `PowV9`, vus à l\'œil sur les enseignes : le blanc '
+            + 'des lettres virait au **gris**, et autour du panneau ESSO apparaissaient '
+            + 'des « fissures » — de la matière qui n\'existe pas chez lui. **Les deux '
+            + 'ont la même cause.** Sur les 13 247 pixels clairs de la photo : sa '
+            + 'source est à L 76,5, son rendu à 61,0, `PowV9` à **52,9** ; et l\'énergie '
+            + 'de haute fréquence vaut 6,82 dans la source, 8,14 chez lui, **9,43** '
+            + 'chez `PowV9`. Trop sombre ET trop amplifié, par la même ligne de la '
+            + 'courbe : son relevé des hautes lumières arrivait trop tard et trop vite '
+            + '(pente 1,83). Une pente de p amplifie le bruit de p, et le bruit JPEG '
+            + 'd\'une capture d\'écran autour d\'une enseigne blanche, c\'est exactement '
+            + 'une fissure. **Il y avait une erreur de mesure derrière** : la '
+            + 'correspondance de niveaux était comparée à son image telle quelle, '
+            + 'dégradé compris — or le dégradé est notre étage à nous, il fallait le '
+            + 'retirer de sa cible avant d\'ajuster la courbe. Corrigée, la pente '
+            + 'optimale tombe à **1,52 toute seule**, les blancs montent à **57,5** et '
+            + 'l\'énergie de haute fréquence à **7,67 — sous la sienne** : plus '
+            + 'd\'amplification du tout. Seule la courbe change ; le virage, le '
+            + 'mélangeur et le ciel sont ceux de `PowV9` au chiffre près. RÉSERVE : la '
+            + 'même que `PowV9`, il verdit l\'ocre et le jaune.',
+        bestFor: 'la scène pour laquelle il a été mesuré : station-service la nuit, '
+            + 'enseignes éclairées, sol de béton mouillé au premier plan',
+        avoidFor: 'tout le reste, et surtout les scènes où le jaune ou l\'ocre compte. '
+            + 'Pour le style, `PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV10Transform,
     },
     {
         id: 'powlisher-showcase',

@@ -22,6 +22,13 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Retirer NOS etages spatiaux de SA cible avant d'ajuster une courbe.** La
+  correspondance de niveaux etait comparee a son image telle quelle, degrade du
+  bas compris: la courbe essayait de rattraper un assombrissement qu'on applique
+  soi-meme ensuite, et choisissait pour ca une epaule raide. Cible corrigee, la
+  pente optimale tombe de 1,83 a 1,52 toute seule, les blancs remontent de 8 L*
+  et l'amplification du bruit disparait. **Une courbe trop raide est souvent le
+  symptome d'une cible mal preparee, pas d'un choix de style.**
 - **Le filtre « blocs plats a faible chroma » fabrique son propre biais sur une
   matiere texturee.** Sur du beton MOUILLE il ne garde que les flaques lisses et
   jette l'essentiel de ce que l'oeil voit: il annoncait le sol « cale » (a* -1,68

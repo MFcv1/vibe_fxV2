@@ -746,3 +746,57 @@ saurait pas si la correction a porté sur le sol ou sur toute l'image.
 tournés de 19 à 33° et désaturés de moitié. Sur un béton chaud à forte chroma la
 rotation mesurée vaut **+46°** — sur une photo où l'ocre ou le jaune est le
 sujet (sable, bois, mur), ce preset le **verdit**.
+
+---
+
+# `powV10` — le blanc des enseignes et les « fissures » : une seule cause
+
+Deux défauts de `powV9`, vus à l'œil sur les enseignes de la station : le blanc
+des lettres virait au **gris**, et autour du panneau ESSO apparaissaient des
+**fissures** — de la matière absente de son rendu.
+
+**Les deux ont la même cause**, et une seule mesure la montre. Sur les 13 247
+pixels clairs de la photo (L d'entrée > 72) :
+
+| | L médian | énergie de haute fréquence |
+|---|---|---|
+| la source | 76,5 | 6,82 |
+| son rendu | 61,0 | 8,14 |
+| `powV9` | **52,9** | **9,43** |
+| **`powV10`** | **57,5** | **7,67** |
+
+`powV9` posait ses blancs **8 L\* trop bas** *et* amplifiait le détail **1,38×**
+la source quand lui ne l'amplifie que 1,19×. Les deux sortent de la même ligne
+de sa courbe : son relevé des hautes lumières arrivait **trop tard et trop vite**
+— pente 1,83 à L 75-80.
+
+> **Une pente de p amplifie le bruit de p**, et le bruit d'un JPEG de capture
+> d'écran autour d'une enseigne blanche, c'est exactement une fissure.
+
+## L'erreur de mesure derrière — la quatrième de la même famille
+
+La correspondance de niveaux sur laquelle la courbe s'ajuste était comparée à son
+image **telle quelle, dégradé compris**. Or le dégradé est **notre** étage : il
+fallait le retirer de sa cible avant d'ajuster la courbe, sinon la courbe essaie
+de rattraper un assombrissement qu'on applique soi-même ensuite — et pour ça elle
+choisit une épaule raide.
+
+**Une fois la cible corrigée, l'optimum n'a plus besoin d'être raide** : sa pente
+maximale tombe à **1,52 toute seule**, la borne de 2,2 ne mord même plus. La
+correspondance de niveaux est meilleure (0,88 L\* contre 0,97), les blancs
+montent, et l'amplification disparaît.
+
+> **Une courbe trop raide est souvent le symptôme d'une cible mal préparée, pas
+> d'un choix de style.**
+
+## Ce qui reste
+
+3,5 L\* sur les blancs. C'est encore son masque : il éclaircit le sujet, et les
+enseignes en font partie.
+
+Le dE76 médian passe de 2,12 à 2,37 — **la troisième fois de la série qu'une
+médiane bouge dans le mauvais sens pendant que l'image s'améliore**. Les
+enseignes pèsent 3,5 % des pixels, et l'œil ne regarde qu'elles.
+
+Seule la **courbe** change : virage, mélangeur et règle du ciel sont ceux de
+`powV9` au chiffre près, vérifié par test.

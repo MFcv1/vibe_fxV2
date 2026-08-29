@@ -8,8 +8,8 @@
 >
 > **Ce qui est livré** — redesign VibeOS (`/creer`, `/publier`, `/video`), moteur
 > de LUT 3D 33³, chaîne d'import Lightroom, six réglages avancés alignés, et
-> **29 presets** dont les dix derniers — `couchant`, `powlishermain` et la série
-> `powV2` à `powV9` — attendent un regard. Le détail est
+> **30 presets** dont les onze derniers — `couchant`, `powlishermain` et la série
+> `powV2` à `powV10` — attendent un regard. Le détail est
 > dans [l'archive du 2026-08-27](docs/archive-calages-lightroom-2026-08-27.md).
 >
 > **2026-08-29** — la **bibliothèque** (`/creer/bibliotheque`) a le mouvement de
@@ -20,6 +20,15 @@
 > sa tuile**. Vignettes passées de 720 à **1600 px**, celles déjà stockées
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
+
+> **2026-08-29 undecies** — **`powV10`** : le blanc des enseignes et les
+> « fissures » autour du panneau ESSO avaient **la même cause** — une épaule de
+> courbe trop tardive et trop raide (pente 1,83), qui posait les blancs 8 L\*
+> trop bas *et* amplifiait le bruit JPEG 1,38× quand lui ne l'amplifie que 1,19×.
+> Derrière : une 4e erreur de mesure de ma part — la cible n'avait pas notre
+> dégradé retiré avant l'ajustement de la courbe. Corrigée, **la pente optimale
+> tombe à 1,52 toute seule**, les blancs remontent et l'amplification disparaît
+> (7,67, sous ses 8,14).
 
 > **2026-08-29 decies** — **`powV9`** : le sol enfin gris-bleu (teinte 123 contre
 > sa cible 122, au lieu de 90). `powV8` l'annonçait « calé » et il ne l'était
@@ -122,7 +131,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la série `powV2` … `powV9`** — 2026-08-29 decies](docs/prompt-reprise-2026-08-29-decies.md),
+[**après la série `powV2` … `powV10`** — 2026-08-29 undecies](docs/prompt-reprise-2026-08-29-undecies.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
@@ -149,6 +158,7 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
+| `powV10` | 2026-08-29 undecies | **Le dernier de la série.** Mêmes couleurs que `powV9`, courbe plus douce : blancs plus clairs, plus d'artefacts autour des enseignes. Même réserve — il verdit l'ocre. |
 | `powV9` | 2026-08-29 decies | **Le plus proche de sa photo de nuit** (2,12). Ses deux secteurs chauds sont tournés de 19 à 33° et désaturés de moitié : sur un ocre franc la rotation vaut +46° — **il verdit le sable, le bois, les murs**. À regarder en gardant ça en tête. |
 | `powV8` | 2026-08-29 nonies | **Le bout de la série.** Rouge et sol calés sur les siens. Sa luminance ×1,57 sur les rouges et son a\* −3,2 dans les ombres sont les leviers les plus forts de la famille : sur une autre photo, ça se verra. |
 | `powV7` | 2026-08-29 octies | **Le bout de la série** (2,42 sur sa photo de nuit). Son relevé des hautes lumières éclaircit TOUT ce qui dépasse L 62 : en plein jour il brûle. À regarder sur une scène nocturne au sujet éclairé. |

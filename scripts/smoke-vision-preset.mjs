@@ -1928,6 +1928,72 @@ function teinteLab(rgb) {
     check('powV8 n\'a pas bougé en accueillant powV9', derive, 0, 1);
 }
 
+/* ---------- powV10 : la pente, les blancs, et les fissures -------------------
+ *
+ * Ce bloc fige la raison d'etre du preset: la pente maximale de sa courbe. Elle
+ * tombe de 2,19 a 1,58 — et comme une pente de p amplifie le bruit de p, c'est
+ * elle qui faisait apparaitre des « fissures » autour des enseignes de la
+ * station. Le meme changement remonte les blancs de 8 L*.
+ */
+{
+    const v9 = getPresetTransform('powV9');
+    const v10 = getPresetTransform('powV10');
+    if (!v10) { console.error('ECHEC: powV10 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]))[0];
+    const pente = (f) => {
+        let m = 0;
+        for (let k = 8; k <= 247; k += 8) {
+            const a = (k - 8) / 255, b = (k + 8) / 255;
+            const d = versLab([b, b, b])[0] - versLab([a, a, a])[0];
+            m = Math.max(m, (gris(f, b) - gris(f, a)) / d);
+        }
+        return m;
+    };
+
+    /* 1. LA PENTE BAISSE, et c'est tout l'objet du preset. Valeurs relevees:
+     * 2,19 pour `powV9`, 1,58 ici. */
+    check('powV10 : sa pente maximale baisse', pente(v10), 1.3, 1.8);
+    check('powV10 : elle est plus douce que celle de powV9', pente(v9) - pente(v10), 0.35, 0.9);
+
+    /* 2. LES BLANCS REMONTENT dans la zone des enseignes (entree L 72), sans
+     * que les ombres ni les medians ne bougent: c'est un relevé, pas une
+     * courbe plus claire. */
+    const aL = (l) => {
+        const t = (l + 16) / 116;
+        const Y = t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787;
+        return Y <= 0.0031308 ? Y * 12.92 : 1.055 * Y ** (1 / 2.4) - 0.055;
+    };
+    check('powV10 : les enseignes remontent', gris(v10, aL(72)) - gris(v9, aL(72)), 4, 12, ' L*');
+    check('powV10 : les ombres ne bougent presque pas',
+        Math.abs(gris(v10, aL(20)) - gris(v9, aL(20))), 0, 1.5, ' L*');
+
+    /* 3. Les gardes communs. */
+    check('powV10 : n\'ajoute pas de contour', amplificationVoile(v10) - voileV1, -4, 0.6, '×');
+    check('powV10 : le noir pur reste noir', Math.max(...v10([0, 0, 0])) * 255, 0, 1);
+    check('powV10 : n\'écrête pas', Math.max(...v10([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 254);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v10, k / 255);
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV10 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV10 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v10(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* 4. ET `powV9` N'A PAS BOUGE. Valeurs RELEVEES. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 46, 59]], [[0.8, 0.2, 0.2], [165, 10, 12]],
+        [[0.5, 0.5, 0.5], [65, 61, 58]], [[1, 1, 1], [226, 220, 208]]]) {
+        const o = v9(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV9 n\'a pas bougé en accueillant powV10', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

@@ -3295,6 +3295,56 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 undecies (`powV10` : les blancs des enseignes, et les fissures)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV10`, 30e preset),
+`scripts/smoke-vision-preset.mjs` (+10 verifications, 315 au total),
+`scripts/verifier-presets-sur-paires.mjs`.
+
+**Deux defauts de `powV9`, vus a l'oeil sur les enseignes**: le blanc des lettres
+virait au gris, et autour du panneau ESSO apparaissaient des « fissures » — de la
+matiere absente de son rendu a lui. **Les deux ont la meme cause**, et une seule
+mesure la montre. Sur les pixels clairs de la photo (L d'entree > 72, 13 247
+points):
+
+| | L median | energie de haute frequence |
+|---|---|---|
+| la source | 76,5 | 6,82 |
+| son rendu | 61,0 | 8,14 |
+| `powV9` | **52,9** | **9,43** |
+| `powV10` | **57,5** | **7,67** |
+
+`powV9` posait ses blancs 8 L\* trop bas ET amplifiait le detail 1,38 fois la
+source quand lui ne l'amplifie que 1,19 fois. Les deux sortent de la meme ligne
+de sa courbe: son releve des hautes lumieres arrivait TROP TARD et TROP VITE —
+pente 1,83 a L 75-80. **Une pente de p amplifie le bruit de p**, et le bruit d'un
+JPEG de capture d'ecran autour d'une enseigne blanche, c'est exactement une
+fissure.
+
+**ET UNE ERREUR DE MESURE DERRIERE, la quatrieme de la meme famille**: la
+correspondance de niveaux sur laquelle la courbe s'ajuste etait comparee a son
+image TELLE QUELLE, degrade compris. Or le degrade est notre etage a nous — il
+fallait le retirer de sa cible avant d'ajuster la courbe, sinon la courbe essaie
+de rattraper un assombrissement qu'on applique nous-memes ensuite.
+
+**Une fois la cible corrigee, l'optimum n'a plus besoin d'etre raide**: sa pente
+maximale tombe a 1,52 TOUTE SEULE — la borne de 2,2 ne mord meme plus. La
+correspondance de niveaux est meilleure (0,88 L\* contre 0,97), les blancs
+montent a 57,5, et l'energie de haute frequence tombe SOUS la sienne.
+
+Seule la COURBE change: virage, melangeur et regle du ciel sont ceux de `powV9`
+au chiffre pres (verifie par test).
+
+**Ce qui reste**: 3,5 L\* sur les blancs. C'est encore son masque — il eclaircit
+le sujet, et les enseignes en font partie.
+
+**Le dE76 median passe de 2,12 a 2,37**, et c'est la troisieme fois de la serie
+qu'une mediane bouge dans le mauvais sens pendant que l'image s'ameliore: les
+enseignes pesent 3,5 % des pixels, et l'oeil ne regarde qu'elles.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 315/315.
+**`powV10` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 decies (`powV9` : le sol degris, et deux erreurs de MESURE)
 
 **Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV9`, 29e preset),
