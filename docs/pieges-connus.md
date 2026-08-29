@@ -22,6 +22,16 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Ne pas mesurer une couleur a travers un masque, ni dans une zone qu'on a
+  rebrillantee.** Retirer d'abord le masque (le ramener a son plateau), puis
+  n'ajuster la couleur que la ou la correction reste faible — un diaphragme au
+  plus. Rebrillanter de quatre diaphragmes un JPEG quasi noir ne restitue pas sa
+  couleur, ca amplifie son bruit: sur la paire de nuit, le melangeur voulait
+  tourner l'orange de +32 degres sur la foi de 1 065 blocs qui n'etaient que du
+  sol remonte. Avec la regle, il en reste 44 et le secteur est ecarte.
+- **Une valeur attendue de test se RELEVE, elle ne s'invente pas.** Le controle
+  de non-regression de `powV3` en portait une ecrite de tete: il a echoue alors
+  que le code etait juste. Un test faux coute plus cher qu'un test absent.
 - **Avant de fabriquer un preset pour rattraper un ecart, verifier qu'il n'est
   pas SPATIAL.** Un preset est une fonction: la meme couleur d'entree doit
   donner la meme sortie ou qu'elle soit dans l'image. Le test tient en une

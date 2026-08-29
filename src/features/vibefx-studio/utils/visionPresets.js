@@ -1758,7 +1758,12 @@ const V2_MELANGEUR = [
  * que par leur courbe. La couleur est la meme au chiffre pres — c'est le style,
  * et ce n'est pas lui qu'on corrige d'une densite a l'autre. Meme decoupe que
  * `ambre` / `ambre-nuit-1` / `ambre-nuit-2`. */
-function construirePowV2(courbe) {
+function construirePowV2(courbe, reglages = {}) {
+    const virageA = reglages.virageA || V2_VIRAGE_A;
+    const virageB = reglages.virageB || V2_VIRAGE_B;
+    const melangeur = reglages.melangeur || V2_MELANGEUR;
+    const cielCible = reglages.cielCible ?? MAIN_CIEL_CIBLE;
+    const cielChroma = reglages.cielChroma ?? MAIN_CIEL_CHROMA;
     return function transform(input) {
     let [r, g, b] = input;
 
@@ -1789,18 +1794,18 @@ function construirePowV2(courbe) {
     if (aUneTeinte > 0 && c > 1e-6) {
         let h = Math.atan2(Bb, A) * 180 / Math.PI;
         if (h < 0) h += 360;
-        const [dh, gain] = melangeurLab(V2_MELANGEUR, h);
+        const [dh, gain] = melangeurLab(melangeur, h);
         const ciel = bandeCielLab(h);
-        const rotation = dh * (1 - ciel) + (MAIN_CIEL_CIBLE - h) * ciel;
-        const gainC = gain * (1 - ciel) + MAIN_CIEL_CHROMA * ciel;
+        const rotation = dh * (1 - ciel) + (cielCible - h) * ciel;
+        const gainC = gain * (1 - ciel) + cielChroma * ciel;
         const hNeuf = (h + rotation * aUneTeinte) * Math.PI / 180;
         const cNeuf = c * (1 + (gainC - 1) * aUneTeinte);
         A = cNeuf * Math.cos(hNeuf);
         Bb = cNeuf * Math.sin(hNeuf);
     }
 
-    A += fonduParL(V2_VIRAGE_A, L);
-    Bb += fonduParL(V2_VIRAGE_B, L);
+    A += fonduParL(virageA, L);
+    Bb += fonduParL(virageB, L);
 
     return lab01ToRgb(L, A, Bb);
     };
@@ -1891,6 +1896,99 @@ const V3_COURBE = [
 ];
 
 const powV3Transform = construirePowV2(V3_COURBE);
+
+/* ==========================================================================
+ * POWV4 — sa photo de nuit, ajustee ENTIEREMENT sur elle, couleur comprise
+ *
+ * `powV3` prend la couleur de `powV2` — mesuree sur ses trois photos — et n'en
+ * change que la densite. `powV4` fait autre chose: il ajuste TOUT sur la seule
+ * paire de nuit, courbe, virage, melangeur et regle du ciel. C'est le rendu le
+ * plus proche de cette image-la que le projet sache produire.
+ *
+ * LE PROBLEME A RESOUDRE D'ABORD: SON MASQUE.
+ * Cette photo porte un masque local (voir l'en-tete de `powV3`): la meme couleur
+ * d'entree y sort a L* 64,8 en haut du cadre et a L* 2,8 en bas. Mesurer la
+ * couleur a travers ca reviendrait a prendre un assombrissement local pour un
+ * virage. La chaine (`scripts/ajuster-preset-sur-paire.mjs`) fait donc, en
+ * boucle: estimer le masque cellule par cellule contre un preset de reference,
+ * le ramener a son PLATEAU — la zone qu'il n'a pas touchee — corriger son rendu
+ * de cet ecart, ajuster, puis re-estimer le masque avec le resultat.
+ *
+ * ET UNE REGLE QUI COMPTE AUTANT: la couleur ne s'ajuste QUE la ou on a peu
+ * corrige (un diaphragme au plus). Rebrillanter de quatre diaphragmes un JPEG
+ * quasi noir ne restitue pas sa couleur, ca fabrique du bruit amplifie — et
+ * c'est exactement ce qu'est le sol de cette photo. Sans cette regle, le
+ * melangeur voulait tourner l'orange de +32 degres sur la foi de 1 065 blocs
+ * qui n'etaient que du sol remonte; la regle en laisse 44, et le secteur est
+ * ecarte. 5 645 blocs sur 10 751 servent a la couleur.
+ *
+ * CE QUE LA MESURE DONNE, une fois le masque retire:
+ *  - une courbe plus basse que celle de `powV2` (L = 0,87 L - 5,0 contre
+ *    0,99 L - 6,5), plafond 205;
+ *  - un virage DIFFERENT, et c'est la trouvaille: ses bas-tons de nuit sont
+ *    beaucoup moins chauds que sur ses deux photos de jour — b* +2,96 a L 30
+ *    contre +4,67, et a* +0,93 contre +1,50. Une scene eclairee aux LED n'est
+ *    pas une scene de jour, et son traitement ne la rechauffe pas pareil;
+ *  - un CIEL qui atterrit a 230,1 degres Lab avec une chroma de 0,611 au lieu
+ *    de 0,85 sur 1 183 blocs: son ciel de nuit est plus sourd que le teal franc
+ *    de `powV2`;
+ *  - trois secteurs de teinte seulement (22,5 / 37,5 / 82,5 degres Lab) ont
+ *    assez de matiere pour bouger. Les autres gardent les valeurs de `powV2`.
+ *
+ * RESULTAT, dE76 median contre son rendu tel quel, sur la zone que son masque
+ * ne touche pas — la seule ou un preset puisse etre juge:
+ *
+ *     powV4  3,68     powV3  4,19     powV2  4,68     powlishermain  9,62
+ *
+ * Sur le cadre ENTIER, masque compris, `powV4` est a 7,61 et `powV3` a 7,46:
+ * `powV3` y gagne pour une mauvaise raison — il assombrit tout, donc il se
+ * trompe moins dans la zone que l'autre a noircie a la main. Ce n'est pas une
+ * meilleure ressemblance, c'est une erreur qui en compense une autre.
+ *
+ * RESERVE, la plus lourde du projet: UNE photo, UN sujet, UNE lumiere. `powV2`
+ * tient sur trois scenes sans rapport; celui-ci ne tient que sur celle-la. Il
+ * est la parce qu'il a ete demande explicitement — « le plus identique
+ * possible » sur cette image — et il ne doit pas etre lu comme une mesure de
+ * son style. Pour ca, c'est `powV2`.
+ * ======================================================================= */
+
+/* Comme partout dans la famille, la premiere ancre est ramenee a 0: un facteur
+ * commun aux trois canaux ne peut pas eclaircir un pixel deja noir. */
+const V4_COURBE = [
+    0, 3.90, 6.45, 9.85, 13.71, 17.75, 21.91, 26.13, 30.38, 34.66, 38.96,
+    43.26, 47.57, 51.89, 56.22, 60.54, 64.87, 69.21, 73.54, 77.88, 82.22,
+];
+
+/* Le virage de nuit. A comparer a `V2_VIRAGE_B` autour de L 30: +2,96 ici,
+ * +4,67 la-bas. C'est le meme regard, mais il ne rechauffe pas une scene de
+ * LED comme il rechauffe un brouillard de jour. */
+const V4_VIRAGE_A = [
+    0.10, -3.18, -4.77, -4.15, -2.03, 0.27, 0.93, 0.94, 1.99, 2.89, 2.93,
+    2.69, 2.40, 1.99, 1.44, 0.78, 0.20, -0.17, -0.32, -0.36, -0.36,
+];
+const V4_VIRAGE_B = [
+    0.51, 0.49, -0.43, -0.77, 0.17, 1.90, 2.96, 3.64, 5.33, 6.69, 6.94,
+    6.88, 6.76, 6.66, 6.61, 6.60, 6.56, 6.44, 6.28, 6.11, 5.98,
+];
+
+/* Trois secteurs bougent (22,5 / 37,5 / 82,5 degres Lab, 263 / 175 / 434
+ * blocs); les autres gardent `powV2`, faute de matiere. */
+const V4_MELANGEUR = [
+    [2.52, 1.028], [6.01, 1.366], [0.64, 1.213], [-5.22, 1.079],
+    [-5.83, 0.911], [6.30, 1.017], [-1.22, 0.716], [4.27, 0.483],
+    [6.74, 0.356], [10.1, 0.60], [5.1, 0.80], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+];
+
+const powV4Transform = construirePowV2(V4_COURBE, {
+    virageA: V4_VIRAGE_A,
+    virageB: V4_VIRAGE_B,
+    melangeur: V4_MELANGEUR,
+    cielCible: 230.1,
+    cielChroma: 0.611,
+});
 
 export const VISION_PRESETS = [
     {
@@ -2216,6 +2314,36 @@ export const VISION_PRESETS = [
             + 'l\'image une demi-exposition plus bas. Prendre `PowV2`',
         recommendedIntensity: 100,
         transform: powV3Transform,
+    },
+    {
+        id: 'powV4',
+        label: 'PowV4',
+        hint: 'Sa photo de nuit, poussée aussi loin qu\'une table de couleurs peut aller',
+        description: 'Le seul preset du projet ajusté sur **une seule** photo — sa '
+            + 'station-service de nuit — et sur tout : courbe, virage, mélangeur, ciel. '
+            + 'Là où `PowV3` reprend la couleur de `PowV2` et n\'en change que la '
+            + 'densité, celui-ci remesure la couleur elle-même. Pour y arriver il a '
+            + 'fallu d\'abord retirer le **masque local** qu\'il a peint sur cette image '
+            + '(le sol y est quatre diaphragmes plus bas que le centre), puis n\'ajuster '
+            + 'la couleur que là où cette correction est faible : rebrillanter du '
+            + 'quasi-noir ne restitue pas sa couleur, ça fabrique du bruit amplifié. '
+            + '5 645 blocs sur 10 751. **La trouvaille** : ses bas-tons de nuit sont '
+            + 'nettement moins chauds que sur ses deux photos de jour (b* +2,96 à L 30 '
+            + 'contre +4,67), et son ciel de nuit est plus sourd — chroma 0,61 au lieu '
+            + 'de 0,85. Une scène de LED n\'est pas une scène de jour, et il ne la '
+            + 'réchauffe pas pareil. Sur la zone que son masque ne touche pas — la '
+            + 'seule où un preset puisse être jugé — l\'écart dE76 tombe à **3,68**, '
+            + 'contre 4,19 pour `PowV3` et 4,68 pour `PowV2`. RÉSERVE, la plus lourde '
+            + 'du projet : une photo, un sujet, une lumière. `PowV2` tient sur trois '
+            + 'scènes sans rapport ; celui-ci ne tient que sur celle-là, et ne doit pas '
+            + 'être lu comme une mesure de son style.',
+        bestFor: 'une station-service la nuit, un parking, une scène urbaine éclairée '
+            + 'aux LED froides — la lumière sur laquelle il a été mesuré',
+        avoidFor: 'tout le reste, et sans hésiter : son ciel est plus sourd et ses '
+            + 'bas-tons plus froids que ceux de la famille. En plein jour ou sur une '
+            + 'lumière chaude, prendre `PowV2`',
+        recommendedIntensity: 100,
+        transform: powV4Transform,
     },
     {
         id: 'powlisher-showcase',

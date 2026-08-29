@@ -1,4 +1,4 @@
-# Prompt de reprise — 2026-08-29 quater (après `powV2` et `powV3`)
+# Prompt de reprise — 2026-08-29 quinquies (après `powV2`, `powV3` et `powV4`)
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
 `presets-mesures-sur-corpus`).
@@ -19,8 +19,8 @@ les autres `docs/prompt-reprise-*`, `node_modules/`, `.next/`.
 
 ## Où en est le livre
 
-23 presets Vision. Les trois derniers — **`powlishermain`**, **`powV2`** et
-**`powV3`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
+24 presets Vision. Les quatre derniers — **`powlishermain`**, **`powV2`**,
+**`powV3`** et **`powV4`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
 l'écran Lightroom de `@powl_d` (posts `1988715650794287456`,
 `1988715687783919978`, `1988715756461179091`, du 12 novembre 2025), la même photo
 avant et après. 43 691 blocs de 8×8 mesurés.
@@ -43,6 +43,11 @@ trois photos y sont muettes, le mélangeur y est à l'identité.
 - **`powV3`** est la déclinaison NUIT de `powV2` : même couleur au chiffre près
   (vérifié dans le smoke à niveau de sortie égal, 0,24 en a\*b\*), seule la
   courbe bouge — la règle de la famille, déjà appliquée à `Ambre Nuit 1/2`.
+- **`powV4`** va plus loin : il remesure la COULEUR sur la seule paire de nuit,
+  une fois son masque retiré. Ses bas-tons y sont bien moins chauds (b\* +2,96
+  contre +4,67) et son ciel plus sourd (chroma 0,61 contre 0,85). Sur la zone
+  jugeable : 3,68 contre 4,19 et 4,68. **Une seule photo** : c'est `powV2` qui
+  reste la mesure de son style.
 
 **DEUX leçons du lot, à ne pas perdre.**
 
@@ -66,8 +71,9 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **240/240**, dont 17 pour `powlishermain`, 17
-  pour `powV2` et 9 pour `powV3`.
+- `npm run test:vision-preset` : **253/253**, dont 17 pour `powlishermain`, 17
+  pour `powV2`, 9 pour `powV3` et 13 pour `powV4` (y compris un contrôle de non-
+  régression sur `powV3`, qui partage désormais la même fabrique).
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est
   compilé pour `NODE_MODULE_VERSION 127` alors que le Node installé en demande
   147. La compilation Next elle-même passe (« Compiled successfully ») ; ça
@@ -91,7 +97,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
    faut un étage AVANT elle, dans `studioRenderer.js`, qui mesure l'histogramme
    et ramène la photo sur l'exposition de référence du preset. À trancher : où
    il vit, comment il se désactive, comment le figer dans un smoke.
-4. **`todo.md` dépasse ~268 lignes** alors que la règle du projet est ~200.
+4. **`todo.md` dépasse ~278 lignes** alors que la règle du projet est ~200.
    Archiver avant d'ajouter le lot suivant.
 
 ## Interdits
@@ -107,6 +113,9 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
   accepter un meilleur chiffre payé par de la matière détruite.
 - Ne pas fabriquer un preset pour rattraper un écart **spatial** : vérifier
   d'abord si l'écart dépend de la POSITION dans le cadre.
+- Ne pas mesurer une couleur à travers un masque, ni dans une zone qu'on vient
+  de rebrillanter de plusieurs diaphragmes.
+- Une valeur attendue de test se **relève**, elle ne s'invente pas.
 
 ## Rituel de fin de phase
 

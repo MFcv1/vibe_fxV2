@@ -524,6 +524,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
 |   |-- aligner-paire-avant-apres.mjs # ALIGNE ses deux captures d'ecran « Avant / Apres » et en sort deux images superposables. Sans ca on comparerait le ciel d'une image au toit de l'autre : le cadre ne tombe pas au meme endroit d'une capture a l'autre, et une des trois paires est en plus RECADREE de 2,6 %. L'alignement se fait sur le GRADIENT, jamais sur la couleur — c'est justement la couleur qui change. Coupe le fond NOIR de Lightroom (5 300 blocs a zero dans une des paires) en cherchant la plus longue suite de lignes non noires, parce qu'un balayage depuis le bord s'arrete sur le mot « Avant » que Lightroom pose DANS la bande
 |   |-- mesurer-paires-powlisher.mjs # Ce que son traitement fait, mesure sur des paires ALIGNEES : la seule source du projet ou l'on connait l'ENTREE ET la SORTIE de la meme image. Compare des BLOCS de 8x8 plats, jamais des pixels — deux captures rejouees ont du bruit JPEG, et au pixel chaque contour fabrique une fausse couleur. Sert aussi de bibliotheque (`blocs()`)
+|   |-- ajuster-preset-sur-paire.mjs # AJUSTE un preset entier (courbe, virage, melangeur, ciel) sur UNE paire avant/apres, en retirant d'abord le MASQUE LOCAL de la photo. Sans ca on mesure un assombrissement local et on le prend pour un virage: sur la paire de nuit, la meme couleur d'entree sort a L* 64,8 en haut du cadre et a L* 2,8 en bas. Boucle: estimer le masque contre un preset de reference, le ramener a son plateau, corriger, ajuster, re-estimer. Et la couleur ne s'ajuste QUE la ou la correction est faible (un diaphragme au plus) — rebrillanter de quatre diaphragmes un JPEG quasi noir fabrique du bruit amplifie, pas de la couleur: c'est ce qui voulait tourner l'orange de +32 degres sur la foi de 1 065 blocs de sol remonte
 |   |-- verifier-presets-sur-paires.mjs # LE CLASSEMENT DES PRESETS FACE A LA VERITE TERRAIN, en DEUX tableaux. SANS exposition libre: le preset applique tel quel, c'est ce qu'on voit dans l'app, et c'est le chiffre qui a fait naitre `powV2`. AVEC exposition libre: chaque candidat recoit le gain qui l'arrange et on ne compare plus que la COULEUR — utile parce que ses trois retouches sont a -1,85 / -0,22 / -0,56 EV, son curseur et pas un preset. Ecart dE76 median par paire
 |   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
 |   |-- planche-showcase.mjs          # LA PLANCHE AVEC LES EFFETS. `planche-presets.mjs` ne montre que la LUT, et le dit; or grain, vignetage et relief ne SONT pas dans la LUT. Celle-ci lance donc le VRAI moteur (studioRenderer) dans un Chromium, en servant src/ en statique: ce qu'on regarde est ce que l'app affiche. Sort deux planches — le cadre entier (vignetage, look) et un carre a 1:1 JAMAIS redimensionne (grain, relief), parce que reduire une image MOYENNE son grain. Imprime aussi l'assombrissement du vignetage en niveaux /255
@@ -3292,6 +3293,70 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   Mixkit ou Pexels. Droits (ils sont servis à tous les visiteurs) et cohérence
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
+
+## Journal — 2026-08-29 quinquies (`powV4` : la couleur de la nuit, remesuree sous son masque)
+
+**Ce qui a change dans l'arbre** : `scripts/ajuster-preset-sur-paire.mjs` ajoute.
+Modifies : `src/features/vibefx-studio/utils/visionPresets.js` (+`powV4`, 24e
+preset ; `construirePowV2` accepte maintenant toutes les tables, les trois
+densites la partagent), `scripts/smoke-vision-preset.mjs` (+13 verifications,
+253 au total), `scripts/verifier-presets-sur-paires.mjs`.
+
+**Pourquoi.** `powV3` reprend la couleur de `powV2` et n'en change que la
+densite. La demande etait d'aller plus loin sur cette photo precise: remesurer
+la COULEUR dessus.
+
+**Le probleme a resoudre d'abord.** Cette photo porte un masque local. Mesurer
+la couleur a travers lui reviendrait a prendre un assombrissement local pour un
+virage. La chaine estime donc le masque cellule par cellule contre un preset de
+reference, le ramene a son PLATEAU, corrige son rendu de cet ecart, ajuste, puis
+re-estime le masque avec le resultat. Trois tours.
+
+**ET UNE REGLE QUI COMPTE AUTANT, notee dans `pieges-connus`:** la couleur ne
+s'ajuste QUE la ou on a peu corrige (un diaphragme au plus). Rebrillanter de
+quatre diaphragmes un JPEG quasi noir ne restitue pas sa couleur, ca fabrique du
+bruit amplifie. Sans cette regle, le melangeur voulait tourner l'orange de +32
+degres sur la foi de 1 065 blocs — qui n'etaient que du sol remonte. Avec, il
+n'en reste 44, et le secteur est ecarte faute de matiere. 5 645 blocs sur 10 751
+servent a la couleur.
+
+**Ce que la mesure donne.** Courbe plus basse (`L = 0,87 L - 5,0` contre
+`0,99 L - 6,5`), plafond 210. Un virage DIFFERENT, et c'est la trouvaille: ses
+bas-tons de nuit sont beaucoup moins chauds que sur ses deux photos de jour —
+b* +2,96 a L 30 contre +4,67. Un ciel plus SOURD: chroma 0,611 au lieu de 0,85,
+sur 1 183 blocs, pour un point d'arrivee inchange (192 degres TSL). Une scene
+eclairee aux LED n'est pas une scene de jour, et son traitement ne la rechauffe
+pas pareil. Trois secteurs de teinte seulement (22,5 / 37,5 / 82,5 degres Lab,
+263 / 175 / 434 blocs) ont assez de matiere pour bouger; les autres gardent
+`powV2`.
+
+**Resultat**, dE76 median contre son rendu tel quel, sur la zone que son masque
+ne touche pas — la seule ou un preset puisse etre juge:
+
+| preset | zone jugeable | cadre entier |
+|---|---|---|
+| **`powV4`** | **3,68** | 7,09 |
+| `powV3` | 4,19 | 7,39 |
+| `powV2` | 4,68 | 8,52 |
+| `powlishermain` | 9,62 | 15,08 |
+
+Sur le cadre ENTIER, l'ecart entre `powV4` et `powV3` se resserre: `powV3` y
+gagne des points pour une mauvaise raison — il assombrit tout, donc il se trompe
+moins la ou l'autre a noirci a la main. Ce n'est pas une meilleure ressemblance,
+c'est une erreur qui en compense une autre.
+
+**RESERVE, la plus lourde du projet**: UNE photo, UN sujet, UNE lumiere. `powV2`
+tient sur trois scenes sans rapport; `powV4` ne tient que sur celle-la. Il
+existe parce qu'il a ete demande explicitement, et il ne doit pas etre lu comme
+une mesure de son style.
+
+**Un test a attrape une faute d'ecriture pendant le lot**: le controle de non-
+regression de `powV3` portait une valeur attendue INVENTEE au lieu d'etre
+relevee. Il a echoue, et c'etait lui qui avait raison — `powV3` est bit a bit
+identique avant et apres le partage de la fabrique.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 253/253. Regarde a
+l'oeil sur la paire de nuit. **`powV4` attend le regard du porteur du projet.**
 
 ## Journal — 2026-08-29 quater (`powV3`, et le masque qu'on a trouve sous la photo de nuit)
 

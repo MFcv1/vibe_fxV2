@@ -342,3 +342,69 @@ dégradé linéaire. C'est ce qu'il a utilisé,
 et c'est un geste d'édition, pas un preset. À rapprocher de l'étage de tonalité
 adaptatif déjà listé dans `todo.md` : les deux disent la même chose sous deux
 angles — une table de couleurs n'a pas de mémoire, et elle n'a pas de carte.
+
+---
+
+# `powV4` — la couleur de la nuit, remesurée sous son masque
+
+`powV3` reprend la couleur de `powV2` et n'en change que la densité. `powV4` va
+plus loin : il **remesure la couleur elle-même** sur la seule paire de nuit.
+
+## Il faut d'abord retirer son masque
+
+Mesurer la couleur à travers un assombrissement local, c'est prendre cet
+assombrissement pour un virage. La chaîne
+(`scripts/ajuster-preset-sur-paire.mjs`) boucle donc :
+
+1. estimer le masque, cellule par cellule, contre un preset de référence ;
+2. le ramener à son **plateau** — la zone qu'il n'a pas touchée ;
+3. corriger son rendu de cet écart ;
+4. ajuster le preset ;
+5. re-estimer le masque avec le résultat. Trois tours.
+
+**Et une règle qui compte autant : la couleur ne s'ajuste que là où la
+correction reste faible** (un diaphragme au plus). Rebrillanter de quatre
+diaphragmes un JPEG quasi noir ne restitue pas sa couleur, ça amplifie son
+bruit. Sans cette règle, le mélangeur voulait tourner l'orange de **+32 degrés**
+sur la foi de **1 065 blocs** — qui n'étaient que du sol remonté. Avec, il en
+reste **44**, et le secteur est écarté faute de matière. **5 645 blocs sur
+10 751** servent à la couleur.
+
+## Ce que la mesure donne
+
+| | `powV2` (trois photos) | `powV4` (la nuit) |
+|---|---|---|
+| courbe | `0,99·L − 6,5` | `0,87·L − 5,0` |
+| plafond du blanc | 239 | 210 |
+| b\* des bas-tons (L 30) | **+4,67** | **+2,96** |
+| chroma du ciel | **0,85** | **0,611** |
+| point d'arrivée du ciel | 192° TSL | 192° TSL |
+
+**La trouvaille** : ses bas-tons de nuit sont nettement moins chauds que sur ses
+deux photos de jour, et son ciel de nuit est plus sourd. Une scène éclairée aux
+LED n'est pas une scène de jour, et son traitement ne la réchauffe pas pareil.
+Le *point d'arrivée* du ciel, lui, ne bouge pas — c'est bien le même regard.
+
+Trois secteurs de teinte seulement (22,5 / 37,5 / 82,5° Lab, soit 263 / 175 /
+434 blocs) ont assez de matière pour bouger. Les autres gardent `powV2`.
+
+## Le résultat
+
+dE76 médian contre son rendu tel quel, **sur la zone que son masque ne touche
+pas** — la seule où un preset puisse être jugé :
+
+| preset | zone jugeable | cadre entier |
+|---|---|---|
+| **`powV4`** | **3,68** | 7,09 |
+| `powV3` | 4,19 | 7,39 |
+| `powV2` | 4,68 | 8,52 |
+| `powlishermain` | 9,62 | 15,08 |
+
+Sur le **cadre entier**, l'écart se resserre : `powV3` y gagne des points pour
+une mauvaise raison — il assombrit tout, donc il se trompe moins là où l'autre a
+noirci à la main. Ce n'est pas une meilleure ressemblance, c'est une erreur qui
+en compense une autre.
+
+**RÉSERVE, la plus lourde du projet** : une photo, un sujet, une lumière.
+`powV2` tient sur trois scènes sans rapport ; `powV4` ne tient que sur celle-là,
+et ne doit pas être lu comme une mesure de son style.

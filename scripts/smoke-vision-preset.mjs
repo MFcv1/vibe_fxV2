@@ -1472,6 +1472,99 @@ function teinteLab(rgb) {
         Math.max(...echantillons.map((rgb) => chromaDe(v3(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
 }
 
+/* ---------- powV4 : sa photo de nuit, couleur remesuree dessus ---------------
+ *
+ * `powV3` reprend la couleur de `powV2` et n'en change que la densite. `powV4`
+ * remesure la couleur elle-meme sur la seule paire de nuit, une fois son masque
+ * local retire. Ce bloc fige ce qui l'en distingue — sinon rien n'empecherait
+ * de le ramener silencieusement sur les valeurs de la famille.
+ */
+{
+    const v2 = getPresetTransform('powV2');
+    const v4 = getPresetTransform('powV4');
+    if (!v4) { console.error('ECHEC: powV4 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]));
+
+    /* 1. C'EST UN REGISTRE DE NUIT: il assombrit, plafond retenu. */
+    check('powV4 : plus sombre que powV2 dans les medians',
+        gris(v2, 0.5)[0] - gris(v4, 0.5)[0], 3, 9, ' L*');
+    const blanc = v4([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('powV4 : plafond mesure', Math.max(...blanc), 198, 212);
+    check('powV4 : n\'ecrete pas', Math.max(...blanc), 0, 254);
+
+    /* 2. LA TROUVAILLE: ses bas-tons de nuit sont MOINS CHAUDS que ceux de ses
+     * deux photos de jour. Mesure b* +2,96 a L 30 contre +4,67 pour `powV2`.
+     * On compare a niveau de sortie egal, sinon on mesurerait la courbe. */
+    const bAuNiveau = (f, cibleL) => {
+        let best = null;
+        for (let k = 0; k <= 255; k += 1) {
+            const c = gris(f, k / 255);
+            const d = Math.abs(c[0] - cibleL);
+            if (!best || d < best.d) best = { d, b: c[2], a: c[1] };
+        }
+        return best;
+    };
+    const n4 = bAuNiveau(v4, 30), n2 = bAuNiveau(v2, 30);
+    check('powV4 : ses bas-tons de nuit sont moins chauds', n2.b - n4.b, 0.8, 3.5, ' b*');
+
+    /* 3. SON CIEL EST PLUS SOURD. Chroma mesuree 0,611 contre 0,85 sur 1 183
+     * blocs de ciel — mais il atterrit dans la meme fenetre de teinte. */
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const cielJour = [0.35, 0.55, 0.85];
+    check('powV4 : son ciel est plus sourd que celui de powV2',
+        chromaDe(v4(cielJour)) / chromaDe(v2(cielJour)), 0.55, 0.95, '×');
+    const teinteTsl = (rgb) => {
+        const [r, g, b] = rgb;
+        const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const d = mx - mn;
+        if (d <= 0) return 0;
+        const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (((h * 60) % 360) + 360) % 360;
+    };
+    check('powV4 : son ciel arrive dans la meme fenetre', teinteTsl(v4(cielJour)), 182, 205, '°');
+    const dejaCyan = [0.45, 0.70, 0.78];
+    check('powV4 : un ciel deja cyan ne part pas au menthe',
+        Math.abs(teinteTsl(v4(dejaCyan)) - teinteTsl(dejaCyan)), 0, 12, '°');
+
+    /* 4. Les gardes communs. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const bas = versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0];
+        const haut = versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0];
+        penteMini = Math.min(penteMini,
+            (gris(v4, (k + 8) / 255)[0] - gris(v4, (k - 8) / 255)[0]) / (haut - bas));
+    }
+    check('powV4 : aucune pente ecrasee dans la courbe', penteMini, 0.3, 2);
+    check('powV4 : le noir pur reste noir', Math.max(...v4([0, 0, 0])) * 255, 0, 1);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v4, k / 255)[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV4 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    check('powV4 : n\'ajoute pas de contour', amplificationVoile(v4) - voileV1, -4, 0.6, '×');
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV4 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v4(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* 5. ET `powV3` N'A PAS BOUGE. La fabrique est desormais partagee par trois
+     * presets; ce controle attrape le jour ou l'un deballerait sur l'autre.
+     * Les valeurs sont RELEVEES sur la version d'avant le partage, pas
+     * calculees de tete: la premiere ecriture de ce test en portait une
+     * inventee, et c'est le test lui-meme qui l'a signalee. */
+    const v3 = getPresetTransform('powV3');
+    let derive = 0;
+    for (const rgb of [[0.2, 0.3, 0.5], [0.8, 0.2, 0.2], [0.5, 0.5, 0.5], [1, 1, 1], [0.1, 0.12, 0.22]]) {
+        const o = v3(rgb).map((v) => Math.round(v * 255));
+        const attendu = { '0.2,0.3,0.5': [0, 65, 79], '0.8,0.2,0.2': [165, 14, 20],
+            '0.5,0.5,0.5': [107, 95, 86], '1,1,1': [204, 198, 186],
+            '0.1,0.12,0.22': [0, 29, 39] }[rgb.join(',')];
+        if (attendu) derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV3 n\'a pas bouge en accueillant powV4', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');
