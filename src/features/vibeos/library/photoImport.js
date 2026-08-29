@@ -12,8 +12,17 @@ import { EMPTY_EXIF, readExif } from './exif';
  * on ne touche l'original qu'a l'ouverture en plein ecran ou a l'edition.
  */
 
-const THUMB_MAX = 720;
-const THUMB_QUALITY = 0.82;
+/*
+ * Taille de la vignette.
+ *
+ * 720 px etait trop court: sur un ecran Retina, une tuile de densite 4 fait
+ * ~370 px CSS, donc 740 px reels, et la vignette etait etiree. La grille avait
+ * l'air floue alors que la photo, elle, etait nette. 1600 px couvre toutes les
+ * densites jusqu'a 2 colonnes sur un ecran Retina, pour ~150 a 250 Ko par photo
+ * dans IndexedDB.
+ */
+export const PREVIEW_MAX = 1600;
+const THUMB_QUALITY = 0.86;
 
 export const ACCEPTED_TYPES = 'image/*,.heic,.heif';
 
@@ -48,8 +57,8 @@ function canvasToBlob(canvas, type, quality) {
     });
 }
 
-async function makeThumbnail(source, width, height) {
-    const scale = Math.min(1, THUMB_MAX / Math.max(width, height));
+async function makeThumbnail(source, width, height, maxSide = PREVIEW_MAX) {
+    const scale = Math.min(1, maxSide / Math.max(width, height));
     const w = Math.max(1, Math.round(width * scale));
     const h = Math.max(1, Math.round(height * scale));
     const canvas = document.createElement('canvas');
@@ -60,6 +69,37 @@ async function makeThumbnail(source, width, height) {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(source, 0, 0, w, h);
     return canvasToBlob(canvas, 'image/webp', THUMB_QUALITY);
+}
+
+/*
+ * Refabrique la vignette d'une photo deja stockee.
+ *
+ * Sert aux photos importees quand la vignette plafonnait a 720 px: plutot
+ * qu'une migration qui redecoderait toute la bibliotheque au demarrage, on ne
+ * refait la vignette QUE des photos dont une tuile a reellement besoin (voir
+ * `ensurePreview` dans `useLibrary.js`). Renvoie `null` si le fichier ne se
+ * decode pas - la vignette existante reste alors en place.
+ */
+export async function makePreview(blob, maxSide = PREVIEW_MAX) {
+    let bitmap = null;
+    try {
+        bitmap = await decode(blob);
+    } catch {
+        return null;
+    }
+    const width = bitmap.width || bitmap.naturalWidth;
+    const height = bitmap.height || bitmap.naturalHeight;
+    if (!width || !height) return null;
+    const side = Math.min(maxSide, Math.max(width, height));
+    const thumbBlob = await makeThumbnail(bitmap, width, height, side);
+    if (typeof bitmap.close === 'function') bitmap.close();
+    if (!thumbBlob) return null;
+    const scale = Math.min(1, side / Math.max(width, height));
+    return {
+        thumbBlob,
+        thumbWidth: Math.max(1, Math.round(width * scale)),
+        thumbHeight: Math.max(1, Math.round(height * scale)),
+    };
 }
 
 /*
@@ -95,6 +135,10 @@ export async function buildPhotoRecord(file) {
         width,
         height,
         ratio: width / height,
+        /* Taille reelle de la vignette: sans elle, on ne peut pas savoir si une
+           tuile a besoin de plus de pixels que ce qui est stocke. */
+        thumbWidth: Math.max(1, Math.round(width * Math.min(1, PREVIEW_MAX / Math.max(width, height)))),
+        thumbHeight: Math.max(1, Math.round(height * Math.min(1, PREVIEW_MAX / Math.max(width, height)))),
         addedAt: now,
         /* Date de prise de vue si l'EXIF la donne, sinon date du fichier: la
            frise chronologique reste juste meme sans metadonnees. */

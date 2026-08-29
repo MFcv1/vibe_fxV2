@@ -1176,6 +1176,240 @@ function teinteLab(rgb) {
         (grisAmbre(nuit1) - grisAmbre(nuit)) / (grisAmbre(ambre) - grisAmbre(nuit)), 0.35, 0.65, '');
 }
 
+/* ---------- couchant : mesure contre des COUCHANTS, le 2026-08-27 ter --------
+ *
+ * Ce qui est fige ici, c'est ce qui n'existait dans aucun autre preset du
+ * projet: un a* qui DESCEND vers les hautes lumieres au lieu de revenir a zero.
+ * C'est la trouvaille — le magenta retire d'un soleil orange — et c'est aussi
+ * la chose la plus facile a casser, puisqu'elle frotte contre la regle « pas de
+ * vert dans les blancs ». Les deux sont verifiees ensemble.
+ */
+{
+    const couchant = getPresetTransform('couchant');
+    if (!couchant) { console.error('ECHEC: preset couchant introuvable.'); process.exit(1); }
+
+    const blanc = couchant([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('couchant : plafond mesure', Math.max(...blanc), 235, 243);
+    check('couchant : n\'ecrete pas', Math.max(...blanc), 0, 254);
+
+    const [, aBlanc, bBlanc] = versLab(couchant([1, 1, 1]));
+    check('couchant : le blanc est creme', bBlanc, 6, 11, ' b*');
+    /* La borne du projet, et ce preset s'y colle exprès: son releve brut donnait
+     * -5,71, ramene a -1,90 en multipliant TOUTE la table par un seul facteur
+     * (0,3327), ce qui garde la forme mesuree. Si ce test casse, c'est que
+     * quelqu'un a relache le facteur, et le blanc verdit. */
+    check('couchant : le blanc ne verdit pas', aBlanc, -2, 1, ' a*');
+    /* Et le blanc reste un IVOIRE: le rouge devant le vert, comme `ambre`. */
+    check('couchant : le blanc reste ivoire', blanc[0] - blanc[1], 0, 12, ' R-G');
+
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = versLab(couchant([k / 255, k / 255, k / 255]))[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('couchant : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+
+    check('couchant : n\'ajoute pas de contour', amplificationVoile(couchant) - voileV1, -4, 0.6, '×');
+
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    check('couchant : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(couchant(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* LE SPLIT-TONE, comme `ambre`: le jaune monte du bas vers le haut. */
+    const b = (v) => versLab(couchant([v, v, v]))[2];
+    check('couchant : le jaune monte des ombres aux clairs', b(0.85) - b(0.2), 2, 8, ' b*');
+
+    /* LA SIGNATURE PROPRE. Chez `ambre` le a* des blancs revient a zero (-0,36);
+     * ici il descend. C'est la seule difference de couleur entre les deux
+     * presets, et c'est tout le sujet: un couchant a un soleil orange dont on
+     * retire le magenta. Si cet ecart s'annule, `couchant` n'est plus qu'un
+     * `ambre` avec une autre courbe. */
+    const a = (v) => versLab(couchant([v, v, v]))[1];
+    check('couchant : le a* descend vers les clairs', a(0.25) - a(0.95), 0.4, 2.5, ' a*');
+    const ambrePourCouchant = getPresetTransform('ambre');
+    check('couchant : ses blancs sont plus froids que ceux d\'ambre',
+        versLab(ambrePourCouchant([1, 1, 1]))[1] - aBlanc, 0.8, 3.5, ' a*');
+
+    /* La courbe est le transport, et sa pente ne descend pas sous le pas
+     * d'entree de la LUT (1/8). Mesuree sur la rampe rendue. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const y0 = couchant([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0] * 255;
+        const y1 = couchant([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0] * 255;
+        penteMini = Math.min(penteMini, (y1 - y0) / 16);
+    }
+    check('couchant : aucune pente sous le pas de la LUT', penteMini, 0.125, 3);
+}
+
+/* ---------- powlishermain : le seul cale sur des avant/apres certains -------
+ *
+ * Ses cibles ne viennent pas d'un tas de photos finies mais de trois paires ou
+ * l'on connait les deux bouts (voir l'en-tete du preset). Les chiffres figes ici
+ * sont ceux de `scripts/mesurer-paires-powlisher.mjs` sur 43 691 blocs.
+ */
+{
+    const main = getPresetTransform('powlishermain');
+    if (!main) { console.error('ECHEC: powlishermain introuvable.'); process.exit(1); }
+
+    /* 1. LA LUMIERE NE BOUGE PAS. C'est LA trouvaille de la mesure: ses trois
+     * retouches ne sont, en lumiere lineaire, qu'un gain (-1,85 / -0,22 /
+     * -0,56 EV), et la courbe qui reste une fois ce gain retire est l'identite.
+     * Si quelqu'un glisse une courbe ici, ce test tombe. */
+    let ecartL = 0;
+    for (let k = 0; k <= 255; k += 1) {
+        const gris = k / 255;
+        ecartL = Math.max(ecartL, Math.abs(versLab(main([gris, gris, gris]))[0] - versLab([gris, gris, gris])[0]));
+    }
+    check('powlishermain : la luminosite ne bouge pas', ecartL, 0, 1.5, ' L*');
+
+    /* 2. LE VIRAGE, tel qu'il a ete mesure sur une entree neutre. Ombres
+     * vert-cyan, bas-tons orange, creme du milieu au blanc. */
+    const virage = (v) => versLab(main([v, v, v]));
+    check('powlishermain : ombres vert-cyan', virage(0.06)[1], -3, -1, ' a*');
+    check('powlishermain : bas-tons orange', virage(0.32)[1], 2, 4.5, ' a*');
+    check('powlishermain : le creme culmine au milieu', virage(0.45)[2], 7.5, 10, ' b*');
+    check('powlishermain : le blanc est creme', virage(1)[2], 4.5, 7.5, ' b*');
+    check('powlishermain : le blanc ne verdit pas', virage(1)[1], -2, 1, ' a*');
+    check('powlishermain : le creme retombe vers le blanc',
+        virage(0.45)[2] - virage(1)[2], 1.5, 4.5, ' b*');
+
+    /* 3. LES VERTS TOMBENT (x0,40 a x0,53 mesures sur deux objets, dans deux
+     * photos), LES ROUGES NON (x1,03 a x1,06 une fois le virage retire). */
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const vert = [0.30, 0.50, 0.25];
+    check('powlishermain : le vert perd sa couleur', chromaDe(main(vert)) / chromaDe(vert), 0.45, 0.75, '×');
+    const rouge = [0.80, 0.20, 0.20];
+    check('powlishermain : le rouge garde la sienne', chromaDe(main(rouge)) / chromaDe(rouge), 0.9, 1.2, '×');
+
+    /* 4. LE CIEL CONVERGE VERS 190-199 EN TSL. Son ciel de nuit part de 223 et
+     * arrive a 192; c'est aussi la fenetre trouvee en 2026-08-12 sur son corpus
+     * par une methode sans rapport. Deux bleus tres differents doivent tomber
+     * dans la meme fenetre — c'est une convergence, pas une rotation fixe. */
+    const teinteTsl = (rgb) => {
+        const [r, g, b] = rgb;
+        const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const d = mx - mn;
+        if (d <= 0) return 0;
+        let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (((h * 60) % 360) + 360) % 360;
+    };
+    check('powlishermain : le ciel de nuit arrive dans sa fenetre',
+        teinteTsl(main([0.10, 0.12, 0.22])), 185, 205, '°');
+    check('powlishermain : un ciel de jour arrive dans la meme',
+        teinteTsl(main([0.35, 0.55, 0.85])), 182, 205, '°');
+    /* Et un ciel DEJA cyan n'est pas repousse plus loin: c'est le defaut que
+     * `powlisher-ciel` avait corrige, on ne le reintroduit pas. */
+    const dejaCyan = [0.45, 0.70, 0.78];
+    check('powlishermain : un ciel deja cyan ne part pas au menthe',
+        Math.abs(teinteTsl(main(dejaCyan)) - teinteTsl(dejaCyan)), 0, 12, '°');
+
+    /* 5. ON NE FAIT RIEN LA OU ON N'A RIEN MESURE. Entre 135 et 250 degres Lab
+     * (verts francs, cyans) et au-dela de 308 (magentas, roses), les trois
+     * photos sont muettes: le melangeur y est a l'identite. Un magenta ne doit
+     * donc bouger que du virage. */
+    const magenta = [0.70, 0.25, 0.60];
+    check('powlishermain : le magenta n\'est pas tourne',
+        Math.abs(teinteTsl(main(magenta)) - teinteTsl(magenta)), 0, 14, '°');
+
+    /* 6. Les gardes communs a tout le projet. */
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = versLab(main([k / 255, k / 255, k / 255]))[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powlishermain : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    check('powlishermain : n\'ecrete pas', Math.max(...main([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 255);
+    check('powlishermain : n\'ajoute pas de contour', amplificationVoile(main) - voileV1, -4, 0.6, '×');
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powlishermain : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(main(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+}
+
+/* ---------- powV2 : la meme source, mais la courbe en plus ------------------
+ *
+ * `powlishermain` fige la COULEUR mesuree sur les trois paires et refuse de
+ * toucher a la lumiere. `powV2` ajoute la meilleure courbe commune aux trois.
+ * Ce bloc verifie donc ce que l'autre ne pouvait pas: la forme de la courbe, et
+ * le fait qu'elle ne detruise rien.
+ */
+{
+    const v2 = getPresetTransform('powV2');
+    const main2 = getPresetTransform('powlishermain');
+    if (!v2 || !main2) { console.error('ECHEC: powV2 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]));
+
+    /* 1. LA COURBE EXISTE, et c'est ce qui le separe de `powlishermain`. */
+    check('powV2 : il assombrit, la ou powlishermain ne bougeait pas',
+        gris(main2, 0.5)[0] - gris(v2, 0.5)[0], 3, 9, ' L*');
+
+    /* 2. LE POINT NOIR EST MESURE, pas choisi: ses trois photos posent leur
+     * tranche L* 0-5 a 2,4 / 3,2 / 0,1. Un facteur commun aux trois canaux ne
+     * peut pas eclaircir un pixel deja noir, donc le noir pur reste noir — et
+     * c'est justement ce qui evite un gain qui explose pres de zero. */
+    check('powV2 : le noir pur reste noir', Math.max(...v2([0, 0, 0])) * 255, 0, 1);
+
+    /* 3. IL NE DETRUIT RIEN. La droite libre, meilleure de 0,7 en dE76, envoyait
+     * a zero tout ce qui est sous L* 9,5 et effacait le volant d'une des trois
+     * photos. La pente de la courbe ne descend nulle part sous le pas de la LUT. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const y0 = versLab(v2([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255]))[0];
+        const y1 = versLab(v2([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255]))[0];
+        penteMini = Math.min(penteMini, (y1 - y0) / (versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0]
+            - versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0]));
+    }
+    check('powV2 : aucune pente ecrasee dans la courbe', penteMini, 0.3, 2);
+
+    /* 4. LES HAUTES LUMIERES SONT RETENUES, jamais brulees. */
+    const blanc = v2([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('powV2 : plafond mesure', Math.max(...blanc), 234, 244);
+    check('powV2 : n\'ecrete pas', Math.max(...blanc), 0, 254);
+    check('powV2 : le blanc est creme', gris(v2, 1)[2], 4, 8, ' b*');
+    check('powV2 : le blanc ne verdit pas', gris(v2, 1)[1], -2.5, 1, ' a*');
+
+    /* 5. LA COULEUR EST CELLE DE LA FAMILLE. Meme signature que
+     * `powlishermain`, reajustee sous la courbe: ombres vert-cyan, bas-tons
+     * orange, creme du milieu au blanc, verts affaiblis, ciel qui converge. */
+    check('powV2 : ombres vert-cyan', gris(v2, 0.10)[1], -4, -1, ' a*');
+    check('powV2 : bas-tons orange', gris(v2, 0.40)[1], 1.8, 4.5, ' a*');
+    check('powV2 : le creme culmine au milieu', gris(v2, 0.55)[2], 6, 9, ' b*');
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const vert = [0.30, 0.50, 0.25];
+    check('powV2 : le vert perd sa couleur', chromaDe(v2(vert)) / chromaDe(vert), 0.4, 0.75, '×');
+    const teinteTsl = (rgb) => {
+        const [r, g, b] = rgb;
+        const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const d = mx - mn;
+        if (d <= 0) return 0;
+        const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (((h * 60) % 360) + 360) % 360;
+    };
+    check('powV2 : le ciel arrive dans sa fenetre', teinteTsl(v2([0.35, 0.55, 0.85])), 182, 205, '°');
+    const dejaCyan = [0.45, 0.70, 0.78];
+    check('powV2 : un ciel deja cyan ne part pas au menthe',
+        Math.abs(teinteTsl(v2(dejaCyan)) - teinteTsl(dejaCyan)), 0, 12, '°');
+    const magenta = [0.70, 0.25, 0.60];
+    check('powV2 : le magenta n\'est pas tourne',
+        Math.abs(teinteTsl(v2(magenta)) - teinteTsl(magenta)), 0, 14, '°');
+
+    /* 6. Les gardes communs. */
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = versLab(v2([k / 255, k / 255, k / 255]))[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV2 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    check('powV2 : n\'ajoute pas de contour', amplificationVoile(v2) - voileV1, -4, 0.6, '×');
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV2 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v2(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

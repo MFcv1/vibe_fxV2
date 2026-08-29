@@ -1345,8 +1345,9 @@ const AMBRE_NUIT_1_COURBE = [
  * tout ce qu'il touche. C'est l'erreur du 2026-08-27, reprise par l'autre bout.
  *
  * Quatre familles ont donc ete moissonnees le 2026-08-27 ter sur Wikimedia
- * Commons: `coucher-mer` (35), `coucher-paysage` (42), `coucher-ville` (31),
- * `heure-bleue` (43). Trois precautions les rendent utilisables:
+ * Commons: `coucher-mer` (35), `coucher-paysage` (31), `coucher-ville` (31),
+ * `heure-bleue` (43). Une passe a l'oeil a retire ensuite les peintures et les
+ * scenes de plein jour que les filtres automatiques laissent passer. Trois precautions les rendent utilisables:
  *   - le titre doit nommer l'heure (l'auteur l'a ecrit, pas nous): Commons
  *     indexe par LIEU, et `sunset landscape` rendait des rizieres de plein midi;
  *   - les oeuvres d'art sont exclues: « sunset » y titre des centaines de
@@ -1372,16 +1373,16 @@ const AMBRE_NUIT_1_COURBE = [
  * CE QUE LA MESURE TROUVE:
  *
  *   etalonnage    ombres    medians   clairs    REFLETS
- *   a*            -4,47     -2,11     -3,91     -5,55
- *   b*            -0,27     +4,96     +6,10     +8,39
+ *   a*            -4,32     -2,11     -3,91     -5,71
+ *   b*            +0,23     +6,01     +5,87     +7,84
  *
- * Le b* monte de 0 a +8,4: c'est le meme split-tone qu'`ambre`, et c'est
+ * Le b* monte de 0 a +7,8: c'est le meme split-tone qu'`ambre`, et c'est
  * attendu — au couchant la lumiere principale est chaude et l'appoint est le
  * ciel, donc bleu. Ce n'est pas un style, c'est ce que fait la scene.
  *
  * CE QUI LE SEPARE D'`AMBRE`, ET QUI EST LA VRAIE TROUVAILLE: le a*. Chez
  * `ambre` il finit a -0,36, donc a zero. Ici il DESCEND vers les hautes
- * lumieres, jusqu'a -5,55. Un couchant a un soleil orange (+a, +b); il en
+ * lumieres, jusqu'a -5,71. Un couchant a un soleil orange (+a, +b); il en
  * retire le magenta et ne garde que le jaune. C'est exactement l'ecart entre un
  * couchant de cinema et un couchant de carte postale, et aucun preset du projet
  * ne le faisait.
@@ -1392,17 +1393,17 @@ const AMBRE_NUIT_1_COURBE = [
  * meme scene: point blanc 215 chez les couchants neutres contre 207 chez lui,
  * contraste 173 contre 182. L'ecart d'exposition a disparu — preuve, au passage,
  * que ses couchants sont sombres a cause du contre-jour et non d'un reglage.
- * On garde donc le transport tel quel; sa pente ne descend pas sous 0,563, soit
- * quatre fois et demie le pas d'entree de la LUT.
+ * On garde donc le transport tel quel; sa pente ne descend pas sous 0,500, soit
+ * quatre fois le pas d'entree de la LUT.
  *
  * Le dernier point est a nous: l'appariement de quantiles force 255 -> 255, on
- * le remplace par la pente locale prolongee, soit 236. Aucun ecretage. */
+ * le remplace par la pente locale prolongee, soit 237. Aucun ecretage. */
 const COUCHANT_COURBE = [
-    [0.0000, 0.0000], [0.0627, 0.0353], [0.1255, 0.0706], [0.1882, 0.1098],
-    [0.2510, 0.1490], [0.3137, 0.2078], [0.3765, 0.2824], [0.4392, 0.3608],
-    [0.5020, 0.4353], [0.5647, 0.5176], [0.6275, 0.5922], [0.6902, 0.6431],
-    [0.7529, 0.6941], [0.8157, 0.7529], [0.8784, 0.8157], [0.9412, 0.8745],
-    [0.9725, 0.9020], [1.0000, 0.9255],
+    [0.0000, 0.0000], [0.0627, 0.0392], [0.1255, 0.0706], [0.1882, 0.1098],
+    [0.2510, 0.1490], [0.3137, 0.2078], [0.3765, 0.2784], [0.4392, 0.3529],
+    [0.5020, 0.4314], [0.5647, 0.5098], [0.6275, 0.5882], [0.6902, 0.6431],
+    [0.7529, 0.6941], [0.8157, 0.7529], [0.8784, 0.8157], [0.9412, 0.8706],
+    [0.9725, 0.9020], [1.0000, 0.9294],
 ];
 
 /* Douze secteurs, comme `ambre`. Zero veut dire « les familles ne s'accordent
@@ -1411,9 +1412,9 @@ const COUCHANT_COURBE = [
  * signature de toute la famille, et le releve la donne ici plus forte
  * qu'ailleurs parce qu'un ciel de couchant est justement ce qui la montre. */
 const COUCHANT_ROT = [
-    /* ombres  */ [-3.02, 9.99, 3.43, 0, 3.32, 0, 0, 0, -15.06, 0, 0, 0],
-    /* medians */ [2.16, 3.78, 0, -1.49, 0, 0, 0, -10.52, 2.78, 0, 0, 0],
-    /* clairs  */ [3.38, 3.63, 5.05, 0, 2.86, 13.74, 0, -19.79, 0, 0, 0, 0],
+    /* ombres  */ [-3.02, 9.99, 3.43, 0, 2.58, 0, 0, 0, -16.63, 0, 0, 0],
+    /* medians */ [2.16, 3.78, 2.69, -1.83, 0, 0, 0, -10.37, 2.78, 0, 0, 0],
+    /* clairs  */ [3.38, 3.63, 5.05, 0, 3.51, 13.54, 0, -19.79, 0, 0, 0, 0],
 ];
 
 function rotationCouchant(h, t) {
@@ -1429,9 +1430,45 @@ function rotationCouchant(h, t) {
         : bande(COUCHANT_ROT[1]) + (bande(COUCHANT_ROT[2]) - bande(COUCHANT_ROT[1])) * (u - 1);
 }
 
-const COUCHANT_ETAL_A = [-4.47, -3.29, -2.11, -3.91, -5.55];
-const COUCHANT_ETAL_B = [-0.27, 2.35, 4.96, 6.10, 8.39];
-const COUCHANT_CHROMA = [0.837, 0.747, 0.930];
+/* LE a* EST RAMENE PAR UN FACTEUR UNIQUE, ET C'EST LE SEUL NOMBRE DE CE PRESET
+ * QUI NE SOIT PAS LE RELEVE BRUT.
+ *
+ * Le releve donne -4,32 / -2,11 / -3,91 / -5,71. Pose tel quel, il rend un blanc
+ * a RGB 232,239,220 — le VERT devant le rouge. C'est la panne que ce projet a
+ * deja payee une fois: prolonger une derive verte jusque dans les blancs a fait
+ * virer au vert-gris un grand ciel a contre-jour.
+ *
+ * Deux raisons de le brider, et la seconde compte plus que la premiere.
+ *
+ * 1. La regle dure du projet: pas de vert dans les blancs, verifiee sur toute la
+ *    famille par « le blanc ne verdit pas » (a* >= -2). Le precedent existe —
+ *    `ambre` a refuse sa cible de contraste mesuree (208) parce qu'elle imposait
+ *    de l'ecretage. Une mesure qui contredit une regle dure est bornee, et la
+ *    borne est ecrite.
+ *
+ * 2. LE RELEVE SE COMPTE DEUX FOIS. L'etalonnage est pris sur les QUASI-GRIS.
+ *    Dans un couchant, les quasi-gris du haut ne sont pas des blancs: c'est du
+ *    ciel pale, de la brume, de l'eau claire. Or le ciel pale est DEJA traite,
+ *    et fortement, par la rotation du secteur bleu (-19,8 degres dans les
+ *    clairs). Le meme virage vers le teal est donc compte une fois comme
+ *    rotation et une fois comme etalonnage. La rotation, elle, ne touche que ce
+ *    qui a une teinte; le decalage fixe, lui, bave sur tous les gris — y compris
+ *    ceux d'une photo qui n'a aucun ciel.
+ *
+ * UN SEUL FACTEUR, PAS CINQ PLAFONDS. Premiere tentative: plafonner chaque bande
+ * a ce qu'elle pouvait porter. Elle a ete jetee — le critere « R - G >= 2 »
+ * applique aux ombres, dont le b* est a +0,23, ramenait leur a* a zero, alors
+ * qu'`ambre` descend a -2,76 et `powlisher-cine` a -2,2 sans que personne n'y
+ * trouve rien a redire. La regle dure ne porte que sur le BLANC.
+ *
+ * On multiplie donc TOUTE la table par 1,90 / 5,71 = 0,3327: le blanc tombe pile
+ * sur le seuil du projet et la FORME mesuree est intacte. Un facteur, un
+ * quotient de deux nombres mesures, aucun reglage par bande. Ce qui survit est
+ * la trouvaille — le a* descend vers les hautes lumieres, la ou `ambre` remonte
+ * a zero. */
+const COUCHANT_ETAL_A = [-1.44, -1.07, -0.70, -1.30, -1.90];
+const COUCHANT_ETAL_B = [0.23, 3.12, 6.01, 5.87, 7.84];
+const COUCHANT_CHROMA = [0.837, 0.712, 0.918];
 
 function construireCouchant(courbe, etalA, etalB) {
     const v = evalCurve(courbe, 1);
@@ -1475,6 +1512,293 @@ const couchantTransform = construireCouchant(COUCHANT_COURBE, COUCHANT_ETAL_A, C
 const ambreTransform = construireAmbre(AMBRE_COURBE);
 const ambreNuit1Transform = construireAmbre(AMBRE_NUIT_1_COURBE);
 const ambreNuit2Transform = construireAmbre(AMBRE_NUIT_COURBE);
+
+/* ==========================================================================
+ * POWLISHERMAIN — le meme regard, mais mesure sur des AVANT/APRES certains
+ *
+ * Tous les autres presets de la famille sont deduits d'un tas de photos FINIES:
+ * on voit ou il arrive, jamais d'ou il part. Celui-ci est le premier construit
+ * sur des paires ou l'on connait les DEUX bouts. Le 12 novembre 2025, un lecteur
+ * lui demande un avant/apres; il repond par trois captures d'ecran de Lightroom
+ * mobile, chacune montrant la meme photo avant et apres son traitement:
+ *
+ *   1988715650794287456   station-service de nuit, moto rouge
+ *   1988715687783919978   autoroute dans le brouillard, interieur de voiture
+ *   1988715756461179091   table de restaurant, nappe a carreaux
+ *
+ * Ce n'est PAS la paire ecartee le 2026-08-12 (1997328906508960039, passee par
+ * une IA generative): ces trois-la sont des captures de son ecran d'edition, la
+ * meme photo des deux cotes, sans autre intermediaire que l'ecran.
+ *
+ * La chaine: `scripts/moissonner-powlisher.mjs` (telechargement en resolution
+ * d'origine), `scripts/aligner-paire-avant-apres.mjs` (le cadre de l'image ne
+ * tombe pas au meme endroit d'une capture a l'autre — une des trois est en plus
+ * recadree de 2,6 %), puis `scripts/mesurer-paires-powlisher.mjs`, qui compare
+ * des BLOCS de 8x8 plats et non des pixels. 43 691 blocs au total.
+ *
+ * CE QUE LA MESURE DIT, ET QUI EST LE COEUR DE CE PRESET
+ *
+ * 1. SA COURBE NE FAIT RIEN. Les trois retouches sont, en lumiere lineaire, un
+ *    simple gain: 0,277 / 0,856 / 0,680 — soit -1,85 / -0,22 / -0,56 EV. Une
+ *    fois ce gain retire, la courbe qui reste est l'identite a +-2 L* pres sur
+ *    toute la plage. Trois valeurs aussi eloignees ne peuvent pas etre un
+ *    reglage de preset: c'est son curseur d'exposition, photo par photo. Donc
+ *    `powlishermain` NE TOUCHE PAS a la luminosite. Poser l'exposition reste au
+ *    photographe, comme chez lui. (Pour la densite, la famille a deja
+ *    `ambre-nuit-1` et `ambre-nuit-2`.)
+ *
+ * 2. TOUT EST DANS LE VIRAGE. Une fois l'exposition neutralisee, le a* et le b*
+ *    d'une entree neutre tombent sur UNE SEULE courbe en fonction du niveau de
+ *    sortie, et les trois photos — une nuit, un brouillard, une table eclairee —
+ *    y tombent ensemble. Ombres vert-cyan (a* -2,2), bas-tons orange (a* +3,4 a
+ *    L 40), creme du milieu jusqu'en haut (b* +8,8 a L 50, encore +6 a L 90).
+ *
+ * 3. LE CIEL ARRIVE A 192 EN TSL. Son ciel de nuit part de 223 et arrive a 192.
+ *    C'est exactement la fenetre 190-199 trouvee en 2026-08-12 sur son corpus,
+ *    par une methode qui n'a rien de commun avec celle-ci. Deux sources
+ *    independantes, le meme point d'arrivee: la regle du ciel est donc une
+ *    CONVERGENCE, comme dans `powlisher-ciel`, et non une rotation fixe.
+ *
+ * 4. LES VERTS TOMBENT. Deux objets, dans deux photos differentes (la vegetation
+ *    du bas-cote, le verre d'une bouteille), perdent 47 % et 55 % de leur
+ *    chroma. Les jaunes en perdent 11 a 21 %. Les rouges et les oranges, eux,
+ *    ne bougent quasiment pas UNE FOIS LE VIRAGE POSE: ce qu'on prenait pour un
+ *    coup de saturation sur les rouges (x1,38 en mesure brute) etait le virage
+ *    lui-meme, qui pousse un rouge vers l'orange en lui ajoutant du b*.
+ *
+ * CE QUE LA MESURE NE DIT PAS — et qu'on n'invente donc pas: entre 135 et 250
+ * degres Lab (verts francs, cyans) et entre 308 et 360 (magentas, roses), les
+ * trois photos n'ont rien. Le melangeur y revient a l'identite et n'y fait RIEN.
+ * Trois photos, trois sujets: c'est une source certaine, ce n'est pas une source
+ * large. Ne pas confondre ce preset avec `powlisher-cine`, qui couvre douze
+ * familles de sujet mais ne connait aucune entree.
+ * ======================================================================= */
+
+/* Le virage, une ancre tous les 5 L*, du noir au blanc. Lissage gaussien
+ * (sigma 5,5) des 19 tranches mesurees, ponderees par la racine du nombre de
+ * blocs — la racine et pas le nombre, sinon les deux tranches a 3 000 blocs
+ * ecraseraient les dix-sept autres. */
+const MAIN_VIRAGE_A = [
+    -2.15, -2.19, -2.12, -1.49, 0.07, 1.66, 2.58, 3.12, 3.37, 3.27, 2.95,
+    2.63, 2.18, 1.53, 0.64, -0.10, -0.33, -0.36, -0.36, -0.36, -0.36,
+];
+const MAIN_VIRAGE_B = [
+    -0.07, 0.15, 0.47, 1.03, 2.22, 3.69, 4.83, 5.81, 6.82, 7.95, 8.77,
+    8.71, 8.30, 7.98, 7.67, 7.25, 6.81, 6.38, 6.04, 5.91, 5.98,
+];
+
+/* Le melangeur: [rotation en degres Lab, gain de chroma], une ancre tous les 15
+ * degres a partir de 7,5 — le centre exact des tranches mesurees. Chaque valeur
+ * est la moyenne des paires qui ont au moins 60 blocs dans la tranche, ponderee
+ * par leur nombre de blocs, mesuree APRES avoir pose le virage (sinon on compte
+ * deux fois ce que le virage fait deja) et en ignorant tout ce qui tombe sous
+ * L* 12 des deux cotes: sous ce niveau une teinte n'est plus mesurable.
+ *
+ * Les trois ancres 142,5 / 157,5 / 172,5 ne sont PAS mesurees: elles ramenent le
+ * creux des verts a l'identite en 45 degres, parce qu'on ignore ou il s'arrete.
+ * Tout ce qui suit jusqu'a 352,5 est a l'identite, sauf le bleu, pris a part par
+ * la regle du ciel. */
+const MAIN_MELANGEUR = [
+    [1.4, 1.03], [-0.6, 1.06], [-2.9, 1.04], [-4.4, 0.95],
+    [-3.4, 0.89], [0.1, 0.87], [0.6, 0.79], [6.7, 0.53],
+    [15.2, 0.40], [10.1, 0.60], [5.1, 0.80], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+];
+const MAIN_MELANGEUR_DEPART = 7.5;
+
+/* La regle du ciel. Cible: 227,5 degres Lab, mesuree comme le point d'arrivee de
+ * 1 819 blocs de ciel (entree 284,2 -> sortie 227,5). C'est une CONVERGENCE: le
+ * fondu d'entree part de la cible elle-meme, donc un pixel deja arrive ne bouge
+ * pas, et plus il en est loin plus on le tire. Le fondu de sortie protege les
+ * violets et les magentas, ou rien n'a ete mesure — et il colle a la mesure: la
+ * tranche 285-300, qu'une convergence pleine ferait tourner de 65 degres, n'en
+ * tourne que 42,5 dans ses images. */
+const MAIN_CIEL_CIBLE = 227.5;
+const MAIN_CIEL_CHROMA = 0.85;
+const MAIN_CIEL_ENTREE = [227.5, 262];
+const MAIN_CIEL_SORTIE = [285, 308];
+
+/* Interpolation circulaire d'une table de 24 ancres espacees de 15 degres a
+ * partir de MAIN_MELANGEUR_DEPART. Partagee par `powlishermain` et `powV2`. */
+function melangeurLab(table, h) {
+    const x = (((h - MAIN_MELANGEUR_DEPART) % 360) + 360) % 360 / 15;
+    const i = Math.floor(x);
+    const t = x - i;
+    const a = table[i % 24];
+    const b = table[(i + 1) % 24];
+    const u = t * t * (3 - 2 * t);
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+}
+
+function bandeCielLab(h) {
+    return smoothstep(MAIN_CIEL_ENTREE[0], MAIN_CIEL_ENTREE[1], h)
+        * (1 - smoothstep(MAIN_CIEL_SORTIE[0], MAIN_CIEL_SORTIE[1], h));
+}
+
+function powlisherMainTransform(input) {
+    let [L, A, B] = rgbToLab01(input[0], input[1], input[2]);
+
+    /* 1. Melangeur, puis regle du ciel — dans l'ordre de Lightroom, avant le
+     * virage. Le garde-fou `aUneTeinte` est celui du projet: dans un voile
+     * quasi blanc la teinte est du bruit, et une regle qui s'y fie trace un
+     * contour. Il s'ouvre a la chroma ou le ciel a ete mesure (8 et plus). */
+    const c = Math.hypot(A, B);
+    const aUneTeinte = smoothstep(4, 11, c);
+    if (aUneTeinte > 0 && c > 1e-6) {
+        let h = Math.atan2(B, A) * 180 / Math.PI;
+        if (h < 0) h += 360;
+        const [dh, gain] = melangeurLab(MAIN_MELANGEUR, h);
+        const ciel = bandeCielLab(h);
+        const rotation = dh * (1 - ciel) + (MAIN_CIEL_CIBLE - h) * ciel;
+        const gainC = gain * (1 - ciel) + MAIN_CIEL_CHROMA * ciel;
+        const hNeuf = (h + rotation * aUneTeinte) * Math.PI / 180;
+        const cNeuf = c * (1 + (gainC - 1) * aUneTeinte);
+        A = cNeuf * Math.cos(hNeuf);
+        B = cNeuf * Math.sin(hNeuf);
+    }
+
+    /* 2. Le virage, pose au niveau de luminosite du pixel. La luminosite, elle,
+     * ne bouge pas: voir le point 1 de l'en-tete. */
+    A += fonduParL(MAIN_VIRAGE_A, L);
+    B += fonduParL(MAIN_VIRAGE_B, L);
+
+    return lab01ToRgb(L, A, B);
+}
+
+/* ==========================================================================
+ * POWV2 — le meme regard que `powlishermain`, mais la LUMIERE en plus
+ *
+ * `powlishermain` a etabli la couleur sur les trois paires avant/apres
+ * certaines de `@powl_d` et a refuse de toucher a la luminosite, parce que ses
+ * trois retouches ne differaient, en lumiere lineaire, que par un gain
+ * (-1,85 / -0,22 / -0,56 EV) — son curseur d'exposition, pas un preset.
+ *
+ * Regarde a l'ecran, ce refus se voit: applique tel quel a ses trois AVANT, le
+ * preset rend une image nettement plus claire et plus plate que son APRES. Le
+ * porteur du projet l'a constate sur les trois. `powV2` est la reponse: la meme
+ * couleur, plus la meilleure courbe possible.
+ *
+ * CE QUE « LA MEILLEURE POSSIBLE » VEUT DIRE ICI
+ *
+ * Aucune courbe ne peut passer par les trois. A L* 42 d'entree, il sort 19,8
+ * sur la station de nuit, 39,5 sur le brouillard et 34,9 sur le restaurant:
+ * une fonction ne rend pas trois valeurs pour une entree. La courbe de `powV2`
+ * est donc le meilleur compromis, cherche en minimisant l'ecart dE76 median des
+ * TROIS paires a la fois, sans exposition libre — c'est-a-dire exactement ce
+ * qu'on voit dans l'app.
+ *
+ * Elle n'a que DEUX parametres libres, et c'est deliberé:
+ *  - 21 noeuds libres donnent une courbe en zigzag (plateaux et sauts) qui
+ *    surapprend sur trois photos et poserait des bandes dans un degrade;
+ *  - la droite libre tombe sur L = 1,05 L - 10, qui envoie a zero tout ce qui
+ *    est sous L* 9,5: sur la paire du brouillard, le volant et la console
+ *    perdent leur dessin. Elle gagnait 0,7 de dE76 en detruisant de la matiere.
+ *    Refusee.
+ * Restent: une DROITE en L* — la forme meme de ses trois retouches, pentes
+ * 0,648 / 0,920 / 0,933 — posee sur un pied doux, avec le point noir FIXE sur
+ * la mesure (ses trois photos posent leur tranche L* 0-5 a 2,4 / 3,2 / 0,1) et
+ * une pente qui ne descend nulle part sous 0,30.
+ *
+ * CE QUE CA DONNE, ecart dE76 median, sans exposition libre:
+ *
+ *                     nuit    brouillard   restaurant
+ *   rien              17,24      7,91        10,41
+ *   powlishermain     15,18      4,30         9,47
+ *   powV2              8,52      2,20         2,81
+ *
+ * Le brouillard et le restaurant tombent au niveau du bruit des captures. La
+ * nuit reste a 8,5 et c'est irreductible: son edit de nuit est 1,3 EV plus bas
+ * que ce qu'une courbe commune peut rendre. Sur une scene de nuit, il faut
+ * poser l'exposition, comme lui.
+ *
+ * Le virage et le melangeur ont ete REAJUSTES contre les memes paires une fois
+ * la courbe en place: assombrir retire de la chroma, et les tables de
+ * `powlishermain` avaient ete mesurees sur des images re-exposees. Les zones ou
+ * les trois photos ne disent rien — 135 a 250 degres Lab (verts francs, cyans)
+ * et au-dela de 308 (magentas, roses) — restent a l'identite, comme la.
+ * ======================================================================= */
+
+/* La courbe, en L*: une ancre tous les 5 L*, du noir au blanc. La premiere est
+ * ramenee a 0 — un facteur multiplicatif ne peut pas eclaircir un pixel deja
+ * noir, et pretendre le contraire ferait exploser le gain pres de zero. Cout
+ * mesure de ce choix: 0,05 de dE76 sur une seule des trois paires. */
+const V2_COURBE = [
+    0, 3.91, 6.62, 10.40, 14.75, 19.35, 24.09, 28.89, 33.73, 38.60, 43.49,
+    48.39, 53.30, 58.22, 63.14, 68.06, 72.99, 77.92, 82.86, 87.79, 92.73,
+];
+
+/* Le virage, reajuste sous la courbe. Ombres vert-cyan, bas-tons orange,
+ * creme du milieu au blanc — la meme signature, aux memes niveaux. */
+const V2_VIRAGE_A = [
+    0.13, -2.48, -3.68, -3.58, -2.33, -0.21, 1.50, 2.56, 3.22, 3.28, 2.97,
+    2.67, 2.45, 2.18, 1.59, 0.70, -0.06, -0.37, -0.38, -0.36, -0.36,
+];
+const V2_VIRAGE_B = [
+    -0.15, 0.20, -0.69, -1.13, -0.05, 2.15, 4.67, 6.48, 7.00, 6.95, 7.01,
+    6.96, 6.75, 6.58, 6.54, 6.63, 6.69, 6.50, 6.23, 6.06, 5.98,
+];
+
+/* Le melangeur, reajuste lui aussi. Les gains de chroma des rouges et des
+ * oranges montent (1,03 -> 1,14) parce que la courbe, en assombrissant, leur en
+ * retire; les verts descendent encore (0,40 -> 0,36). Trois ancres — 142,5,
+ * 157,5 et 172,5 — ne sont toujours PAS mesurees: elles ramenent le creux des
+ * verts a l'identite en 45 degres, parce qu'on ignore ou il s'arrete. */
+const V2_MELANGEUR = [
+    [2.52, 1.028], [1.99, 1.063], [-0.88, 1.136], [-5.22, 1.079],
+    [-5.83, 0.911], [0.24, 0.828], [-1.22, 0.716], [4.27, 0.483],
+    [6.74, 0.356], [10.1, 0.60], [5.1, 0.80], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+];
+
+function powV2Transform(input) {
+    let [r, g, b] = input;
+
+    /* 1. La courbe. Elle s'applique comme un changement d'EXPOSITION — un
+     * facteur commun aux trois canaux, en lumiere lineaire — et pas sur le seul
+     * L*. C'est ainsi qu'elle a ete mesuree, et ce n'est pas equivalent:
+     * assombrir une photo lui retire aussi de la chroma, alors que baisser le
+     * L* en Lab la laisserait intacte et rendrait des couleurs criardes. */
+    const R = srgbToLin(r), G = srgbToLin(g), B = srgbToLin(b);
+    const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+    if (Y > 1e-6) {
+        const Lentree = rgbToLab01(r, g, b)[0];
+        const Lsortie = fonduParL(V2_COURBE, Lentree);
+        const t = (Lsortie + 16) / 116;
+        const Ysortie = t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787;
+        const k = Ysortie / Y;
+        r = clamp01(linToSrgb(R * k));
+        g = clamp01(linToSrgb(G * k));
+        b = clamp01(linToSrgb(B * k));
+    }
+
+    /* 2. Melangeur, regle du ciel, puis virage — l'ordre de Lightroom, et le
+     * meme garde-fou de chroma que `powlishermain`: dans un voile quasi blanc
+     * la teinte est du bruit, et une regle qui s'y fie trace un contour. */
+    let [L, A, Bb] = rgbToLab01(r, g, b);
+    const c = Math.hypot(A, Bb);
+    const aUneTeinte = smoothstep(4, 11, c);
+    if (aUneTeinte > 0 && c > 1e-6) {
+        let h = Math.atan2(Bb, A) * 180 / Math.PI;
+        if (h < 0) h += 360;
+        const [dh, gain] = melangeurLab(V2_MELANGEUR, h);
+        const ciel = bandeCielLab(h);
+        const rotation = dh * (1 - ciel) + (MAIN_CIEL_CIBLE - h) * ciel;
+        const gainC = gain * (1 - ciel) + MAIN_CIEL_CHROMA * ciel;
+        const hNeuf = (h + rotation * aUneTeinte) * Math.PI / 180;
+        const cNeuf = c * (1 + (gainC - 1) * aUneTeinte);
+        A = cNeuf * Math.cos(hNeuf);
+        Bb = cNeuf * Math.sin(hNeuf);
+    }
+
+    A += fonduParL(V2_VIRAGE_A, L);
+    Bb += fonduParL(V2_VIRAGE_B, L);
+
+    return lab01ToRgb(L, A, Bb);
+}
 
 export const VISION_PRESETS = [
     {
@@ -1708,6 +2032,71 @@ export const VISION_PRESETS = [
         avoidFor: 'nuit et intérieur — sans ciel, c\'est `powlisher` tel quel',
         recommendedIntensity: 100,
         transform: powlisherCielTransform,
+    },
+    {
+        id: 'powlishermain',
+        label: 'Powlisher Main',
+        hint: 'Le seul mesuré sur des avant/après certains : la couleur, pas l\'exposition',
+        description: 'Le premier preset du projet construit sur des paires où l\'on '
+            + 'connaît les DEUX bouts. Le 12 novembre 2025, `@powl_d` répond à un '
+            + 'lecteur par trois captures de son écran Lightroom : la même photo avant '
+            + 'et après, trois fois — une station-service de nuit, une autoroute dans '
+            + 'le brouillard, une table de restaurant. 43 691 blocs mesurés. '
+            + 'Résultat : **sa courbe ne fait rien**. Les trois retouches sont un '
+            + 'simple gain de lumière (−1,85, −0,22 et −0,56 EV), et une fois ce gain '
+            + 'retiré la courbe qui reste est l\'identité. Trois valeurs aussi '
+            + 'éloignées, c\'est son curseur d\'exposition, pas un preset : celui-ci '
+            + 'ne touche donc PAS à la luminosité. Tout tient dans le virage — ombres '
+            + 'vert-cyan (a* −2,2), bas-tons orange (a* +3,4), crème du milieu au '
+            + 'blanc (b* +8,8 puis +6) — dans les verts qui perdent la moitié de leur '
+            + 'couleur, dans les jaunes qui en perdent un cinquième, et dans le ciel '
+            + 'qui converge. Son ciel de nuit part de 223° et arrive à 192° : '
+            + 'exactement la fenêtre trouvée en 2026 sur son corpus, par une méthode '
+            + 'qui n\'a rien de commun. Deux sources indépendantes, le même point '
+            + 'd\'arrivée. RÉSERVE : trois photos, c\'est certain mais c\'est étroit. '
+            + 'Entre 135° et 250° Lab (verts francs, cyans) et au-delà de 308° '
+            + '(magentas, roses), rien n\'a été mesuré — et rien n\'est fait.',
+        bestFor: 'tout, sur une photo déjà correctement exposée : c\'est une couche de '
+            + 'couleur qui se pose sans déplacer la lumière',
+        avoidFor: 'une photo qu\'il faut d\'abord éclaircir ou assombrir — il ne le '
+            + 'fera pas à votre place. Et les scènes dont la couleur dominante est un '
+            + 'vert franc ou un cyan : ce sont les deux trous de la mesure',
+        recommendedIntensity: 100,
+        transform: powlisherMainTransform,
+    },
+    {
+        id: 'powV2',
+        label: 'PowV2',
+        hint: 'Le plus proche de ses avant/après : la couleur ET la lumière',
+        description: 'La suite de `Powlisher Main`, et le preset le plus proche de ses '
+            + 'photos que le projet sache faire. Même source — trois captures de son '
+            + 'écran Lightroom, la même photo avant et après — mais cette fois la '
+            + 'COURBE est du lot. `Powlisher Main` refusait d\'y toucher, parce que ses '
+            + 'trois retouches ne diffèrent que par un gain de lumière (−1,85, −0,22 et '
+            + '−0,56 EV), ce qui est un curseur d\'exposition et pas un preset. Vu à '
+            + 'l\'écran, ce refus se voyait : appliqué à ses AVANT, le rendu restait '
+            + 'nettement plus clair et plus plat que son APRÈS. `PowV2` cherche donc la '
+            + 'meilleure courbe commune aux trois, en minimisant l\'écart réel — celui '
+            + 'qu\'on voit dans l\'app, sans exposition libre. Elle n\'a que deux '
+            + 'paramètres : une droite en L*, la forme même de ses retouches, posée sur '
+            + 'un pied doux, point noir fixé sur la mesure et pente jamais sous 0,30. '
+            + 'La droite libre faisait mieux de 0,7 en envoyant à zéro tout ce qui est '
+            + 'sous L* 9,5 — elle a été refusée : un preset n\'a pas le droit de '
+            + 'détruire de la matière. Résultat, écart dE76 médian : brouillard 7,91 → '
+            + '**2,20**, restaurant 10,41 → **2,81**, nuit 17,24 → **8,52**. Les deux '
+            + 'premiers tombent au niveau du bruit des captures. RÉSERVE : la nuit '
+            + 'reste à 8,52 et c\'est irréductible — son édit de nuit est 1,3 EV plus '
+            + 'bas que ce qu\'une courbe commune peut rendre. Et comme `Powlisher '
+            + 'Main`, il ne fait RIEN entre 135° et 250° Lab ni au-delà de 308° : trois '
+            + 'photos n\'y disent rien.',
+        bestFor: 'tout — c\'est celui qui ressemble le plus à ses photos, couleur et '
+            + 'densité comprises',
+        avoidFor: 'une scène de nuit franche : il l\'assombrit comme les autres, mais '
+            + 'lui descend encore 1,3 EV plus bas à la main. Et une photo déjà sombre '
+            + 'qu\'on ne veut pas assombrir — prendre `Powlisher Main`, qui ne touche '
+            + 'pas à la lumière',
+        recommendedIntensity: 100,
+        transform: powV2Transform,
     },
     {
         id: 'powlisher-showcase',

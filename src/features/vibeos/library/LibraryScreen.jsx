@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+    useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Camera, Check, Grid2x2, Images, Minus, Plus, Trash2, Upload, Wand2, X,
@@ -28,8 +30,204 @@ import styles from './library.module.css';
  *   catalogue photo.
  */
 
-const GAP = 8;
+const GAP = 10;
 const DENSITY_KEY = 'vibeos.library.density';
+
+/* Apparition des tuiles.
+   Le decalage est plafonne: sur une rangee, l'oeil lit une vague; passe une
+   quinzaine de tuiles, attendre plus longtemps ne se lit plus comme une vague
+   mais comme une page qui rame. */
+const REVEAL_STEP = 70;
+const REVEAL_MAX = 16;
+/* Deux tuiles reperees a moins de 60 ms d'ecart font partie de la meme bouffee,
+   donc de la meme vague. La fenetre est courte exprès: un chargement de page
+   revele tout en une ou deux images, alors qu'un import ajoute les photos une
+   par une, a 100 ms d'intervalle. Sans cette coupure, la seizieme photo
+   importee attendrait le retard cumule des quinze precedentes avant de
+   s'afficher - elle doit au contraire arriver tout de suite. */
+const REVEAL_BURST = 60;
+
+/*
+ * Revelateur de tuiles.
+ *
+ * Pourquoi un observateur plutot qu'une animation CSS a la volee: une tuile
+ * doit apparaitre quand elle ENTRE dans le champ, pas quand elle est montee.
+ * Avec cent photos, tout animer au montage revient a jouer cent animations
+ * hors ecran - c'est exactement ce qui fait tomber la cadence.
+ *
+ * Renvoie `null` quand il n'y a rien a animer (rendu serveur, navigateur sans
+ * IntersectionObserver, ou mouvement reduit): les tuiles se posent alors
+ * directement a leur place, sans transition.
+ */
+function createRevealer() {
+    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return null;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
+
+    const burst = { at: 0, count: 0 };
+    /* L'observateur ne promet aucun ordre, et il livre souvent les tuiles UNE
+       PAR UNE, dans le desordre - la vague remontait alors du bas a droite.
+       On accumule donc les arrivees de l'image en cours, et on ne decide des
+       retards qu'a la fin, une fois qu'on sait qui est la et dans quel rang. */
+    let waiting = [];
+    let scheduled = false;
+
+    function flush() {
+        scheduled = false;
+        const nodes = waiting.sort((a, b) => (
+            Number(a.dataset.position) - Number(b.dataset.position)
+        ));
+        waiting = [];
+        if (!nodes.length) return;
+        const now = performance.now();
+        if (now - burst.at > REVEAL_BURST) burst.count = 0;
+        burst.at = now;
+        nodes.forEach((node) => {
+            const delay = Math.min(burst.count, REVEAL_MAX) * REVEAL_STEP;
+            burst.count += 1;
+            node.style.setProperty('--vo-reveal-delay', `${delay}ms`);
+            node.dataset.in = 'true';
+        });
+    }
+
+    return new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            /* Une tuile ne se revele qu'une fois: revenir en arriere dans la
+               grille ne doit pas refaire clignoter ce qu'on a deja vu. */
+            observer.unobserve(entry.target);
+            waiting.push(entry.target);
+        });
+        if (waiting.length && !scheduled) {
+            scheduled = true;
+            window.requestAnimationFrame(flush);
+        }
+    }, { rootMargin: '280px 0px 340px' });
+}
+
+/*
+ * Une tuile.
+ *
+ * Deux couches, et c'est la seule chose qui compte ici: la `figure` porte la
+ * MISE EN PAGE (position et taille calculees par la masonry), la couche
+ * interieure porte le MOUVEMENT (apparition, survol). Melanger les deux ferait
+ * que changer la densite pendant qu'une tuile apparait ecraserait l'une des
+ * deux transformations.
+ */
+const Tile = React.memo(function Tile({
+    photo, position, rect, selected, revealer, onOpen, onEdit, onDelete, onToggle, onNeedPixels,
+}) {
+    const nodeRef = useRef(null);
+    const [loaded, setLoaded] = useState(false);
+
+    /*
+     * Une vignette de 720 px etiree dans une tuile Retina de 740 px, ca se voit:
+     * la grille a l'air floue alors que la photo est nette. On compare donc ce
+     * que la vignette contient VRAIMENT (`naturalWidth`) a ce que la tuile
+     * demande en pixels ecran, et on refabrique la vignette si l'ecart est
+     * reel. Les photos importees apres ce changement n'y passent jamais.
+     */
+    const checkPixels = useCallback((event) => {
+        setLoaded(true);
+        const img = event.currentTarget;
+        const dpr = typeof window === 'undefined' ? 1 : (window.devicePixelRatio || 1);
+        const needed = Math.round(Math.max(rect.width, rect.height) * dpr);
+        if (img.naturalWidth && Math.max(img.naturalWidth, img.naturalHeight) < needed * 0.85) {
+            onNeedPixels?.(photo, needed);
+        }
+    }, [rect.width, rect.height, onNeedPixels, photo]);
+
+    useEffect(() => {
+        const node = nodeRef.current;
+        if (!node) return undefined;
+        if (!revealer) {
+            node.dataset.in = 'true';
+            return undefined;
+        }
+        revealer.observe(node);
+        return () => revealer.unobserve(node);
+    }, [revealer]);
+
+    return (
+        <figure
+            ref={nodeRef}
+            className={styles.tile}
+            data-selected={selected ? 'true' : 'false'}
+            data-position={position}
+            data-testid="vibeos-library-tile"
+            style={{
+                transform: `translate3d(${rect.x}px, ${rect.y}px, 0)`,
+                width: rect.width,
+                height: rect.height,
+            }}
+        >
+            <div className={styles.tileInner}>
+                <button
+                    type="button"
+                    className={styles.tileOpen}
+                    onClick={() => onOpen(position)}
+                    aria-label={`Ouvrir ${photo.name}`}
+                >
+                    {/* La photo se fond une fois decodee: on ne voit jamais un
+                        rectangle vide monter puis se remplir. */}
+                    <img
+                        src={thumbUrl(photo)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        data-loaded={loaded ? 'true' : 'false'}
+                        onLoad={checkPixels}
+                        onError={() => setLoaded(true)}
+                    />
+                </button>
+
+                <span className={styles.tileScrim} aria-hidden="true" />
+
+                <figcaption className={styles.tileChips}>
+                    <span className={styles.chip}>{deviceLabel(photo)}</span>
+                    {photo.preset ? (
+                        <span className={`${styles.chip} ${styles.chipPreset}`}>
+                            {photo.preset.label}
+                        </span>
+                    ) : null}
+                </figcaption>
+
+                <div className={styles.tileTools}>
+                    <button
+                        type="button"
+                        className={styles.tileTool}
+                        onClick={() => onEdit(photo)}
+                        aria-label="Retoucher dans Vision"
+                        title="Retoucher dans Vision"
+                    >
+                        <Wand2 size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.tileTool}
+                        onClick={() => onDelete(photo)}
+                        aria-label="Supprimer"
+                        title="Supprimer"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+
+                <button
+                    type="button"
+                    className={styles.tileSelect}
+                    data-selected={selected ? 'true' : 'false'}
+                    onClick={() => onToggle(photo.id)}
+                    aria-pressed={selected}
+                    aria-label={selected ? 'Retirer de la sélection' : 'Sélectionner'}
+                >
+                    <Check size={12} />
+                </button>
+
+                <span className={styles.tileRing} aria-hidden="true" />
+            </div>
+        </figure>
+    );
+});
 
 function Toolbar({
     count, weight, density, onDensity, devices, deviceFilter, onDeviceFilter,
@@ -144,7 +342,7 @@ export default function LibraryScreen() {
         visible, photos, status, importState, devices, presets,
         search, setSearch, deviceFilter, setDeviceFilter,
         presetFilter, setPresetFilter, sort, setSort,
-        importFiles, removePhoto, removeAll,
+        importFiles, removePhoto, removeAll, ensurePreview,
     } = library;
 
     /* Densite relue au premier rendu client. Le rendu serveur part de 4: sans
@@ -157,14 +355,57 @@ export default function LibraryScreen() {
     });
     const [containerWidth, setContainerWidth] = useState(0);
     const [lightboxIndex, setLightboxIndex] = useState(-1);
+    /* Etat distinct de `lightboxIndex`: la grille doit repartir vers l'avant
+       DES le debut de la fermeture, alors que le carrousel est encore monte le
+       temps de son fondu. */
+    const [zoomedOut, setZoomedOut] = useState(false);
     const [selection, setSelection] = useState(() => new Set());
     const [isDropping, setIsDropping] = useState(false);
 
     const gridRef = useRef(null);
     const gridObserver = useRef(null);
     const inputRef = useRef(null);
-    const tileNodes = useRef(new Map());
     const dragDepth = useRef(0);
+
+    /* Un seul observateur pour toute la grille, cree au premier rendu client. */
+    const [revealer] = useState(createRevealer);
+    useEffect(() => () => revealer?.disconnect(), [revealer]);
+
+    /*
+     * Rejeu de la vague au changement de densite.
+     *
+     * Redimensionner la grille, c'est la reconstruire: toutes les photos
+     * changent de taille et de place en meme temps. Les faire glisser une par
+     * une vers leur nouvelle case donne une bouillie; la reference, elle,
+     * efface tout et refait la vague. C'est aussi plus honnete: la grille
+     * qu'on regarde n'est plus la meme.
+     *
+     * L'ordre compte. On cache les tuiles AVANT que le navigateur peigne la
+     * nouvelle mise en page (d'ou `useLayoutEffect`), transitions coupees pour
+     * que la disparition soit instantanee, puis on rend les transitions et on
+     * remet les tuiles sous l'observateur a l'image suivante.
+     */
+    const replayedOnce = useRef(false);
+    useLayoutEffect(() => {
+        if (!replayedOnce.current) { replayedOnce.current = true; return; }
+        const grid = gridRef.current;
+        if (!grid || !revealer) return;
+        const nodes = [...grid.querySelectorAll('[data-testid="vibeos-library-tile"]')];
+        if (!nodes.length) return;
+        grid.dataset.replay = 'true';
+        nodes.forEach((node) => {
+            delete node.dataset.in;
+            node.style.removeProperty('--vo-reveal-delay');
+            revealer.unobserve(node);
+        });
+        const first = window.requestAnimationFrame(() => {
+            delete grid.dataset.replay;
+            window.requestAnimationFrame(() => {
+                nodes.forEach((node) => revealer.observe(node));
+            });
+        });
+        return () => window.cancelAnimationFrame(first);
+    }, [density, revealer]);
 
     /* La densite choisie survit au rechargement: c'est un reglage de confort,
        pas une donnee de projet. */
@@ -274,15 +515,50 @@ export default function LibraryScreen() {
            il reste sur la place liberee (donc sur la photo suivante). */
         setLightboxIndex((current) => {
             if (current < 0) return current;
-            if (visible.length <= 1) return -1;
+            if (visible.length <= 1) {
+                /* Derniere photo supprimee: le carrousel disparait, la grille
+                   doit revenir au premier plan avec lui. */
+                setZoomedOut(false);
+                return -1;
+            }
             return Math.min(current, visible.length - 2);
         });
     }, [removePhoto, visible.length]);
 
-    const getTileRect = useCallback((id) => {
-        const node = tileNodes.current.get(id);
-        return node ? node.getBoundingClientRect() : null;
+    /*
+     * Position de la grille relevee A L'OUVERTURE, quand elle est encore a
+     * l'echelle 1.
+     *
+     * C'est ce qui permet au carrousel de renvoyer la photo exactement sur sa
+     * tuile a la fermeture: a cet instant-la, la grille est en train de revenir
+     * de son agrandissement, donc lire le rectangle de la tuile a l'ecran
+     * donnerait une position fausse - celle d'une image intermediaire de
+     * l'animation. Ici on additionne un rectangle de mise en page (la masonry)
+     * a une origine mesuree hors animation: le resultat ne depend d'aucun
+     * mouvement en cours. La page ne defile pas pendant que le carrousel est
+     * ouvert, donc l'origine reste valable.
+     */
+    const gridOriginRef = useRef(null);
+
+    const openLightbox = useCallback((position) => {
+        gridOriginRef.current = gridRef.current?.getBoundingClientRect() || null;
+        setLightboxIndex(position);
+        setZoomedOut(true);
     }, []);
+
+    const getTileRect = useCallback((id) => {
+        const origin = gridOriginRef.current;
+        const rect = rects.get(id);
+        if (!origin || !rect) return null;
+        return {
+            left: origin.left + rect.x,
+            top: origin.top + rect.y,
+            width: rect.width,
+            height: rect.height,
+        };
+    }, [rects]);
+
+    const closeLightbox = useCallback(() => setLightboxIndex(-1), []);
 
     const weight = formatBytes(totalBytes(photos));
     const isEmpty = status === 'ready' && !photos.length;
@@ -291,6 +567,7 @@ export default function LibraryScreen() {
         <div
             className={styles.screen}
             data-testid="vibeos-library-screen"
+            data-lightbox={zoomedOut ? 'true' : 'false'}
             onDragEnter={onDragEnter}
             onDragOver={(event) => event.preventDefault()}
             onDragLeave={onDragLeave}
@@ -339,110 +616,62 @@ export default function LibraryScreen() {
                 </div>
             ) : null}
 
-            <div className={styles.body}>
-                {isEmpty ? (
-                    <div className={styles.empty}>
-                        <span className={styles.emptyIcon} aria-hidden="true"><Images size={26} /></span>
-                        <h2 className={styles.emptyTitle}>Ta bibliothèque est vide</h2>
-                        <p className={styles.emptyBody}>
-                            Dépose tes photos ici, ou importe un dossier entier. Elles restent
-                            enregistrées sur cet appareil : tu les retrouves à chaque ouverture,
-                            sans jamais les réimporter.
-                        </p>
-                        <Button
-                            variant="primary"
-                            size="lg"
-                            icon={<Upload size={15} />}
-                            onClick={() => inputRef.current?.click()}
+            <div className={styles.bodyWrap}>
+                {/* La grille se dissout sous la barre d'outils au lieu d'y buter. */}
+                <span className={styles.topVeil} aria-hidden="true" />
+
+                <div className={styles.body}>
+                    {isEmpty ? (
+                        <div className={styles.empty}>
+                            <span className={styles.emptyIcon} aria-hidden="true"><Images size={26} /></span>
+                            <h2 className={styles.emptyTitle}>Ta bibliothèque est vide</h2>
+                            <p className={styles.emptyBody}>
+                                Dépose tes photos ici, ou importe un dossier entier. Elles restent
+                                enregistrées sur cet appareil : tu les retrouves à chaque ouverture,
+                                sans jamais les réimporter.
+                            </p>
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                icon={<Upload size={15} />}
+                                onClick={() => inputRef.current?.click()}
+                            >
+                                Importer des photos
+                            </Button>
+                        </div>
+                    ) : (
+                        <div
+                            ref={attachGrid}
+                            className={styles.grid}
+                            style={{ height }}
+                            data-testid="vibeos-library-grid"
                         >
-                            Importer des photos
-                        </Button>
-                    </div>
-                ) : (
-                    <div
-                        ref={attachGrid}
-                        className={styles.grid}
-                        style={{ height }}
-                        data-testid="vibeos-library-grid"
-                    >
-                        {visible.map((photo, photoIndex) => {
-                            const rect = rects.get(photo.id);
-                            if (!rect) return null;
-                            const selected = selection.has(photo.id);
-                            return (
-                                <figure
-                                    key={photo.id}
-                                    ref={(node) => {
-                                        if (node) tileNodes.current.set(photo.id, node);
-                                        else tileNodes.current.delete(photo.id);
-                                    }}
-                                    className={styles.tile}
-                                    data-selected={selected ? 'true' : 'false'}
-                                    data-testid="vibeos-library-tile"
-                                    style={{
-                                        transform: `translate3d(${rect.x}px, ${rect.y}px, 0)`,
-                                        width: rect.width,
-                                        height: rect.height,
-                                    }}
-                                >
-                                    <button
-                                        type="button"
-                                        className={styles.tileOpen}
-                                        onClick={() => setLightboxIndex(photoIndex)}
-                                        aria-label={`Ouvrir ${photo.name}`}
-                                    >
-                                        <img src={thumbUrl(photo)} alt="" loading="lazy" decoding="async" />
-                                    </button>
+                            {visible.map((photo, photoIndex) => {
+                                const rect = rects.get(photo.id);
+                                if (!rect) return null;
+                                return (
+                                    <Tile
+                                        key={photo.id}
+                                        photo={photo}
+                                        position={photoIndex}
+                                        rect={rect}
+                                        selected={selection.has(photo.id)}
+                                        revealer={revealer}
+                                        onOpen={openLightbox}
+                                        onEdit={openInVision}
+                                        onDelete={handleDelete}
+                                        onToggle={toggleSelect}
+                                        onNeedPixels={ensurePreview}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
 
-                                    <figcaption className={styles.tileChips}>
-                                        <span className={styles.chip}>{deviceLabel(photo)}</span>
-                                        {photo.preset ? (
-                                            <span className={`${styles.chip} ${styles.chipPreset}`}>
-                                                {photo.preset.label}
-                                            </span>
-                                        ) : null}
-                                    </figcaption>
-
-                                    <div className={styles.tileTools}>
-                                        <button
-                                            type="button"
-                                            className={styles.tileTool}
-                                            onClick={() => openInVision(photo)}
-                                            aria-label="Retoucher dans Vision"
-                                            title="Retoucher dans Vision"
-                                        >
-                                            <Wand2 size={14} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={styles.tileTool}
-                                            onClick={() => handleDelete(photo)}
-                                            aria-label="Supprimer"
-                                            title="Supprimer"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        className={styles.tileSelect}
-                                        data-selected={selected ? 'true' : 'false'}
-                                        onClick={() => toggleSelect(photo.id)}
-                                        aria-pressed={selected}
-                                        aria-label={selected ? 'Retirer de la sélection' : 'Sélectionner'}
-                                    >
-                                        <Check size={12} />
-                                    </button>
-                                </figure>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {status === 'ready' && photos.length > 0 && visible.length === 0 ? (
-                    <p className={styles.noMatch}>Aucune photo ne correspond à ce filtre.</p>
-                ) : null}
+                    {status === 'ready' && photos.length > 0 && visible.length === 0 ? (
+                        <p className={styles.noMatch}>Aucune photo ne correspond à ce filtre.</p>
+                    ) : null}
+                </div>
             </div>
 
             {selection.size ? (
@@ -470,10 +699,12 @@ export default function LibraryScreen() {
                     photos={visible}
                     index={lightboxIndex}
                     onIndexChange={setLightboxIndex}
-                    onClose={() => setLightboxIndex(-1)}
-                    onEdit={(photo) => openInVision(photo)}
+                    onCloseStart={() => setZoomedOut(false)}
+                    onClose={closeLightbox}
+                    onEdit={openInVision}
                     onDelete={handleDelete}
                     getTileRect={getTileRect}
+                    onNeedPixels={ensurePreview}
                 />
             ) : null}
         </div>

@@ -1,6 +1,11 @@
 /* Bibliotheque photo VibeOS.
    Meme squelette que les autres ecrans: la page ne scrolle jamais, seule la
-   grille scrolle. Les tuiles sont positionnees en absolu par `masonry.js`. */
+   grille scrolle. Les tuiles sont positionnees en absolu par `masonry.js`.
+
+   Regle de mouvement tenue partout dans ce fichier: pendant une animation, on
+   ne touche QUE `opacity` et `transform`. Aucune largeur, aucun filtre, aucune
+   ombre ne bouge image par image - c'est ce qui garde la grille et le carrousel
+   sur le fil des 60 images par seconde meme avec cent photos montees. */
 
 .screen {
     position: relative;
@@ -11,6 +16,20 @@
     width: 100%;
     overflow: hidden;
     background: var(--vo-bg-sunken);
+
+    /* Courbes du module. `expo` sort tres vite puis se pose sans rebond: c'est
+       la sensation "glisse" du carrousel de reference. `soft` est sa version
+       courte pour les micro-etats (survol, puces). */
+    --vo-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --vo-ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    /* Courbe des APPARITIONS. Volontairement plus douce qu'`expo`: une
+       exponentielle sortante fait 90 % du chemin dans le premier quart, donc
+       une animation d'une seconde se lit comme un clignotement. Ici (cubique
+       sortante), la moitie du temps fait 87 % du chemin - le mouvement reste
+       lisible d'un bout a l'autre. Relevee sur la video de reference: a 27 %
+       de la duree, la tuile est a 66 % de sa course. */
+    --vo-ease-reveal: cubic-bezier(0.33, 1, 0.68, 1);
+    --vo-tile-radius: 4px;
 }
 
 .hiddenInput {
@@ -26,6 +45,8 @@
     padding: var(--vo-space-3) var(--vo-space-4);
     border-bottom: 1px solid var(--vo-line);
     background: var(--vo-bg);
+    position: relative;
+    z-index: 3;
 }
 
 .toolbarLead {
@@ -149,6 +170,7 @@
     background: var(--vo-surface);
     border-bottom: 1px solid var(--vo-line);
     overflow: hidden;
+    z-index: 3;
 }
 
 .importFill {
@@ -166,12 +188,86 @@
 }
 
 /* ---------- Grille ---------- */
-.body {
+/* `.bodyWrap` ne bouge jamais: il porte le voile du haut et le recadrage.
+   `.body` est la surface qui defile ET celle qui recule quand le carrousel
+   s'ouvre - une seule transformation composite pour tout le tapis de photos. */
+.bodyWrap {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
+}
+
+.body {
+    height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     padding: var(--vo-space-3);
+    transform-origin: 50% 42%;
+    /* Duree du RETOUR. L'aller est plus long (voir la regle
+       `[data-lightbox="true"]`): a l'ouverture la grille a le temps de
+       s'eloigner, a la fermeture elle doit etre revenue au moment ou la photo
+       se repose sur sa tuile. */
+    transition:
+        transform 620ms var(--vo-ease-reveal),
+        opacity 420ms var(--vo-ease);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.body::-webkit-scrollbar {
+    width: 10px;
+}
+
+.body::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16) padding-box;
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28) padding-box;
+}
+
+/* Carrousel ouvert: la grille recule et s'assombrit sans disparaitre. Elle doit
+   rester la, car c'est ELLE que le voile floute derriere la photo - c'est ce
+   fond marbre qu'on voit dans la reference, pas un flou de la photo courante. */
+.screen[data-lightbox="true"] .body {
+    /* Plus la grille recule, plus la photo est loin devant - c'est tout ce qui
+       fabrique la profondeur ici. Elle reste a 0,66 d'opacite parce qu'il faut
+       qu'il RESTE quelque chose a flouter derriere: un fond noir uni ne donne
+       aucune profondeur, seulement un trou. */
+    transform: scale(1.14);
+    opacity: 0.82;
+    will-change: transform, opacity;
+    transition:
+        transform 900ms var(--vo-ease-reveal),
+        opacity 700ms var(--vo-ease);
+}
+
+/* La barre d'outils recule avec la grille: c'est tout l'ecran qui passe
+   derriere le carrousel, pas seulement les photos. */
+.toolbar {
+    transition:
+        transform 620ms var(--vo-ease-reveal),
+        opacity 420ms var(--vo-ease);
+}
+
+.screen[data-lightbox="true"] .toolbar {
+    transform: scale(1.06);
+    opacity: 0.4;
+    transition:
+        transform 900ms var(--vo-ease-reveal),
+        opacity 700ms var(--vo-ease);
+}
+
+/* Le haut de la grille se dissout sous la barre d'outils au lieu d'y buter. */
+.topVeil {
+    position: absolute;
+    inset: 0 10px auto 0;
+    height: 28px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--vo-bg-sunken), transparent);
 }
 
 .grid {
@@ -184,16 +280,47 @@
     top: 0;
     left: 0;
     margin: 0;
-    border-radius: var(--vo-radius-sm);
-    overflow: hidden;
-    background: var(--vo-surface-2);
-    /* Le glissement des tuiles au changement de densite: seule la position est
-       animee en composite, la taille suit dans le meme temps. */
+    /* Le glissement des tuiles au changement de densite. La tuile EXTERIEURE ne
+       porte que la mise en page: sa transformation est reservee a la masonry. */
     transition:
         transform var(--vo-dur-4) var(--vo-ease-out),
         width var(--vo-dur-4) var(--vo-ease-out),
         height var(--vo-dur-4) var(--vo-ease-out);
     will-change: transform;
+}
+
+/* L'apparition vit sur une couche interieure: elle ne se bat donc jamais avec
+   la transformation de mise en page ci-dessus. Deux temps, comme la reference:
+   1. le cadre monte et se revele (ici), 2. la photo se fond dedans une fois
+   decodee (`.tileOpen img`). On ne voit jamais un rectangle vide arriver. */
+.tileInner {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--vo-tile-radius);
+    overflow: hidden;
+    background: var(--vo-surface-2);
+    opacity: 0;
+    /* La tuile s'ouvre depuis son propre centre, comme dans la reference: pas
+       de glissement lateral, pas de rebond. La duree est longue (1,15 s) et
+       l'amorti tres franc - c'est ce qui rend le mouvement lisible au lieu
+       d'un simple clignotement. */
+    transform: scale(0.62);
+    transition:
+        opacity 820ms var(--vo-ease) var(--vo-reveal-delay, 0ms),
+        transform 1000ms var(--vo-ease-reveal) var(--vo-reveal-delay, 0ms);
+}
+
+.tile[data-in="true"] .tileInner {
+    opacity: 1;
+    transform: none;
+}
+
+/* Le temps d'effacer la grille pour la refaire: aucune transition, sinon on
+   verrait les tuiles s'eteindre puis se rallumer. */
+.grid[data-replay="true"] .tile,
+.grid[data-replay="true"] .tileInner,
+.grid[data-replay="true"] .tileOpen img {
+    transition: none !important;
 }
 
 .tileOpen {
@@ -211,16 +338,55 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform var(--vo-dur-4) var(--vo-ease-out);
+    opacity: 0;
+    transition:
+        opacity 700ms var(--vo-ease),
+        transform 900ms var(--vo-ease-reveal);
+}
+
+.tileOpen img[data-loaded="true"] {
+    opacity: 1;
 }
 
 .tile:hover .tileOpen img {
-    transform: scale(1.03);
+    transform: scale(1.045);
 }
 
-.tile[data-selected="true"] {
-    outline: 2px solid var(--vo-accent);
-    outline-offset: -2px;
+/* Voile bas: les puces ne se posent jamais sur une zone claire de la photo. */
+.tileScrim {
+    position: absolute;
+    inset: 40% 0 0 0;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.6));
+    transition: opacity var(--vo-dur-3) var(--vo-ease);
+}
+
+.tile:hover .tileScrim,
+.tile:focus-within .tileScrim {
+    opacity: 1;
+}
+
+/* Le lisere de survol est peint sur une couche a part: une bordure animee
+   ferait relayouter la tuile a chaque image. */
+.tileRing {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: var(--vo-tile-radius);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    opacity: 0;
+    transition: opacity var(--vo-dur-2) var(--vo-ease);
+}
+
+.tile:hover .tileRing,
+.tile:focus-within .tileRing {
+    opacity: 1;
+}
+
+.tile[data-selected="true"] .tileRing {
+    opacity: 1;
+    box-shadow: inset 0 0 0 2px var(--vo-accent);
 }
 
 /* Puces d'indexation, comme dans la reference: appareil a gauche, look a droite. */
@@ -233,8 +399,8 @@
     gap: 6px;
     flex-wrap: wrap;
     opacity: 0;
-    transform: translateY(4px);
-    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+    transform: translate3d(0, 6px, 0);
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-3) var(--vo-ease-soft);
     pointer-events: none;
 }
 
@@ -274,8 +440,8 @@
     display: flex;
     gap: 4px;
     opacity: 0;
-    transform: translateY(-4px);
-    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+    transform: translate3d(0, -6px, 0);
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-3) var(--vo-ease-soft);
 }
 
 .tile:hover .tileTools,
@@ -427,87 +593,135 @@
     gap: var(--vo-space-2);
 }
 
-/* ---------- Carrousel plein ecran ---------- */
+/* ==========================================================================
+   Carrousel plein ecran
+   ==========================================================================
+   Trois couches, chacune avec son propre timing d'entree, dans cet ordre:
+   le voile, la photo, puis l'habillage. C'est ce decalage qui donne
+   l'impression que la photo "arrive" et que l'interface la suit, au lieu
+   d'un bloc qui apparait d'un coup. */
+
 .lightbox {
     position: fixed;
     inset: 0;
     z-index: 200;
     display: flex;
     flex-direction: column;
+    --vo-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --vo-ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    --vo-ease-reveal: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
+@keyframes voVeilIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes voVeilOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* L'entree vit sur une couche a part (`.slideEnter`), pas sur le cadre. Le
+   cadre, lui, porte l'etat de repos calcule depuis `--d`, qui n'est pas le meme
+   pour la photo courante et pour ses voisines. Deux couches, et l'entree finit
+   toujours sur `opacity: 1; transform: none` - donc plus rien ne saute au
+   moment ou elle est retiree, quelle que soit la place de la diapositive. */
+@keyframes voPhotoIn {
+    from { opacity: 0; transform: scale(0.86) translate3d(0, 26px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes voPhotoOut {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: scale(0.93) translate3d(0, 14px, 0); }
+}
+
+@keyframes voChromeIn {
+    from { opacity: 0; transform: translate3d(0, 8px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes voChromeOut {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translate3d(0, 6px, 0); }
+}
+
+/* Le voile ne floute pas la photo courante: il floute ce qu'il y a DESSOUS,
+   c'est-a-dire la grille qui vient de reculer. D'ou le fond marbre. */
 .lightboxBackdrop {
     position: absolute;
     inset: 0;
-    background: rgba(6, 6, 8, 0.96);
-    backdrop-filter: blur(28px);
+    /* Volontairement pas opaque: on doit deviner la grille derriere. C'est la
+       difference entre « une photo posee sur du noir » et « une photo devant
+       quelque chose ». */
+    background: rgba(7, 7, 9, 0.62);
+    backdrop-filter: blur(26px) saturate(1.25);
+    animation: voVeilIn 700ms var(--vo-ease) both;
 }
 
+.lightbox[data-state="closing"] .lightboxBackdrop {
+    animation: voVeilOut 420ms var(--vo-ease) both;
+}
+
+/* ---------- Habillage haut ---------- */
 .lightboxBar {
     position: relative;
-    z-index: 2;
+    z-index: 4;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--vo-space-4);
-    padding: var(--vo-space-3) var(--vo-space-4);
+    padding: var(--vo-space-4) var(--vo-space-5);
+    animation: voChromeIn 660ms var(--vo-ease-soft) 300ms both;
 }
 
-.lightboxMeta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
+.lightbox[data-state="closing"] .lightboxBar {
+    animation: voChromeOut 220ms var(--vo-ease) both;
 }
 
-.lightboxName {
-    font-size: var(--vo-text-sm);
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.lightboxSub {
-    font-size: var(--vo-text-xs);
-    color: var(--vo-text-3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.lightboxCount {
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.42);
+    padding-top: 6px;
 }
 
 .lightboxActions {
     display: flex;
     align-items: center;
-    gap: var(--vo-space-2);
+    gap: 6px;
     flex: 0 0 auto;
 }
 
-.lightboxCount {
-    font-family: var(--vo-font-numeric);
-    font-size: var(--vo-text-xs);
-    color: var(--vo-text-3);
-    margin-right: var(--vo-space-2);
-}
-
+/* Actions volontairement effacees: elles existent, mais elles ne se disputent
+   pas l'attention avec la photo. Elles se rallument au survol. */
 .lightboxButton {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     height: 30px;
     padding: 0 var(--vo-space-3);
-    border-radius: var(--vo-radius-pill);
-    border: 0;
-    background: var(--vo-accent);
-    color: var(--vo-text-on-accent);
-    font-size: var(--vo-text-xs);
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 10px;
     font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: background var(--vo-dur-1) var(--vo-ease);
+    transition:
+        color var(--vo-dur-2) var(--vo-ease),
+        border-color var(--vo-dur-2) var(--vo-ease),
+        background var(--vo-dur-2) var(--vo-ease);
 }
 
 .lightboxButton:hover {
-    background: var(--vo-accent-hover);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .lightboxIcon {
@@ -517,18 +731,23 @@
     width: 30px;
     height: 30px;
     border-radius: var(--vo-radius-sm);
-    border: 1px solid var(--vo-line);
-    background: var(--vo-surface);
-    color: var(--vo-text-2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.62);
     cursor: pointer;
-    transition: color var(--vo-dur-1) var(--vo-ease), border-color var(--vo-dur-1) var(--vo-ease);
+    transition:
+        color var(--vo-dur-2) var(--vo-ease),
+        border-color var(--vo-dur-2) var(--vo-ease),
+        background var(--vo-dur-2) var(--vo-ease);
 }
 
 .lightboxIcon:hover {
-    color: var(--vo-text);
-    border-color: var(--vo-line-strong);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
 }
 
+/* ---------- Scene ---------- */
 .lightboxStage {
     position: relative;
     z-index: 1;
@@ -543,34 +762,87 @@
     cursor: grabbing;
 }
 
+/* Rail a largeur variable: chaque diapositive fait la taille de SA photo, donc
+   le voisin qui depasse a droite n'a pas la meme laisse selon qu'il soit un
+   portrait ou un panoramique. C'est ce qui manque a un carrousel a colonnes
+   fixes, et c'est ce qui se voit tout de suite. */
 .lightboxTrack {
+    position: absolute;
+    top: 50%;
+    left: 0;
     display: flex;
-    width: 300%;
-    height: 100%;
-    /* Position de depart: la diapositive du milieu est centree. */
-    transform: translate3d(-33.3333%, 0, 0);
+    align-items: center;
+    /* Doit valoir exactement l'ecart utilise par le calcul du rail dans
+       `Lightbox.jsx`, sinon la photo courante n'est plus centree. */
+    column-gap: var(--vo-slide-gap, 44px);
+    will-change: transform;
 }
 
+/*
+ * `--d` : distance de la diapositive au centre de la scene, en nombre de
+ * photos. 0 = la photo courante, 1 = sa voisine immediate, 1,44 = eteinte.
+ *
+ * Tout l'etat de repos en decoule par formule - echelle, opacite, voile - au
+ * lieu d'etre un jeu de paliers `data-active`. Deux consequences:
+ * - au repos, changer `--d` declenche les transitions CSS: le fondu croise se
+ *   fait tout seul quand le rail glisse;
+ * - pendant un glissement au doigt, on ecrit `--d` en fraction (0,37 par
+ *   exemple) et les voisines suivent le doigt EN CONTINU au lieu de basculer
+ *   d'un palier a l'autre. C'est ce qui separe un carrousel qui bascule d'un
+ *   carrousel qu'on manipule.
+ */
 .slide {
+    --d: 1;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 33.3333%;
+}
+
+/* Couche d'entree: elle ne sert qu'a l'ouverture et a la fermeture, et finit
+   toujours a l'identite - donc elle ne perturbe jamais l'etat de repos. */
+.slideEnter {
+    width: 100%;
     height: 100%;
-    padding: var(--vo-space-4);
 }
 
 .slideFrame {
     position: relative;
-    max-width: 100%;
-    max-height: 100%;
-    /* Le cadre prend le rapport de la photo: le zoom partage part donc d'une
-       tuile de meme forme, sans deformation. */
+    width: 100%;
     height: 100%;
-    border-radius: var(--vo-radius-md);
     overflow: hidden;
-    box-shadow: var(--vo-shadow-3);
-    will-change: transform;
+    border-radius: var(--vo-tile-radius, 4px);
+    /* Aucun fond clair: le moindre liseré blanc autour d'une photo se voit. */
+    background: #0a0a0c;
+    box-shadow: 0 40px 96px -28px rgba(0, 0, 0, 0.88);
+    transform:
+        scale(calc(1 - 0.055 * clamp(0, var(--d), 1.5)))
+        translate3d(0, calc(clamp(0, var(--d), 1.5) * 10px), 0);
+    opacity: clamp(0, calc(1.84 - 1.36 * var(--d)), 1);
+    transition:
+        transform 620ms var(--vo-ease-reveal),
+        opacity 520ms var(--vo-ease);
+    will-change: transform, opacity;
+}
+
+/* Pendant le geste, plus aucune transition: la photo colle au doigt. */
+.lightboxTrack[data-dragging="true"] .slideFrame {
+    transition: none;
+}
+
+/* Voile sombre sur les voisines: dans la reference elles sont en retrait, pas
+   seulement plus petites. */
+.slideShade {
+    position: absolute;
+    inset: 0;
+    background: #06060a;
+    opacity: clamp(0, calc(var(--d) * 0.42), 0.42);
+    transition: opacity 520ms var(--vo-ease);
+    pointer-events: none;
+}
+
+.lightboxTrack[data-dragging="true"] .slideShade {
+    transition: none;
 }
 
 .slideThumb,
@@ -584,19 +856,42 @@
     -webkit-user-drag: none;
 }
 
+/* Aucun flou ici. La vignette n'est qu'un premier trait, le temps que la
+   pleine resolution se decode; la flouter faisait passer les voisines pour des
+   photos molles alors qu'elles etaient simplement en attente. */
 .slideThumb {
-    filter: blur(1px);
+    opacity: 0.999;
 }
 
 .slideFull {
     opacity: 0;
-    transition: opacity var(--vo-dur-3) var(--vo-ease);
+    transition: opacity 420ms var(--vo-ease);
 }
 
 .slideFull[data-ready="true"] {
     opacity: 1;
 }
 
+/* Original illisible: on ne laisse pas le navigateur dessiner son cadre
+   d'image cassee par-dessus la photo. L'apercu en dessous fait le travail. */
+.slideFull[data-failed="true"] {
+    display: none;
+}
+
+/* Entree des VOISINES seulement: elles montent en fondu, 150 ms apres la photo
+   centrale. Celle-ci, elle, est cueillie sur sa tuile par une animation
+   calculee dans `Lightbox.jsx` - une regle CSS ici l'ecraserait. */
+.lightbox[data-state="open"] .slide[data-active="false"] .slideEnter {
+    animation: voPhotoIn 900ms var(--vo-ease-reveal) 150ms both;
+}
+
+/* Seules les voisines se retirent en CSS: la photo centrale, elle, est
+   renvoyee vers sa tuile par une animation calculee dans `Lightbox.jsx`. */
+.lightbox[data-state="closing"] .slide[data-active="false"] .slideEnter {
+    animation: voPhotoOut 300ms var(--vo-ease) both;
+}
+
+/* ---------- Fleches ---------- */
 .lightboxNav {
     position: absolute;
     top: 50%;
@@ -605,38 +900,122 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    border: 1px solid var(--vo-line);
-    background: rgba(22, 22, 26, 0.7);
-    backdrop-filter: blur(16px);
-    color: var(--vo-text);
+    width: 48px;
+    height: 72px;
+    border: 0;
+    border-radius: var(--vo-radius-sm);
+    background: transparent;
+    color: #fff;
     cursor: pointer;
-    opacity: 0.7;
-    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+    opacity: 0.34;
+    transition: opacity var(--vo-dur-2) var(--vo-ease);
+    animation: voChromeIn 660ms var(--vo-ease-soft) 460ms both;
 }
 
 .lightboxNav:hover {
-    opacity: 1;
+    opacity: 0.9;
+}
+
+.lightbox[data-state="closing"] .lightboxNav {
+    animation: voChromeOut 220ms var(--vo-ease) both;
 }
 
 .lightboxNavPrev {
-    left: var(--vo-space-4);
+    left: 2px;
 }
 
 .lightboxNavNext {
-    right: var(--vo-space-4);
+    right: 2px;
 }
 
-.filmstrip {
+/* ---------- Habillage bas ---------- */
+.metaBar {
     position: relative;
-    z-index: 2;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-4) var(--vo-space-5);
+    animation: voChromeIn 660ms var(--vo-ease-soft) 360ms both;
+}
+
+.lightbox[data-state="closing"] .metaBar {
+    animation: voChromeOut 220ms var(--vo-ease) both;
+}
+
+.metaFacts {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-width: 0;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.metaFact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.metaFact svg {
+    opacity: 0.6;
+}
+
+.metaSep {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.metaFile {
+    flex: 0 1 auto;
+    font-family: var(--vo-font-numeric);
+    font-size: 10px;
+    font-style: italic;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.32);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------- Frise ---------- */
+/* La reference n'a pas de frise: elle ne doit donc pas etre la par defaut.
+   Elle remonte quand la souris approche du bas, ou des qu'on la met au clavier. */
+.filmstrip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 54px;
+    z-index: 3;
     display: flex;
     gap: 6px;
-    padding: var(--vo-space-3) var(--vo-space-4);
+    padding: var(--vo-space-3) var(--vo-space-5);
     overflow-x: auto;
     scrollbar-width: none;
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+    pointer-events: none;
+    transition:
+        opacity 260ms var(--vo-ease),
+        transform 380ms var(--vo-ease-expo);
+}
+
+.lightbox[data-strip="true"] .filmstrip,
+.filmstrip:focus-within {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.lightbox[data-state="closing"] .filmstrip {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+    pointer-events: none;
+    transition-duration: 180ms;
 }
 
 .filmstrip::-webkit-scrollbar {
@@ -645,15 +1024,15 @@
 
 .filmstripItem {
     flex: 0 0 auto;
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 1px solid transparent;
-    border-radius: var(--vo-radius-sm);
+    border-radius: var(--vo-tile-radius);
     background: var(--vo-surface-2);
     overflow: hidden;
     cursor: pointer;
-    opacity: 0.5;
+    opacity: 0.42;
     transition: opacity var(--vo-dur-2) var(--vo-ease), border-color var(--vo-dur-2) var(--vo-ease);
 }
 
@@ -665,7 +1044,7 @@
 
 .filmstripItem[data-active="true"] {
     opacity: 1;
-    border-color: var(--vo-accent);
+    border-color: rgba(255, 255, 255, 0.55);
 }
 
 .filmstripItem:hover {
@@ -696,16 +1075,56 @@
         display: none;
     }
 
+    .lightboxBar,
+    .metaBar {
+        padding: var(--vo-space-3);
+    }
+
+    .metaFile {
+        display: none;
+    }
+
+    /* Sur un ecran etroit la ligne de metadonnees ne tient pas: elle se coupe
+       en fondu plutot qu'a la hache. */
+    .metaFacts {
+        overflow: hidden;
+        gap: var(--vo-space-2);
+        mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    }
+
     .selectionBar {
         bottom: calc(var(--vo-tabbar-height) + var(--vo-space-3));
     }
 }
 
+/* Accessibilite: le mouvement est un confort, jamais une condition pour
+   comprendre l'ecran. Sans mouvement, tout est simplement deja en place. */
 @media (prefers-reduced-motion: reduce) {
     .tile,
+    .tileInner,
     .tileOpen img,
     .tileChips,
-    .tileTools {
-        transition-duration: 1ms;
+    .tileTools,
+    .body,
+    .toolbar,
+    .filmstrip,
+    .slideFrame,
+    .slideShade {
+        transition-duration: 1ms !important;
+        transition-delay: 0ms !important;
+    }
+
+    .lightboxBackdrop,
+    .lightboxBar,
+    .metaBar,
+    .lightboxNav,
+    .slideEnter {
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
+    }
+
+    .screen[data-lightbox="true"] .body,
+    .screen[data-lightbox="true"] .toolbar {
+        transform: none;
     }
 }

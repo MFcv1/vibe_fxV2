@@ -522,8 +522,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- compare-preset-vs-lightroom.mjs # La validation qui compte : notre rendu vs le rendu Lightroom sur une VRAIE photo, avec centiles. Applique l'orientation EXIF, sinon les deux images n'ont meme pas la meme taille. Convertit les deux cotes en sRVB par ColorSync (les JPEG recents sont en P3 : sans ca l'instrument est decale de 0,80/255). Depuis le 2026-08-19 il rend DEUX fois — couleur seule (LUT, en Node) et rendu COMPLET (renderStudio dans un Chromium, effets spatiaux compris) — ce qui donne l'ATTRIBUTION de l'ecart ; et il mesure la MATIERE (gradient) en separant contours et zones plates, parce qu'un effet peut avoir la bonne force ET faire monter l'ecart pixel a pixel. Grain force a 0 : deux bruits aleatoires ne se comparent pas. `--sans-effets` revient au comportement d'avant, `--sortie` ecrit notre rendu
 |   |-- compare-vision-presets-on-photos.mjs # Comparaison des presets sur de vraies photos : ECRETAGE ajoute (matiere detruite), force du look, derive du ciel/vegetation/peau
 |   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
+|   |-- aligner-paire-avant-apres.mjs # ALIGNE ses deux captures d'ecran « Avant / Apres » et en sort deux images superposables. Sans ca on comparerait le ciel d'une image au toit de l'autre : le cadre ne tombe pas au meme endroit d'une capture a l'autre, et une des trois paires est en plus RECADREE de 2,6 %. L'alignement se fait sur le GRADIENT, jamais sur la couleur — c'est justement la couleur qui change. Coupe le fond NOIR de Lightroom (5 300 blocs a zero dans une des paires) en cherchant la plus longue suite de lignes non noires, parce qu'un balayage depuis le bord s'arrete sur le mot « Avant » que Lightroom pose DANS la bande
+|   |-- mesurer-paires-powlisher.mjs # Ce que son traitement fait, mesure sur des paires ALIGNEES : la seule source du projet ou l'on connait l'ENTREE ET la SORTIE de la meme image. Compare des BLOCS de 8x8 plats, jamais des pixels — deux captures rejouees ont du bruit JPEG, et au pixel chaque contour fabrique une fausse couleur. Sert aussi de bibliotheque (`blocs()`)
+|   |-- verifier-presets-sur-paires.mjs # LE CLASSEMENT DES PRESETS FACE A LA VERITE TERRAIN, en DEUX tableaux. SANS exposition libre: le preset applique tel quel, c'est ce qu'on voit dans l'app, et c'est le chiffre qui a fait naitre `powV2`. AVEC exposition libre: chaque candidat recoit le gain qui l'arrange et on ne compare plus que la COULEUR — utile parce que ses trois retouches sont a -1,85 / -0,22 / -0,56 EV, son curseur et pas un preset. Ecart dE76 median par paire
 |   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
 |   |-- planche-showcase.mjs          # LA PLANCHE AVEC LES EFFETS. `planche-presets.mjs` ne montre que la LUT, et le dit; or grain, vignetage et relief ne SONT pas dans la LUT. Celle-ci lance donc le VRAI moteur (studioRenderer) dans un Chromium, en servant src/ en statique: ce qu'on regarde est ce que l'app affiche. Sort deux planches — le cadre entier (vignetage, look) et un carre a 1:1 JAMAIS redimensionne (grain, relief), parce que reduire une image MOYENNE son grain. Imprime aussi l'assombrissement du vignetage en niveaux /255
+|   |-- verifier-neutre.mjs           # LE TRI DU TAS NEUTRE, et surtout ce qu'il NE fait PAS. `trier-biblio.mjs` pose trois questions; la troisieme (« porte-t-elle le meme traitement ? ») serait une FAUTE ici — dans le tas neutre l'heterogeneite est la qualite recherchee, et ecarter les photos atypiques reviendrait a lui fabriquer un style. Ne garde donc que « est-ce une photo ? », plus les quasi-doublons (dHash 16x16: l'empreinte 8x8 du projet a ete essayee et jetee, sur des couchants elle ne decrit plus rien). Sort une planche, parce que « est-ce vraiment un couchant ? » ne se tranche qu'a l'oeil
+|   |-- grouper-couchants.mjs         # Range SES couchants en sous-familles appariees au tas neutre (`coucher-mer`, `coucher-paysage`, `coucher-ville`). Sans ca ils restent etiquetes `mer` ou `auto` et sont compares a des plages de MIDI: on mesurerait la scene et pas le traitement. La selection est faite A L'OEIL et c'est assume — aucun seuil ne separe « couchant » de « pas couchant » sans filtrer sur la chaleur, or c'est la chaleur qu'on va mesurer
+|   |-- ciel-couchant-1-1.mjs         # LE DEGRADE DE CIEL A 1:1, JAMAIS REDIMENSIONNE. C'est le gradient le plus dur de la photographie pour une LUT: orange a l'horizon, bleu au zenith, en passant par la chroma quasi nulle — la ou un split-tone comprime les teintes voisines. Une planche reduite MOYENNE les pixels et cacherait une bande de deux niveaux qui se verra en plein chez l'utilisateur. Choisit seul le ciel le plus LISSE du tas neutre, celui qui revele une bande s'il y en a une, et montre le temoin non traite a cote
 |   |-- mesure-mire-c.mjs             # L'instrument de la mire C: amplification zone par zone d'un export Lightroom (nettete, texture, clarte). Les trois reseaux SINUSOIDAUX font foi — un sinus ne contient qu'une echelle, une barre nette les contient toutes. Ne lit que le COEUR de chaque zone (marge 70 px). La raideur du bord doux se mesure sur profil LISSE: en brut, elle lisait le maximum du BRUIT (2,00 la ou la transition vaut 1,26) et faisait passer du bruit ajoute pour un bord raidi
 |   |-- rendu-mire-c.mjs              # Le symetrique du precedent: passe la mire C dans NOTRE moteur, dans un Chromium (les etages spatiaux s'appuient sur ctx.filter = blur(), qui n'existe pas en Node — les reimplementer donnerait un chiffre sur du code que personne n'execute). `--safeSmartphone false` pour mesurer au-dela des bornes sures
 |   |-- audit-reglages-avances.mjs     # LE BANC D'ESSAI DES REGLAGES: passe chacun des 31 reglages supportes dans le VRAI moteur (Chromium, renderStudio) a plusieurs valeurs, garde-fous actifs ET coupes, et mesure ce qui bouge a l'ecran. Repond a « ce reglage fait-il quelque chose », la question qu'aucun test statique ne pose. Mire batie expres: rampe de gris, peaux, ciel, feuillage, NEONS (sans haute lumiere COLOREE la halation parait morte alors qu'elle est faite pour ca), reseaux sinusoidaux, voile. Verdict a DEUX criteres — moyenne OU ecart franc sur une part du cadre — parce qu'un effet local a une moyenne minuscule sans etre invisible
@@ -609,6 +615,99 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-27 ter (`couchant` : un tas neutre de couchants, et trois registres abandonnes)
+
+**Ce qui a change dans l'arbre** : `scripts/verifier-neutre.mjs`,
+`scripts/grouper-couchants.mjs`, `scripts/ciel-couchant-1-1.mjs` ajoutes.
+Modifies : `moissonner-neutre.mjs` (+4 familles, filtre de titre, rejet des
+oeuvres d'art, plafond par auteur), `visionPresets.js` (**+1 preset, aucune
+suppression**), `smoke-vision-preset.mjs` (185 -> **197**). `todo.md` ramene de
+499 a 224 lignes; `docs/archive-calages-lightroom-2026-08-27.md` et
+`docs/pieges-connus.md` crees.
+
+**CE QUI MANQUAIT AU PROJET N'ETAIT PAS UN PRESET, C'ETAIT UN TAS D'EN FACE.**
+Les douze familles neutres etaient toutes diurnes. Mesurer ses couchants contre
+elles aurait repondu « couchant contre midi » — la scene, pas le traitement — et
+rendu un preset qui rechauffe tout. Quatre familles de couchant ont donc ete
+moissonnees sur Commons. Trois defauts ont ete trouves A LA PLANCHE, chacun
+corrige dans le moissonneur :
+
+| ce qu'on a vu | pourquoi c'est grave | remede |
+|---|---|---|
+| des rizieres de plein midi dans `coucher-paysage` | Commons indexe par LIEU, pas par heure | le TITRE doit nommer l'heure — l'auteur l'a ecrit, pas nous |
+| des toiles de Friedrich, encadrees | une peinture n'a ni capteur, ni courbe, ni balance des blancs | filtre negatif, puis une passe a l'oeil |
+| **vingt vues de la meme ville depuis la meme colline** | le tas neutre ne tient que si des retouches INDIVIDUELLES s'annulent | **au plus 3 photos par televerseur** |
+
+Le troisieme est le plus instructif. Une detection par empreinte a ete essayee
+d'abord et JETEE: sur des couchants, qui ont tous un ciel clair en haut et un sol
+sombre en bas, une empreinte 8x8 ne decrit presque plus rien et ecartait 20
+photos sans rapport sur 44. Ce sont les identifiants Commons qui ont trahi le
+lot — ils se suivaient. Le bon critere n'etait pas dans les pixels.
+
+**LE TRANSPORT REDEVIENT UTILISABLE QUAND LES DEUX TAS MONTRENT LA MEME SCENE.**
+Partout ailleurs le projet refuse un transport de quantiles, parce qu'il emporte
+l'exposition du tas qui l'a produit. Ici: point blanc **215** chez les couchants
+neutres contre **207** chez lui, contraste 173 contre 182. L'ecart d'exposition a
+disparu — et c'est la preuve, au passage, que ses couchants sont sombres a cause
+du contre-jour et non d'un reglage. La courbe est donc le transport tel quel,
+pente minimale 0,500, sommet ramene de 255 a 237 pour ne pas ecreter.
+
+**LA TROUVAILLE** : le a\*. Chez `ambre` il finit a -0,36, donc a zero. Ici il
+DESCEND vers les hautes lumieres, jusqu'a **-5,71**. Un couchant a un soleil
+orange; il en retire le magenta et ne garde que le jaune. C'est l'ecart entre un
+couchant de cinema et un couchant de carte postale, et aucun preset du projet ne
+le faisait.
+
+**MAIS IL A FALLU LE BRIDER, ET C'EST LE SEUL NOMBRE NON BRUT DU PRESET.** Pose
+tel quel, -5,71 rend un blanc a RGB 232,**239**,220 — le vert devant le rouge,
+exactement la panne deja payee une fois (un grand ciel a contre-jour vire au
+vert-gris). Deux raisons de le brider, la seconde comptant plus que la premiere :
+
+1. la regle dure du projet, verifiee sur toute la famille : a\* >= -2 dans le
+   blanc ;
+2. **le releve se compte deux fois.** L'etalonnage est pris sur les QUASI-GRIS;
+   dans un couchant, les quasi-gris du haut sont du CIEL PALE — deja traite, et
+   fortement, par la rotation du secteur bleu (-19,8 degres). Le meme virage vers
+   le teal est mesure une fois comme rotation et une fois comme etalonnage. La
+   rotation ne touche que ce qui a une teinte; le decalage fixe, lui, bave sur
+   tous les gris, y compris ceux d'une photo sans ciel.
+
+Premiere correction essayee puis JETEE: plafonner chaque bande separement. Le
+critere « R - G >= 2 » applique aux ombres, dont le b\* est a +0,23, ramenait leur
+a\* a zero, alors qu'`ambre` descend a -2,76 sans que personne n'y trouve rien a
+redire — la regle dure ne porte que sur le BLANC. Retenu a la place: **un seul
+facteur**, 1,90 / 5,71 = 0,3327, applique a toute la table. Le blanc tombe pile
+sur le seuil et la FORME mesuree est intacte.
+
+**TROIS REGISTRES SUR QUATRE SONT ABANDONNES**, et c'est le corpus qui le dit :
+
+| registre | ce qu'on a trouve |
+|---|---|
+| `heure-bleue` | **UNE SEULE** photo dans tout son corpus. Ses nuits sont de la vraie nuit. |
+| `contre-jour` | 4 ou 5 photos — sous le plancher « dix photos ne se mesurent pas ». |
+| `heure-doree` / `sunset-sobre` separes | le point blanc s'etale de 123 a 238 **en continu**, sans la coupure nette qui avait justifie les deux densites d'`ambre`. |
+
+Recensement fait a l'oeil sur les douze planches de familles: **23 couchants**
+dans 320 photos. C'est la reserve principale de ce preset, et elle est ecrite
+dans sa description.
+
+**Verifie** : `test:vision-preset` **197** verifications. `juger-vers-modele`
+donne **55 %** du chemin vers son modele, contre 34 % a `ambre` — le preset gagne
+son existence sur son propre registre. Peau a 34,4 degres (la limite etait 35,8),
+feuillage a 99,5 sans virer au citron, aucun contour (-1,86x). Le degrade de ciel
+a **1:1, jamais redimensionne** (`ciel-couchant-1-1.mjs`, script neuf) ne montre
+**aucune bande** sur trois ciels.
+
+**FAIBLESSE HONNETE, mesuree et non cachee** : `couchant` ne bouge presque pas la
+teinte du ciel (3 % du chemin) la ou `powlisher-cine` en fait 48 %. La cause est
+une interaction entre deux grandeurs mesurees: sa coupe de chroma (x0,71 dans les
+medians) desature le ciel SOUS le seuil ou la rotation de teinte s'applique
+pleinement (`smoothstep(3, 14)`). La corriger voudrait dire ecraser l'une des
+deux mesures. A l'oeil, le preset retire nettement le rose des ciels magenta —
+ce qui est le but — mais eteint l'or des soleils dores. **C'est le point a
+trancher par le porteur du projet**, et il n'entre pas dans
+`docs/presets-valides.md` avant.
 
 ## Journal — 2026-08-28 (les presets de nuit a deux densites)
 
@@ -2612,11 +2711,13 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   compte comme « illisibles par ce navigateur » au lieu d'echouer en silence
   (Safari, lui, les accepte).
 
-- **Carrousel** (`Lightbox.jsx`) : zoom partage FLIP depuis la tuile cliquee
-  (l'animation porte sur le cadre au rapport de la photo, donc aucune
-  deformation), vignette deja decodee affichee au premier trait puis fondu vers
-  la pleine resolution, rail de trois diapositives, glissement au doigt ecrit
-  directement sur le DOM, fermeture par glissement vertical, frise, clavier.
+- **Carrousel** (`Lightbox.jsx`) : rail a largeur variable (chaque diapositive
+  fait la taille de SA photo), une voisine visible de chaque cote, ouverture en
+  fondu-zoom, vignette deja decodee affichee au premier trait puis fondu vers la
+  pleine resolution, glissement au doigt ecrit directement sur le DOM, fermeture
+  par glissement vertical, frise escamotable, clavier. **Refait le 2026-08-29**
+  — voir le journal du jour ; le zoom partage FLIP depuis la tuile n'existe
+  plus.
 
 - **Avant/apres refait** (`shared/BeforeAfter.jsx`). L'ancien bouton « maintiens
   le clic » avait trois defauts structurels : il perdait l'appui des que le
@@ -3191,6 +3292,321 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   Mixkit ou Pexels. Droits (ils sont servis à tous les visiteurs) et cohérence
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
+
+## Journal — 2026-08-29 ter (`powV2` : la courbe qui manquait a `powlishermain`)
+
+**Ce qui a change dans l'arbre** : `scripts/verifier-powlishermain.mjs` renomme
+en `scripts/verifier-presets-sur-paires.mjs` (il sort desormais DEUX tableaux).
+Modifies : `src/features/vibefx-studio/utils/visionPresets.js` (+`powV2`, 22e
+preset ; `mainMelangeur`/`mainBandeCiel` factorises en `melangeurLab`/
+`bandeCielLab`, partages par les deux ; aucun autre preset touche),
+`scripts/smoke-vision-preset.mjs` (+17 verifications, 231 au total),
+`docs/paires-avant-apres-powlisher-2026-08-29.md`.
+
+**Pourquoi.** `powlishermain` refusait de toucher a la luminosite, et la mesure
+lui donnait raison : les trois retouches ne different que par un gain (-1,85 /
+-0,22 / -0,56 EV), donc un curseur d'exposition. **Regarde a l'ecran, ce refus
+etait un defaut** : applique a ses trois AVANT, le rendu restait nettement plus
+clair et plus plat que son APRES, sur les trois. Le porteur du projet l'a
+constate en rejouant les trois paires dans l'app. Lecon generale : un ecart
+mesure a exposition libre ne dit RIEN de ce que l'utilisateur voit.
+
+**Ce qui a ete cherche.** Aucune courbe ne peut passer par les trois — a L* 42
+d'entree il sort 19,8 / 39,5 / 34,9, et une fonction ne rend pas trois valeurs
+pour une entree. On cherche donc le meilleur compromis, en minimisant le dE76
+median des trois paires a la fois **sans exposition libre**. Trois familles
+essayees :
+
+| famille | dE76 moyen | verdict |
+|---|---|---|
+| 21 noeuds libres | 3,21 | **refusee** : courbe en zigzag (plateaux et sauts), surapprend sur trois photos, poserait des bandes |
+| droite libre (L = 1,05 L - 10) | 3,84 | **refusee** : envoie a zero tout sous L* 9,5 — le volant et la console du brouillard perdent leur dessin |
+| droite + pied doux, point noir mesure, pente >= 0,30 | 4,51 | **retenue** |
+
+Le meilleur chiffre n'a pas gagne, deux fois. C'est le point du lot : **un
+preset n'a pas le droit de detruire de la matiere pour gagner un dixieme
+d'ecart**, et une courbe libre sur trois photos n'est pas une mesure.
+
+Le point noir, lui, n'est pas un reglage : ses trois photos posent leur tranche
+L* 0-5 a 2,4 / 3,2 / 0,1, et la premiere ancre est ramenee a 0 parce qu'un
+facteur commun aux trois canaux ne peut pas eclaircir un pixel deja noir —
+pretendre le contraire faisait exploser le gain pres de zero. Cout mesure de ce
+choix : 0,05 de dE76 sur une seule paire.
+
+La courbe s'applique comme une EXPOSITION — un facteur commun aux trois canaux
+en lumiere lineaire — et pas sur le seul L\*. Ce n'est pas equivalent :
+assombrir retire de la chroma, baisser le L* en Lab la laisserait intacte et
+rendrait des couleurs criardes. Le virage et le melangeur ont donc ete
+reajustes sous la courbe (les rouges remontent de x1,03 a x1,14, les verts
+descendent de x0,40 a x0,36).
+
+**Resultat**, dE76 median, **sans** exposition libre — ce qu'on voit dans l'app :
+
+| preset | nuit | brouillard | restaurant | moyenne |
+|---|---|---|---|---|
+| rien | 17,24 | 7,91 | 10,41 | 11,85 |
+| **`powV2`** | **8,52** | **2,34** | **2,81** | **4,56** |
+| `powlisher-cine` | 11,17 | 3,90 | 5,32 | 6,80 |
+| `powlishermain` | 15,08 | 4,36 | 9,44 | 9,63 |
+
+**61,6 % de l'ecart repris**, contre 18,8 % pour `powlishermain`. Le brouillard
+et le restaurant tombent au niveau du bruit des captures. La nuit reste a 8,52 :
+son edit de nuit est 1,3 EV plus bas que ce qu'une courbe commune peut rendre,
+et c'est irreductible sans etage de tonalite adaptatif. Avec exposition libre —
+la couleur seule — `powV2` passe aussi devant `powlishermain` (2,61 contre
+3,15) : le reajustement sous la courbe a ameliore la couleur elle-meme.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 231/231. Regarde a
+l'oeil sur les trois paires et sur quatre photos peu retouchees, plus un degrade
+de ciel a 1:1 : l'ecart moyen entre deux lignes voisines passe de 0,76 a
+0,79/255, donc aucune bande ajoutee. **`powV2` attend le regard du porteur du
+projet avant d'entrer dans `docs/presets-valides.md`.**
+
+## Journal — 2026-08-29 bis (`powlishermain` : le premier preset cale sur des avant/apres certains)
+
+**Ce qui a change dans l'arbre** : `scripts/aligner-paire-avant-apres.mjs`,
+`scripts/mesurer-paires-powlisher.mjs`, `scripts/verifier-powlishermain.mjs` et
+`docs/paires-avant-apres-powlisher-2026-08-29.md` ajoutes. Modifies :
+`src/features/vibefx-studio/utils/visionPresets.js` (+`powlishermain`, 21e
+preset, aucun autre touche) et `scripts/smoke-vision-preset.mjs` (+17
+verifications, 214 au total).
+
+**La source.** Le 12 novembre 2025, `@powl_d` repond a un lecteur par trois
+posts portant chacun deux captures de son ecran Lightroom : la meme photo avant
+et apres. Station-service de nuit, autoroute dans le brouillard, table de
+restaurant. **Ce n'est pas la paire ecartee le 2026-08-12** (celle-la etait
+passee par une IA generative et avait coute trois presets) : ici la meme image
+est des deux cotes, sans autre intermediaire que la dalle et le JPEG de X.
+C'est la premiere fois que le projet connait une ENTREE.
+
+**Trois pieges de mesure, tous invisibles dans les moyennes.** Le fond de
+Lightroom est NOIR et pas gris : les bandes d'une photo qui n'a pas le format de
+l'ecran donnaient 5 300 blocs a zero dans la paire du brouillard, qui ecrasaient
+tout le bas de la courbe. La bande grise `#1D1D1D` sous l'image entrait dans le
+cadre et donnait 400 blocs identiques des deux cotes. Et une des trois paires
+est RECADREE (echelle 1,026, decalage -29 px) : trouvee par correlation sur le
+gradient, parce que la couleur — la seule chose qui change — ne peut pas servir
+de reference. 43 691 blocs de 8x8 apres nettoyage.
+
+**Ce que la mesure a trouve, et qui contredit ce qu'on croyait.**
+
+1. **Sa courbe ne fait rien.** En lumiere lineaire, les trois retouches sont un
+   simple gain : 0,277 / 0,856 / 0,680, soit -1,85 / -0,22 / -0,56 EV. Une fois
+   ce gain retire, la courbe qui reste est l'identite a +-2 L* pres sur toute la
+   plage. Trois valeurs aussi eloignees ne sont pas un preset : c'est son
+   curseur d'exposition. `powlishermain` ne touche donc PAS a la luminosite —
+   et c'est la meme chose que dit `todo.md` sous « l'etage de tonalite
+   adaptatif », vue par l'autre bout : il ne suit pas la densite de la scene
+   avec une courbe, il la suit a la main.
+2. **Le « coup de saturation sur les rouges » n'existe pas.** En mesure brute il
+   vaut x1,38 ; il disparait des qu'on pose le virage d'abord. Ajouter du b* a
+   un rouge le pousse vers l'orange ET lui ajoute de la chroma. C'est le virage
+   qu'on voyait. Une fois pose, les rouges sont a x1,03-1,06 : rien.
+3. **`powlisher-ciel` avait raison contre `powlisher`.** Son ciel de nuit part de
+   223 degres TSL et arrive a 192. C'est exactement la fenetre 190-199 trouvee
+   le 2026-08-12 sur son corpus, par une methode sans aucun rapport. Deux
+   sources independantes, le meme point d'arrivee : c'est une CONVERGENCE.
+
+**Ce qu'on n'a pas invente.** Rien entre 135 et 250 degres Lab (verts francs,
+cyans) ni au-dela de 308 (magentas, roses) : les trois photos y sont muettes, le
+melangeur y est a l'identite. Trois photos, c'est une source certaine, ce n'est
+pas une source large.
+
+**Resultat mesure**, chaque candidat ayant droit a sa propre exposition libre —
+sans quoi le classement mesurerait surtout qui assombrit : dE76 median 6,81 sans
+rien, **3,15 avec `powlishermain`**, contre 5,43 pour `powlisher-cine`, 5,49
+pour `ambre` et 6,10 pour `powlisher`. **53,8 % de l'ecart de couleur repris**,
+et la paire du brouillard tombe a 1,73 — le plancher de bruit des captures. Ce
+qui reste est du travail photo par photo : la paire de nuit garde ses hautes
+lumieres 17 L* au-dessus de ce qu'un gain seul predit.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 214/214. Regarde a
+l'oeil sur les trois paires (avant / notre rendu / son apres) et sur quatre
+photos peu retouchees, plus un degrade de ciel a 1:1 — aucune bande, aucun
+contour, amplification dans un voile a -1,33x sous `powlisher`. **Le preset
+attend le regard du porteur du projet avant d'entrer dans
+`docs/presets-valides.md`.**
+
+Detail chiffre : [docs/paires-avant-apres-powlisher-2026-08-29.md](docs/paires-avant-apres-powlisher-2026-08-29.md).
+
+## Journal — 2026-08-29 (bibliothèque : la grille et le carrousel de la référence)
+
+Refonte du **mouvement** de `/creer/bibliotheque` sur la référence donnée par
+l'utilisateur (deux vidéos de `@powl_d`, la grille et la lightbox). L'en-tête
+Apple-OS de VibeOS ne bouge pas : c'est l'atmosphère des photos qui change.
+Fichiers touchés : `library/LibraryScreen.jsx`, `library/Lightbox.jsx`,
+`library/library.module.css`.
+
+**Règle tenue partout : pendant une animation, seuls `opacity` et `transform`
+bougent.** Aucune largeur, aucun filtre, aucune ombre n'est animée image par
+image — c'est ce qui tient les 60 im/s avec cent photos montées.
+
+- **Les tuiles ont deux couches.** La `figure` porte la **mise en page** (le
+  `translate3d` et la taille calculés par la masonry), une couche intérieure
+  porte le **mouvement** (apparition, survol). Sans cette séparation, changer la
+  densité pendant qu'une tuile apparaît écrase l'une des deux transformations.
+
+- **Apparition en deux temps, comme la référence** : le cadre monte et se révèle
+  (16 px, 460/620 ms, expo-out), puis la photo se fond dedans une fois **décodée**
+  (`data-loaded`). On ne voit jamais un rectangle vide arriver puis se remplir.
+
+- **La vague est ordonnée à la main.** Un `IntersectionObserver` révèle les
+  tuiles à l'entrée dans le champ (`rootMargin` 280/340 px), pas au montage :
+  avec cent photos, tout animer au montage revient à jouer cent animations hors
+  écran. **Piège trouvé en mesurant** : l'observateur ne promet aucun ordre et
+  livre en pratique les tuiles **une par une, à l'envers** — la vague remontait
+  du bas à droite. On accumule donc les arrivées de l'image en cours
+  (`requestAnimationFrame`) et on ne décide des retards qu'au moment de poser,
+  triés par `data-position`. Vérifié sur un rechargement à 16 photos :
+  `0, 26, 52 … 234 ms` dans l'ordre de lecture.
+
+- **La bouffée dure 60 ms, pas 140.** Un chargement de page révèle tout en une
+  ou deux images ; un **import** ajoute les photos une par une, à ~100 ms
+  d'intervalle. Avec une fenêtre longue, la seizième photo importée héritait du
+  retard cumulé des quinze précédentes (338 ms d'attente). Elle arrive
+  maintenant tout de suite.
+
+- **Le carrousel a un rail à largeur variable.** Chaque diapositive fait la
+  taille de sa propre photo (70 % de la hauteur utile, au plus 50 % de la
+  largeur ; 68 %/84 % sous 860 px). Un portrait laisse donc voir large de ses
+  voisines, un panoramique les repousse presque hors champ — c'est exactement ce
+  qui distingue la référence d'un carrousel à colonnes fixes.
+
+- **Une voisine visible de chaque côté, pas deux.** Les diapositives à deux crans
+  restent montées (il faut de la réserve quand le rail part) mais sont
+  transparentes. Elles se révèlent **pendant** le glissement, parce que la
+  réserve suit `visual`, l'index visé, qui bascule dès le début du geste.
+
+- **Bug attrapé à la capture** : le rail calculait les positions avec un écart de
+  44 px entre diapositives que le DOM n'appliquait pas — la photo courante était
+  décentrée de 88 px, et de la moitié de l'écran sur téléphone. L'écart vit
+  maintenant dans `--vo-slide-gap`, posé sur la racine du carrousel et lu par le
+  `column-gap` du rail : une seule source pour le calcul et pour le DOM.
+
+- **Ouverture : fondu puis zoom, pas de FLIP.** La photo arrive centrée à 90 %
+  et se déplie (520 ms), les voisines suivent à 90 ms, l'habillage à 180 ms.
+  Pendant ce temps **la grille recule** (`scale(1.07)`, opacité 0,55) au lieu de
+  disparaître : c'est elle que le voile floute par `backdrop-filter`, et c'est ce
+  qui donne le fond marbré de la référence. Un voile qui flouterait la photo
+  courante ne donnerait pas du tout la même image.
+
+- **Les animations d'entrée ne vivent que pendant l'entrée.** Passé 700 ms on
+  repasse en `idle`. Sinon le sélecteur `data-active` se remettait à matcher à
+  chaque changement de photo et le zoom d'ouverture se rejouait — le carrousel
+  « sautait » à chaque flèche. Les voisines ont leurs propres images-clés, qui
+  finissent sur **leur** état de repos : sinon elles sautaient au moment où
+  l'animation d'entrée est retirée.
+
+- **L'habillage suit la référence** : compteur monospace en haut à gauche, actions
+  effacées et croix en haut à droite, ligne de métadonnées en petites capitales
+  espacées en bas à gauche, nom de fichier en italique à droite, chevrons nus aux
+  bords. **La frise n'est pas dans la référence** : elle ne remonte que quand la
+  souris descend dans les 150 derniers pixels, ou au clavier — la fonction reste,
+  elle ne s'impose plus.
+
+### Deuxième passe, le même jour (retour de l'utilisateur)
+
+Trois reproches, tous fondés : **trop rapide**, **images pas en pleine qualité**,
+**carrousel pas assez travaillé**. Ce qui a changé :
+
+- **La courbe d'apparition, d'abord.** Le problème n'était pas la durée mais
+  l'amorti : une exponentielle sortante fait 90 % du chemin dans le premier
+  quart, donc une animation d'une seconde se lisait comme un clignotement.
+  Mesuré sur la vidéo de référence, image par image : à 27 % de la durée la
+  tuile est à **66 %** de sa course, à 47 % elle est à **87 %**. C'est une
+  cubique sortante, pas une exponentielle. D'où `--vo-ease-reveal:
+  cubic-bezier(0.33, 1, 0.68, 1)`, et la tuile qui s'ouvre depuis
+  **`scale(0.62)`** en 1 s, décalage de **70 ms** par tuile.
+
+- **Le clic sur la densité refait la grille.** Redimensionner, c'est
+  reconstruire : toutes les photos changent de case en même temps, et les faire
+  glisser une par une donne une bouillie. On efface, on repose, on rejoue la
+  vague — comme la référence. L'ordre compte : les tuiles sont cachées
+  **avant** que le navigateur peigne la nouvelle mise en page (`useLayoutEffect`,
+  transitions coupées), puis remises sous l'observateur à l'image suivante.
+
+- **La vignette passe de 720 à 1600 px.** 720 px étirés dans une tuile Retina de
+  740 px, ça se voit : la grille avait l'air floue alors que la photo était
+  nette. Et les photos **déjà importées** ne sont pas laissées de côté : quand
+  une tuile charge sa vignette, elle compare le `naturalWidth` réel à ce qu'elle
+  demande en pixels écran et, si l'écart est vrai, `ensurePreview` refabrique la
+  vignette et l'écrit dans IndexedDB. **À la demande, jamais en masse** — une
+  migration au démarrage redécoderait deux cents JPEG de 8 Mo pour des tuiles
+  que personne ne regardera. Vérifié de bout en bout : vignettes rabaissées à
+  300 px dans IndexedDB, rechargement, elles remontent **et sont réécrites**.
+
+- **Dans le carrousel, les voisines chargeaient en `lazy`.** Elles restaient sur
+  leur vignette une seconde et passaient pour des photos molles. Toute
+  diapositive visible charge maintenant sa pleine résolution tout de suite, et
+  le `blur(1px)` posé sur la vignette d'attente a sauté.
+
+- **La profondeur.** Le voile est passé de 0,84 à **0,74** d'opacité et la grille
+  recule plus loin (`scale(1.16)`) en restant à **0,66** — il faut qu'il RESTE
+  quelque chose à flouter derrière. Un fond noir uni ne donne pas de la
+  profondeur, seulement un trou.
+
+- **Le carrousel n'a plus de paliers.** Chaque diapositive porte `--d`, sa
+  distance au centre en nombre de photos, et son échelle, son opacité et son
+  voile en découlent par formule. Au repos, changer `--d` déclenche les
+  transitions — le fondu croisé se fait tout seul. Pendant un geste, on écrit
+  `--d` **en fraction** (0,37) et les voisines suivent le doigt en continu au
+  lieu de basculer d'un cran à l'autre. C'est ce qui sépare un carrousel qui
+  bascule d'un carrousel qu'on manipule.
+
+- **Piège corrigé au passage** : l'animation d'entrée vivait sur le cadre, dont
+  l'état de repos dépend maintenant de `--d`. Elle a sa propre couche
+  (`.slideEnter`) qui finit toujours à l'identité — sinon les voisines sautaient
+  au moment où l'animation était retirée.
+
+### Troisième passe, le même jour (le carrousel, fini)
+
+- **Le « contour blanc » autour des photos était un cadre d'image cassée.** Pas
+  une bordure : Safari dessine un cadre gris, le nom du fichier et un point
+  d'interrogation par-dessus une image qui n'a pas pu se décoder. En rendant les
+  voisines `eager` à la passe précédente, on lançait le décodage de **trois
+  originaux en même temps** — des PNG de 10 Mo dans la bibliothèque de
+  l'utilisateur — et Safari lâchait. Correctif : **seule la photo centrale monte
+  sa pleine résolution**, les voisines s'arrêtent à l'aperçu 1600 px (elles sont
+  affichées à ~500 px CSS, l'aperçu les rend déjà nettes). Et l'original porte
+  `alt=""` avec un `data-failed` qui le retire du flux : s'il échoue quand même,
+  le navigateur ne dessine RIEN, l'aperçu en dessous fait le travail. Le fond
+  clair du cadre (`rgba(255,255,255,0.03)`) est passé en `#0a0a0c` — le moindre
+  liseré clair autour d'une photo se voit.
+
+- **Le carrousel demande aussi ses pixels.** `ensurePreview` n'était appelé que
+  par les tuiles de la grille ; les voisines du carrousel seraient restées sur
+  un aperçu 720 px pour toujours.
+
+- **On distingue mieux la galerie derrière** : voile 0,74 → **0,62**, flou 32 →
+  26 px, grille à **0,82** d'opacité. C'est ce qui fait la profondeur.
+
+- **La photo est cueillie sur sa tuile, et rendue à sa tuile.** Les deux sens,
+  symétriques, en animation calculée (`Element.animate`) :
+  - **la position d'arrivée ne peut pas être lue sur la tuile.** Au moment de la
+    fermeture, la grille est en train de revenir de son agrandissement : son
+    rectangle à l'écran est celui d'une image intermédiaire d'animation.
+    `getTileRect` additionne donc le rectangle de mise en page de la masonry à
+    l'origine de la grille **relevée à l'ouverture**, quand elle était encore à
+    l'échelle 1. Exact, et indépendant de tout mouvement en cours.
+  - **l'échelle du trajet est uniforme**, calculée sur la largeur : une tuile n'a
+    pas toujours exactement le rapport de sa photo (la masonry borne les formats
+    extrêmes), et une échelle à deux axes déformerait la photo en plein vol.
+  - **tuile hors champ** (on a navigué loin dans la collection) : pas de trajet
+    vers un point invisible, on recule sur place.
+  - **piège** : l'effet d'ouverture ne peut pas avoir des dépendances vides. Au
+    tout premier rendu la scène n'est pas mesurée, donc aucune diapositive
+    n'existe — l'effet ne trouvait rien et le trajet ne se jouait jamais. Il
+    attend `layout` et se protège par un drapeau.
+  - le retour de la grille est plus court que l'aller (620 ms contre 900) pour
+    qu'elle soit revenue au moment où la photo se repose.
+
+- **Gates** : `npm run lint` vert, `npm run test:vibeos-library` vert (8 tests
+  EXIF, 8 masonry, 1 parcours navigateur complet, rejeu de densité compris).
+  `npm run build` **échoue pour une raison antérieure et étrangère au lot** :
+  `better-sqlite3` est compilé pour `NODE_MODULE_VERSION 127` alors que le Node
+  installé attend `147`, ce qui fait tomber `/api/reset`. Un
+  `npm rebuild better-sqlite3` réglera ça, aucun fichier de ce lot n'est en
+  cause.
 
 ## Journal — 2026-08-03 (lot B3b — les 15 dernières transitions)
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { deletePhoto, listPhotos, putPhoto } from './libraryDb';
-import { buildPhotoRecord, deviceLabel } from './photoImport';
+import { buildPhotoRecord, deviceLabel, makePreview, PREVIEW_MAX } from './photoImport';
 
 /*
  * Etat de la bibliotheque: liste, import, filtres, tri.
@@ -37,6 +37,14 @@ function releaseUrls(id) {
         if (url) URL.revokeObjectURL(url);
         cache.delete(id);
     });
+}
+
+/* Seule la vignette est liberee: la pleine resolution peut etre affichee au
+   meme instant par le carrousel, la revoquer la ferait disparaitre. */
+function releaseThumbUrl(id) {
+    const url = thumbUrls.get(id);
+    if (url) URL.revokeObjectURL(url);
+    thumbUrls.delete(id);
 }
 
 export const SORTS = [
@@ -118,6 +126,35 @@ export default function useLibrary() {
         setPhotos((current) => current.filter((photo) => !removed.has(photo.id)));
     }, []);
 
+    /*
+     * Refabrique la vignette d'une photo quand la tuile qui l'affiche demande
+     * plus de pixels que ce qui est stocke.
+     *
+     * A la demande, jamais en masse: une migration au demarrage redecoderait
+     * toute la bibliotheque - deux cents JPEG de 8 Mo - pour des tuiles que
+     * l'utilisateur ne regardera peut-etre jamais. Ici, seule une tuile
+     * reellement affichee et reellement trop grande declenche le travail, et
+     * une seule fois: le resultat est ecrit dans IndexedDB.
+     */
+    const upgrading = useRef(new Set());
+    const ensurePreview = useCallback(async (photo, neededSide) => {
+        if (!photo || upgrading.current.has(photo.id)) return;
+        const stored = Math.max(photo.thumbWidth || 0, photo.thumbHeight || 0);
+        const source = Math.max(photo.width || 0, photo.height || 0);
+        /* Rien a gagner: soit la vignette est deja assez grande, soit la photo
+           d'origine n'a pas plus de pixels a donner, soit on est au plafond. */
+        if (stored && stored >= neededSide) return;
+        if (stored >= Math.min(PREVIEW_MAX, source)) return;
+        upgrading.current.add(photo.id);
+        const preview = await makePreview(photo.blob, PREVIEW_MAX);
+        if (!preview) return;
+        const next = { ...photo, ...preview };
+        await putPhoto(next);
+        releaseThumbUrl(photo.id);
+        if (!mountedRef.current) return;
+        setPhotos((current) => current.map((item) => (item.id === photo.id ? next : item)));
+    }, []);
+
     /* Mise a jour d'un champ de metadonnee (preset applique, favori). */
     const patchPhoto = useCallback(async (id, patch) => {
         let next = null;
@@ -179,6 +216,6 @@ export default function useLibrary() {
         deviceFilter, setDeviceFilter,
         presetFilter, setPresetFilter,
         sort, setSort,
-        importFiles, removePhoto, removeAll, patchPhoto,
+        importFiles, removePhoto, removeAll, patchPhoto, ensurePreview,
     };
 }
