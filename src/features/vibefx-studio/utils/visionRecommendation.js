@@ -13,7 +13,7 @@
  */
 
 import { DEFAULT_FILTERS } from '../hooks/useStudioFilters';
-import { normalizeVisionFilters } from './visionColorScience';
+import { normalizeVisionFilters } from './visionColorScience.js';
 import {
     applyFusedPixelOps,
     applyPerceptualIntensityBlend,

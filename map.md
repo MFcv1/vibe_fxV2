@@ -3294,6 +3294,69 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 septies (`powV6` : le premier effet de POSITION mesure)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/canvasUtils.js`
+(+`applyDegradeBas`), `src/features/vibefx-studio/engine/studioRenderer.js`
+(etage 7 bis), `src/features/vibefx-studio/utils/visionColorScience.js` (cle et
+bornes `degradeBas`), `src/features/vibeos/vision/useVisionEditor.js` (le preset
+peut le porter, et le panneau l'annonce), `visionPresets.js` (+`powV6`, 26e
+preset), `scripts/smoke-vision-preset.mjs` (+9 verifications, 272 au total).
+
+**La question.** Une fois `powV5` pose, ce qui restait sur sa photo de nuit
+n'etait plus une couleur. Ecart en diaphragmes, du haut vers le bas du cadre:
+
+      +0,05   <- le plafond de la station: juste au centieme pres
+      +1,0    <- la station et la moto: il est plus CLAIR
+      -1,1
+      -2,5    <- le sol: il est BIEN plus sombre
+
+**LE VIGNETAGE NE PEUT PAS REPONDRE A CA, et c'est mesure**: il est RADIAL, donc
+il assombrirait aussi le haut, qui est deja juste. `powV5` seul fait 5,41 de
+dE76; `powV5` plus vignetage fait 5,46 a 5,99 selon la dose, de 10 a 100. Le
+vignetage EMPIRE le rendu, quelle que soit la force. Une courbe plus contrastee
+ne fait pas mieux non plus: une recherche large sur trois parametres (pente,
+decalage, epaule) retombe sur 3,08 — le meme chiffre que `powV5`. **3,08 est le
+plancher d'une table de couleurs sur cette image.**
+
+**L'effet ajoute.** `applyDegradeBas`: une rampe verticale qui part du MILIEU du
+cadre et descend jusqu'en bas, en lumiere lineaire, sans la protection des
+hautes lumieres du vignetage (un degrade de Lightroom est un curseur
+d'exposition pose sur un masque, il n'epargne rien). Un seul curseur: 100 =
+quatre diaphragmes au bas du cadre.
+
+Le point de depart de la rampe a ete CHERCHE, pas choisi: de 0,40 a 0,60 de la
+hauteur l'ecart obtenu va de 3,10 a 3,03. La courbe est plate, donc le milieu
+est aussi bon que le meilleur — un parametre de moins, et rien de perdu.
+
+**UN PIEGE ATTRAPE PAR SON PROPRE TEST.** La premiere version quantifiait le
+gain en 64 paliers, comme le fait le vignetage. Mesure sur un aplat: 4/255
+d'ecart entre deux lignes voisines, et **ce chiffre ne baissait pas quand
+l'image grandissait** (4/255 a 101 lignes comme a 1 200). Ce n'etait donc pas la
+pente du degrade, c'etait la marche de la quantification — une bande. Le gain ne
+depend que de la LIGNE: on calcule donc une table par ligne (256 puissances,
+2 ms sur 1 200 lignes) et la quantification disparait au lieu d'etre reduite.
+Mesure apres correction: 1/255 a 401 comme a 1 200 lignes.
+
+**Resultat**, chaine complete de l'app (LUT + effets spatiaux), sur sa photo de
+nuit: `powV2` 10,37, `powV4` 8,94, `powV5` 5,41, **`powV6` 3,03**.
+
+**RESERVE**: le degrade est un geste de COMPOSITION. Il suppose que le bas du
+cadre est un premier plan qu'on veut faire taire. Sur une photo dont le sujet est
+en bas, il l'efface. C'est aussi le premier preset du projet a porter un effet
+de position: `powlisher-showcase` en portait un (vignetage 8), mais choisi a
+l'oeil; celui-ci est mesure, forme comprise.
+
+**Note d'hygiene**: `canvasUtils.js` et `visionRecommendation.js` importaient
+`./visionColorScience` sans extension — valide pour le bundler, invalide pour
+Node, ce qui empechait tout test d'importer le moteur (le smoke lisait le
+fichier en TEXTE pour verifier la loi de la clarte). Extension ajoutee: le
+degrade est teste en appelant la vraie fonction.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 272/272,
+`npm run test:vision-filters` vert. **`powV6` attend le regard du porteur du
+projet.**
+
 ## Journal — 2026-08-29 sexies (`powV5`, et une erreur de niveau corrigee)
 
 **Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/visionPresets.js`

@@ -26,7 +26,7 @@ import { buildAutoEnhancement } from './autoEnhance';
 
 /* Cles que le preset s'approprie quand il en porte: elles ne peuvent pas vivre
    dans une LUT (elles dependent des pixels voisins ou de la position). */
-const PRESET_SPATIAL_KEYS = ['texture', 'clarity', 'sharpness', 'dehaze', 'grain', 'grainSize', 'vignette'];
+const PRESET_SPATIAL_KEYS = ['texture', 'clarity', 'sharpness', 'dehaze', 'grain', 'grainSize', 'vignette', 'degradeBas'];
 
 /* Les memes noms que dans le panneau des reglages: on annonce ce que le preset
    pose avec les mots que l'utilisateur voit ensuite bouger. */
@@ -38,6 +38,7 @@ const SPATIAL_LABELS = {
     grain: 'grain',
     grainSize: 'grosseur du grain',
     vignette: 'vignettage',
+    degradeBas: 'dégradé du bas',
 };
 
 const withoutPresetSpatials = (filters) => {

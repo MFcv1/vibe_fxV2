@@ -2431,6 +2431,35 @@ export const VISION_PRESETS = [
         transform: powV5Transform,
     },
     {
+        id: 'powV6',
+        label: 'PowV6',
+        hint: 'PowV5, plus le dégradé du bas — le seul qui reproduise sa structure',
+        description: 'La même table de couleurs que `PowV5`, plus un **dégradé du bas**. '
+            + 'C\'est le premier preset du projet à porter un effet de POSITION mesuré '
+            + 'et non choisi. Une fois `PowV5` posé, ce qui restait sur sa photo de '
+            + 'nuit n\'était plus une couleur : c\'était un dégradé vertical — son '
+            + 'plafond était juste au centième de diaphragme près, son sujet un '
+            + 'diaphragme plus clair, et son sol **2,5 diaphragmes plus sombre**. Le '
+            + 'vignetage ne peut pas répondre à ça : il est radial, donc il '
+            + 'assombrirait aussi le haut, qui est déjà juste — et la mesure le '
+            + 'confirme, `PowV5` plus vignetage donne 5,46 à 5,99 selon la dose contre '
+            + '5,41 sans, il EMPIRE le rendu. Le dégradé, lui, fait passer l\'écart de '
+            + '**5,41 à 3,03**. Sa force, 66, est mesurée ; sa forme (rampe partant du '
+            + 'milieu du cadre) a été cherchée et le milieu s\'est révélé aussi bon que '
+            + 'le meilleur point — un paramètre de moins. RÉSERVE : le dégradé est un '
+            + 'geste de composition. Il suppose que le bas du cadre est un premier '
+            + 'plan qu\'on veut faire taire. Sur une photo dont le sujet est en bas, '
+            + 'il l\'efface.',
+        bestFor: 'une scène nocturne au sujet centré, avec un premier plan (sol, '
+            + 'route, table) qu\'on veut faire disparaître dans le noir',
+        avoidFor: 'toute photo dont le sujet est dans le bas du cadre — il l\'éteint. '
+            + 'Et le plein jour, comme `PowV5`. Pour la même couleur sans le dégradé, '
+            + 'prendre `PowV5`',
+        spatialFilters: { degradeBas: 66 },
+        recommendedIntensity: 100,
+        transform: powV5Transform,
+    },
+    {
         id: 'powlisher-showcase',
         label: 'Powlisher Showcase',
         hint: 'Clair-obscur : le sujet garde sa couleur, le décor la perd',

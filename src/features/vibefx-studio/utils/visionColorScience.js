@@ -15,6 +15,7 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'grainSize',
     'grainRoughness',
     'vignette',
+    'degradeBas',
     'tintColor',
     'tintIntensity',
     'filterIntensity',
@@ -126,6 +127,15 @@ export const VISION_SAFE_BOUNDS = {
     grainRoughness: { min: 0, max: 100, neutre: 50 },
     vignette: { min: 0, max: 30, neutre: 0 },
     /*
+     * LE DEGRADE DU BAS. Ajoute le 2026-08-29, mesure sur la paire de nuit de
+     * `@powl_d`: apres avoir cale couleur et courbe, ce qui restait etait un
+     * degrade VERTICAL de 2,5 diaphragmes sur le sol, qu'aucun vignetage radial
+     * ne peut porter. 100 = quatre diaphragmes au bas du cadre; le reglage
+     * mesure sur sa photo vaut 66. Plafond du mode sur: 80, au-dela le bas du
+     * cadre n'a plus de matiere.
+     */
+    degradeBas: { min: 0, max: 80, neutre: 0 },
+    /*
      * AJOUTES LE 2026-08-17. Ces huit bornes existaient deja, mais ECRITES EN
      * DUR dans `normalizeVisionFilters` juste en dessous — donc invisibles pour
      * une interface, qui proposait alors ses propres chiffres. Mesure faite ce
@@ -169,6 +179,7 @@ export const VISION_FREE_BOUNDS = {
     grainSize: { min: 0, max: 100, neutre: 25 },
     grainRoughness: { min: 0, max: 100, neutre: 50 },
     vignette: { min: 0, max: 100, neutre: 0 },
+    degradeBas: { min: 0, max: 100, neutre: 0 },
     /*
      * Hors garde-fous, `normalizeVisionFilters` ne borne RIEN (elle sort avant).
      * Ces plafonds ne sont donc pas appliques par le moteur: ils disent a
@@ -283,6 +294,7 @@ export function normalizeVisionFilters(filters = {}) {
     next.fadedBlacks = clampSafe(next.fadedBlacks || 0, 'fadedBlacks', 0, isMono);
     next.halation = clampSafe(next.halation || 0, 'halation', 0);
     next.vignette = clampSafe(next.vignette || 0, 'vignette', 0);
+    next.degradeBas = clampSafe(next.degradeBas || 0, 'degradeBas', 0);
     next.grain = clampSafe(next.grain || 0, 'grain', 0, isMono);
     /* Au repos c'est 25, la valeur de Lightroom — pas 0, qui donnerait des
        grains PLUS FINS qu'un pixel et un bruit plus fort. */

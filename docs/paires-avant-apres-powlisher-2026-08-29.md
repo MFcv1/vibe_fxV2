@@ -408,3 +408,92 @@ en compense une autre.
 **RÉSERVE, la plus lourde du projet** : une photo, un sujet, une lumière.
 `powV2` tient sur trois scènes sans rapport ; `powV4` ne tient que sur celle-là,
 et ne doit pas être lu comme une mesure de son style.
+
+---
+
+# `powV6` — le dégradé du bas, premier effet de POSITION mesuré
+
+## Ce qui restait après `powV5`
+
+Écart en diaphragmes entre son rendu et le nôtre, du haut vers le bas du cadre :
+
+```
+    +0,05   ← le plafond de la station : juste au centième près
+    +1,0    ← la station et la moto : il est plus CLAIR
+    -1,1
+    -2,5    ← le sol : il est BIEN plus sombre
+```
+
+Ce n'est plus une couleur. C'est un **dégradé vertical**.
+
+## Pourquoi le vignetage ne peut pas le faire — mesuré, pas supposé
+
+Le vignetage est **radial** : il assombrirait aussi le haut du cadre, qui est
+déjà juste. Le chiffre le dit sans ambiguïté :
+
+| | dE76 médian |
+|---|---|
+| `powV5` seul | **5,41** |
+| `powV5` + vignetage 10 | 5,56 |
+| `powV5` + vignetage 20 → 100 | 5,46 → 5,99 |
+
+**Le vignetage empire le rendu à toutes les doses.** Et poser le vignetage sur
+une courbe plus claire (`powV4`, qui matche le sujet) ne rattrape pas non plus :
+son meilleur réglage donne 5,86, toujours au-dessus de `powV5` seul.
+
+Une **courbe plus contrastée** ne fait pas mieux non plus : une recherche large
+sur trois paramètres (pente de 0,40 à 1,60, décalage de −30 à +2, épaule de 0,50
+à 1,80) retombe sur **3,08** — exactement le chiffre de `powV5`. **3,08 est le
+plancher d'une table de couleurs sur cette image.**
+
+## L'effet ajouté
+
+`applyDegradeBas` dans `canvasUtils.js`, étage 7 bis du renderer. Une rampe
+verticale qui part du **milieu du cadre** et descend jusqu'en bas, en lumière
+linéaire, **sans** la protection des hautes lumières que porte le vignetage — un
+dégradé de Lightroom est un curseur d'exposition posé sur un masque, il
+n'épargne rien.
+
+Un seul curseur : **100 = quatre diaphragmes** au bas du cadre. Le réglage de
+`powV6` vaut **66**.
+
+Le point de départ de la rampe a été **cherché, pas choisi** :
+
+| départ | meilleure force | dE76 |
+|---|---|---|
+| 0,40 | ×0,17 | 3,10 |
+| **0,50** | **×0,16** | **3,03** |
+| 0,55 | ×0,15 | 3,03 |
+| 0,65 | ×0,11 | 3,18 |
+
+La courbe est plate entre 0,40 et 0,60 : le milieu du cadre est aussi bon que le
+meilleur point. **Un paramètre de moins, et rien de perdu.**
+
+## Un piège attrapé par son propre test
+
+La première version quantifiait le gain en **64 paliers**, comme le fait le
+vignetage. Mesure sur un aplat : **4/255** d'écart entre deux lignes voisines —
+et **ce chiffre ne baissait pas quand l'image grandissait** (4/255 à 101 lignes
+comme à 1 200). Ce n'était donc pas la pente du dégradé, c'était la marche de la
+quantification. Une bande, exactement ce que le projet refuse partout ailleurs.
+
+Le gain ne dépend que de la **ligne** : on calcule donc une table par ligne (256
+puissances, 2 ms sur 1 200 lignes) et la quantification **disparaît** au lieu
+d'être réduite. Après correction : **1/255** à 401 comme à 1 200 lignes.
+
+## Le résultat
+
+Chaîne complète de l'app (LUT + effets spatiaux), sur sa photo de nuit :
+
+| preset | dE76 médian |
+|---|---|
+| `powV2` | 10,37 |
+| `powV4` | 8,94 |
+| `powV5` | 5,41 |
+| **`powV6`** | **3,03** |
+
+**RÉSERVE** : le dégradé est un geste de **composition**. Il suppose que le bas
+du cadre est un premier plan qu'on veut faire taire. Sur une photo dont le sujet
+est en bas, il l'efface. C'est le premier preset du projet à porter un effet de
+position dont la **forme** comme la **force** sortent d'une mesure —
+`powlisher-showcase` en portait un aussi (vignetage 8), mais choisi à l'œil.

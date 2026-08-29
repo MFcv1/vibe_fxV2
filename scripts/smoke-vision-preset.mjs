@@ -27,6 +27,7 @@ import {
 } from '../src/features/vibefx-studio/utils/haldClut.js';
 import { parseXmpPreset, verifierDomaineSpatial } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 import { visionBoundsFor } from '../src/features/vibefx-studio/utils/visionColorScience.js';
+import { applyDegradeBas } from '../src/features/vibefx-studio/utils/canvasUtils.js';
 import {
     GRAIN_ATTENUATION,
     GRAIN_NOISE_TABLE,
@@ -1633,6 +1634,83 @@ function teinteLab(rgb) {
         derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
     }
     check('powV4 n\'a pas bouge en accueillant powV5', derive, 0, 1);
+}
+
+/* ---------- powV6 : le degrade du bas, un effet de POSITION mesure ----------
+ *
+ * Premier effet spatial du projet dont la forme ET la force sortent d'une
+ * mesure. Il existe parce que le vignetage ne pouvait PAS repondre au probleme:
+ * sur la photo qui l'a motive, `powV5` seul fait 5,41 de dE76 et `powV5` plus
+ * vignetage fait 5,46 a 5,99 selon la dose — le vignetage, radial, assombrit le
+ * haut du cadre, qui etait deja juste. Le degrade fait 3,03.
+ */
+{
+    /* Un contexte de canvas minimal: l'effet ne fait que lire et reecrire des
+     * pixels, il n'a besoin de rien d'autre. */
+    const faireCtx = (w, h, valeur) => {
+        const data = new Uint8ClampedArray(w * h * 4);
+        for (let i = 0; i < w * h; i += 1) {
+            data[i * 4] = valeur; data[i * 4 + 1] = valeur;
+            data[i * 4 + 2] = valeur; data[i * 4 + 3] = 255;
+        }
+        const image = { data, width: w, height: h };
+        return { image, getImageData: () => image, putImageData: () => {} };
+    };
+    const versLin = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    /* 401 lignes, pas 101: sur une image minuscule la pente REELLE du degrade
+     * suffit a faire 4/255 entre deux lignes, et le test ne dirait plus rien de
+     * la quantification. A 401 comme a 1 200 lignes, la mesure donne 1/255. */
+    const W = 8, H = 401;
+    const lire = (ctx, y) => ctx.image.data[(y * W) * 4];
+
+    /* 1. AU REPOS, IL NE FAIT RIEN. */
+    const repos = faireCtx(W, H, 180);
+    applyDegradeBas(repos, W, H, 0);
+    check('dégradé : à 0 il ne fait rien', Math.abs(lire(repos, H - 1) - 180), 0, 0);
+
+    /* 2. LE HAUT ET LE MILIEU NE BOUGENT PAS: la rampe part du milieu du cadre.
+     * C'est ce qui le distingue d'un vignetage, et c'est la raison d'etre de
+     * l'effet — le haut de la photo mesuree etait deja juste. */
+    const ctx = faireCtx(W, H, 180);
+    applyDegradeBas(ctx, W, H, 66);
+    check('dégradé : le haut du cadre ne bouge pas', Math.abs(lire(ctx, 0) - 180), 0, 0);
+    check('dégradé : le milieu du cadre ne bouge pas', Math.abs(lire(ctx, (H - 1) / 2) - 180), 0, 1);
+
+    /* 3. LE BAS TOMBE DE CE QU'ON A MESURE. L'echelle est: 100 = quatre
+     * diaphragmes; le reglage de `powV6` vaut 66, soit -2,64. */
+    const chute = Math.log2(versLin(lire(ctx, H - 1)) / versLin(180));
+    check('dégradé : le bas tombe de la valeur mesurée', chute, -2.85, -2.45, ' diaph');
+
+    /* 4. LA RAMPE EST MONOTONE ET LISSE: aucune ligne plus claire que celle du
+     * dessus, et aucun saut visible d'une ligne a l'autre. */
+    let monotone = true;
+    let sautMax = 0;
+    for (let y = 1; y < H; y += 1) {
+        const v = lire(ctx, y), p = lire(ctx, y - 1);
+        if (v > p) monotone = false;
+        sautMax = Math.max(sautMax, p - v);
+    }
+    check('dégradé : la rampe ne remonte jamais', monotone ? 1 : 0, 1, 1);
+    /* Ce test a servi: la premiere version quantifiait le gain en 64 paliers et
+     * posait 4/255 de marche, sans que ca baisse quand l'image grandissait —
+     * une bande. Le gain est desormais calcule ligne par ligne. */
+    check('dégradé : aucune marche de quantification', sautMax, 0, 2, ' /255');
+
+    /* 5. IL EST BORNE COTE MOTEUR, comme tous les reglages du projet. */
+    const bornes = visionBoundsFor('degradeBas');
+    check('dégradé : borné côté moteur', bornes && bornes.max > 0 ? 1 : 0, 1, 1);
+
+    /* 6. powV6 PORTE LE REGLAGE MESURE, et sa couleur est exactement celle de
+     * `powV5`: seul l'effet spatial les separe. */
+    const p6 = VISION_PRESETS.find((p) => p.id === 'powV6');
+    check('powV6 : porte le dégradé mesuré', p6?.spatialFilters?.degradeBas ?? 0, 66, 66);
+    const v5 = getPresetTransform('powV5');
+    let ecart = 0;
+    for (const rgb of [[0.2, 0.3, 0.5], [0.8, 0.2, 0.2], [0.5, 0.5, 0.5], [1, 1, 1]]) {
+        const a = p6.transform(rgb), b = v5(rgb);
+        ecart = Math.max(ecart, Math.max(...a.map((v, i) => Math.abs(v - b[i]) * 255)));
+    }
+    check('powV6 : sa couleur est celle de powV5, au bit près', ecart, 0, 0);
 }
 
 /* ---------- rapport ---------- */

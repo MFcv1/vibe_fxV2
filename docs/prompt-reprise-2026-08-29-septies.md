@@ -1,4 +1,4 @@
-# Prompt de reprise — 2026-08-29 quinquies (après `powV2`, `powV3` et `powV4`)
+# Prompt de reprise — 2026-08-29 septies (après la série `powV2` … `powV6`)
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
 `presets-mesures-sur-corpus`).
@@ -19,8 +19,8 @@ les autres `docs/prompt-reprise-*`, `node_modules/`, `.next/`.
 
 ## Où en est le livre
 
-24 presets Vision. Les quatre derniers — **`powlishermain`**, **`powV2`**,
-**`powV3`** et **`powV4`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
+26 presets Vision. Les six derniers — **`powlishermain`**, **`powV2`**,
+**`powV3`**, **`powV4`**, **`powV5`** et **`powV6`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
 l'écran Lightroom de `@powl_d` (posts `1988715650794287456`,
 `1988715687783919978`, `1988715756461179091`, du 12 novembre 2025), la même photo
 avant et après. 43 691 blocs de 8×8 mesurés.
@@ -32,7 +32,12 @@ ciel qui **converge** vers 192° TSL — la fenêtre déjà trouvée en 2026-08-
 une méthode sans rapport. Rien entre 135 et 250° Lab ni au-delà de 308° : les
 trois photos y sont muettes, le mélangeur y est à l'identité.
 
-**La différence entre les deux, c'est la LUMIÈRE :**
+**La série `powV2` → `powV6` va du plus général au plus spécifique** :
+`powV2` (trois photos, le style), `powV3` (sa densité de nuit), `powV4` (la
+couleur de nuit remesurée), `powV5` (le niveau de son image), `powV6` (plus le
+dégradé du bas). Chacun bat le précédent sur la photo de nuit et perd ailleurs.
+
+**La différence entre les deux premiers, c'est la LUMIÈRE :**
 
 - **`powlishermain`** n'y touche pas. Ses trois retouches ne diffèrent que par un
   gain (−1,85 / −0,22 / −0,56 EV), donc un curseur d'exposition, pas un preset.
@@ -71,7 +76,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **253/253**, dont 17 pour `powlishermain`, 17
+- `npm run test:vision-preset` : **272/272**, dont 17 pour `powlishermain`, 17
   pour `powV2`, 9 pour `powV3` et 13 pour `powV4` (y compris un contrôle de non-
   régression sur `powV3`, qui partage désormais la même fabrique).
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est
@@ -85,10 +90,10 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 1. **Faire regarder les presets qui attendent** (`couchant`, `powlishermain`, et
    les six du 2026-08-27). C'est la seule étape que les mesures ne remplacent
    pas — trois presets supprimés le 2026-08-12 passaient toutes leurs mesures.
-2. **Un outil de dégradé LOCAL dans Vision**, par photo. C'est le geste qu'il a
-   utilisé sur la photo de nuit, et aucun preset ne peut le remplacer : une
-   table de couleurs n'a pas de carte. À rapprocher du point suivant — les deux
-   disent la même chose sous deux angles.
+2. **Le masquage local dans Vision** (sélection du sujet, dégradés orientables).
+   Le **dégradé du bas** existe depuis le 2026-08-29 septies et couvre déjà le
+   cas mesuré ; ce qui manque encore, c'est de pouvoir le POSER — orientation,
+   position, et une sélection du sujet. C'est le geste qu'il a utilisé.
 3. **L'étage de tonalité adaptatif.** C'est le vrai gros reste, et `powV2` vient
    d'en montrer la limite en dur : sa paire de nuit reste à 8,52 de dE76 parce
    que l'édit de nuit est 1,3 EV plus bas que ce qu'une courbe commune peut

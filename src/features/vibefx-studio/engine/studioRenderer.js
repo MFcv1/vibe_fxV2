@@ -1,5 +1,6 @@
 import {
     applyFilmGrain,
+    applyDegradeBas,
     applyLightroomVignette,
     applyFusedPixelOps,
     applyClarity,
@@ -235,6 +236,20 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
      */
     if (safeFilters.vignette > 0) {
         applyLightroomVignette(ctx, w, h, safeFilters.vignette);
+    }
+
+    // ── Stage 7 bis: Degrade du bas ──────────────────────
+    /*
+     * Ajoute le 2026-08-29. Ce n'est PAS un vignetage: sa rampe est verticale,
+     * elle part du milieu du cadre et n'assombrit que le bas. Le vignetage,
+     * radial, assombrit aussi le haut — sur la photo qui a motive cet effet, ca
+     * faisait EMPIRER le rendu (5,41 sans, 5,46 a 5,99 avec, quelle que soit la
+     * dose). La mesure est dans `applyDegradeBas`. Il vient apres le vignetage
+     * parce que les deux sont des poids d'exposition et que leur ordre ne
+     * change rien; il vient avant le grain, qui doit rester le dernier.
+     */
+    if (safeFilters.degradeBas > 0) {
+        applyDegradeBas(ctx, w, h, safeFilters.degradeBas);
     }
 
     // ── Stage 8: Grain ───────────────────────────────────

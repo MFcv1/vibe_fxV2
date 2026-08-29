@@ -22,6 +22,15 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Une marche qui ne baisse pas quand l'image grandit est une QUANTIFICATION,
+  pas une pente.** Le degrade du bas quantifiait son gain en 64 paliers: 4/255
+  entre deux lignes voisines a 101 lignes comme a 1 200. Le test qui mesure ca
+  doit tourner sur une image REALISTE — sur une image minuscule, la vraie pente
+  suffit a produire le meme chiffre et le test ne dit plus rien.
+- **Un vignetage ne remplace pas un degrade.** Le premier est radial, le second
+  vertical. Sur la photo de nuit de `@powl_d`, ajouter du vignetage a `powV5`
+  EMPIRE le rendu a toutes les doses (5,46 a 5,99 contre 5,41 sans), parce qu'il
+  assombrit le haut du cadre, qui etait deja juste.
 - **Choisir la zone sur laquelle on ajuste, c'est deja choisir le resultat.**
   `powV4` a pris son NIVEAU sur le plateau du masque — la ou l'on mesure
   justement la couleur. C'etait une decision deguisee en mesure: la meme photo

@@ -10,7 +10,7 @@
 // ═══════════════════════════════════════════════════════════
 
 // ── Improved Noise Pattern (512px, Box-Muller Gaussian) ──
-import { normalizeVisionFilters } from './visionColorScience';
+import { normalizeVisionFilters } from './visionColorScience.js';
 import {
     GRAIN_ATTENUATION,
     GRAIN_NOISE_SIZE,
@@ -882,6 +882,85 @@ export function applyLightroomVignette(ctx, w, h, vignette) {
             const r = Math.sqrt(dx * dx + dy2);
             const palier = Math.round(gainVignette(r, dosage) * VIGNETTE_PALIERS);
             const lut = VIGNETTE_LUT[palier];
+            const i = (y * w + x) * 4;
+            d[i] = lut[d[i]];
+            d[i + 1] = lut[d[i + 1]];
+            d[i + 2] = lut[d[i + 2]];
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DEGRADE DU BAS — l'assombrissement progressif du premier plan
+// ═══════════════════════════════════════════════════════════
+/*
+ * POURQUOI CET EFFET EXISTE, et pourquoi ce n'est pas un vignetage.
+ *
+ * Mesure du 2026-08-29 sur la paire avant/apres de nuit de `@powl_d`. Une fois
+ * la couleur et la courbe calees au plus pres (`powV5`), ce qui reste n'est pas
+ * une erreur de couleur: c'est un DEGRADE VERTICAL. Ecart en diaphragmes entre
+ * son rendu et le notre, du haut vers le bas du cadre:
+ *
+ *      +0,05   <- le plafond de la station: parfait
+ *      +1,0    <- la station et la moto: il est plus CLAIR
+ *      -1,1
+ *      -2,5    <- le sol: il est BIEN plus sombre
+ *
+ * Notre vignetage ne peut pas repondre a ca: il est RADIAL, donc il
+ * assombrirait aussi le haut, qui est deja juste. Mesure a l'appui — sur cette
+ * photo, `powV5` seul fait 5,41 de dE76, et `powV5` plus vignetage fait 5,46 a
+ * 5,99 quelle que soit la dose. Le vignetage EMPIRE le rendu.
+ *
+ * Le degrade, lui, le fait passer de 5,41 a 3,03.
+ *
+ * FORME. Un seul curseur, comme le vignetage. La rampe part du MILIEU du cadre
+ * et descend jusqu'en bas, en smoothstep. Le point de depart a ete cherche: de
+ * 0,40 a 0,60 de la hauteur, l'ecart obtenu va de 3,10 a 3,03 — la courbe est
+ * plate, donc le milieu est aussi bon que le meilleur et ne coute rien. Un
+ * parametre de moins.
+ *
+ * ECHELLE. 100 = quatre diaphragmes au bas du cadre. Le reglage mesure sur sa
+ * photo vaut 66.
+ *
+ * La multiplication a lieu en lumiere LINEAIRE, comme le vignetage depuis le
+ * 2026-08-16, et SANS la protection des hautes lumieres que celui-ci porte: un
+ * degrade de Lightroom est un curseur d'exposition pose sur un masque, pas un
+ * vignetage, et il n'epargne rien.
+ */
+const DEGRADE_DIAPHRAGMES = 4;
+
+export function applyDegradeBas(ctx, w, h, force) {
+    if (!force || force <= 0) return;
+    const bas = 2 ** (-DEGRADE_DIAPHRAGMES * Math.min(100, force) / 100);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    /*
+     * UNE TABLE PAR LIGNE, et pas par palier de gain.
+     *
+     * La premiere version quantifiait le gain en 64 paliers, comme le fait le
+     * vignetage. Mesure: 4/255 d'ecart entre deux lignes voisines sur un aplat,
+     * et ce chiffre NE BAISSAIT PAS quand l'image grandissait (4/255 a 101
+     * lignes comme a 1 200) — donc ce n'etait pas la pente du degrade, c'etait
+     * la marche de la quantification. Une bande, exactement ce que le projet
+     * refuse partout ailleurs.
+     *
+     * Ici le gain ne depend que de la LIGNE: il y en a donc au plus h valeurs
+     * distinctes, et la moitie superieure du cadre n'en a qu'une (1, qu'on
+     * saute). Calculer la table de la ligne coute 256 puissances et supprime la
+     * quantification au lieu de la reduire.
+     */
+    const lut = new Uint8Array(256);
+    for (let y = 0; y < h; y += 1) {
+        const t = Math.max(0, Math.min(1, (y / Math.max(1, h - 1) - 0.5) / 0.5));
+        if (t <= 0) continue;
+        const gain = 1 + (bas - 1) * (t * t * (3 - 2 * t));
+        for (let v = 0; v < 256; v += 1) {
+            const lin = SRGB_VERS_LINEAIRE[v] * gain;
+            const srgb = lin <= 0.0031308 ? lin * 12.92 : 1.055 * lin ** (1 / 2.4) - 0.055;
+            lut[v] = Math.max(0, Math.min(255, Math.round(srgb * 255)));
+        }
+        for (let x = 0; x < w; x += 1) {
             const i = (y * w + x) * 4;
             d[i] = lut[d[i]];
             d[i + 1] = lut[d[i + 1]];
