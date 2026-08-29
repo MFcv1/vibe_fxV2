@@ -8,8 +8,8 @@
 >
 > **Ce qui est livré** — redesign VibeOS (`/creer`, `/publier`, `/video`), moteur
 > de LUT 3D 33³, chaîne d'import Lightroom, six réglages avancés alignés, et
-> **22 presets** dont les trois derniers, `couchant`, `powlishermain` et `powV2`,
-> attendent un regard. Le détail est
+> **23 presets** dont les quatre derniers — `couchant`, `powlishermain`, `powV2`
+> et `powV3` — attendent un regard. Le détail est
 > dans [l'archive du 2026-08-27](docs/archive-calages-lightroom-2026-08-27.md).
 >
 > **2026-08-29** — la **bibliothèque** (`/creer/bibliotheque`) a le mouvement de
@@ -20,6 +20,16 @@
 > sa tuile**. Vignettes passées de 720 à **1600 px**, celles déjà stockées
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
+
+> **2026-08-29 quater** — **`powV3`**, la déclinaison NUIT de `powV2` (même
+> couleur au chiffre près, seule la courbe bouge — la règle de la famille). Mais
+> **la vraie trouvaille du lot est ailleurs** : sur sa photo de nuit, l'essentiel
+> de ce qui manquait n'est pas un preset, c'est un **masque qu'il a peint à la
+> main**. Au centre du cadre `powV2` est déjà juste (−0,03 diaphragme) ; en bas
+> il est **quatre diaphragmes** plus sombre. Ses deux autres photos n'ont rien de
+> tel (0,00 et 0,06 d'écart centre-bords), donc ce n'est pas son preset — et une
+> LUT ne sait pas où est le pixel. **Ce qu'il faudrait : un outil de dégradé
+> local dans Vision**, pas un preset de plus.
 
 > **2026-08-29 ter** — **`powV2`**, 22e preset : `powlishermain` plus **la
 > courbe**. Le refus de toucher à la lumière était juste sur le papier et faux à
@@ -58,7 +68,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après `powV2`** — 2026-08-29 ter](docs/prompt-reprise-2026-08-29-ter.md),
+[**après `powV2` et `powV3`** — 2026-08-29 quater](docs/prompt-reprise-2026-08-29-quater.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
@@ -85,6 +95,7 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
+| `powV3` | 2026-08-29 quater | **La nuit de `powV2`**, même couleur. À regarder sur de vraies scènes nocturnes. Son plafond à 205 empêche un lampadaire de percer un trou blanc. Calé sur **une seule** photo : c'est assez pour une densité, pas pour une couleur — et sa couleur ne bouge donc pas. |
 | `powV2` | 2026-08-29 ter | **Le plus proche de ses photos que le projet sache faire** : couleur ET densité. À regarder : est-ce qu'il assombrit trop sur une photo déjà sombre ? (Si oui, `powlishermain` fait la même couleur sans toucher à la lumière.) `node scripts/verifier-presets-sur-paires.mjs ~/Desktop/paires-powlisher` rejoue les chiffres. |
 | `powlishermain` | 2026-08-29 bis | **Le seul mesuré sur des avant/après certains.** Il ne touche PAS à la luminosité (c'est mesuré : sa courbe à lui ne fait rien), donc il se pose sur une photo déjà exposée et ne la sauve pas. À regarder : le ciel, qui converge fort vers le teal, et les verts, qui perdent la moitié de leur couleur. Il ne touche pas à la lumière, contrairement à `powV2`. |
 | les six du 2026-08-27 | 2026-08-27 | `ambre`, `ambre-nuit-1/2`, `powlisher-chaud`, `powlisher-froid`, et la famille cine |

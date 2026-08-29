@@ -1410,6 +1410,68 @@ function teinteLab(rgb) {
         Math.max(...echantillons.map((rgb) => chromaDe(v2(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
 }
 
+/* ---------- powV3 : la meme couleur, une autre densite ----------------------
+ *
+ * La regle de la famille (`ambre` / `ambre-nuit-1` / `ambre-nuit-2`) est qu'une
+ * declinaison de densite ne touche PAS a la couleur: c'est le style, et ce n'est
+ * pas lui qu'on corrige. Ce bloc verifie exactement ca, plus la courbe de nuit.
+ */
+{
+    const v2 = getPresetTransform('powV2');
+    const v3 = getPresetTransform('powV3');
+    if (!v3) { console.error('ECHEC: powV3 introuvable.'); process.exit(1); }
+
+    /* 1. IL EST PLUS SOMBRE, et c'est tout ce qui le distingue. */
+    const gris = (f, v) => versLab(f([v, v, v]));
+    check('powV3 : plus sombre que powV2 dans les medians',
+        gris(v2, 0.5)[0] - gris(v3, 0.5)[0], 3, 9, ' L*');
+    const blanc = v3([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('powV3 : plafond mesure', Math.max(...blanc), 200, 212);
+    check('powV3 : n\'ecrete pas', Math.max(...blanc), 0, 254);
+
+    /* 2. SA COULEUR EST CELLE DE powV2. On compare a NIVEAU DE SORTIE EGAL:
+     * pour chaque gris, on cherche l'entree de powV2 qui sort au meme L* que
+     * powV3, et on veut la meme teinte. Sinon on mesurerait la courbe une
+     * seconde fois et pas la couleur. */
+    let ecartCouleur = 0;
+    for (let k = 24; k <= 232; k += 8) {
+        const cible = gris(v3, k / 255);
+        let meilleur = null;
+        for (let j = 0; j <= 255; j += 1) {
+            const c = gris(v2, j / 255);
+            const d = Math.abs(c[0] - cible[0]);
+            if (!meilleur || d < meilleur.d) meilleur = { d, a: c[1], b: c[2] };
+        }
+        if (meilleur.d > 1) continue;
+        ecartCouleur = Math.max(ecartCouleur, Math.hypot(meilleur.a - cible[1], meilleur.b - cible[2]));
+    }
+    check('powV3 : sa couleur est celle de powV2', ecartCouleur, 0, 1.2, ' a*b*');
+
+    /* 3. Les gardes communs, comme partout. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const bas = versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0];
+        const haut = versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0];
+        penteMini = Math.min(penteMini,
+            (gris(v3, (k + 8) / 255)[0] - gris(v3, (k - 8) / 255)[0]) / (haut - bas));
+    }
+    check('powV3 : aucune pente ecrasee dans la courbe', penteMini, 0.3, 2);
+    check('powV3 : le noir pur reste noir', Math.max(...v3([0, 0, 0])) * 255, 0, 1);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v3, k / 255)[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV3 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    check('powV3 : n\'ajoute pas de contour', amplificationVoile(v3) - voileV1, -4, 0.6, '×');
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV3 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v3(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

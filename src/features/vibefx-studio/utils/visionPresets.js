@@ -1754,7 +1754,12 @@ const V2_MELANGEUR = [
     [0, 1], [0, 1], [0, 1], [0, 1],
 ];
 
-function powV2Transform(input) {
+/* Une seule fabrique pour les deux densites: `powV2` et `powV3` ne different
+ * que par leur courbe. La couleur est la meme au chiffre pres — c'est le style,
+ * et ce n'est pas lui qu'on corrige d'une densite a l'autre. Meme decoupe que
+ * `ambre` / `ambre-nuit-1` / `ambre-nuit-2`. */
+function construirePowV2(courbe) {
+    return function transform(input) {
     let [r, g, b] = input;
 
     /* 1. La courbe. Elle s'applique comme un changement d'EXPOSITION — un
@@ -1766,7 +1771,7 @@ function powV2Transform(input) {
     const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
     if (Y > 1e-6) {
         const Lentree = rgbToLab01(r, g, b)[0];
-        const Lsortie = fonduParL(V2_COURBE, Lentree);
+        const Lsortie = fonduParL(courbe, Lentree);
         const t = (Lsortie + 16) / 116;
         const Ysortie = t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787;
         const k = Ysortie / Y;
@@ -1798,7 +1803,72 @@ function powV2Transform(input) {
     Bb += fonduParL(V2_VIRAGE_B, L);
 
     return lab01ToRgb(L, A, Bb);
+    };
 }
+
+const powV2Transform = construirePowV2(V2_COURBE);
+
+/* ==========================================================================
+ * POWV3 — le meme regard que `powV2`, pose au registre de la NUIT
+ *
+ * D'ou il vient. Applique a sa photo de station-service de nuit, `powV2` reste
+ * visiblement plus clair que son rendu a lui, la ou les deux autres paires sont
+ * a l'oeil indiscernables. La question posee etait: peut-on aller chercher cette
+ * troisieme photo ? La mesure repond en deux temps.
+ *
+ * 1. LE GROS DE L'ECART N'EST PAS UN PRESET, C'EST UN MASQUE.
+ *    Carte de l'ecart d'exposition entre son rendu et `powV2`, sur cette photo,
+ *    en diaphragmes (le cadre decoupe en huit bandes du haut vers le bas):
+ *
+ *        -1,49  -1,44  -1,31  -0,98  -1,14     <- le plafond de la station
+ *        -1,54  -1,46  -0,23  -0,25  -1,21
+ *        -0,76  -0,42  -0,18  -0,25  -0,49
+ *        -0,54  -0,30  -0,03  -0,03  -0,27     <- le centre: `powV2` est JUSTE
+ *        -1,50  -0,43  +0,14  -0,11  -0,51
+ *        -2,35  -1,79  -1,18  -1,05  -1,09
+ *        -3,20  -3,06  -2,39  -1,99  -1,50
+ *        -3,94  -4,06  -3,93  -3,57  -3,04     <- le sol: QUATRE diaphragmes
+ *
+ *    Au centre l'ecart est nul; en bas il vaut quatre diaphragmes. Aucune table
+ *    de couleurs ne peut faire ca: une LUT ne sait pas OU est le pixel.
+ *
+ *    Et ce n'est pas un vignetage de son preset: sur ses deux autres photos le
+ *    meme calcul donne un ecart centre-bords de 0,00 et 0,06 diaphragme. Le
+ *    degrade n'existe que sur celle-la — c'est un masque qu'il a pose a la main
+ *    sur cette image. Notre vignetage, radial et symetrique, ne peut pas s'y
+ *    substituer: le sien vaut -1,4 en haut et -3,9 en bas au meme rayon.
+ *
+ * 2. CE QUI RESTE, LUI, EST UNE DENSITE, ET CA SE MESURE.
+ *    Dans la zone que le masque ne touche pas (rayon < 0,5), il reste un ecart
+ *    qui ne depend que du NIVEAU: -0,3 a -0,6 diaphragme dans les medians, et
+ *    +0,2 dans les noirs les plus profonds. 62 645 points. C'est une courbe, et
+ *    c'est elle que porte `powV3`.
+ *
+ * SA COULEUR EST CELLE DE `powV2`, AU CHIFFRE PRES — c'est le style, et ce n'est
+ * pas lui qu'on corrige. Meme raison que pour `ambre-nuit-1` et `ambre-nuit-2`:
+ * un seul regard a deux densites, pas deux presets sans rapport. Seule la courbe
+ * bouge, et elle appartient a la meme famille a deux parametres que celle de
+ * `powV2`: une droite en L*, un pied doux, le point noir sur la mesure, la pente
+ * jamais sous 0,30. Ajustee ici sur la seule photo de nuit: L = 0,840 L - 4,25,
+ * erreur moyenne 0,85 L* sur dix-huit tranches.
+ *
+ * RESERVE, et elle est lourde: UNE photo. `powV2` est cale sur trois, `powV3`
+ * sur une seule, et sur sa partie non masquee. C'est assez pour une DENSITE —
+ * la question « combien plus sombre » n'a qu'une reponse par photo de toute
+ * facon — ce ne serait pas assez pour une couleur. C'est pourquoi la couleur
+ * n'y touche pas.
+ * ======================================================================= */
+
+/* La courbe de nuit. Plafond a 79,95: un blanc pur y atterrit vers 205 au lieu
+ * de 236. C'est le meme geste que `ambre-nuit-1` (209) et `ambre-nuit-2` (181),
+ * et c'est ce qui empeche un lampadaire de percer un trou blanc dans une scene
+ * nocturne. */
+const V3_COURBE = [
+    2.40, 3.97, 6.58, 9.95, 13.71, 17.65, 21.69, 25.77, 29.88, 34.02, 38.17,
+    42.33, 46.49, 50.67, 54.84, 59.02, 63.20, 67.39, 71.57, 75.76, 79.95,
+];
+
+const powV3Transform = construirePowV2(V3_COURBE);
 
 export const VISION_PRESETS = [
     {
@@ -2097,6 +2167,33 @@ export const VISION_PRESETS = [
             + 'pas à la lumière',
         recommendedIntensity: 100,
         transform: powV2Transform,
+    },
+    {
+        id: 'powV3',
+        label: 'PowV3',
+        hint: 'Le même regard que PowV2, posé au registre de la nuit',
+        description: 'La déclinaison NUIT de `PowV2`. Sa couleur est celle de `PowV2` '
+            + 'au chiffre près — c\'est le style, et ce n\'est pas lui qu\'on corrige '
+            + 'd\'une densité à l\'autre, exactement comme `Ambre Nuit 1` et `Ambre '
+            + 'Nuit 2`. Seule la courbe bouge : blanc à 205 au lieu de 236, et médians '
+            + 'un demi-diaphragme plus bas. Elle est mesurée sur sa photo de '
+            + 'station-service de nuit, dans la zone que son masque local ne touche '
+            + 'pas — 62 645 points, erreur moyenne 0,85 L*. **Ce qu\'elle ne fait '
+            + 'pas** : sur cette photo, l\'essentiel de l\'écart restant n\'est pas un '
+            + 'preset mais un dégradé qu\'il a peint à la main — le sol est quatre '
+            + 'diaphragmes plus bas que le centre, le plafond un et demi. Ses deux '
+            + 'autres photos n\'ont rien de tel (écart centre-bords 0,00 et 0,06), donc '
+            + 'ce n\'est pas son preset, et aucune table de couleurs ne peut le porter : '
+            + 'une LUT ne sait pas où est le pixel. RÉSERVE : `PowV2` est calé sur '
+            + 'trois photos, celui-ci sur une seule. C\'est assez pour une densité — '
+            + '« combien plus sombre » n\'a qu\'une réponse par photo de toute façon — '
+            + 'ce ne serait pas assez pour une couleur.',
+        bestFor: 'nuit franche, station-service, néons, parking, ville après le '
+            + 'coucher du soleil — quand la scène est déjà nocturne',
+        avoidFor: 'plein jour : sa courbe est mesurée sur une scène de nuit et pose '
+            + 'l\'image une demi-exposition plus bas. Prendre `PowV2`',
+        recommendedIntensity: 100,
+        transform: powV3Transform,
     },
     {
         id: 'powlisher-showcase',

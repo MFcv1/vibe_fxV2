@@ -229,3 +229,87 @@ ce qu'une courbe commune peut rendre, et aucune LUT 3D ne peut le rattraper :
 une table n'a pas de mémoire, elle ne sait pas que la photo qu'on lui donne est
 une scène de nuit. C'est exactement l'**étage de tonalité adaptatif** décrit dans
 `todo.md`. Sur une scène de nuit, il faut poser l'exposition — comme lui.
+
+---
+
+# `powV3`, et surtout : ce que la photo de nuit contient vraiment
+
+## La question
+
+`powV2` rend les paires du brouillard et du restaurant quasi indiscernables des
+siennes à l'œil. Sur la station-service de nuit, l'écart reste visible : son ciel
+et son sol sont plus sombres, son rouge ressort plus, le plafond de la station et
+le halo de la lampe sont plus éteints. **Peut-on aller chercher cette
+troisième ?**
+
+## La réponse : l'essentiel de ce qui reste n'est pas un preset
+
+Carte de l'écart d'exposition entre son rendu et `powV2` sur cette photo, en
+diaphragmes, le cadre découpé en huit bandes du haut vers le bas :
+
+```
+    -1,49  -1,44  -1,31  -0,98  -1,14     <- le plafond de la station
+    -1,54  -1,46  -0,23  -0,25  -1,21
+    -0,76  -0,42  -0,18  -0,25  -0,49
+    -0,54  -0,30  -0,03  -0,03  -0,27     <- le centre : powV2 est JUSTE
+    -1,50  -0,43  +0,14  -0,11  -0,51
+    -2,35  -1,79  -1,18  -1,05  -1,09
+    -3,20  -3,06  -2,39  -1,99  -1,50
+    -3,94  -4,06  -3,93  -3,57  -3,04     <- le sol : QUATRE diaphragmes
+```
+
+Au centre, l'écart est **nul**. En bas, il vaut **quatre diaphragmes**. Aucune
+table de couleurs ne peut faire ça : **une LUT ne sait pas où est le pixel.**
+
+### Ce n'est pas un vignetage de son preset
+
+Le même calcul sur les deux autres paires donne un écart centre-bords de
+**0,00** et **0,06** diaphragme. Le dégradé n'existe que sur la photo de nuit :
+c'est un **masque qu'il a posé à la main sur cette image-là**, pas un réglage de
+son preset.
+
+Et notre vignetage ne peut pas s'y substituer, pour deux raisons mesurées :
+
+- **Le profil ne colle pas.** Le nôtre est plat jusqu'au rayon 0,6 puis tombe ;
+  le sien tombe dès 0,45 et se stabilise ensuite. Le meilleur réglage laisse
+  0,44 diaphragme d'erreur moyenne.
+- **Le sien n'est pas symétrique.** Au même rayon, il vaut −1,4 en haut et −3,9
+  en bas. Un vignetage radial est symétrique par construction.
+
+## Ce qui restait, et qui se mesure : une densité
+
+Dans la zone que le masque ne touche pas (rayon < 0,5), il reste un écart qui ne
+dépend que du **niveau** : −0,3 à −0,6 diaphragme dans les médians, +0,2 dans les
+noirs les plus profonds. **62 645 points.** C'est une courbe, et c'est elle que
+porte `powV3` :
+
+`L sortie = 0,840 × L entrée − 4,25`, même famille à deux paramètres que
+`powV2` (droite, pied doux, point noir mesuré, pente jamais sous 0,30). Erreur
+moyenne **0,85 L\*** sur dix-huit tranches. Plafond à **205** au lieu de 236,
+comme `Ambre Nuit 1` (209) et `Ambre Nuit 2` (181).
+
+**Sa couleur est celle de `powV2` au chiffre près** — vérifié dans le smoke, à
+niveau de sortie égal, écart maximal **0,24** en a\*b\*. C'est la règle de la
+famille : une déclinaison de densité ne corrige pas le style.
+
+| Preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| `powV2` | 8,52 | **2,34** | **2,81** |
+| `powV3` | **7,39** | 8,58 | 4,58 |
+
+`powV3` gagne sur la nuit et perd ailleurs — c'est ce qu'on attend d'un registre.
+Le gain est modeste (8,52 → 7,39) précisément parce que le reste est le masque,
+et qu'assombrir tout le cadre corrige le sol en abîmant le centre.
+
+**RÉSERVE, et elle est lourde : une seule photo.** `powV2` est calé sur trois,
+`powV3` sur une, et sur sa partie non masquée. C'est assez pour une DENSITÉ — la
+question « combien plus sombre » n'a de toute façon qu'une réponse par photo —
+ce ne serait pas assez pour une couleur. C'est pourquoi la couleur n'y touche
+pas.
+
+## Ce qu'il faudrait vraiment
+
+Un **outil de dégradé local**, par photo, dans Vision. C'est ce qu'il a utilisé,
+et c'est un geste d'édition, pas un preset. À rapprocher de l'étage de tonalité
+adaptatif déjà listé dans `todo.md` : les deux disent la même chose sous deux
+angles — une table de couleurs n'a pas de mémoire, et elle n'a pas de carte.

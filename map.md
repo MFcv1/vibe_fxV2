@@ -3293,6 +3293,77 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 quater (`powV3`, et le masque qu'on a trouve sous la photo de nuit)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/visionPresets.js`
+(+`powV3`, 23e preset ; `powV2Transform` devient la fabrique `construirePowV2`,
+les deux densites la partagent — seule la courbe change),
+`scripts/smoke-vision-preset.mjs` (+9 verifications, 240 au total),
+`scripts/verifier-presets-sur-paires.mjs` (+`powV3` aux candidats),
+`docs/paires-avant-apres-powlisher-2026-08-29.md`.
+
+**La question posee.** `powV2` rend le brouillard et le restaurant quasi
+indiscernables des siens a l'oeil; sur la station de nuit l'ecart reste visible.
+Faut-il un preset de plus pour aller chercher celle-la ?
+
+**LA TROUVAILLE DU LOT : ce qui reste n'est pas un preset, c'est un MASQUE.**
+Carte de l'ecart d'exposition entre son rendu et `powV2` sur cette photo, en
+diaphragmes, huit bandes du haut vers le bas:
+
+```
+    -1,49  -1,44  -1,31  -0,98  -1,14     <- le plafond de la station
+    -1,54  -1,46  -0,23  -0,25  -1,21
+    -0,76  -0,42  -0,18  -0,25  -0,49
+    -0,54  -0,30  -0,03  -0,03  -0,27     <- le centre: powV2 est JUSTE
+    -1,50  -0,43  +0,14  -0,11  -0,51
+    -2,35  -1,79  -1,18  -1,05  -1,09
+    -3,20  -3,06  -2,39  -1,99  -1,50
+    -3,94  -4,06  -3,93  -3,57  -3,04     <- le sol: QUATRE diaphragmes
+```
+
+Au centre l'ecart est nul, en bas il vaut quatre diaphragmes. Une LUT ne sait pas
+OU est le pixel: elle ne peut pas porter ca.
+
+**Et ce n'est pas un vignetage de son preset**: le meme calcul sur les deux
+autres paires donne 0,00 et 0,06 diaphragme d'ecart centre-bords. Le degrade
+n'existe que sur cette photo-la. Notre vignetage ne peut pas s'y substituer non
+plus — profil incompatible (le notre est plat jusqu'au rayon 0,6, le sien tombe
+des 0,45; 0,44 diaphragme d'erreur au meilleur reglage) et surtout ASYMETRIE:
+au meme rayon le sien vaut -1,4 en haut et -3,9 en bas, ce qu'un vignetage
+radial ne peut pas faire.
+
+**Ce qui restait de mesurable**, dans la zone non masquee (rayon < 0,5): un ecart
+qui ne depend que du NIVEAU, -0,3 a -0,6 diaphragme dans les medians et +0,2
+dans les noirs profonds, sur 62 645 points. C'est une densite, et c'est
+`powV3`: `L = 0,840 L - 4,25`, meme famille a deux parametres que `powV2`,
+erreur moyenne 0,85 L*, plafond a 205 (contre 236 pour `powV2`, et a comparer
+aux 209 et 181 d'`ambre-nuit-1` et `-2`).
+
+**Sa couleur est celle de `powV2` au chiffre pres**, et le smoke le verifie a
+NIVEAU DE SORTIE EGAL — sinon on mesurerait la courbe une seconde fois au lieu
+de la couleur. Ecart maximal 0,24 en a*b*. C'est la regle de la famille, deja
+appliquee a `ambre-nuit-1` et `ambre-nuit-2`.
+
+| preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| `powV2` | 8,52 | **2,34** | **2,81** |
+| `powV3` | **7,39** | 8,58 | 4,58 |
+
+Le gain sur la nuit est modeste (8,52 -> 7,39) precisement parce que le reste est
+le masque: assombrir tout le cadre corrige le sol en abimant le centre.
+
+**RESERVE**: `powV2` est cale sur trois photos, `powV3` sur une seule, et sur sa
+partie non masquee. Assez pour une DENSITE — « combien plus sombre » n'a qu'une
+reponse par photo — pas pour une couleur.
+
+**Ce qu'il faudrait vraiment**: un outil de degrade LOCAL, par photo, dans
+Vision. Meme constat que l'etage de tonalite adaptatif deja au `todo.md`, vu
+sous un autre angle: une table de couleurs n'a pas de memoire, et elle n'a pas
+de carte.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 240/240. Regarde a
+l'oeil sur la paire de nuit. **`powV3` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 ter (`powV2` : la courbe qui manquait a `powlishermain`)
 
 **Ce qui a change dans l'arbre** : `scripts/verifier-powlishermain.mjs` renomme

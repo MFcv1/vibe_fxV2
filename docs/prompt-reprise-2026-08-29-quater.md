@@ -1,4 +1,4 @@
-# Prompt de reprise — 2026-08-29 ter (après `powV2`)
+# Prompt de reprise — 2026-08-29 quater (après `powV2` et `powV3`)
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
 `presets-mesures-sur-corpus`).
@@ -19,8 +19,8 @@ les autres `docs/prompt-reprise-*`, `node_modules/`, `.next/`.
 
 ## Où en est le livre
 
-22 presets Vision. Les deux derniers, **`powlishermain`** et **`powV2`**, sont
-les premiers du projet calés sur des avant/après **certains** : trois captures de
+23 presets Vision. Les trois derniers — **`powlishermain`**, **`powV2`** et
+**`powV3`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
 l'écran Lightroom de `@powl_d` (posts `1988715650794287456`,
 `1988715687783919978`, `1988715756461179091`, du 12 novembre 2025), la même photo
 avant et après. 43 691 blocs de 8×8 mesurés.
@@ -40,9 +40,21 @@ trois photos y sont muettes, le mélangeur y est à l'identité.
   `powlishermain` était juste sur le papier et faux à l'écran : appliqué à ses
   AVANT, le rendu restait plus clair et plus plat que son APRÈS.
 
-**La leçon du lot, à ne pas perdre** : un écart mesuré à **exposition libre** ne
-dit rien de ce que l'utilisateur voit. Il faut les deux chiffres, et
-`scripts/verifier-presets-sur-paires.mjs` sort désormais les deux tableaux.
+- **`powV3`** est la déclinaison NUIT de `powV2` : même couleur au chiffre près
+  (vérifié dans le smoke à niveau de sortie égal, 0,24 en a\*b\*), seule la
+  courbe bouge — la règle de la famille, déjà appliquée à `Ambre Nuit 1/2`.
+
+**DEUX leçons du lot, à ne pas perdre.**
+
+1. Un écart mesuré à **exposition libre** ne dit rien de ce que l'utilisateur
+   voit. Il faut les deux chiffres, et `scripts/verifier-presets-sur-paires.mjs`
+   sort désormais les deux tableaux.
+2. Sur sa photo de nuit, l'essentiel de ce qui manque n'est **pas un preset**,
+   c'est un **masque peint à la main** : au centre `powV2` est déjà juste
+   (−0,03 diaphragme), en bas il est **quatre diaphragmes** plus sombre. Ses
+   deux autres photos n'ont rien de tel (0,00 et 0,06 d'écart centre-bords),
+   donc ce n'est pas son preset. Avant de fabriquer un preset de plus pour
+   rattraper un écart, **regarder s'il est spatial**.
 
 Deux courbes **meilleures en chiffres ont été refusées** : 21 nœuds libres (3,21
 de dE76) part en zigzag et surapprend sur trois photos ; la droite libre (3,84)
@@ -54,8 +66,8 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **231/231**, dont 17 pour `powlishermain` et 17
-  pour `powV2`.
+- `npm run test:vision-preset` : **240/240**, dont 17 pour `powlishermain`, 17
+  pour `powV2` et 9 pour `powV3`.
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est
   compilé pour `NODE_MODULE_VERSION 127` alors que le Node installé en demande
   147. La compilation Next elle-même passe (« Compiled successfully ») ; ça
@@ -67,7 +79,11 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 1. **Faire regarder les presets qui attendent** (`couchant`, `powlishermain`, et
    les six du 2026-08-27). C'est la seule étape que les mesures ne remplacent
    pas — trois presets supprimés le 2026-08-12 passaient toutes leurs mesures.
-2. **L'étage de tonalité adaptatif.** C'est le vrai gros reste, et `powV2` vient
+2. **Un outil de dégradé LOCAL dans Vision**, par photo. C'est le geste qu'il a
+   utilisé sur la photo de nuit, et aucun preset ne peut le remplacer : une
+   table de couleurs n'a pas de carte. À rapprocher du point suivant — les deux
+   disent la même chose sous deux angles.
+3. **L'étage de tonalité adaptatif.** C'est le vrai gros reste, et `powV2` vient
    d'en montrer la limite en dur : sa paire de nuit reste à 8,52 de dE76 parce
    que l'édit de nuit est 1,3 EV plus bas que ce qu'une courbe commune peut
    rendre. Le lot du 2026-08-29 bis en a fourni la preuve directe : il suit la densité de
@@ -75,7 +91,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
    faut un étage AVANT elle, dans `studioRenderer.js`, qui mesure l'histogramme
    et ramène la photo sur l'exposition de référence du preset. À trancher : où
    il vit, comment il se désactive, comment le figer dans un smoke.
-3. **`todo.md` dépasse ~258 lignes** alors que la règle du projet est ~200.
+4. **`todo.md` dépasse ~268 lignes** alors que la règle du projet est ~200.
    Archiver avant d'ajouter le lot suivant.
 
 ## Interdits
@@ -89,6 +105,8 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
   côtés.
 - Ne pas ajuster une courbe à 21 nœuds libres sur trois photos, et ne pas
   accepter un meilleur chiffre payé par de la matière détruite.
+- Ne pas fabriquer un preset pour rattraper un écart **spatial** : vérifier
+  d'abord si l'écart dépend de la POSITION dans le cadre.
 
 ## Rituel de fin de phase
 
