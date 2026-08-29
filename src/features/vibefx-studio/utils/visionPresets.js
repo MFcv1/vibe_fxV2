@@ -1621,7 +1621,16 @@ const MAIN_CIEL_ENTREE = [227.5, 262];
 const MAIN_CIEL_SORTIE = [285, 308];
 
 /* Interpolation circulaire d'une table de 24 ancres espacees de 15 degres a
- * partir de MAIN_MELANGEUR_DEPART. Partagee par `powlishermain` et `powV2`. */
+ * partir de MAIN_MELANGEUR_DEPART. Partagee par toute la famille.
+ *
+ * Chaque ancre porte [rotation, gain de chroma, gain de LUMINANCE]. Le
+ * troisieme terme a ete ajoute le 2026-08-29 (nonies): c'est le curseur que le
+ * melangeur de Lightroom a depuis toujours et que le notre n'avait pas.
+ * Mesure qui l'a impose: sur sa photo de nuit, ses rouges et ses oranges a
+ * forte chroma sont 1,44 fois plus lumineux que les notres — alors que son ciel
+ * bleu, mesure au meme moment sur 2 799 blocs, est a 0,99. Ce n'est donc pas
+ * une erreur de courbe, qui aurait touche les deux: c'est une luminance par
+ * TEINTE. Les tables qui ne portent que deux valeurs valent 1 par defaut. */
 function melangeurLab(table, h) {
     const x = (((h - MAIN_MELANGEUR_DEPART) % 360) + 360) % 360 / 15;
     const i = Math.floor(x);
@@ -1629,7 +1638,9 @@ function melangeurLab(table, h) {
     const a = table[i % 24];
     const b = table[(i + 1) % 24];
     const u = t * t * (3 - 2 * t);
-    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const la = a[2] === undefined ? 1 : a[2];
+    const lb = b[2] === undefined ? 1 : b[2];
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, la + (lb - la) * u];
 }
 
 function bandeCielLab(h) {
@@ -1794,7 +1805,7 @@ function construirePowV2(courbe, reglages = {}) {
     if (aUneTeinte > 0 && c > 1e-6) {
         let h = Math.atan2(Bb, A) * 180 / Math.PI;
         if (h < 0) h += 360;
-        const [dh, gain] = melangeurLab(melangeur, h);
+        const [dh, gain, gainL] = melangeurLab(melangeur, h);
         const ciel = bandeCielLab(h);
         const rotation = dh * (1 - ciel) + (cielCible - h) * ciel;
         const gainC = gain * (1 - ciel) + cielChroma * ciel;
@@ -1802,6 +1813,10 @@ function construirePowV2(courbe, reglages = {}) {
         const cNeuf = c * (1 + (gainC - 1) * aUneTeinte);
         A = cNeuf * Math.cos(hNeuf);
         Bb = cNeuf * Math.sin(hNeuf);
+        /* La luminance par teinte, sous le meme garde-fou que le reste: un
+         * pixel sans teinte fiable ne doit pas changer de niveau, sinon la
+         * regle trace un contour la ou la photo etait lisse. */
+        if (gainL !== 1) L = Math.min(100, L * (1 + (gainL - 1) * aUneTeinte));
     }
 
     A += fonduParL(virageA, L);
@@ -2146,6 +2161,92 @@ const powV7Transform = construirePowV2(V7_COURBE, {
     virageA: V7_VIRAGE_A,
     virageB: V7_VIRAGE_B,
     melangeur: V7_MELANGEUR,
+    cielCible: 228,
+    cielChroma: 0.828,
+});
+
+/* ==========================================================================
+ * POWV8 — le rouge et le sol, et le curseur qui manquait au melangeur
+ *
+ * Deux ecarts restaient a `powV7`, vus a l'oeil puis mesures. Ils ne se
+ * corrigeaient pas avec les leviers existants, et c'est ca l'interet du lot.
+ *
+ * 1. SON ROUGE EST PLUS VIF. Mesure sur 656 blocs de la moto et de l'element
+ *    Synergy (chroma d'entree > 25, teinte Lab < 50):
+ *
+ *                  L      chroma
+ *      son rendu   19,0    46,3
+ *      powV7       13,2    39,6
+ *
+ *    L'ecart est d'abord une affaire de LUMIERE, pas de saturation. Et il ne
+ *    vient pas de la courbe: mesure au meme moment sur 2 799 blocs, son ciel
+ *    bleu est a 0,99 fois notre luminance. Une courbe aurait touche les deux.
+ *
+ *    C'est donc une LUMINANCE PAR TEINTE — le troisieme curseur du melangeur de
+ *    Lightroom, que le notre n'avait pas. Il a ete ajoute a `melangeurLab` pour
+ *    l'occasion: chaque ancre porte desormais [rotation, chroma, LUMINANCE], et
+ *    les tables qui n'en portent que deux valent 1, donc aucun preset existant
+ *    ne bouge. Mesure retenue: x1,57 sur les rouges et les oranges a forte
+ *    chroma, sous le meme garde-fou que le reste (un pixel sans teinte fiable
+ *    ne change pas de niveau, sinon la regle trace un contour).
+ *
+ *    Resultat: L 18,5 contre ses 19,0, chroma 48,5 contre ses 46,3.
+ *
+ * 2. SON SOL EST GRIS-BLEU, LE NOTRE TIRAIT AU MARRON. `powV7` le laissait a
+ *    la teinte 105 quand la sienne est a 127, et le commentaire de `powV7`
+ *    expliquait pourquoi la correction n'arrivait pas: elle etait mesuree sur
+ *    une cible rebrillantee, ou diluee par des blocs quasi eteints.
+ *
+ *    Ici le virage se mesure sur la sortie FINALE — degrade compris — contre son
+ *    image telle quelle, par niveau de SORTIE et non d'entree. Ce qu'il
+ *    demandait etait net et regulier:
+ *
+ *      L sortie 0-4    a* -1,02   b* +1,05   (1 568 blocs)
+ *      L sortie 4-8    a* -0,73   b* -0,09   (1 088)
+ *      L sortie 8-12   a* -0,40   b* -0,47   (996)
+ *
+ *    Resultat: teinte 120 contre ses 127, a* -0,91 contre ses -1,63.
+ *
+ * Ce qui reste: 7 degres de teinte sur le sol et 0,5 L* sur le rouge. Le dE76
+ * median passe de 2,53 a 2,46 — il bouge peu, comme au lot precedent, parce que
+ * ce lot ne cherchait pas a baisser une moyenne mais a corriger deux choses que
+ * l'oeil voit et qu'une moyenne noie.
+ *
+ * RESERVE: la luminance x1,57 sur les rouges est le levier le plus fort de la
+ * famille. Sur une photo ou le rouge n'est pas le sujet — un mur de briques, un
+ * coucher de soleil — il le fera sauter au visage. Comme tout le reste de la
+ * serie a partir de `powV5`: ce preset reproduit UNE image.
+ * ======================================================================= */
+
+/* La premiere ancre est ramenee a 0: avec les valeurs brutes de l'ajustement
+ * (-1,96 / +2,00) un noir PUR ressortait a 1,34/255 au lieu de 0, et
+ * l'invariant « le noir reste noir » vaut mieux qu'un chiffre mesure sur une
+ * tranche ou rien n'atterrit vraiment. Le fondu se fait alors entre L 0 et L 5,
+ * et la tranche 0-4 recoit encore l'essentiel de la correction mesuree. */
+const V8_VIRAGE_A = [
+    0, -5.90, -2.98, -1.88, -0.17, 1.24, 1.96, 2.25, 2.40, 2.47, 2.49,
+    2.41, 2.17, 1.81, 1.35, 0.87, 0.45, 0.11, -0.13, -0.27, -0.36,
+];
+const V8_VIRAGE_B = [
+    0, 0.50, -0.41, -0.01, 1.58, 3.39, 4.68, 5.44, 5.89, 6.20, 6.46,
+    6.63, 6.70, 6.68, 6.63, 6.56, 6.49, 6.38, 6.26, 6.13, 5.98,
+];
+/* [rotation, chroma, LUMINANCE]. Seuls les deux secteurs chauds portent une
+ * luminance: ce sont les seuls ou la mesure en trouvait une (656 blocs), et le
+ * bleu, mesure sur 2 799, n'en demande aucune. */
+const V8_MELANGEUR = [
+    [2.52, 1.028, 1], [9.84, 1.598, 1.569], [0.64, 1.504, 1.568], [-5.22, 1.079, 1],
+    [-5.83, 0.911, 1], [8.89, 1.173, 1], [-1.22, 0.716, 1], [4.27, 0.483, 1],
+    [6.74, 0.356, 1], [10.1, 0.60, 1], [5.1, 0.80, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+];
+
+const powV8Transform = construirePowV2(V7_COURBE, {
+    virageA: V8_VIRAGE_A,
+    virageB: V8_VIRAGE_B,
+    melangeur: V8_MELANGEUR,
     cielCible: 228,
     cielChroma: 0.828,
 });
@@ -2591,6 +2692,36 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 80 },
         recommendedIntensity: 100,
         transform: powV7Transform,
+    },
+    {
+        id: 'powV8',
+        label: 'PowV8',
+        hint: 'Le rouge de la moto et le gris-bleu du sol : le plus proche',
+        description: 'Le dernier de la série. Deux écarts restaient à `PowV7`, vus à '
+            + 'l\'œil puis mesurés. **Son rouge est plus vif** : sur 656 blocs de la '
+            + 'moto et de l\'élément Synergy, il est à L 19,0 et chroma 46,3 quand '
+            + '`PowV7` rend L 13,2 et 39,6. C\'est d\'abord une affaire de LUMIÈRE, et '
+            + 'elle ne vient pas de la courbe : son ciel bleu, mesuré au même moment '
+            + 'sur 2 799 blocs, est à 0,99 fois notre luminance — une courbe aurait '
+            + 'touché les deux. C\'est donc une **luminance par teinte**, le troisième '
+            + 'curseur du mélangeur de Lightroom, que le nôtre n\'avait pas : il a été '
+            + 'ajouté pour l\'occasion, et aucun preset existant ne bouge. **Son sol '
+            + 'est gris-bleu**, le nôtre tirait au marron : le virage se mesure '
+            + 'désormais sur la sortie finale, dégradé compris, par niveau de SORTIE — '
+            + 'ce que le sol demandait était net et régulier (a\* −1,02 dans les '
+            + 'ombres, sur 1 568 blocs). Résultat : rouge à L 18,5 / chroma 48,5 '
+            + '(contre 19,0 / 46,3), sol à la teinte 120 (contre 127). RÉSERVE : la '
+            + 'luminance ×1,57 sur les rouges est le levier le plus fort de la '
+            + 'famille. Sur une photo où le rouge n\'est pas le sujet — un mur de '
+            + 'briques, un coucher de soleil — il lui saute au visage.',
+        bestFor: 'la scène pour laquelle il a été mesuré : une station-service la nuit, '
+            + 'un sujet rouge éclairé au centre, un premier plan à éteindre',
+        avoidFor: 'tout le reste, et particulièrement les scènes chaudes ou le plein '
+            + 'jour. C\'est le preset le plus spécifique du projet. Pour le style, '
+            + '`PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV8Transform,
     },
     {
         id: 'powlisher-showcase',

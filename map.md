@@ -3295,6 +3295,68 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 nonies (`powV8` : le curseur qui manquait au melangeur)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (`melangeurLab` porte
+desormais une LUMINANCE par teinte, +`powV8`, 28e preset),
+`scripts/smoke-vision-preset.mjs` (+11 verifications, 295 au total),
+`scripts/verifier-presets-sur-paires.mjs`.
+
+**Deux ecarts restaient a `powV7`**, vus a l'oeil puis mesures. Aucun ne se
+corrigeait avec les leviers existants, et c'est l'interet du lot.
+
+**1. SON ROUGE EST PLUS VIF.** Sur 656 blocs de la moto et de l'element Synergy
+(chroma d'entree > 25, teinte Lab < 50): son rendu est a L 19,0 / chroma 46,3,
+`powV7` a L 13,2 / 39,6. **L'ecart est d'abord une affaire de LUMIERE.**
+
+Et il ne vient pas de la courbe: mesure au meme moment sur 2 799 blocs, son ciel
+bleu est a **0,99** fois notre luminance. Une courbe aurait touche les deux.
+C'est donc une **luminance par TEINTE** — le troisieme curseur du melangeur de
+Lightroom, que le notre n'avait pas.
+
+Ajoute a `melangeurLab`: chaque ancre porte maintenant [rotation, chroma,
+LUMINANCE], et les tables a deux valeurs valent 1 par defaut, donc **aucun
+preset existant ne bouge** (verifie par test). Sous le meme garde-fou de chroma
+que le reste: un pixel sans teinte fiable ne change pas de niveau, sinon la
+regle trace un contour. Mesure: x1,57 sur les rouges et oranges a forte chroma.
+
+Resultat: L 18,3 / chroma 47,9 contre ses 19,0 / 46,3.
+
+**2. SON SOL EST GRIS-BLEU, LE NOTRE TIRAIT AU MARRON.** `powV7` le laissait a
+la teinte 105 quand la sienne est a 127, et son commentaire disait deja pourquoi
+la correction n'arrivait pas. Ici le virage se mesure sur la sortie FINALE —
+degrade compris — contre son image telle quelle, par niveau de SORTIE. Ce qu'il
+demandait etait net: a* -1,02 sur 1 568 blocs a L 0-4, -0,73 sur 1 088 a L 4-8.
+
+**Et un arbitrage a l'interieur.** Les valeurs brutes de l'ajustement mettaient
+la premiere ancre du virage a (-1,96 / +2,00), ce qui faisait ressortir un noir
+PUR a 1,34/255 au lieu de 0. L'invariant du projet a gagne: ancre ramenee a 0.
+Mais le fondu vers zero reprenait la moitie du gain (sol a 110 au lieu de 120),
+alors l'ancre L=5 a ete **RESOLUE** sous la contrainte — -5,90 au lieu de -2,90.
+Ce n'est pas un chiffre choisi, c'est la solution d'une equation a une inconnue.
+Cout: 0,03 de dE76.
+
+Resultat: sol a a* -1,68 contre ses -1,63.
+
+**Resultat global**, dE76 median contre son rendu, chaine complete:
+
+| preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| `powV7` | **2,42** | 5,18 | 17,64 |
+| `powV8` | 2,45 | 5,17 | **13,88** |
+
+Le dE76 de la nuit bouge a peine (2,42 -> 2,45) et c'est le point: ce lot ne
+cherchait pas a baisser une moyenne, il corrigeait deux choses que l'oeil voit
+et qu'une moyenne noie. Le restaurant, lui, gagne 3,8 au passage — la correction
+des ombres lui profite.
+
+**RESERVE**: la luminance x1,57 sur les rouges est le levier le plus fort de la
+famille, et le a* -3,2 des ombres se verra sur toute autre photo. `powV8`
+reproduit UNE image.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 295/295.
+**`powV8` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 octies (`powV7` : les LED rallumees, et un residu nomme)
 
 **Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV7`, 27e preset),

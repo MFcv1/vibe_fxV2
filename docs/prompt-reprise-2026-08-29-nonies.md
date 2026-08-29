@@ -1,4 +1,4 @@
-# Prompt de reprise — 2026-08-29 octies (après la série `powV2` … `powV7`)
+# Prompt de reprise — 2026-08-29 nonies (après la série `powV2` … `powV8`)
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
 `presets-mesures-sur-corpus`).
@@ -19,8 +19,8 @@ les autres `docs/prompt-reprise-*`, `node_modules/`, `.next/`.
 
 ## Où en est le livre
 
-27 presets Vision. Les sept derniers — **`powlishermain`**, **`powV2`**,
-**`powV3`**, **`powV4`**, **`powV5`**, **`powV6`** et **`powV7`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
+28 presets Vision. Les huit derniers — **`powlishermain`**, **`powV2`**,
+**`powV3`**, **`powV4`**, **`powV5`**, **`powV6`**, **`powV7`** et **`powV8`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
 l'écran Lightroom de `@powl_d` (posts `1988715650794287456`,
 `1988715687783919978`, `1988715756461179091`, du 12 novembre 2025), la même photo
 avant et après. 43 691 blocs de 8×8 mesurés.
@@ -35,9 +35,15 @@ trois photos y sont muettes, le mélangeur y est à l'identité.
 **La série `powV2` → `powV6` va du plus général au plus spécifique** :
 `powV2` (trois photos, le style), `powV3` (sa densité de nuit), `powV4` (la
 couleur de nuit remesurée), `powV5` (le niveau de son image), `powV6` (plus le
-dégradé du bas), `powV7` (plus le relevé des hautes lumières). Chacun bat le
-précédent sur la photo de nuit et perd ailleurs : 8,52 → 7,39 → 7,09 → 2,92 →
-2,48 → **2,42**. `powV2` reste la mesure de son STYLE ; le reste de la série
+dégradé du bas), `powV7` (plus le relevé des hautes lumières), `powV8` (plus la
+luminance par teinte et le sol dégrisé). Chacun bat le précédent sur la photo de
+nuit et perd ailleurs : 8,52 → 7,39 → 7,09 → 2,92 → 2,48 → 2,42 → **2,45**
+(`powV8` s'arrête là parce qu'il ne cherchait plus la moyenne mais deux détails
+que l'œil voit).
+
+**Le moteur a gagné deux leviers dans la série** : le **dégradé du bas** (effet
+de position, 2026-08-29 septies) et la **luminance par teinte** dans le mélangeur
+(2026-08-29 nonies). Les deux sont mesurés, les deux sont rétro-compatibles. `powV2` reste la mesure de son STYLE ; le reste de la série
 reproduit UNE image.
 
 **Trois fois dans cette série, le meilleur chiffre a été refusé** — une courbe à
@@ -84,7 +90,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **284/284**, dont 17 pour `powlishermain`, 17
+- `npm run test:vision-preset` : **295/295**, dont 17 pour `powlishermain`, 17
   pour `powV2`, 9 pour `powV3` et 13 pour `powV4` (y compris un contrôle de non-
   régression sur `powV3`, qui partage désormais la même fabrique).
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est

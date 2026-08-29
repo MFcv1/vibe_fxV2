@@ -1796,6 +1796,70 @@ function teinteLab(rgb) {
     check('powV6 n\'a pas bougé en accueillant powV7', derive, 0, 1);
 }
 
+/* ---------- powV8 : la luminance par teinte, et le sol degris -----------------
+ *
+ * Ce bloc fige le levier ajoute au melangeur pour ce preset — la LUMINANCE par
+ * teinte, le troisieme curseur de celui de Lightroom — et le controle qui l'a
+ * impose: ses rouges sont 1,5 fois plus lumineux que les notres, alors que son
+ * ciel bleu est a 0,99. Une courbe aurait touche les deux.
+ */
+{
+    const v7 = getPresetTransform('powV7');
+    const v8 = getPresetTransform('powV8');
+    if (!v8) { console.error('ECHEC: powV8 introuvable.'); process.exit(1); }
+    const L = (f, c) => versLab(f(c))[0];
+    const C = (f, c) => Math.hypot(...versLab(f(c)).slice(1));
+    const rouge = [0.80, 0.14, 0.13];
+
+    /* 1. LE ROUGE MONTE. Valeur relevee: x1,514. */
+    check('powV8 : le rouge gagne en lumière', L(v8, rouge) / L(v7, rouge), 1.35, 1.70, '×');
+    check('powV8 : le rouge gagne en couleur', C(v8, rouge) / C(v7, rouge), 1.15, 1.60, '×');
+
+    /* 2. ET RIEN D'AUTRE NE MONTE. C'est ce qui separe une luminance PAR TEINTE
+     * d'une courbe: le gris et le ciel ne doivent pas bouger d'un pouce. Sans
+     * ce controle, on ne saurait pas si le levier fait ce qu'il annonce. */
+    check('powV8 : le gris ne bouge pas', Math.abs(L(v8, [0.5, 0.5, 0.5]) - L(v7, [0.5, 0.5, 0.5])), 0, 0.5, ' L*');
+    check('powV8 : le ciel ne bouge pas',
+        Math.abs(L(v8, [0.35, 0.55, 0.85]) - L(v7, [0.35, 0.55, 0.85])), 0, 0.5, ' L*');
+
+    /* 3. LE SOL SE DEGRISE: le virage descend dans les ombres (a* -1,02 mesure
+     * sur 1 568 blocs de sortie a L 0-4). */
+    /* Valeur relevee: -3,23. C'est fort, et c'est le prix du sol: l'ancre L=5
+     * a ete resolue pour rendre au sol ce que le fondu vers le noir lui prenait.
+     * Sur une autre photo, ce vert se verra dans les ombres — c'est dans la
+     * reserve du preset. */
+    check('powV8 : les ombres virent plus au vert-cyan',
+        versLab(v8([0.10, 0.10, 0.10]))[1] - versLab(v7([0.10, 0.10, 0.10]))[1], -4.5, -1.5, ' a*');
+
+    /* 4. Les gardes communs. La luminance par teinte est sous le meme garde-fou
+     * de chroma que le reste: un pixel sans teinte fiable ne change pas de
+     * niveau, sinon la regle trace un contour la ou la photo etait lisse. */
+    check('powV8 : n\'ajoute pas de contour', amplificationVoile(v8) - voileV1, -4, 0.6, '×');
+    check('powV8 : le noir pur reste noir', Math.max(...v8([0, 0, 0])) * 255, 0, 1);
+    check('powV8 : n\'écrête pas', Math.max(...v8([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 254);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = L(v8, [k / 255, k / 255, k / 255]);
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV8 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV8 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => C(v8, rgb) / Math.hypot(...versLab(rgb).slice(1)))), 0, 1.3, '×');
+
+    /* 5. ET `powV7` N'A PAS BOUGE. Le troisieme terme du melangeur vaut 1 par
+     * defaut, donc aucune table a deux valeurs ne change. Valeurs RELEVEES. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 45, 57]], [[0.8, 0.2, 0.2], [116, 0, 0]],
+        [[0.5, 0.5, 0.5], [67, 61, 56]], [[1, 1, 1], [225, 220, 208]]]) {
+        const o = v7(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV7 n\'a pas bougé en accueillant powV8', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

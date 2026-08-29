@@ -589,3 +589,81 @@ dégradé) :
 **RÉSERVE** : le relevé des hautes lumières éclaircit **tout** ce qui dépasse
 L 62. En plein jour, il brûle. C'est le bout de la série — une photo, un sujet,
 une lumière.
+
+---
+
+# `powV8` — le rouge, le sol, et le curseur qui manquait au mélangeur
+
+Deux écarts restaient à `powV7`, **vus à l'œil puis mesurés**. Aucun ne se
+corrigeait avec les leviers existants.
+
+## 1. Son rouge est plus vif
+
+Sur **656 blocs** de la moto et de l'élément Synergy (chroma d'entrée > 25,
+teinte Lab < 50) :
+
+| | L | chroma |
+|---|---|---|
+| son rendu | **19,0** | **46,3** |
+| `powV7` | 13,2 | 39,6 |
+
+**L'écart est d'abord une affaire de lumière**, pas de saturation.
+
+### Et ce n'est pas la courbe — le secteur témoin le prouve
+
+Mesuré au même moment sur **2 799 blocs**, son ciel bleu est à **0,99** fois
+notre luminance. Une courbe aurait touché les deux.
+
+> **Un écart de lumière sur une seule teinte n'est pas une erreur de courbe.**
+> Toujours mesurer un secteur témoin avant de conclure à un problème global.
+
+C'est donc une **luminance par teinte** — le troisième curseur du mélangeur de
+Lightroom, que le nôtre n'avait pas. Ajouté à `melangeurLab` : chaque ancre
+porte maintenant `[rotation, chroma, LUMINANCE]`, et les tables à deux valeurs
+valent 1 par défaut — **aucun preset existant ne bouge**, un test le vérifie.
+Sous le même garde-fou de chroma que le reste : un pixel sans teinte fiable ne
+change pas de niveau, sinon la règle trace un contour.
+
+Mesure retenue : **×1,57** sur les rouges et oranges à forte chroma.
+Résultat : **L 18,3 / chroma 47,9** contre ses 19,0 / 46,3.
+
+## 2. Son sol est gris-bleu, le nôtre tirait au marron
+
+`powV7` le laissait à la teinte 105 quand la sienne est à 127. Ici le virage se
+mesure sur la sortie **finale** — dégradé compris — contre son image telle
+quelle, et par niveau de **sortie**. Ce qu'il demandait était net :
+
+| L sortie | Δa\* | Δb\* | blocs |
+|---|---|---|---|
+| 0-4 | **−1,02** | +1,05 | 1 568 |
+| 4-8 | −0,73 | −0,09 | 1 088 |
+| 8-12 | −0,40 | −0,47 | 996 |
+
+### Un arbitrage à l'intérieur, et l'invariant a gagné
+
+Les valeurs brutes de l'ajustement mettaient la première ancre du virage à
+(−1,96 / +2,00), ce qui faisait ressortir un **noir pur à 1,34/255** au lieu de
+0. L'invariant du projet a gagné : ancre ramenée à 0.
+
+Mais le fondu vers zéro reprenait la moitié du gain (sol à 110 au lieu de 120).
+L'ancre L=5 a donc été **résolue** sous la contrainte : **−5,90** au lieu de
+−2,90. Ce n'est pas un chiffre choisi, c'est la solution d'une équation à une
+inconnue. Coût : **0,03 de dE76**.
+
+Résultat : sol à **a\* −1,68** contre ses −1,63.
+
+## Le résultat
+
+| preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| `powV7` | **2,42** | 5,18 | 17,64 |
+| `powV8` | 2,45 | 5,17 | **13,88** |
+
+Le dE76 de la nuit bouge à peine (2,42 → 2,45), et **c'est le point** : ce lot ne
+cherchait pas à baisser une moyenne, il corrigeait deux choses que l'œil voit et
+qu'une moyenne noie. Le restaurant gagne 3,8 au passage — la correction des
+ombres lui profite.
+
+**RÉSERVE** : la luminance ×1,57 sur les rouges est le levier le plus fort de la
+famille, et le a\* −3,2 des ombres se verra sur toute autre photo. `powV8`
+reproduit **une** image.

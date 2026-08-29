@@ -22,6 +22,12 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Un ecart de LUMIERE sur une seule teinte n'est pas une erreur de courbe.**
+  Sur la photo de nuit, ses rouges etaient 1,5x plus lumineux que les notres
+  alors que son ciel bleu, mesure au meme moment, etait a 0,99. Une courbe
+  aurait touche les deux: c'etait une luminance par TEINTE, le troisieme
+  curseur du melangeur de Lightroom. Toujours mesurer un SECTEUR TEMOIN avant
+  de conclure a un probleme global.
 - **La mediane d'une image n'est pas le regard de celui qui la regarde.** Les
   LED d'une station-service pesent 3,5 % des blocs: une mediane de dE ne les
   voit pas, et l'oeil ne voit qu'elles. Pour une COURBE, ajuster sur la
