@@ -3295,6 +3295,69 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 decies (`powV9` : le sol degris, et deux erreurs de MESURE)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV9`, 29e preset),
+`src/features/vibefx-studio/hooks/useStudioFilters.js` (+`degradeBas: 0` dans
+`DEFAULT_FILTERS`, qui manquait), `scripts/smoke-vision-preset.mjs`
+(+10 verifications, 305 au total), `scripts/verifier-presets-sur-paires.mjs`.
+
+**`powV8` annoncait le sol « cale » et il ne l'etait pas.** Son sol a lui est
+gris-bleu (teinte Lab 122), le notre restait a 90 — marron, et l'oeil le voyait
+tout de suite. Les deux causes sont des erreurs de MESURE, pas de reglage, et
+elles se reproduiront:
+
+**ERREUR 1 — un sous-ensemble qui n'en etait pas un.** Toutes les mesures de
+couleur du projet passent par des BLOCS PLATS a faible chroma, pour ne pas
+compter les contours. Sur du beton MOUILLE, ce filtre garde les flaques lisses
+et jette tout le reste — c'est-a-dire l'essentiel de ce que l'oeil voit. Mesure
+sur ce sous-ensemble: a\* -1,68 contre ses -1,63, « cale ». Mesure sur TOUS les
+pixels du sol: a\* 0,00 contre ses -1,99. **Le filtre qui protege d'un biais en
+fabriquait un autre.**
+
+**ERREUR 2 — la correction indexee au mauvais niveau.** Le virage se pose AVANT
+le degrade du bas, et le degrade divise ensuite la luminosite du sol par trois.
+En attribuant la correction au niveau mesure A L'ARRIVEE (L 6,5) au lieu de
+celui ou elle s'applique (L 11,5), elle partait dans la mauvaise ancre. Trois
+tentatives ont echoue sur ce seul point.
+
+**CE QUE `powV9` FAIT, une fois les deux corrigees.** Le virage, reajuste sur
+tous les pixels et indexe au bon niveau, monte le sol de 90 a 102 puis PLAFONNE:
+a ce niveau il partage son ancre avec le CIEL, qui lui est deja juste, et un
+virage indexe par le NIVEAU ne sait pas separer deux teintes qui partagent un
+niveau. Le melangeur, indexe par la TEINTE, finit le travail sur les deux
+secteurs chauds.
+
+**L'ORDRE COMPTE, et c'est l'enseignement du lot.** Resolu AVANT le virage, le
+melangeur demandait +40 et +55 degres. Ces valeurs sont vides de sens: le
+garde-fou de chroma (smoothstep 4 -> 11) n'en laisse passer qu'un sixieme a la
+chroma du sol, mais les appliquerait EN ENTIER a un jaune franc. Resolu APRES,
+il demande +18,8 et +33,5 — la moitie — et **le garde-fou du projet n'a pas eu a
+bouger d'un pouce**: l'amplification dans un voile reste a 2,39x pour une borne
+a 3,63x. Un garde-fou qu'on est tente de baisser est souvent le signe qu'on
+corrige au mauvais endroit.
+
+**Resultat** : sol a la teinte 123 contre sa cible 122, rouge et ciel inchanges
+(controles par test), et sur sa photo de nuit **2,12 de dE76** — le meilleur de
+toute la serie:
+
+| preset | nuit |
+|---|---|
+| rien | 17,24 |
+| `powV2` | 8,52 |
+| `powV5` | 2,92 |
+| `powV7` | 2,42 |
+| `powV8` | 2,45 |
+| **`powV9`** | **2,12** |
+
+**RESERVE**, plus lourde que celle de `powV8`: ses deux secteurs chauds sont
+tournes de 19 a 33 degres et desatures de moitie. Sur un beton chaud a forte
+chroma, la rotation mesuree vaut +46 degres — sur une photo ou l'ocre ou le
+jaune est le sujet (sable, bois, mur), ce preset le verdit.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 305/305.
+**`powV9` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 nonies (`powV8` : le curseur qui manquait au melangeur)
 
 **Ce qui a change dans l'arbre** : `visionPresets.js` (`melangeurLab` porte

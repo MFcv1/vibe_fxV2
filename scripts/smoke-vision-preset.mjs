@@ -1860,6 +1860,74 @@ function teinteLab(rgb) {
     check('powV7 n\'a pas bougé en accueillant powV8', derive, 0, 1);
 }
 
+/* ---------- powV9 : le sol degris, et l'ordre des leviers ---------------------
+ *
+ * Ce bloc fige ce qui separe `powV9` de `powV8`: les deux secteurs CHAUDS du
+ * melangeur, tournes et desatures pour que le sol de beton mouille tombe sur le
+ * gris-bleu du sien (teinte Lab 123 contre sa cible 122, au lieu de 90).
+ *
+ * Il fige aussi ce qui NE devait pas bouger — le rouge et le ciel — parce que
+ * c'est la seule facon de savoir que la correction a porte la ou il fallait.
+ */
+{
+    const v8 = getPresetTransform('powV8');
+    const v9 = getPresetTransform('powV9');
+    if (!v9) { console.error('ECHEC: powV9 introuvable.'); process.exit(1); }
+    const teinte = (f, c) => {
+        const [, a, b] = versLab(f(c));
+        return ((Math.atan2(b, a) * 180 / Math.PI) + 360) % 360;
+    };
+    const chroma = (f, c) => Math.hypot(...versLab(f(c)).slice(1));
+
+    /* 1. LE CHAUD TOURNE VERS LE VERT. Valeur relevee sur un beton chaud:
+     * +46 degres. C'est fort, et c'est assume — voir la reserve du preset. */
+    const beton = [0.32, 0.30, 0.28];
+    check('powV9 : le sol chaud vire au gris-vert', teinte(v9, beton) - teinte(v8, beton), 30, 60, '°');
+    /* Sa CHROMA, elle, ne baisse pas: 1,33x releve. Les gains de secteur sont
+     * pourtant plus bas que ceux de `powV8` (0,50 et 0,65 contre 0,91 et 1,17),
+     * mais la rotation amene la couleur sur un secteur voisin et le virage
+     * s'ajoute par-dessus. Ce qui change sur le sol est la TEINTE, pas la
+     * quantite de couleur — le test le dit tel quel plutot que l'inverse. */
+    check('powV9 : sa chroma ne s\'effondre pas', chroma(v9, beton) / chroma(v8, beton), 0.8, 1.8, '×');
+
+    /* 2. LE ROUGE ET LE CIEL NE BOUGENT PAS. Sans ce controle, on ne saurait
+     * pas si la correction a porte sur le sol ou sur toute l'image. */
+    const rouge = [0.80, 0.14, 0.13];
+    check('powV9 : le rouge ne bouge pas',
+        Math.abs(versLab(v9(rouge))[0] - versLab(v8(rouge))[0]), 0, 1, ' L*');
+    check('powV9 : le ciel ne bouge pas',
+        Math.abs(teinte(v9, [0.35, 0.55, 0.85]) - teinte(v8, [0.35, 0.55, 0.85])), 0, 5, '°');
+
+    /* 3. LE GARDE-FOU DU PROJET N'A PAS BOUGE, et c'est le point du lot: resolu
+     * APRES le virage, le melangeur demande la moitie de ce qu'il demandait
+     * avant, et l'amplification dans un voile reste ou elle etait. */
+    check('powV9 : n\'ajoute pas de contour', amplificationVoile(v9) - voileV1, -4, 0.6, '×');
+
+    /* 4. Les gardes communs. */
+    check('powV9 : le noir pur reste noir', Math.max(...v9([0, 0, 0])) * 255, 0, 1);
+    check('powV9 : n\'écrête pas', Math.max(...v9([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 254);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = versLab(v9([k / 255, k / 255, k / 255]))[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV9 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV9 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chroma(v9, rgb) / Math.hypot(...versLab(rgb).slice(1)))), 0, 1.3, '×');
+
+    /* 5. ET `powV8` N'A PAS BOUGE. Valeurs RELEVEES. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 45, 57]], [[0.8, 0.2, 0.2], [163, 16, 12]],
+        [[0.5, 0.5, 0.5], [66, 61, 56]], [[1, 1, 1], [225, 220, 208]]]) {
+        const o = v8(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV8 n\'a pas bougé en accueillant powV9', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

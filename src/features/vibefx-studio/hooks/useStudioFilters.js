@@ -12,6 +12,12 @@ export const DEFAULT_FILTERS = {
        grain a ete calibre: voir `grainField.js`. */
     grainSize: 25,
     vignette: 0,
+    /* Le degrade du bas (2026-08-29). Au repos c'est 0: il n'existe que si un
+       preset le pose ou si l'utilisateur le monte. Sans cette entree,
+       `withoutPresetSpatials` remettait la cle a `undefined` au lieu de 0 —
+       le moteur le normalisait quand meme, mais le panneau ne savait pas quoi
+       afficher. */
+    degradeBas: 0,
     tintColor: '#ffffff',
     tintIntensity: 0,
     filterIntensity: 100,

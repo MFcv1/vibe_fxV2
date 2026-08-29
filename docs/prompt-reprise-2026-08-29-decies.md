@@ -1,4 +1,4 @@
-# Prompt de reprise — 2026-08-29 nonies (après la série `powV2` … `powV8`)
+# Prompt de reprise — 2026-08-29 decies (après la série `powV2` … `powV9`)
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
 `presets-mesures-sur-corpus`).
@@ -19,8 +19,8 @@ les autres `docs/prompt-reprise-*`, `node_modules/`, `.next/`.
 
 ## Où en est le livre
 
-28 presets Vision. Les huit derniers — **`powlishermain`**, **`powV2`**,
-**`powV3`**, **`powV4`**, **`powV5`**, **`powV6`**, **`powV7`** et **`powV8`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
+29 presets Vision. Les neuf derniers — **`powlishermain`**, **`powV2`**,
+**`powV3`**, **`powV4`**, **`powV5`**, **`powV6`**, **`powV7`**, **`powV8`** et **`powV9`** — sont les premiers du projet calés sur des avant/après **certains** : trois captures de
 l'écran Lightroom de `@powl_d` (posts `1988715650794287456`,
 `1988715687783919978`, `1988715756461179091`, du 12 novembre 2025), la même photo
 avant et après. 43 691 blocs de 8×8 mesurés.
@@ -36,10 +36,16 @@ trois photos y sont muettes, le mélangeur y est à l'identité.
 `powV2` (trois photos, le style), `powV3` (sa densité de nuit), `powV4` (la
 couleur de nuit remesurée), `powV5` (le niveau de son image), `powV6` (plus le
 dégradé du bas), `powV7` (plus le relevé des hautes lumières), `powV8` (plus la
-luminance par teinte et le sol dégrisé). Chacun bat le précédent sur la photo de
+luminance par teinte), `powV9` (plus le sol dégrisé). Chacun bat le précédent sur la photo de
 nuit et perd ailleurs : 8,52 → 7,39 → 7,09 → 2,92 → 2,48 → 2,42 → **2,45**
 (`powV8` s'arrête là parce qu'il ne cherchait plus la moyenne mais deux détails
 que l'œil voit).
+
+**Trois règles de mesure sont nées de cette série et vivent dans
+`docs/pieges-connus.md`** : la médiane d'une image n'est pas le regard de celui
+qui la regarde ; le filtre « blocs plats » fabrique son propre biais sur une
+matière texturée ; et l'ORDRE des leviers change leur valeur — être tenté de
+baisser un garde-fou est le signe qu'on corrige au mauvais endroit.
 
 **Le moteur a gagné deux leviers dans la série** : le **dégradé du bas** (effet
 de position, 2026-08-29 septies) et la **luminance par teinte** dans le mélangeur
@@ -90,7 +96,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **295/295**, dont 17 pour `powlishermain`, 17
+- `npm run test:vision-preset` : **305/305**, dont 17 pour `powlishermain`, 17
   pour `powV2`, 9 pour `powV3` et 13 pour `powV4` (y compris un contrôle de non-
   régression sur `powV3`, qui partage désormais la même fabrique).
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est

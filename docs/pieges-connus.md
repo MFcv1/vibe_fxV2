@@ -22,6 +22,22 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Le filtre « blocs plats a faible chroma » fabrique son propre biais sur une
+  matiere texturee.** Sur du beton MOUILLE il ne garde que les flaques lisses et
+  jette l'essentiel de ce que l'oeil voit: il annoncait le sol « cale » (a* -1,68
+  contre -1,63) quand la mesure sur TOUS les pixels donnait 0,00 contre -1,99.
+  Verifier une couleur de MATIERE sur toute sa surface, pas sur ce qui passe le
+  filtre a contours.
+- **Une correction s'indexe au niveau ou elle S'APPLIQUE, pas a celui qu'on
+  mesure a l'arrivee.** Le virage se pose avant le degrade du bas, qui divise
+  ensuite la luminosite par trois: indexer sur la sortie envoyait toute la
+  correction dans la mauvaise ancre. Trois tentatives ont echoue sur ce point.
+- **L'ORDRE DES LEVIERS CHANGE LEUR VALEUR.** Resolu avant le virage, le
+  melangeur demandait +40 et +55 degres de rotation; resolu apres, +18,8 et
+  +33,5. Et une valeur de melangeur ne veut pas dire la meme chose selon la
+  chroma: le garde-fou n'en laisse passer qu'un sixieme sur une matiere peu
+  coloree, mais l'applique EN ENTIER a une couleur franche. **Etre tente de
+  baisser un garde-fou est le signe qu'on corrige au mauvais endroit.**
 - **Un ecart de LUMIERE sur une seule teinte n'est pas une erreur de courbe.**
   Sur la photo de nuit, ses rouges etaient 1,5x plus lumineux que les notres
   alors que son ciel bleu, mesure au meme moment, etait a 0,99. Une courbe

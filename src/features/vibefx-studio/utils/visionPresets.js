@@ -2251,6 +2251,82 @@ const powV8Transform = construirePowV2(V7_COURBE, {
     cielChroma: 0.828,
 });
 
+/* ==========================================================================
+ * POWV9 — le sol, et DEUX erreurs de mesure que j'ai faites avant lui
+ *
+ * `powV8` avait le rouge, pas le sol: son sol a lui est gris-bleu (teinte Lab
+ * 122), le notre restait a 90 — marron. Or `powV8` annoncait le sol « cale ».
+ * Les deux raisons de cet ecart sont des erreurs de MESURE, pas de reglage, et
+ * elles valent d'etre ecrites parce qu'elles se reproduiront.
+ *
+ * ERREUR 1 — J'AI MESURE LE SOL SUR UN SOUS-ENSEMBLE QUI N'EN ETAIT PAS UN.
+ * Toutes les mesures de couleur du projet passent par des BLOCS PLATS a faible
+ * chroma, pour ne pas compter les contours. Sur un sol de beton MOUILLE, ce
+ * filtre garde les flaques lisses et jette tout le reste — c'est-a-dire
+ * l'essentiel de ce que l'oeil voit. Mesure sur ce sous-ensemble: a* -1,68
+ * contre ses -1,63, « cale ». Mesure sur TOUS les pixels du sol: a* 0,00 contre
+ * ses -1,99. Le filtre qui protege d'un biais en fabriquait un autre.
+ *
+ * ERREUR 2 — J'AI INDEXE LA CORRECTION AU MAUVAIS NIVEAU. Le virage se pose
+ * AVANT le degrade du bas; le degrade divise ensuite la luminosite du sol par
+ * trois. En attribuant la correction au niveau mesure A L'ARRIVEE (L 6,5) au
+ * lieu de celui ou elle s'applique (L 11,5), elle allait dans la mauvaise ancre.
+ * Trois tentatives ont echoue sur ce seul point.
+ *
+ * CE QUE `powV9` FAIT, une fois les deux corrigees:
+ *
+ *  - le VIRAGE, reajuste sur TOUS les pixels et indexe au bon niveau. Il monte
+ *    le sol de la teinte 90 a 102, puis PLAFONNE — et la raison est structurelle:
+ *    a ce niveau, le sol partage son ancre avec le CIEL, qui lui est deja juste.
+ *    Un virage est indexe par le NIVEAU; il ne sait pas separer deux teintes qui
+ *    partagent un niveau.
+ *  - le MELANGEUR, qui lui est indexe par la TEINTE, finit le travail sur les
+ *    deux secteurs chauds. +18,8 et +33,5 degres, chroma 0,50 et 0,65.
+ *
+ * L'ORDRE COMPTE, et c'est le vrai enseignement. Resolu AVANT le virage, le
+ * melangeur demandait +40 et +55 degres — des valeurs qui ne veulent rien dire,
+ * parce que le garde-fou de chroma (smoothstep 4 -> 11) ne laisse passer qu'un
+ * sixieme de la regle a la chroma du sol, et qu'un jaune FRANC aurait pris les
+ * 55 degres en entier. Resolu APRES, il demande la moitie, et le garde-fou du
+ * projet n'a pas eu a bouger d'un pouce: l'amplification dans un voile reste a
+ * 2,39x pour une borne a 3,63x.
+ *
+ * Resultat: sol a la teinte 123 contre sa cible 122, rouge inchange, et le dE76
+ * par pixel sur toute l'image passe de 3,30 a 2,77.
+ *
+ * RESERVE: la meme que `powV8`, en plus marque. Les deux secteurs chauds sont
+ * desormais tournes de 19 a 33 degres et desatures de moitie: sur une photo ou
+ * le jaune ou l'ocre est le sujet — du sable, du bois, un mur — ce preset le
+ * verdit. Il reproduit UNE image.
+ * ======================================================================= */
+
+const V9_VIRAGE_A = [
+    0, -3.00, -4.71, -4.21, -1.99, 0.57, 2.68, 3.49, 3.11, 2.71, 2.52,
+    2.29, 1.97, 1.62, 1.27, 0.94, 0.64, 0.35, 0.09, -0.14, -0.36,
+];
+const V9_VIRAGE_B = [
+    0, 0.17, -0.60, -1.21, -0.39, 2.08, 4.54, 5.80, 6.76, 7.24, 7.01,
+    6.90, 6.95, 6.88, 6.72, 6.58, 6.46, 6.36, 6.25, 6.12, 5.98,
+];
+/* Seuls les deux secteurs chauds changent par rapport a `powV8`: c'est eux que
+ * le sol traverse. Le rouge (secteurs 1 et 2) et le ciel ne bougent pas. */
+const V9_MELANGEUR = [
+    [2.52, 1.028, 1], [9.84, 1.598, 1.569], [0.64, 1.504, 1.568], [-5.22, 1.079, 1],
+    [18.77, 0.502, 1], [33.49, 0.647, 1], [-1.22, 0.716, 1], [4.27, 0.483, 1],
+    [6.74, 0.356, 1], [10.1, 0.60, 1], [5.1, 0.80, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+    [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+];
+
+const powV9Transform = construirePowV2(V7_COURBE, {
+    virageA: V9_VIRAGE_A,
+    virageB: V9_VIRAGE_B,
+    melangeur: V9_MELANGEUR,
+    cielCible: 228,
+    cielChroma: 0.828,
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -2722,6 +2798,40 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 80 },
         recommendedIntensity: 100,
         transform: powV8Transform,
+    },
+    {
+        id: 'powV9',
+        label: 'PowV9',
+        hint: 'Le sol gris-bleu enfin juste — et deux erreurs de mesure corrigées',
+        description: '`PowV8` avait le rouge mais pas le sol : le sien est gris-bleu '
+            + '(teinte Lab 122), le nôtre restait à 90 — marron. Les deux causes '
+            + 'étaient des erreurs de **mesure**, pas de réglage. **(1)** Le sol était '
+            + 'mesuré sur des blocs plats à faible chroma — le filtre standard du '
+            + 'projet, qui sur du béton MOUILLÉ ne garde que les flaques lisses et '
+            + 'jette l\'essentiel de ce que l\'œil voit : il annonçait a\* −1,68 contre '
+            + 'ses −1,63, « calé », quand la mesure sur TOUS les pixels donnait 0,00 '
+            + 'contre −1,99. **(2)** La correction était indexée sur le niveau mesuré '
+            + 'à l\'arrivée (L 6,5) au lieu de celui où le virage s\'applique, avant le '
+            + 'dégradé (L 11,5) : elle partait dans la mauvaise ancre. Une fois les '
+            + 'deux corrigées, le virage monte le sol de 90 à 102 puis **plafonne** — à '
+            + 'ce niveau il partage son ancre avec le ciel, déjà juste, et un virage ne '
+            + 'sait pas séparer deux teintes qui partagent un niveau. Le mélangeur, '
+            + 'indexé par la teinte, finit le travail : sol à **123** contre sa cible '
+            + '122. **L\'ordre compte** : résolu avant le virage, le mélangeur '
+            + 'demandait +40 et +55° — des valeurs vides de sens, puisque le garde-fou '
+            + 'de chroma n\'en laisse passer qu\'un sixième à la chroma du sol mais les '
+            + 'appliquerait en entier à un jaune franc. Résolu après, il demande la '
+            + 'moitié, et le garde-fou n\'a pas eu à bouger (contour 2,39× pour une '
+            + 'borne à 3,63×). RÉSERVE : ses deux secteurs chauds sont tournés de 19 à '
+            + '33° et désaturés de moitié — sur une photo où l\'ocre ou le jaune est le '
+            + 'sujet (sable, bois, mur), il le verdit.',
+        bestFor: 'la scène pour laquelle il a été mesuré : station-service la nuit, '
+            + 'sujet rouge éclairé, sol de béton mouillé au premier plan',
+        avoidFor: 'tout le reste, et surtout les scènes où le jaune ou l\'ocre compte. '
+            + 'C\'est le preset le plus spécifique du projet ; pour le style, `PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV9Transform,
     },
     {
         id: 'powlisher-showcase',

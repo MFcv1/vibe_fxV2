@@ -667,3 +667,82 @@ ombres lui profite.
 **RÉSERVE** : la luminance ×1,57 sur les rouges est le levier le plus fort de la
 famille, et le a\* −3,2 des ombres se verra sur toute autre photo. `powV8`
 reproduit **une** image.
+
+---
+
+# `powV9` — le sol dégrisé, et deux erreurs de mesure que j'avais faites
+
+`powV8` annonçait le sol « calé » et il ne l'était pas. Son sol est gris-bleu
+(teinte Lab **122**), le nôtre restait à **90** — marron, et l'œil le voyait tout
+de suite. **Les deux causes sont des erreurs de mesure, pas de réglage.**
+
+## Erreur 1 — un sous-ensemble qui n'en était pas un
+
+Toutes les mesures de couleur du projet passent par des **blocs plats à faible
+chroma**, pour ne pas compter les contours. Sur du béton **mouillé**, ce filtre
+ne garde que les flaques lisses et jette tout le reste — c'est-à-dire
+l'essentiel de ce que l'œil voit.
+
+| mesure du sol | a\* | verdict |
+|---|---|---|
+| sur les blocs plats | −1,68 (lui : −1,63) | « calé » |
+| **sur tous les pixels** | **0,00** (lui : −1,99) | faux |
+
+**Le filtre qui protège d'un biais en fabriquait un autre.**
+
+## Erreur 2 — la correction indexée au mauvais niveau
+
+Le virage se pose **avant** le dégradé du bas, et le dégradé divise ensuite la
+luminosité du sol par trois. En attribuant la correction au niveau mesuré **à
+l'arrivée** (L 6,5) au lieu de celui où elle s'applique (**L 11,5**), elle
+partait dans la mauvaise ancre. **Trois tentatives ont échoué sur ce seul
+point.**
+
+## Ce que `powV9` fait
+
+Le **virage**, réajusté sur tous les pixels et indexé au bon niveau, monte le sol
+de 90 à **102** — puis **plafonne**. La raison est structurelle : à ce niveau, le
+sol partage son ancre avec le **ciel**, qui lui est déjà juste. *Un virage est
+indexé par le niveau ; il ne sait pas séparer deux teintes qui partagent un
+niveau.*
+
+Le **mélangeur**, lui indexé par la teinte, finit le travail sur les deux
+secteurs chauds : sol à **123** contre sa cible **122**.
+
+## L'ordre des leviers change leur valeur
+
+C'est l'enseignement du lot :
+
+| mélangeur résolu… | rotation demandée |
+|---|---|
+| **avant** le virage | +40° et +55° |
+| **après** le virage | **+18,8° et +33,5°** |
+
+Et les premières valeurs sont **vides de sens** : le garde-fou de chroma
+(smoothstep 4 → 11) n'en laisse passer qu'un sixième à la chroma du sol, mais les
+appliquerait **en entier** à un jaune franc.
+
+Résolu dans le bon ordre, **le garde-fou du projet n'a pas eu à bouger d'un
+pouce** : l'amplification dans un voile reste à 2,39× pour une borne à 3,63×.
+
+> **Être tenté de baisser un garde-fou est souvent le signe qu'on corrige au
+> mauvais endroit.**
+
+## Le résultat
+
+| preset | nuit |
+|---|---|
+| rien | 17,24 |
+| `powV2` | 8,52 |
+| `powV5` | 2,92 |
+| `powV7` | 2,42 |
+| `powV8` | 2,45 |
+| **`powV9`** | **2,12** |
+
+Le rouge et le ciel sont vérifiés **inchangés** par test — sans quoi on ne
+saurait pas si la correction a porté sur le sol ou sur toute l'image.
+
+**RÉSERVE**, plus lourde que celle de `powV8` : ses deux secteurs chauds sont
+tournés de 19 à 33° et désaturés de moitié. Sur un béton chaud à forte chroma la
+rotation mesurée vaut **+46°** — sur une photo où l'ocre ou le jaune est le
+sujet (sable, bois, mur), ce preset le **verdit**.
