@@ -24,6 +24,13 @@ const prefixe = process.argv[2];
 if (!prefixe) { console.error('usage: node scripts/ajuster-preset-sur-paire.mjs <prefixe>'); process.exit(1); }
 const iPlat = process.argv.indexOf('--plat');
 const PLAT = iPlat > 0 ? Number(process.argv[iPlat + 1]) : 7;
+/* --cadre-entier: on n'estime plus le masque et on ne filtre plus rien. Le
+ * preset s'ajuste alors sur CE QU'ON VOIT, masque compris. Les deux modes
+ * repondent a deux questions differentes:
+ *   sans l'option -> « quel preset a-t-il applique, sous son masque ? »
+ *   avec          -> « quel preset ressemble le plus a son image finie ? »
+ * Le second est le bon quand le but est de reproduire l'image. */
+const CADRE_ENTIER = process.argv.includes('--cadre-entier');
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const s2l = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -170,7 +177,7 @@ const lireMasque = (m, x, y) => m.liss[Math.min(CY - 1, Math.floor(y * CY))][Mat
  * couleur, ca fabrique du bruit amplifie — et le sol de cette photo, c'est
  * justement 4 diaphragmes. La courbe, elle, se cale sur les memes blocs: c'est
  * la zone dont on sait ce qu'elle mesure. */
-const SEUIL_MASQUE = 1.0;
+const SEUIL_MASQUE = CADRE_ENTIER ? 99 : 1.0;
 const NOIR = 2.4;
 const courbeParam = (alpha, beta) => {
     const pied = Math.sqrt(Math.max(0, (2 * NOIR - beta) ** 2 - beta * beta));
@@ -195,7 +202,7 @@ function score(pas = 1) {
 }
 function ajusteCourbe() {
     let best = null;
-    for (let a = 0.60; a <= 1.201; a += 0.01) for (let b = -16; b <= 2.01; b += 0.5) {
+    for (let a = 0.40; a <= 1.201; a += 0.01) for (let b = -16; b <= 2.01; b += 0.5) {
         const t = courbeParam(a, b); if (penteMini(t) < 0.30) continue;
         const garde = COURBE; COURBE = t;
         const s = score(7); COURBE = garde;
@@ -263,8 +270,8 @@ for (let tour = 1; tour <= 3; tour += 1) {
     masque = estimerMasque();
     /* on corrige SON rendu de l'ecart au plateau, en lumiere lineaire */
     cible = blocs.map((o) => {
-        const retire = masque.plateau - lireMasque(masque, o.x, o.y);
-        const corr = o.b.map((v) => clamp01(l2s(s2l(v) * 2 ** retire)));
+        const retire = CADRE_ENTIER ? 0 : masque.plateau - lireMasque(masque, o.x, o.y);
+        const corr = retire ? o.b.map((v) => clamp01(l2s(s2l(v) * 2 ** retire))) : o.b;
         return { ...o, retire, c: lab(...corr) };
     });
     const c = ajusteCourbe(); ajusteVirage(); ajusteMelangeur();

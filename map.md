@@ -3294,6 +3294,62 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 sexies (`powV5`, et une erreur de niveau corrigee)
+
+**Ce qui a change dans l'arbre** : `src/features/vibefx-studio/utils/visionPresets.js`
+(+`powV5`, 25e preset), `scripts/smoke-vision-preset.mjs` (+10 verifications,
+263 au total), `scripts/ajuster-preset-sur-paire.mjs` (option `--cadre-entier`),
+`scripts/verifier-presets-sur-paires.mjs`.
+
+**L'ERREUR, et elle est de moi.** `powV4` est ajuste sur le PLATEAU du masque —
+la zone que son masque local ne touche pas. C'etait le bon endroit pour mesurer
+sa COULEUR, et ca l'est toujours. Mais j'en avais aussi tire le NIVEAU du
+preset, et la c'etait une DECISION deguisee en mesure. Les memes chiffres se
+lisent de deux facons:
+
+  A) il a assombri les BORDS               -> le niveau est celui du centre
+  B) il a assombri TOUT puis rattrape le
+     SUJET                                 -> le niveau est bien plus bas
+
+Une seule photo ne tranche pas. Ce qui tranche, c'est le BUT: pour ressembler a
+son image, il faut la courbe qui minimise l'ecart sur le CADRE ENTIER. Elle
+donne 3,08 de dE76 median la ou `powV4` est a 7,15 — plus de deux fois mieux.
+La lecture B est donc la bonne pour cet usage, et c'est ce que voyait l'oeil du
+porteur du projet avant que la mesure ne le dise: « tout est plus sombre chez
+lui, le sol comme le ciel ».
+
+**LECON GENERALE, notee dans `pieges-connus.md`**: choisir la zone sur laquelle
+on ajuste, c'est deja choisir le resultat. Une mesure impeccable sur la mauvaise
+zone reste une erreur, et elle ne se voit pas dans les chiffres — seulement a
+l'oeil.
+
+**`powV5`** reprend donc les tables de couleur de `powV4` telles quelles (elles,
+elles sont mesurees au bon endroit, masque retire) et ne change que la courbe:
+droite en L*, pied doux, plus une EPAULE. a = 0,61, b = -2,0, epaule 1,15, pente
+jamais sous 0,30, plafond 141.
+
+  niveau median rendu   son image 8,6   powV5 10,3   powV4 17,4   powV2 19,0
+  dE76 sur sa nuit      powV5 2,92      powV4 7,09   powV3 7,39   powV2 8,52
+
+Sur ses deux autres photos `powV5` est a 23 et 21: c'est un preset de nuit
+extreme, et il n'a rien a y faire.
+
+**Ce qui reste et ne se rattrapera pas**: son sujet est plus lumineux que le
+notre — c'est l'autre moitie de son masque, il a rattrape la station et la moto
+apres avoir tout baisse. Un preset ne sait pas ou est le sujet.
+
+**RESERVE**: `powV5` descend tres bas (un blanc pur atterrit a 141). Il est fait
+pour une photo prise CLAIRE et rendue en nuit; sur une photo deja sombre il la
+detruit.
+
+**Et une faute d'ecriture, deux fois de suite**: les controles de non-regression
+de `powV3` puis de `powV4` portaient des valeurs attendues INVENTEES au lieu
+d'etre relevees. Les deux ont echoue alors que le code etait juste. La regle est
+dans `pieges-connus.md` depuis le premier; elle vaut d'etre relue.
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 263/263.
+**`powV5` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 quinquies (`powV4` : la couleur de la nuit, remesuree sous son masque)
 
 **Ce qui a change dans l'arbre** : `scripts/ajuster-preset-sur-paire.mjs` ajoute.

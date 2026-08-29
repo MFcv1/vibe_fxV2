@@ -22,6 +22,14 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Choisir la zone sur laquelle on ajuste, c'est deja choisir le resultat.**
+  `powV4` a pris son NIVEAU sur le plateau du masque — la ou l'on mesure
+  justement la couleur. C'etait une decision deguisee en mesure: la meme photo
+  se lit « il a assombri les bords » ou « il a tout assombri puis rattrape le
+  sujet », et une seule image ne tranche pas. Ce qui tranche est le BUT. Pour
+  ressembler a une image finie, ajuster sur le CADRE ENTIER: 3,08 de dE76 au
+  lieu de 7,15. Une mesure impeccable sur la mauvaise zone reste une erreur, et
+  elle ne se voit pas dans les chiffres — seulement a l'oeil.
 - **Ne pas mesurer une couleur a travers un masque, ni dans une zone qu'on a
   rebrillantee.** Retirer d'abord le masque (le ramener a son plateau), puis
   n'ajuster la couleur que la ou la correction reste faible — un diaphragme au

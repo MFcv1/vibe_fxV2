@@ -1565,6 +1565,76 @@ function teinteLab(rgb) {
     check('powV3 n\'a pas bouge en accueillant powV4', derive, 0, 1);
 }
 
+/* ---------- powV5 : la couleur de powV4, au niveau de son image -------------
+ *
+ * `powV4` prend son NIVEAU sur la zone que le masque ne touche pas; `powV5` le
+ * prend sur le cadre entier, c'est-a-dire sur ce que l'oeil voit. Seule la
+ * courbe les separe — ce bloc le verifie, et fige la chute.
+ */
+{
+    const v4 = getPresetTransform('powV4');
+    const v5 = getPresetTransform('powV5');
+    if (!v5) { console.error('ECHEC: powV5 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]));
+
+    /* 1. IL DESCEND TRES BAS, et c'est le geste entier. */
+    check('powV5 : bien plus sombre que powV4', gris(v4, 0.5)[0] - gris(v5, 0.5)[0], 8, 18, ' L*');
+    const blanc = v5([1, 1, 1]).map((v) => Math.round(v * 255));
+    check('powV5 : plafond mesure', Math.max(...blanc), 120, 142);
+    check('powV5 : n\'ecrete pas', Math.max(...blanc), 0, 254);
+
+    /* 2. SA COULEUR EST CELLE DE powV4, a niveau de sortie egal — sinon on
+     * mesurerait la courbe une seconde fois. Meme controle que powV3/powV2. */
+    let ecartCouleur = 0;
+    for (let k = 40; k <= 248; k += 8) {
+        const cible = gris(v5, k / 255);
+        let meilleur = null;
+        for (let j = 0; j <= 255; j += 1) {
+            const c = gris(v4, j / 255);
+            const d = Math.abs(c[0] - cible[0]);
+            if (!meilleur || d < meilleur.d) meilleur = { d, a: c[1], b: c[2] };
+        }
+        if (meilleur.d > 1) continue;
+        ecartCouleur = Math.max(ecartCouleur, Math.hypot(meilleur.a - cible[1], meilleur.b - cible[2]));
+    }
+    check('powV5 : sa couleur est celle de powV4', ecartCouleur, 0, 1.2, ' a*b*');
+
+    /* 3. Les gardes communs. Malgre la chute, rien n'est ecrase ni ecrete. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const bas = versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0];
+        const haut = versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0];
+        penteMini = Math.min(penteMini,
+            (gris(v5, (k + 8) / 255)[0] - gris(v5, (k - 8) / 255)[0]) / (haut - bas));
+    }
+    check('powV5 : aucune pente ecrasee dans la courbe', penteMini, 0.28, 2);
+    check('powV5 : le noir pur reste noir', Math.max(...v5([0, 0, 0])) * 255, 0, 1);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v5, k / 255)[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV5 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    check('powV5 : n\'ajoute pas de contour', amplificationVoile(v5) - voileV1, -4, 0.6, '×');
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV5 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v5(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* 4. ET `powV4` N'A PAS BOUGE. Valeurs RELEVEES avant l'ajout, pas ecrites
+     * de tete: la premiere version de ce controle-la, pour powV3, portait un
+     * chiffre invente et a echoue alors que le code etait juste. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [22, 63, 74]], [[0.8, 0.2, 0.2], [172, 0, 13]],
+        [[0.5, 0.5, 0.5], [108, 98, 90]], [[1, 1, 1], [210, 204, 192]]]) {
+        const o = v4(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV4 n\'a pas bouge en accueillant powV5', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

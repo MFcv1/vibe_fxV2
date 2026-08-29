@@ -1990,6 +1990,63 @@ const powV4Transform = construirePowV2(V4_COURBE, {
     cielChroma: 0.611,
 });
 
+/* ==========================================================================
+ * POWV5 — la meme couleur que `powV4`, mais posee au niveau de SON IMAGE
+ *
+ * ET LA CORRECTION D'UNE ERREUR DE MA PART, qu'il faut lire avant les chiffres.
+ *
+ * `powV4` est ajuste sur le PLATEAU du masque — la zone que son masque local ne
+ * touche pas. C'etait le bon endroit pour mesurer sa COULEUR, et ca l'est
+ * toujours. Mais j'en avais aussi tire le NIVEAU du preset, et la c'etait une
+ * decision, pas une mesure: les memes chiffres se lisent de deux facons.
+ *
+ *   A) il a assombri les BORDS       -> le niveau du preset est celui du centre
+ *   B) il a assombri TOUT, puis a
+ *      rattrape le SUJET             -> le niveau du preset est bien plus bas
+ *
+ * Une seule photo ne tranche pas entre les deux. Ce qui tranche, c'est le but:
+ * si l'on veut RESSEMBLER A SON IMAGE, il faut la courbe qui minimise l'ecart
+ * sur le CADRE ENTIER, et pas sur la zone que j'avais choisie. Elle donne un
+ * dE76 median de 3,08 la ou `powV4` est a 7,15. Plus de deux fois mieux. La
+ * lecture B est donc la bonne pour cet usage — et c'est ce que voyait l'oeil du
+ * porteur du projet: « tout est plus sombre chez lui, le sol comme le ciel ».
+ *
+ * Ce que ca ne change pas: le masque existe (la meme couleur d'entree sort a
+ * L* 64,8 en haut du cadre et a L* 2,8 en bas, c'est un fait mesure), et la
+ * COULEUR se mesure toujours sous lui — `powV5` reprend donc telles quelles les
+ * tables de `powV4`, ajustees masque retire. Seule la courbe change.
+ *
+ * LA COURBE. Meme famille qu'ailleurs, avec un parametre de plus: une droite en
+ * L*, un pied doux, et une EPAULE. Cherchee sur le cadre entier de sa photo de
+ * nuit: a = 0,61, b = -2,0, epaule 1,15, pente jamais sous 0,30.
+ *
+ *   niveau median rendu   son image 8,6   powV5 10,3   powV4 17,4   powV2 19,0
+ *   dE76 median            powV5 3,08     powV4 7,15   powV3 7,45  powV2 8,57
+ *
+ * CE QUI RESTE, et qui ne se rattrapera pas: son sujet est plus lumineux que le
+ * notre. C'est l'autre moitie de son masque — il a rattrape la station et la
+ * moto apres avoir tout baisse. Un preset ne sait pas ou est le sujet.
+ *
+ * RESERVE, encore plus lourde que celle de `powV4`: ce preset descend TRES bas
+ * (un blanc pur atterrit vers 130). Il est fait pour une photo prise claire et
+ * rendue en nuit. Sur une photo deja sombre, il la detruit. Sur une photo de
+ * jour, il n'a aucun sens. C'est le bout extreme du registre, et c'est assume:
+ * il a ete demande pour reproduire UNE image, et il la reproduit.
+ * ======================================================================= */
+
+const V5_COURBE = [
+    0, 2.34, 3.85, 5.80, 8.02, 10.43, 12.97, 15.60, 18.32, 21.11, 23.96,
+    26.86, 29.80, 32.80, 35.83, 38.89, 41.99, 45.13, 48.29, 51.48, 54.70,
+];
+
+const powV5Transform = construirePowV2(V5_COURBE, {
+    virageA: V4_VIRAGE_A,
+    virageB: V4_VIRAGE_B,
+    melangeur: V4_MELANGEUR,
+    cielCible: 230.1,
+    cielChroma: 0.611,
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -2344,6 +2401,34 @@ export const VISION_PRESETS = [
             + 'lumière chaude, prendre `PowV2`',
         recommendedIntensity: 100,
         transform: powV4Transform,
+    },
+    {
+        id: 'powV5',
+        label: 'PowV5',
+        hint: 'La même couleur que PowV4, posée au niveau de son image',
+        description: 'Le plus proche de sa photo de nuit que le projet sache faire. '
+            + 'Même couleur que `PowV4` — mesurée sous son masque, c\'est toujours le '
+            + 'bon endroit pour ça — mais posée **au niveau de son image finie**. '
+            + '`PowV4` prenait son niveau sur la zone que le masque ne touche pas ; '
+            + 'c\'était une décision, pas une mesure, et une seule photo ne permet pas '
+            + 'de trancher entre « il a assombri les bords » et « il a tout assombri '
+            + 'puis rattrapé le sujet ». Ce qui tranche, c\'est le but : pour '
+            + 'ressembler à son image, il faut la courbe qui minimise l\'écart sur le '
+            + 'CADRE ENTIER. Écart dE76 médian **3,08**, contre 7,15 pour `PowV4`, '
+            + '7,45 pour `PowV3` et 8,57 pour `PowV2` — plus de deux fois mieux. '
+            + 'Niveau médian rendu 10,3 contre 8,6 chez lui (17,4 pour `PowV4`). '
+            + 'Ce qui reste ne se rattrapera pas : son sujet est plus lumineux que le '
+            + 'nôtre, parce qu\'il l\'a rattrapé au masque après avoir tout baissé, et '
+            + 'un preset ne sait pas où est le sujet. RÉSERVE, la plus lourde de la '
+            + 'famille : il descend très bas — un blanc pur atterrit vers 130. Il est '
+            + 'fait pour une photo prise CLAIRE et rendue en nuit.',
+        bestFor: 'une scène nocturne photographiée trop claire, qu\'on veut rendre '
+            + 'dense : station-service, parking, rue la nuit',
+        avoidFor: 'une photo déjà sombre — il la détruit — et le plein jour, où il '
+            + 'n\'a aucun sens. Pour la même couleur sans cette chute, prendre '
+            + '`PowV4` ; pour le style mesuré sur ses trois photos, `PowV2`',
+        recommendedIntensity: 100,
+        transform: powV5Transform,
     },
     {
         id: 'powlisher-showcase',
