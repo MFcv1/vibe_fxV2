@@ -3307,6 +3307,26 @@ indiscernables des siens a l'oeil; sur la station de nuit l'ecart reste visible.
 Faut-il un preset de plus pour aller chercher celle-la ?
 
 **LA TROUVAILLE DU LOT : ce qui reste n'est pas un preset, c'est un MASQUE.**
+
+Le test qui tranche, et il ne demande aucune hypothese: un preset est une
+FONCTION, donc la meme couleur d'entree doit donner la meme sortie ou qu'elle
+soit. On regroupe les pixels par couleur d'entree exacte (pas de 8 niveaux) et
+on compare haut contre bas: restaurant -0,0 L* sur 89 couleurs, brouillard
+-0,3 L* sur 67 (gauche/droite: son haut et son bas n'ont aucune couleur commune),
+NUIT -4,8 L* sur 30. Cas extreme: la couleur 204,188,164, presente 3 027 fois,
+sort a L* 64,8 en haut du cadre et a L* 2,8 en bas. Meme entree, 62 L* d'ecart.
+
+La FORME de ce qu'il a assombri epouse le contour de la station (l'arche, la
+marquise, la pompe restent a 0,7-0,8 du niveau d'entree, tout le reste tombe a
+0,4) et le sol descend en rampe continue de 0,29 a 0,09. C'est le panneau
+MASQUAGE de Lightroom mobile — selection du sujet ou de l'arriere-plan, plus un
+degrade lineaire par le bas.
+
+PIEGE ATTRAPE EN ROUTE, note dans `docs/pieges-connus.md`: le premier controle
+« meme couleur, hauteurs differentes » ne prouvait rien, parce qu'il n'avait
+quasi aucun echantillon dans le bas du cadre (14 blocs sur une bande, 1 sur
+l'autre). Un controle sans echantillon dans la zone suspecte ne controle rien.
+
 Carte de l'ecart d'exposition entre son rendu et `powV2` sur cette photo, en
 diaphragmes, huit bandes du haut vers le bas:
 

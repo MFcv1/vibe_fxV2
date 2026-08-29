@@ -22,6 +22,16 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **Avant de fabriquer un preset pour rattraper un ecart, verifier qu'il n'est
+  pas SPATIAL.** Un preset est une fonction: la meme couleur d'entree doit
+  donner la meme sortie ou qu'elle soit dans l'image. Le test tient en une
+  mesure — regrouper les pixels par couleur d'entree exacte et comparer leur
+  sortie en haut et en bas du cadre. Sur la paire de nuit de `@powl_d`, la
+  couleur 204,188,164 sort a L* 64,8 en haut et a L* 2,8 en bas: c'est un
+  masque, pas un preset, et aucune LUT ne peut le porter. Sur ses deux autres
+  photos le meme test donne -0,0 et -0,3 L*. **Un controle qui n'a pas
+  d'echantillon dans la zone suspecte ne prouve rien** — c'etait le defaut du
+  premier essai, qui n'avait quasi aucun bloc dans le bas du cadre.
 - **Ne jamais se caler sur une source dont on ignore ce qu'elle mesure** (la
   « paire avant/après » est passée par une IA : écartée), et se méfier du **biais
   de sélection** quand on mesure un corpus.

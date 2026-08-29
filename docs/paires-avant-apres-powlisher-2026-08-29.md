@@ -242,39 +242,67 @@ et son sol sont plus sombres, son rouge ressort plus, le plafond de la station e
 le halo de la lampe sont plus éteints. **Peut-on aller chercher cette
 troisième ?**
 
-## La réponse : l'essentiel de ce qui reste n'est pas un preset
+## La réponse : le test qui tranche
 
-Carte de l'écart d'exposition entre son rendu et `powV2` sur cette photo, en
-diaphragmes, le cadre découpé en huit bandes du haut vers le bas :
+**Un preset est une FONCTION.** La même couleur d'entrée doit donner la même
+couleur de sortie, où qu'elle soit dans l'image. On regroupe donc les pixels par
+couleur d'entrée exacte (pas de 8 niveaux) et on compare leur sortie en haut et
+en bas du cadre. Aucune hypothèse, aucun modèle.
+
+| Photo | couleurs présentes des deux côtés | écart bas − haut |
+|---|---|---|
+| restaurant | 89 | **−0,0 L\*** |
+| brouillard (gauche/droite¹) | 67 | **−0,3 L\*** |
+| **nuit** | 30 | **−4,8 L\*** |
+
+¹ *le haut et le bas de la photo de brouillard n'ont aucune couleur en commun —
+la brume est à 90 de luminosité, l'habitacle à 10 ; le contrôle se fait donc
+gauche/droite.*
+
+Sur ses deux autres photos, son traitement est **une fonction de la couleur et
+rien d'autre**. C'est un preset, et `powV2` peut le suivre.
+
+Sur la nuit, non. Le cas extrême est sans appel :
+
+> La couleur **204,188,164** (L\* 77), présente **3 027 fois** dans l'image,
+> sort à **L\* 64,8 en haut du cadre** et à **L\* 2,8 en bas**.
+> Même entrée. **62 L\* d'écart selon l'endroit.**
+
+Aucune table de couleurs ne peut faire ça : une LUT ne sait pas *où* est le
+pixel. Et aucun curseur des panneaux Lumière, Couleur ou Effets non plus — ils
+sont tous globaux.
+
+## Quel levier, exactement
+
+La forme de ce qu'il a assombri, rapport L sortie / L entrée, cadre découpé en
+dix-huit bandes :
 
 ```
-    -1,49  -1,44  -1,31  -0,98  -1,14     <- le plafond de la station
-    -1,54  -1,46  -0,23  -0,25  -1,21
-    -0,76  -0,42  -0,18  -0,25  -0,49
-    -0,54  -0,30  -0,03  -0,03  -0,27     <- le centre : powV2 est JUSTE
-    -1,50  -0,43  +0,14  -0,11  -0,51
-    -2,35  -1,79  -1,18  -1,05  -1,09
-    -3,20  -3,06  -2,39  -1,99  -1,50
-    -3,94  -4,06  -3,93  -3,57  -3,04     <- le sol : QUATRE diaphragmes
+    0,47 0,46 0,40 0,46 0,45 0,39 0,39 0,49 0,38   ← le ciel, le plafond
+    0,48 0,47 0,47 0,46 0,68 0,70 0,38 0,46 0,44
+    0,49 0,48 0,48 0,78 0,75 0,73 0,72 0,50 0,44
+    0,40 0,44 0,48 0,78 0,79 0,82 0,71 0,81 0,43   ← la station : GARDÉE
+    0,38 0,39 0,81 0,76 0,70 0,75 0,72 0,81 0,83
+    0,39 0,44 0,47 0,73 0,82 0,75 0,68 0,51 0,78
+    0,29 0,25 0,30 0,31 0,33 0,33 0,34 0,37 0,36
+    0,14 0,14 0,17 0,19 0,22 0,25 0,30 0,32 0,32
+    0,09 0,10 0,09 0,10 0,10 0,12 0,14 0,17 0,15   ← le sol : 0,09
 ```
 
-Au centre, l'écart est **nul**. En bas, il vaut **quatre diaphragmes**. Aucune
-table de couleurs ne peut faire ça : **une LUT ne sait pas où est le pixel.**
+La zone laissée à 0,7-0,8 **épouse le contour de la station** — l'arche, la
+marquise, la pompe. Autour, tout tombe à 0,4. Et le sol descend en **rampe
+continue** de 0,29 à 0,09.
 
-### Ce n'est pas un vignetage de son preset
+C'est le panneau **Masquage** de Lightroom mobile — l'icône en pointillés
+visible dans sa propre capture d'écran, entre les curseurs et la gomme :
 
-Le même calcul sur les deux autres paires donne un écart centre-bords de
-**0,00** et **0,06** diaphragme. Le dégradé n'existe que sur la photo de nuit :
-c'est un **masque qu'il a posé à la main sur cette image-là**, pas un réglage de
-son preset.
+- une **sélection du sujet / de l'arrière-plan** (Lightroom mobile la fait en un
+  geste, elle détoure la station), avec l'exposition baissée sur l'arrière-plan ;
+- plus un **dégradé linéaire** par le bas, qui donne la rampe régulière du sol.
 
-Et notre vignetage ne peut pas s'y substituer, pour deux raisons mesurées :
-
-- **Le profil ne colle pas.** Le nôtre est plat jusqu'au rayon 0,6 puis tombe ;
-  le sien tombe dès 0,45 et se stabilise ensuite. Le meilleur réglage laisse
-  0,44 diaphragme d'erreur moyenne.
-- **Le sien n'est pas symétrique.** Au même rayon, il vaut −1,4 en haut et −3,9
-  en bas. Un vignetage radial est symétrique par construction.
+Ce n'est donc pas un vignetage de son preset — ni un vignetage tout court : au
+même rayon le sien vaut −1,4 en haut et −3,9 en bas, et un vignetage est
+symétrique par construction.
 
 ## Ce qui restait, et qui se mesure : une densité
 
@@ -309,7 +337,8 @@ pas.
 
 ## Ce qu'il faudrait vraiment
 
-Un **outil de dégradé local**, par photo, dans Vision. C'est ce qu'il a utilisé,
+Un **outil de masquage local**, par photo, dans Vision : sélection du sujet et
+dégradé linéaire. C'est ce qu'il a utilisé,
 et c'est un geste d'édition, pas un preset. À rapprocher de l'étage de tonalité
 adaptatif déjà listé dans `todo.md` : les deux disent la même chose sous deux
 angles — une table de couleurs n'a pas de mémoire, et elle n'a pas de carte.

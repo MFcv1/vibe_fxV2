@@ -1817,26 +1817,48 @@ const powV2Transform = construirePowV2(V2_COURBE);
  * troisieme photo ? La mesure repond en deux temps.
  *
  * 1. LE GROS DE L'ECART N'EST PAS UN PRESET, C'EST UN MASQUE.
- *    Carte de l'ecart d'exposition entre son rendu et `powV2`, sur cette photo,
- *    en diaphragmes (le cadre decoupe en huit bandes du haut vers le bas):
  *
- *        -1,49  -1,44  -1,31  -0,98  -1,14     <- le plafond de la station
- *        -1,54  -1,46  -0,23  -0,25  -1,21
- *        -0,76  -0,42  -0,18  -0,25  -0,49
- *        -0,54  -0,30  -0,03  -0,03  -0,27     <- le centre: `powV2` est JUSTE
- *        -1,50  -0,43  +0,14  -0,11  -0,51
- *        -2,35  -1,79  -1,18  -1,05  -1,09
- *        -3,20  -3,06  -2,39  -1,99  -1,50
- *        -3,94  -4,06  -3,93  -3,57  -3,04     <- le sol: QUATRE diaphragmes
+ *    LE TEST QUI TRANCHE, et il ne demande aucune hypothese: un preset est une
+ *    FONCTION. La meme couleur d'entree doit donner la meme couleur de sortie,
+ *    ou qu'elle soit dans l'image. On regroupe donc les pixels par couleur
+ *    d'entree exacte (pas de 8 niveaux) et on compare leur sortie en haut et en
+ *    bas du cadre.
  *
- *    Au centre l'ecart est nul; en bas il vaut quatre diaphragmes. Aucune table
- *    de couleurs ne peut faire ca: une LUT ne sait pas OU est le pixel.
+ *      restaurant   89 couleurs presentes des deux cotes   ecart  -0,0 L*
+ *      brouillard   67 couleurs (gauche/droite: le haut et
+ *                   le bas n'ont aucune couleur commune)   ecart  -0,3 L*
+ *      NUIT         30 couleurs                            ecart  -4,8 L*
  *
- *    Et ce n'est pas un vignetage de son preset: sur ses deux autres photos le
- *    meme calcul donne un ecart centre-bords de 0,00 et 0,06 diaphragme. Le
- *    degrade n'existe que sur celle-la — c'est un masque qu'il a pose a la main
- *    sur cette image. Notre vignetage, radial et symetrique, ne peut pas s'y
- *    substituer: le sien vaut -1,4 en haut et -3,9 en bas au meme rayon.
+ *    Sur ses deux autres photos, son traitement est une fonction de la couleur
+ *    et rien d'autre — c'est un preset, et `powV2` peut le suivre. Sur la nuit,
+ *    non. Le cas extreme est sans appel: la couleur 204,188,164 (L* 77), presente
+ *    3 027 fois, sort a L* 64,8 en haut du cadre et a L* 2,8 en bas. MEME entree,
+ *    62 L* d'ecart selon l'endroit. Aucune table de couleurs ne peut faire ca:
+ *    une LUT ne sait pas OU est le pixel — et aucun curseur des panneaux
+ *    Lumiere, Couleur ou Effets non plus, ils sont tous globaux.
+ *
+ *    LA FORME de ce qu'il a assombri, rapport L sortie / L entree, cadre decoupe
+ *    en dix-huit bandes:
+ *
+ *        0,47 0,46 0,40 0,46 0,45 0,39 0,39 0,49 0,38    <- le ciel, le plafond
+ *        0,48 0,47 0,47 0,46 0,68 0,70 0,38 0,46 0,44
+ *        0,49 0,48 0,48 0,78 0,75 0,73 0,72 0,50 0,44
+ *        0,40 0,44 0,48 0,78 0,79 0,82 0,71 0,81 0,43    <- la station: gardee
+ *        0,38 0,39 0,81 0,76 0,70 0,75 0,72 0,81 0,83
+ *        0,39 0,44 0,47 0,73 0,82 0,75 0,68 0,51 0,78
+ *        0,29 0,25 0,30 0,31 0,33 0,33 0,34 0,37 0,36
+ *        0,14 0,14 0,17 0,19 0,22 0,25 0,30 0,32 0,32
+ *        0,09 0,10 0,09 0,10 0,10 0,12 0,14 0,17 0,15    <- le sol: 0,09
+ *
+ *    La zone laissee a 0,7-0,8 epouse le contour de la station — l'arche, la
+ *    marquise, la pompe. Autour, tout tombe a 0,4, et le sol descend en RAMPE
+ *    continue de 0,29 a 0,09. C'est le panneau MASQUAGE de Lightroom mobile
+ *    (l'icone en pointilles de sa propre capture d'ecran): une selection du
+ *    sujet ou de l'arriere-plan, plus un degrade lineaire par le bas.
+ *
+ *    Ce n'est donc pas un vignetage de son preset — ni un vignetage tout court:
+ *    au meme rayon le sien vaut -1,4 en haut et -3,9 en bas, et un vignetage est
+ *    symetrique par construction.
  *
  * 2. CE QUI RESTE, LUI, EST UNE DENSITE, ET CA SE MESURE.
  *    Dans la zone que le masque ne touche pas (rayon < 0,5), il reste un ecart
