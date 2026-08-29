@@ -49,7 +49,7 @@ export async function blocs(prefixe, plat = PLAT) {
                 if (sa > plat || sb > plat) uni = false;
             }
             if (!uni) continue;
-            out.push({ a: ma, b: mb });
+            out.push({ a: ma, b: mb, x: (bx + BLOC / 2) / W, y: (by + BLOC / 2) / H });
         }
     }
     return out;

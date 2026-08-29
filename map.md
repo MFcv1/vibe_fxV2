@@ -524,6 +524,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- mesure-ciel-powlisher.mjs       # OU LE CIEL ATTERRIT, et le score des presets face a cette cible. Repond a ce qu aucun autre outil ne mesure : que devient le ciel Y COMPRIS les pixels desatures jusqu au blanc. Affiche expres la part partie au blanc A COTE de la teinte — c est en l oubliant qu on avait conclu l inverse de la verite (biais de selection). `--photo <f>` note les presets sur UNE DE NOS PHOTOS, dont on connait l origine (l ancienne paire avant/apres du photographe est ecartee : passee par une IA generative)
 |   |-- aligner-paire-avant-apres.mjs # ALIGNE ses deux captures d'ecran « Avant / Apres » et en sort deux images superposables. Sans ca on comparerait le ciel d'une image au toit de l'autre : le cadre ne tombe pas au meme endroit d'une capture a l'autre, et une des trois paires est en plus RECADREE de 2,6 %. L'alignement se fait sur le GRADIENT, jamais sur la couleur — c'est justement la couleur qui change. Coupe le fond NOIR de Lightroom (5 300 blocs a zero dans une des paires) en cherchant la plus longue suite de lignes non noires, parce qu'un balayage depuis le bord s'arrete sur le mot « Avant » que Lightroom pose DANS la bande
 |   |-- mesurer-paires-powlisher.mjs # Ce que son traitement fait, mesure sur des paires ALIGNEES : la seule source du projet ou l'on connait l'ENTREE ET la SORTIE de la meme image. Compare des BLOCS de 8x8 plats, jamais des pixels — deux captures rejouees ont du bruit JPEG, et au pixel chaque contour fabrique une fausse couleur. Sert aussi de bibliotheque (`blocs()`)
+|   |-- ajuster-preset-sur-paire.mjs # (voir aussi `--cadre-entier`, et l'ajustement de la courbe sur la CORRESPONDANCE DE NIVEAUX plutot que sur la mediane du dE: les LED d'une station pesent 3,5 % des blocs, une mediane ne les voit pas et l'oeil ne voit qu'elles)
 |   |-- ajuster-preset-sur-paire.mjs # AJUSTE un preset entier (courbe, virage, melangeur, ciel) sur UNE paire avant/apres, en retirant d'abord le MASQUE LOCAL de la photo. Sans ca on mesure un assombrissement local et on le prend pour un virage: sur la paire de nuit, la meme couleur d'entree sort a L* 64,8 en haut du cadre et a L* 2,8 en bas. Boucle: estimer le masque contre un preset de reference, le ramener a son plateau, corriger, ajuster, re-estimer. Et la couleur ne s'ajuste QUE la ou la correction est faible (un diaphragme au plus) — rebrillanter de quatre diaphragmes un JPEG quasi noir fabrique du bruit amplifie, pas de la couleur: c'est ce qui voulait tourner l'orange de +32 degres sur la foi de 1 065 blocs de sol remonte
 |   |-- verifier-presets-sur-paires.mjs # LE CLASSEMENT DES PRESETS FACE A LA VERITE TERRAIN, en DEUX tableaux. SANS exposition libre: le preset applique tel quel, c'est ce qu'on voit dans l'app, et c'est le chiffre qui a fait naitre `powV2`. AVEC exposition libre: chaque candidat recoit le gain qui l'arrange et on ne compare plus que la COULEUR — utile parce que ses trois retouches sont a -1,85 / -0,22 / -0,56 EV, son curseur et pas un preset. Ecart dE76 median par paire
 |   |-- planche-presets.mjs           # LA PLANCHE A REGARDER: chaque photo passee dans tous les presets, cote a cote, dans un seul PNG. Repond a la seule question qu aucune mesure ne couvre — « est-ce que ca a l air bien ? » — et qui a fait supprimer trois presets. Photos de test: Unsplash, parce qu elles sont PEU RETOUCHEES (celles d un corpus de reference sont deja des edits finis). Montre la LUT seule: grain, vignetage et relief s appliquent dans l app
@@ -3293,6 +3294,76 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   Mixkit ou Pexels. Droits (ils sont servis à tous les visiteurs) et cohérence
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
+
+## Journal — 2026-08-29 octies (`powV7` : les LED rallumees, et un residu nomme)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV7`, 27e preset),
+`scripts/smoke-vision-preset.mjs` (+12 verifications, 284 au total),
+`scripts/verifier-presets-sur-paires.mjs` (il REJOUE desormais le degrade, sinon
+`powV6` et `powV7` seraient juges sur la moitie de ce qu'ils font),
+`scripts/mesurer-paires-powlisher.mjs` (les blocs portent leur position).
+
+**Deux defauts restaient a `powV6`**, tous deux vus a l'oeil AVANT d'etre
+mesures — c'est la quatrieme fois de la serie, et ca vaut d'etre note.
+
+**1. LES LED.** A un niveau d'entree de 75-85, son image est **22,6 L\* plus
+claire** que `powV6`; a 55-65 l'ecart n'est que de **1,0**. Un seul endroit de
+l'echelle, et c'est celui que l'oeil regarde.
+
+Deux changements pour y repondre:
+
+- **la courbe s'ajuste desormais sur la CORRESPONDANCE DE NIVEAUX**, chaque
+  tranche comptant pareil (ponderee par la racine de son effectif), et non plus
+  sur la mediane du dE de l'image. Ces LED pesent 3,5 % des blocs: une mediane
+  ne les voit pas. C'est une lecon generale — **la mediane d'une image n'est pas
+  le regard de celui qui la regarde**;
+- **un parametre de plus**: un releve des hautes lumieres qui n'agit qu'au-dessus
+  d'un seuil (0,75 a partir de L 62, sur 38 L\* de large). Une epaule globale
+  releve tout, elle ne sait pas faire ce virage-la.
+
+**ET UNE BORNE QUI A SERVI.** Laisse libre, ce releve montait a une pente de
+**3,62 L\* par L\*** et ramenait l'ecart des LED a +4,1 — mais il faisait
+ECHOUER le test « amplification dans un voile »: **3,71x contre 3,63 autorise**.
+Une pente de p amplifie le bruit de p. Pente bornee a 2,2: l'amplification
+retombe a **2,39x** et l'ecart des LED s'arrete a **+9,3**. Le chiffre parfait
+n'a pas gagne — troisieme fois dans cette serie.
+
+**2. LE SOL, NON CORRIGE, et il faut dire pourquoi.** Son sol est a a\* -1,99 /
+b\* +2,76, le notre a -0,37 / +3,40: a chroma quasi egale (3,4 contre 3,7),
+c'est une difference de TEINTE de 29 degres — le sien plus vert, le notre plus
+jaune. Deux raisons, mesurees:
+
+- le melangeur ne le voit pas: a chroma 3,7 le garde-fou du projet
+  (smoothstep 4 -> 11) est a zero, et l'ouvrir reveillerait la teinte dans les
+  voiles — le contour que trois presets ont deja paye en 2026-08-12;
+- le virage est une fonction du NIVEAU: corriger le sol veut dire corriger toute
+  sa tranche, et le reste de cette tranche ne le demande pas. Deux passes ont
+  ete tentees pour l'y forcer — compensation de l'attenuation du degrade (le
+  virage se pose AVANT lui, qui le divise ensuite par six) et exclusion des
+  blocs quasi eteints (residu nul par construction, ils noyaient la mediane).
+  Le b\* est passe de 3,66 a 3,40 et s'est arrete la.
+
+Cette difference-la est **encore positionnelle**: elle appartient a son masque.
+1,7 en Lab sur une zone sombre — c'est le residu, et il est nomme.
+
+**Un garde-fou a aussi servi**: l'ajustement voulait un degrade de 82, or le
+plafond du mode sur est 80. Un preset qui demande plus se fait ramener EN
+SILENCE et n'annonce pas ce qu'il rend; le smoke l'a attrape. Cout nul, la
+courbe est plate a cet endroit (76 / 82 / 84 sur les trois tours).
+
+**Resultat**, dE76 median contre son rendu, chaine complete (le verificateur
+rejoue le degrade):
+
+| preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| rien | 17,24 | 7,91 | 10,41 |
+| `powV2` | 8,52 | **2,34** | **2,81** |
+| `powV5` | 2,92 | 23,17 | 21,57 |
+| `powV6` | 2,48 | 26,12 | 24,58 |
+| **`powV7`** | **2,42** | 5,18 | 17,64 |
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 284/284.
+**`powV7` attend le regard du porteur du projet.**
 
 ## Journal — 2026-08-29 septies (`powV6` : le premier effet de POSITION mesure)
 

@@ -28,7 +28,7 @@ import { VISION_PRESET_BY_ID } from '../src/features/vibefx-studio/utils/visionP
 const dossier = process.argv[2];
 if (!dossier) { console.error('usage: node scripts/verifier-presets-sur-paires.mjs <dossier>'); process.exit(1); }
 
-const CANDIDATS = ['powV2', 'powV3', 'powV4', 'powV5', 'powlishermain', 'powlisher', 'powlisher-ciel', 'powlisher-cine', 'ambre'];
+const CANDIDATS = ['powV2', 'powV3', 'powV4', 'powV5', 'powV6', 'powV7', 'powlishermain', 'powlisher', 'powlisher-ciel', 'powlisher-cine', 'ambre'];
 /* Une des trois paires est recadree puis reechantillonnee: ses blocs doivent
  * rester plats pour rester justes. Les deux autres sont alignees au pixel. */
 const PLAT = { p1: 7, p2: 22, p3: 22 };
@@ -52,9 +52,20 @@ const paires = {};
 for (const p of ['p1', 'p2', 'p3']) paires[p] = await blocs(`${dossier}/${p}`, PLAT[p]);
 
 /* Ecart median d'un candidat sur une paire, exposition libre. */
-function ecart(bl, fn, exposition) {
-    const sortie = bl.map(({ a, b }) => {
-        const t = fn ? fn(a.map((v) => v / 255)).map((v) => v * 255) : a.slice();
+/* Le degrade du bas ne vit pas dans la LUT: il depend de la LIGNE. On le rejoue
+ * ici comme le moteur, sinon `powV6` et `powV7` seraient juges sur la moitie de
+ * ce qu'ils font. La loi est dans `applyDegradeBas` (canvasUtils.js). */
+function gainDegrade(y, force) {
+    if (!force) return 1;
+    const t = Math.max(0, Math.min(1, (y - 0.5) / 0.5));
+    return 1 + (2 ** (-4 * Math.min(100, force) / 100) - 1) * (t * t * (3 - 2 * t));
+}
+
+function ecart(bl, fn, exposition, degrade = 0) {
+    const sortie = bl.map(({ a, b, y }) => {
+        let t = fn ? fn(a.map((v) => v / 255)).map((v) => v * 255) : a.slice();
+        const g = gainDegrade(y, degrade);
+        if (g !== 1) t = t.map((v) => l2s(s2l(v) * g));
         return { t, b };
     });
     const k = exposition
@@ -80,7 +91,8 @@ for (const exposition of [false, true]) {
     for (const id of ['aucun', ...CANDIDATS]) {
         const fn = id === 'aucun' ? null : VISION_PRESET_BY_ID[id]?.transform;
         if (id !== 'aucun' && !fn) { console.log(`${id}: absent`); continue; }
-        const r = ['p1', 'p2', 'p3'].map((p) => ecart(paires[p], fn, exposition));
+        const deg = VISION_PRESET_BY_ID[id]?.spatialFilters?.degradeBas || 0;
+        const r = ['p1', 'p2', 'p3'].map((p) => ecart(paires[p], fn, exposition, deg));
         const moy = r.reduce((s, x) => s + x.dE, 0) / 3;
         lignes.push([id, moy]);
         console.log(`${id.padEnd(16)}${r.map((x) => x.dE.toFixed(2).padStart(6)).join('  ')}   ${moy.toFixed(2).padStart(5)}    `

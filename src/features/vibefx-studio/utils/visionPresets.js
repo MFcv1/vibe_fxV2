@@ -2047,6 +2047,109 @@ const powV5Transform = construirePowV2(V5_COURBE, {
     cielChroma: 0.611,
 });
 
+/* ==========================================================================
+ * POWV7 — les LED rallumees, et pourquoi le sol reste plus chaud que le sien
+ *
+ * Deux defauts restaient a `powV6`, tous deux vus a l'oeil avant d'etre
+ * mesures: le centre manquait de lumiere (« on le voit aux LED blanches ») et
+ * le sol tirait au marron.
+ *
+ * 1. LES LED. Chiffre: a un niveau d'entree de 75-85, son image est 22,6 L*
+ *    plus claire que `powV6`, alors qu'a 55-65 l'ecart n'est que de 1,0. Un
+ *    seul endroit de l'echelle, et c'est celui que l'oeil regarde.
+ *
+ *    Deux choses ont du changer pour y repondre.
+ *
+ *    a) LA COURBE S'AJUSTE DESORMAIS SUR LA CORRESPONDANCE DE NIVEAUX, et non
+ *       plus sur la mediane du dE de l'image. Ces LED pesent 3,5 % des blocs:
+ *       une mediane ne les voit pas, et l'oeil ne voit qu'elles. Chaque tranche
+ *       de niveau compte donc pareil (ponderee par la racine de son effectif).
+ *    b) UN PARAMETRE DE PLUS: un releve des hautes lumieres qui n'agit
+ *       qu'au-dessus d'un seuil (0,75 a partir de L 62, sur 38 L* de large).
+ *       Une epaule globale ne sait pas faire ce virage-la, elle releve tout.
+ *
+ *    ET UNE BORNE QUI A SERVI. Laisse libre, ce releve montait a une pente de
+ *    3,62 L* par L* et rendait l'ecart des LED a +4,1 — mais il faisait ECHOUER
+ *    le test « amplification dans un voile » du projet: 3,71x contre 3,63
+ *    autorise. Une pente de p amplifie le bruit de p. Pente bornee a 2,2:
+ *    l'amplification retombe a 2,39x (sous les 3,03x de `powlisher`) et l'ecart
+ *    des LED s'arrete a +9,3 au lieu de +4,1. Le chiffre parfait n'a pas gagne;
+ *    c'est la troisieme fois dans cette serie, et c'est chaque fois la bonne
+ *    decision.
+ *
+ * 2. LE SOL. Mesure: son sol est a a* -1,99 / b* +2,76, le notre a -0,37 /
+ *    +3,40 — a chroma quasi egale (3,4 contre 3,7), c'est une difference de
+ *    TEINTE de 29 degres: le sien est plus vert, le notre plus jaune. NON
+ *    CORRIGE, et il faut dire pourquoi:
+ *
+ *    - le melangeur ne le voit pas: a chroma 3,7, le garde-fou du projet
+ *      (smoothstep 4 -> 11) est a zero, et l'ouvrir reveillerait la teinte dans
+ *      les voiles — le contour que trois presets ont deja paye;
+ *    - le virage, lui, est une fonction du NIVEAU. Corriger le sol veut dire
+ *      corriger toute sa tranche de luminosite, et le reste de cette tranche ne
+ *      le demande pas: la correction se dilue et n'arrive jamais. Deux passes
+ *      ont ete tentees pour l'y forcer (compensation de l'attenuation du
+ *      degrade, exclusion des blocs quasi eteints qui noyaient la mediane): le
+ *      b* est passe de 3,66 a 3,40, et s'est arrete la.
+ *
+ *    Autrement dit, cette difference-la est encore POSITIONNELLE. Elle
+ *    appartient a son masque, pas a une table de couleurs. 1,7 en Lab sur une
+ *    zone sombre: c'est le residu, et il est nomme.
+ *
+ * RESULTAT, chaine complete, sur sa photo de nuit:
+ *
+ * Le degrade est a 80 et non a 82, la valeur brute de l'ajustement: 80 est le
+ * plafond du mode sur, et un preset qui demande plus que le plafond se fait
+ * ramener EN SILENCE par le moteur — il n'annoncerait pas ce qu'il rend. Le
+ * smoke du projet attrape ce cas, et il l'a attrape ici. Le cout est nul: sur
+ * les trois tours de l'ajustement la force est passee par 76, 82 et 84, la
+ * courbe est plate a cet endroit.
+ *
+ *   ecart des LED (entree 75-85)   powV6 +22,6 L*      powV7 +9,3 L*
+ *   dE76 median                    powV6 2,56          powV7 2,53
+ *   amplification dans un voile    powV6 0,73x         powV7 2,39x (borne 3,63)
+ *
+ * Le dE76 bouge a peine: c'est justement le point. Ce lot ne cherchait pas a
+ * baisser une moyenne, il cherchait a rallumer 3,5 % de l'image.
+ *
+ * RESERVE: tout ce qui vaut pour `powV6` vaut ici, en plus marque. Le releve
+ * des hautes lumieres eclaircit TOUT ce qui est au-dessus de L 62 — sur une
+ * photo de jour, il brule. C'est le bout de la serie.
+ * ======================================================================= */
+
+const V7_COURBE = [
+    0, 3.11, 5.11, 7.24, 9.47, 11.77, 14.14, 16.57, 19.04, 21.56, 24.12,
+    26.71, 29.34, 32.90, 40.29, 50.13, 60.82, 70.98, 79.45, 85.30, 87.84,
+];
+const V7_VIRAGE_A = [
+    0.10, -2.67, -3.16, -1.90, -0.10, 1.56, 2.44, 2.42, 2.28, 2.49, 2.68,
+    2.60, 2.31, 1.90, 1.38, 0.83, 0.34, -0.03, -0.23, -0.33, -0.36,
+];
+const V7_VIRAGE_B = [
+    0.51, -0.29, -0.66, -0.07, 1.65, 3.96, 5.56, 5.79, 5.73, 6.17, 6.64,
+    6.80, 6.76, 6.69, 6.63, 6.58, 6.52, 6.41, 6.28, 6.13, 5.98,
+];
+/* Deux secteurs seulement ont assez de matiere pour bouger (22,5 et 82,5
+ * degres Lab, 198 et 486 blocs), et les deux sont bornes: hors bande du ciel,
+ * une rotation de plus de 20 degres ou un gain de chroma hors [0,3 ; 1,6] n'est
+ * pas un reglage, c'est l'ajustement qui compense autre chose. */
+const V7_MELANGEUR = [
+    [2.52, 1.028], [9.84, 1.600], [0.64, 1.213], [-5.22, 1.079],
+    [-5.83, 0.911], [8.89, 1.173], [-1.22, 0.716], [4.27, 0.483],
+    [6.74, 0.356], [10.1, 0.60], [5.1, 0.80], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+    [0, 1], [0, 1], [0, 1], [0, 1],
+];
+
+const powV7Transform = construirePowV2(V7_COURBE, {
+    virageA: V7_VIRAGE_A,
+    virageB: V7_VIRAGE_B,
+    melangeur: V7_MELANGEUR,
+    cielCible: 228,
+    cielChroma: 0.828,
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -2458,6 +2561,36 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 66 },
         recommendedIntensity: 100,
         transform: powV5Transform,
+    },
+    {
+        id: 'powV7',
+        label: 'PowV7',
+        hint: 'Les LED rallumées : le bout de la série',
+        description: 'Le dernier de la série, et le plus proche de sa photo de nuit. '
+            + 'Deux défauts restaient à `PowV6`, tous deux vus à l\'œil avant d\'être '
+            + 'mesurés. **Les LED** : à un niveau d\'entrée de 75-85, son image était '
+            + '**22,6 L\* plus claire** que la nôtre, alors qu\'à 55-65 l\'écart n\'était '
+            + 'que de 1,0 — un seul endroit de l\'échelle, et c\'est celui que l\'œil '
+            + 'regarde. Il a fallu changer la façon d\'ajuster : la courbe se cale '
+            + 'désormais sur la **correspondance de niveaux**, chaque niveau comptant '
+            + 'pareil, et non plus sur la médiane de l\'image — ces LED pèsent 3,5 % '
+            + 'des blocs, une médiane ne les voit pas. Plus un relevé des hautes '
+            + 'lumières qui n\'agit qu\'au-dessus de L 62. Écart ramené à **+9,3**. '
+            + 'Laissé libre il descendait à +4,1, mais il faisait alors **échouer le '
+            + 'test de contour du projet** (3,71× contre 3,63 autorisé) : la pente est '
+            + 'bornée à 2,2 et l\'amplification retombe à 2,39×. **Le sol**, lui, reste '
+            + 'plus chaud que le sien (a\* −0,37 contre −1,99, à chroma égale : 29° de '
+            + 'teinte) et ce n\'est PAS corrigé — cette différence-là est encore '
+            + 'positionnelle, elle appartient à son masque. RÉSERVE : le relevé des '
+            + 'hautes lumières éclaircit tout ce qui dépasse L 62. En plein jour, il '
+            + 'brûle.',
+        bestFor: 'la scène pour laquelle il a été mesuré : une station-service la nuit, '
+            + 'sujet éclairé au centre, premier plan à éteindre',
+        avoidFor: 'tout le reste. C\'est le preset le plus spécifique du projet — une '
+            + 'photo, un sujet, une lumière. Pour le style, `PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV7Transform,
     },
     {
         id: 'powlisher-showcase',

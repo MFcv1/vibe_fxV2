@@ -497,3 +497,95 @@ du cadre est un premier plan qu'on veut faire taire. Sur une photo dont le sujet
 est en bas, il l'efface. C'est le premier preset du projet à porter un effet de
 position dont la **forme** comme la **force** sortent d'une mesure —
 `powlisher-showcase` en portait un aussi (vignetage 8), mais choisi à l'œil.
+
+---
+
+# `powV7` — les LED rallumées, et un résidu qu'on nomme au lieu de le forcer
+
+Deux défauts restaient à `powV6`, **tous deux vus à l'œil avant d'être
+mesurés** — c'est la quatrième fois de la série.
+
+## 1. Les LED
+
+À un niveau d'entrée de 75-85, son image est **22,6 L\* plus claire** que
+`powV6`. À 55-65, l'écart n'est que de **1,0**.
+
+| entrée | `powV6` | lui | écart |
+|---|---|---|---|
+| 55-65 | 30,7 | 31,7 | +1,0 |
+| 65-75 | 36,1 | 40,9 | +4,8 |
+| **75-85** | **39,0** | **61,6** | **+22,6** |
+
+Un seul endroit de l'échelle, et c'est celui que l'œil regarde. Deux changements
+pour y répondre :
+
+**a) La courbe s'ajuste désormais sur la correspondance de NIVEAUX**, chaque
+tranche comptant pareil (pondérée par la racine de son effectif), et non plus
+sur la médiane du dE de l'image. Ces LED pèsent **3,5 % des blocs** : une médiane
+ne les voit pas, et l'œil ne voit qu'elles.
+
+> **La médiane d'une image n'est pas le regard de celui qui la regarde.**
+
+**b) Un paramètre de plus** : un relevé des hautes lumières qui n'agit
+qu'au-dessus d'un seuil (0,75 à partir de L 62, sur 38 L\* de large). Une épaule
+globale relève tout, elle ne sait pas faire ce virage-là.
+
+### Et une borne qui a servi
+
+Laissé libre, ce relevé montait à une pente de **3,62 L\* par L\*** et ramenait
+l'écart des LED à **+4,1**. Mais il faisait **échouer le test « amplification
+dans un voile »** du projet : **3,71× contre 3,63 autorisé**. Une pente de p
+amplifie le bruit de p.
+
+Pente bornée à 2,2 → amplification **2,39×** (sous les 3,03× de `powlisher`), et
+l'écart des LED s'arrête à **+9,3** au lieu de +4,1.
+
+**Le chiffre parfait n'a pas gagné. Troisième fois dans cette série.**
+
+## 2. Le sol — non corrigé, et voici pourquoi
+
+| | a\* | b\* | chroma | teinte |
+|---|---|---|---|---|
+| lui | −1,99 | +2,76 | 3,4 | 126° |
+| nous | −0,37 | +3,40 | 3,7 | 97° |
+
+À chroma quasi égale, c'est une différence de **teinte de 29°** : le sien plus
+vert, le nôtre plus jaune. Deux raisons, mesurées :
+
+- **le mélangeur ne le voit pas** : à chroma 3,7 le garde-fou du projet
+  (smoothstep 4 → 11) est à zéro, et l'ouvrir réveillerait la teinte dans les
+  voiles — le trait de contour que trois presets ont déjà payé en 2026-08-12 ;
+- **le virage est une fonction du NIVEAU** : corriger le sol veut dire corriger
+  toute sa tranche de luminosité, et le reste de cette tranche ne le demande
+  pas. Deux passes ont été tentées pour l'y forcer — compenser l'atténuation du
+  dégradé (le virage se pose **avant** lui, qui le divise ensuite par six) et
+  exclure les blocs quasi éteints (résidu nul par construction, ils noyaient la
+  médiane de leur tranche). Le b\* est passé de 3,66 à 3,40 et s'est arrêté là.
+
+**Cette différence-là est encore positionnelle** : elle appartient à son masque,
+pas à une table de couleurs. 1,7 en Lab sur une zone sombre — c'est le résidu, et
+il est nommé plutôt que forcé.
+
+## Un garde-fou a servi aussi
+
+L'ajustement voulait un dégradé de **82**, or le plafond du mode sûr est **80**.
+Un preset qui demande plus que le plafond se fait ramener **en silence** par le
+moteur : il n'annoncerait pas ce qu'il rend. Le smoke l'a attrapé. Coût nul — sur
+les trois tours la force est passée par 76, 82 et 84, la courbe est plate là.
+
+## Le résultat
+
+dE76 médian contre son rendu, chaîne complète (le vérificateur rejoue le
+dégradé) :
+
+| preset | nuit | brouillard | restaurant |
+|---|---|---|---|
+| rien | 17,24 | 7,91 | 10,41 |
+| `powV2` | 8,52 | **2,34** | **2,81** |
+| `powV5` | 2,92 | 23,17 | 21,57 |
+| `powV6` | 2,48 | 26,12 | 24,58 |
+| **`powV7`** | **2,42** | 5,18 | 17,64 |
+
+**RÉSERVE** : le relevé des hautes lumières éclaircit **tout** ce qui dépasse
+L 62. En plein jour, il brûle. C'est le bout de la série — une photo, un sujet,
+une lumière.

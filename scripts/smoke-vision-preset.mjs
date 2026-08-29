@@ -1713,6 +1713,89 @@ function teinteLab(rgb) {
     check('powV6 : sa couleur est celle de powV5, au bit près', ecart, 0, 0);
 }
 
+/* ---------- powV7 : les hautes lumieres relevees, et la borne qui l'arrete ---
+ *
+ * Ce bloc fige ce qui distingue `powV7` de `powV6`: un releve des hautes
+ * lumieres, ne au constat que son image etait 22,6 L* plus claire que la notre
+ * a un niveau d'entree de 75-85 (les LED de la station) alors que l'ecart
+ * n'etait que de 1,0 a 55-65.
+ */
+{
+    const v6 = getPresetTransform('powV6');
+    const v7 = getPresetTransform('powV7');
+    if (!v7) { console.error('ECHEC: powV7 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]));
+
+    /* 1. LE RELEVE EXISTE, ET IL NE TOUCHE QUE LE HAUT. C'est tout l'objet du
+     * preset: une epaule globale releverait aussi les medians. */
+    /* Valeur relevee: 24,95 L*. La fourchette encadre la mesure, elle ne la
+     * precede pas — meme regle que partout dans ce fichier. */
+    check('powV7 : les hautes lumières remontent', gris(v7, 0.82)[0] - gris(v6, 0.82)[0], 18, 32, ' L*');
+    check('powV7 : les médians ne bougent presque pas',
+        Math.abs(gris(v7, 0.40)[0] - gris(v6, 0.40)[0]), 0, 3, ' L*');
+    check('powV7 : les ombres ne bougent pas',
+        Math.abs(gris(v7, 0.12)[0] - gris(v6, 0.12)[0]), 0, 2, ' L*');
+
+    /* 2. LA BORNE QUI L'ARRETE. Laisse libre, le releve montait a une pente de
+     * 3,62 L* par L* et faisait ECHOUER le test d'amplification (3,71x contre
+     * 3,63 autorise): une pente de p amplifie le bruit de p. Ce test-la est la
+     * raison pour laquelle l'ecart des LED s'arrete a +9,3 au lieu de +4,1. */
+    let penteMax = 0;
+    for (let k = 8; k <= 247; k += 8) {
+        const bas = versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0];
+        const haut = versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0];
+        penteMax = Math.max(penteMax,
+            (gris(v7, (k + 8) / 255)[0] - gris(v7, (k - 8) / 255)[0]) / (haut - bas));
+    }
+    check('powV7 : la pente reste sous la borne', penteMax, 0, 2.4);
+    check('powV7 : n\'ajoute pas de contour', amplificationVoile(v7) - voileV1, -4, 0.6, '×');
+
+    /* 3. Les gardes communs. */
+    let penteMini = 9;
+    for (let k = 8; k <= 247; k += 8) {
+        const bas = versLab([(k - 8) / 255, (k - 8) / 255, (k - 8) / 255])[0];
+        const haut = versLab([(k + 8) / 255, (k + 8) / 255, (k + 8) / 255])[0];
+        penteMini = Math.min(penteMini,
+            (gris(v7, (k + 8) / 255)[0] - gris(v7, (k - 8) / 255)[0]) / (haut - bas));
+    }
+    check('powV7 : aucune pente écrasée', penteMini, 0.25, 3);
+    check('powV7 : le noir pur reste noir', Math.max(...v7([0, 0, 0])) * 255, 0, 1);
+    check('powV7 : n\'écrête pas', Math.max(...v7([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 254);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v7, k / 255)[0];
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV7 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV7 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v7(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* 4. SON DEGRADE TIENT DANS LE PLAFOND. Il vaut 80 et non 82, la valeur
+     * brute de l'ajustement: au-dela du plafond le moteur ramene EN SILENCE, et
+     * le preset n'annoncerait pas ce qu'il rend. Le controle general au-dessus
+     * l'a attrape; celui-ci nomme le cas. */
+    const p7 = VISION_PRESETS.find((p) => p.id === 'powV7');
+    const borne = visionBoundsFor('degradeBas', { safe: true });
+    check('powV7 : son dégradé tient dans le plafond du mode sûr',
+        p7.spatialFilters.degradeBas <= borne.max ? 1 : 0, 1, 1);
+
+    /* 5. ET `powV6` N'A PAS BOUGE. Valeurs RELEVEES en executant le preset,
+     * pas ecrites de tete: c'est la troisieme fois de la serie que ce genre de
+     * controle echoue parce que le chiffre attendu avait ete devine. La regle
+     * est dans `docs/pieges-connus.md`. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 42, 51]], [[0.8, 0.2, 0.2], [110, 4, 5]],
+        [[0.5, 0.5, 0.5], [64, 62, 59]], [[1, 1, 1], [141, 129, 119]]]) {
+        const o = v6(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV6 n\'a pas bougé en accueillant powV7', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

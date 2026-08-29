@@ -8,8 +8,8 @@
 >
 > **Ce qui est livré** — redesign VibeOS (`/creer`, `/publier`, `/video`), moteur
 > de LUT 3D 33³, chaîne d'import Lightroom, six réglages avancés alignés, et
-> **26 presets** dont les sept derniers — `couchant`, `powlishermain` et la série
-> `powV2` à `powV6` — attendent un regard. Le détail est
+> **27 presets** dont les huit derniers — `couchant`, `powlishermain` et la série
+> `powV2` à `powV7` — attendent un regard. Le détail est
 > dans [l'archive du 2026-08-27](docs/archive-calages-lightroom-2026-08-27.md).
 >
 > **2026-08-29** — la **bibliothèque** (`/creer/bibliotheque`) a le mouvement de
@@ -20,6 +20,16 @@
 > sa tuile**. Vignettes passées de 720 à **1600 px**, celles déjà stockées
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
+
+> **2026-08-29 octies** — **`powV7`** : les LED rallumées. À un niveau d'entrée
+> de 75-85, son image était **22,6 L\* plus claire** que `powV6` alors qu'à 55-65
+> l'écart n'était que de 1,0 — un seul endroit de l'échelle, et c'est celui que
+> l'œil regarde. Deux changements : la courbe s'ajuste sur la **correspondance
+> de niveaux** (une médiane ne voit pas 3,5 % de l'image) et un relevé des
+> hautes lumières au-dessus de L 62. Écart ramené à **+9,3** — et pas plus bas,
+> parce que le test de contour du projet a **refusé** la version à +4,1
+> (3,71× contre 3,63 autorisé). **Le sol reste plus chaud que le sien** et c'est
+> assumé : cette différence-là est encore positionnelle.
 
 > **2026-08-29 septies** — **`powV6`** et un **nouvel effet dans le moteur** :
 > le **dégradé du bas**. Après `powV5`, ce qui restait sur sa photo de nuit
@@ -93,7 +103,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la série `powV2` … `powV6`** — 2026-08-29 septies](docs/prompt-reprise-2026-08-29-septies.md),
+[**après la série `powV2` … `powV7`** — 2026-08-29 octies](docs/prompt-reprise-2026-08-29-octies.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
@@ -120,6 +130,7 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
+| `powV7` | 2026-08-29 octies | **Le bout de la série** (2,42 sur sa photo de nuit). Son relevé des hautes lumières éclaircit TOUT ce qui dépasse L 62 : en plein jour il brûle. À regarder sur une scène nocturne au sujet éclairé. |
 | `powV6` | 2026-08-29 septies | **`powV5` plus le dégradé du bas.** Le plus proche de sa photo de nuit (3,03). Le dégradé est un geste de COMPOSITION : il suppose que le bas du cadre est un premier plan à faire taire. À regarder sur une photo dont le sujet est en bas — il l'éteindra. |
 | `powV5` | 2026-08-29 sexies | **Le plus proche de sa photo de nuit** (2,92 contre 7,09). Il descend très bas : un blanc pur atterrit à 141. À regarder sur une scène nocturne photographiée trop claire. Sur une photo déjà sombre il la détruit — c'est assumé, il reproduit UNE image. |
 | `powV4` | 2026-08-29 quinquies | **Sa photo de nuit, poussée au maximum.** À regarder sur une vraie scène nocturne aux LED. Son ciel est plus sourd et ses bas-tons plus froids que le reste de la famille : sur une lumière chaude ou en plein jour, il aura tort. Calé sur **une seule** photo. |

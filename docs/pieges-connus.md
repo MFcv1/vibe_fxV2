@@ -22,6 +22,20 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **La mediane d'une image n'est pas le regard de celui qui la regarde.** Les
+  LED d'une station-service pesent 3,5 % des blocs: une mediane de dE ne les
+  voit pas, et l'oeil ne voit qu'elles. Pour une COURBE, ajuster sur la
+  correspondance de NIVEAUX (chaque tranche comptant pareil) et non sur la
+  mediane de l'image.
+- **Une pente de p amplifie le bruit de p.** Un releve de hautes lumieres laisse
+  libre est monte a 3,62 L* par L* et a fait echouer le test d'amplification
+  (3,71x contre 3,63 autorise). Borner la pente MAXIMALE d'une courbe, pas
+  seulement la minimale.
+- **Un virage se pose AVANT les effets spatiaux, qui l'attenuent ensuite.** Sur
+  le sol assombri de quatre diaphragmes, un a* pose vaut six fois moins a
+  l'arrivee: sans compenser cette attenuation, la correction n'arrive jamais.
+  Et les blocs qui arrivent quasi eteints des DEUX cotes ont un residu nul par
+  construction — nombreux, ils noient la mediane de leur tranche.
 - **Une marche qui ne baisse pas quand l'image grandit est une QUANTIFICATION,
   pas une pente.** Le degrade du bas quantifiait son gain en 64 paliers: 4/255
   entre deux lignes voisines a 101 lignes comme a 1 200. Le test qui mesure ca
