@@ -800,3 +800,45 @@ enseignes pèsent 3,5 % des pixels, et l'œil ne regarde qu'elles.
 
 Seule la **courbe** change : virage, mélangeur et règle du ciel sont ceux de
 `powV9` au chiffre près, vérifié par test.
+
+---
+
+# `powV11` — le dernier point de blanc, et la preuve de ce qui reste
+
+**La question :** restait-il du blanc à aller chercher ? J'avais répondu « non,
+c'est son masque ». **La mesure dit : un cinquième était récupérable, et c'était
+ma grille de recherche qui l'avait manqué.**
+
+| | pente réelle | blancs | « fissures » | fidélité des niveaux |
+|---|---|---|---|---|
+| `powV10` | 1,52 | 57,5 | 7,67 | 0,88 L\* |
+| **`powV11`** | **1,59** | **58,7** | **7,95** | 0,90 L\* |
+| son rendu | — | **61,0** | **8,14** | — |
+| la source | — | — | 6,82 | — |
+
++1,2 point de blanc, et les artefacts restent **sous les siens**. La borne de
+pente n'a pas eu à bouger : au-delà de 1,6 l'optimum ne remonte plus — la
+fidélité des niveaux se dégraderait ailleurs plus qu'elle ne gagnerait ici.
+
+## Et le reste — 2,3 points — est cette fois démontré
+
+Au **même** niveau d'entrée (L > 72), sa sortie vaut :
+
+| zone du cadre | L de sortie |
+|---|---|
+| haut | **48,6** |
+| bande des enseignes | **62,1** |
+| bas | **60,8** |
+
+**Treize points d'écart pour une même entrée, selon l'endroit.** Une courbe rend
+une valeur par niveau : elle prend la médiane, et les 2,3 points qui manquent
+sont exactement ce que cette médiane coûte. Aucune table de couleurs ne les
+rendra.
+
+> **« C'est le masque » se démontre, ça ne s'invoque pas.** La démonstration
+> tient en une mesure. Sans elle, l'explication sert à couvrir un ajustement qui
+> plafonne pour une autre raison — ici une grille trop grossière, qui cachait un
+> cinquième du gain encore disponible.
+
+Seule la **courbe** change ; virage, mélangeur et ciel sont ceux de `PowV9` et
+`PowV10` au chiffre près, vérifié par test.

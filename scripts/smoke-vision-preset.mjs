@@ -1994,6 +1994,72 @@ function teinteLab(rgb) {
     check('powV9 n\'a pas bougé en accueillant powV10', derive, 0, 1);
 }
 
+/* ---------- powV11 : le dernier point de blanc ------------------------------
+ *
+ * `powV10` laissait 3,5 L* sur les blancs des enseignes et j'avais mis tout
+ * l'ecart sur le compte de son masque. Un cinquieme etait recuperable: sa
+ * grille de recherche avait manque un meilleur point. Ce bloc fige le gain et
+ * la borne qui l'encadre.
+ */
+{
+    const v10 = getPresetTransform('powV10');
+    const v11 = getPresetTransform('powV11');
+    if (!v11) { console.error('ECHEC: powV11 introuvable.'); process.exit(1); }
+    const gris = (f, v) => versLab(f([v, v, v]))[0];
+    const aL = (l) => {
+        const t = (l + 16) / 116;
+        const Y = t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787;
+        return Y <= 0.0031308 ? Y * 12.92 : 1.055 * Y ** (1 / 2.4) - 0.055;
+    };
+    const pente = (f) => {
+        let m = 0;
+        for (let k = 8; k <= 247; k += 8) {
+            const a = (k - 8) / 255, b = (k + 8) / 255;
+            const d = versLab([b, b, b])[0] - versLab([a, a, a])[0];
+            m = Math.max(m, (gris(f, b) - gris(f, a)) / d);
+        }
+        return m;
+    };
+
+    /* 1. LES BLANCS MONTENT ENCORE UN PEU, et la pente reste douce. Valeurs
+     * relevees: +2,0 L* a l'entree L 80, pente 1,64 contre 1,58. */
+    check('powV11 : les blancs des enseignes montent', gris(v11, aL(80)) - gris(v10, aL(80)), 0.8, 4, ' L*');
+    check('powV11 : sa pente reste douce', pente(v11), 1.4, 1.9);
+
+    /* 2. ET RIEN D'AUTRE NE BOUGE: c'est un dernier cran sur le haut, pas une
+     * courbe plus claire. */
+    check('powV11 : les ombres ne bougent pas',
+        Math.abs(gris(v11, aL(20)) - gris(v10, aL(20))), 0, 1, ' L*');
+    check('powV11 : les médians ne bougent pas',
+        Math.abs(gris(v11, aL(45)) - gris(v10, aL(45))), 0, 1, ' L*');
+
+    /* 3. Les gardes communs. */
+    check('powV11 : n\'ajoute pas de contour', amplificationVoile(v11) - voileV1, -4, 0.6, '×');
+    check('powV11 : le noir pur reste noir', Math.max(...v11([0, 0, 0])) * 255, 0, 1);
+    check('powV11 : n\'écrête pas', Math.max(...v11([1, 1, 1]).map((v) => Math.round(v * 255))), 0, 254);
+    let monotone = true;
+    let precedent = -1;
+    for (let k = 0; k <= 255; k += 1) {
+        const y = gris(v11, k / 255);
+        if (y < precedent - 1e-9) monotone = false;
+        precedent = y;
+    }
+    check('powV11 : rampe grise croissante', monotone ? 1 : 0, 1, 1);
+    const chromaDe = (rgb) => Math.hypot(...versLab(rgb).slice(1));
+    const echantillons = [[0.72, 0.52, 0.32], [0.34, 0.45, 0.24], [0.45, 0.62, 0.82], [0.80, 0.60, 0.48]];
+    check('powV11 : n\'ajoute pas de saturation',
+        Math.max(...echantillons.map((rgb) => chromaDe(v11(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
+
+    /* 4. ET `powV10` N'A PAS BOUGE. Valeurs RELEVEES. */
+    let derive = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 47, 60]], [[0.8, 0.2, 0.2], [169, 12, 13]],
+        [[0.5, 0.5, 0.5], [70, 64, 60]], [[1, 1, 1], [206, 198, 187]]]) {
+        const o = v10(rgb).map((v) => Math.round(v * 255));
+        derive = Math.max(derive, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV10 n\'a pas bougé en accueillant powV11', derive, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

@@ -8,8 +8,8 @@
 >
 > **Ce qui est livré** — redesign VibeOS (`/creer`, `/publier`, `/video`), moteur
 > de LUT 3D 33³, chaîne d'import Lightroom, six réglages avancés alignés, et
-> **30 presets** dont les onze derniers — `couchant`, `powlishermain` et la série
-> `powV2` à `powV10` — attendent un regard. Le détail est
+> **31 presets** dont les douze derniers — `couchant`, `powlishermain` et la série
+> `powV2` à `powV11` — attendent un regard. Le détail est
 > dans [l'archive du 2026-08-27](docs/archive-calages-lightroom-2026-08-27.md).
 >
 > **2026-08-29** — la **bibliothèque** (`/creer/bibliotheque`) a le mouvement de
@@ -20,6 +20,14 @@
 > sa tuile**. Vignettes passées de 720 à **1600 px**, celles déjà stockées
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
+
+> **2026-08-29 duodecies** — **`powV11`** : il restait **+1,2 point de blanc**
+> sur les enseignes, et ce n'était pas son masque comme je l'avais annoncé —
+> c'était ma grille de recherche, trop grossière. Les artefacts restent **sous
+> les siens** (7,95 contre 8,14). **Le reste — 2,3 points — est cette fois
+> démontré** : au même niveau d'entrée, sa sortie vaut 48,6 en haut du cadre,
+> 62,1 sur les enseignes et 60,8 en bas. Une courbe rend une valeur par niveau ;
+> ces 2,3 points sont ce que la médiane coûte.
 
 > **2026-08-29 undecies** — **`powV10`** : le blanc des enseignes et les
 > « fissures » autour du panneau ESSO avaient **la même cause** — une épaule de
@@ -131,7 +139,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la série `powV2` … `powV10`** — 2026-08-29 undecies](docs/prompt-reprise-2026-08-29-undecies.md),
+[**après la série `powV2` … `powV11`** — 2026-08-29 duodecies](docs/prompt-reprise-2026-08-29-duodecies.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
@@ -158,6 +166,7 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
+| `powV11` | 2026-08-29 duodecies | **Le bout de la série, pour de bon.** Identique à `powV10` sauf les blancs des enseignes, +1,2 point. Même réserve : il verdit l'ocre. |
 | `powV10` | 2026-08-29 undecies | **Le dernier de la série.** Mêmes couleurs que `powV9`, courbe plus douce : blancs plus clairs, plus d'artefacts autour des enseignes. Même réserve — il verdit l'ocre. |
 | `powV9` | 2026-08-29 decies | **Le plus proche de sa photo de nuit** (2,12). Ses deux secteurs chauds sont tournés de 19 à 33° et désaturés de moitié : sur un ocre franc la rotation vaut +46° — **il verdit le sable, le bois, les murs**. À regarder en gardant ça en tête. |
 | `powV8` | 2026-08-29 nonies | **Le bout de la série.** Rouge et sol calés sur les siens. Sa luminance ×1,57 sur les rouges et son a\* −3,2 dans les ombres sont les leviers les plus forts de la famille : sur une autre photo, ça se verra. |

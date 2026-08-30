@@ -22,6 +22,12 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **« C'est le masque » se DEMONTRE, ca ne s'invoque pas.** La demonstration
+  tient en une mesure: MEME niveau d'entree, sorties differentes selon
+  l'endroit (48,6 en haut du cadre, 62,1 sur les enseignes, 60,8 en bas). Sans
+  cette mesure, l'explication sert a couvrir un ajustement qui plafonne pour
+  une autre raison — ici une grille de recherche trop grossiere, qui cachait
+  un cinquieme du gain encore disponible.
 - **Retirer NOS etages spatiaux de SA cible avant d'ajuster une courbe.** La
   correspondance de niveaux etait comparee a son image telle quelle, degrade du
   bas compris: la courbe essayait de rattraper un assombrissement qu'on applique

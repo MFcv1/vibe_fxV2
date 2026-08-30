@@ -3295,6 +3295,50 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 duodecies (`powV11` : le dernier point de blanc, et la preuve du reste)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV11`, 31e preset),
+`scripts/smoke-vision-preset.mjs` (+10 verifications, 325 au total),
+`scripts/verifier-presets-sur-paires.mjs`.
+
+**La question posee**: reste-t-il du blanc a aller chercher ? J'avais repondu
+« non, c'est son masque ». **La mesure dit: un cinquieme etait recuperable, et
+c'etait ma grille de recherche qui l'avait manque.**
+
+| | pente reelle | blancs | fissures | fidelite des niveaux |
+|---|---|---|---|---|
+| `powV10` | 1,52 | 57,5 | 7,67 | 0,88 L\* |
+| **`powV11`** | **1,59** | **58,7** | **7,95** | 0,90 L\* |
+| son rendu | — | **61,0** | **8,14** | — |
+| la source | — | — | 6,82 | — |
+
++1,2 point de blanc, et les fissures restent SOUS les siennes. La borne de pente
+n'a pas eu a bouger: au-dela de 1,6 l'optimum ne remonte plus — la fidelite des
+niveaux se degraderait ailleurs plus qu'elle ne gagnerait ici.
+
+**ET LE RESTE — 2,3 POINTS — EST BIEN SON MASQUE, CETTE FOIS DEMONTRE.** Au MEME
+niveau d'entree (L > 72), sa sortie vaut:
+
+    48,6  en haut du cadre
+    62,1  sur la bande des enseignes
+    60,8  en bas
+
+**Treize points d'ecart pour une meme entree, selon l'endroit.** Une courbe rend
+une valeur par niveau: elle prend la mediane, et les 2,3 points qui manquent
+sont exactement ce que cette mediane coute. Aucune table de couleurs ne les
+rendra.
+
+**Lecon**: « c'est le masque » est une conclusion qui se DEMONTRE (meme entree,
+sorties differentes selon l'endroit), pas une explication qu'on invoque quand
+un ajustement plafonne. Ici elle etait vraie a 66 % et servait a couvrir une
+grille de recherche trop grossiere.
+
+Seule la COURBE change; virage, melangeur et ciel sont ceux de `powV9` et
+`powV10` au chiffre pres (verifie par test).
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 325/325.
+**`powV11` attend le regard du porteur du projet.**
+
 ## Journal — 2026-08-29 undecies (`powV10` : les blancs des enseignes, et les fissures)
 
 **Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV10`, 30e preset),

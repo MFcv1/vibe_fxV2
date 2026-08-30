@@ -28,7 +28,7 @@ import { VISION_PRESET_BY_ID } from '../src/features/vibefx-studio/utils/visionP
 const dossier = process.argv[2];
 if (!dossier) { console.error('usage: node scripts/verifier-presets-sur-paires.mjs <dossier>'); process.exit(1); }
 
-const CANDIDATS = ['powV2', 'powV3', 'powV4', 'powV5', 'powV6', 'powV7', 'powV8', 'powV9', 'powV10', 'powlishermain', 'powlisher', 'powlisher-ciel', 'powlisher-cine', 'ambre'];
+const CANDIDATS = ['powV2', 'powV3', 'powV4', 'powV5', 'powV6', 'powV7', 'powV8', 'powV9', 'powV10', 'powV11', 'powlishermain', 'powlisher', 'powlisher-ciel', 'powlisher-cine', 'ambre'];
 /* Une des trois paires est recadree puis reechantillonnee: ses blocs doivent
  * rester plats pour rester justes. Les deux autres sont alignees au pixel. */
 const PLAT = { p1: 7, p2: 22, p3: 22 };

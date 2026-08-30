@@ -2387,6 +2387,53 @@ const powV10Transform = construirePowV2(V10_COURBE, {
     cielChroma: 0.828,
 });
 
+/* ==========================================================================
+ * POWV11 — le dernier point de blanc que la courbe pouvait rendre
+ *
+ * `powV10` posait les blancs des enseignes a 57,5 quand les siens sont a 61,0.
+ * Je l'avais mis sur le compte de son masque. C'etait vrai pour l'essentiel, et
+ * faux pour un cinquieme: sa grille de recherche etait trop grossiere et avait
+ * manque un meilleur point.
+ *
+ *   borne de pente   pente reelle   blancs   fissures   fidelite des niveaux
+ *   powV10               1,52         57,5     7,67          0,88 L*
+ *   powV11               1,59         58,7     7,95          0,90 L*
+ *   son rendu             —           61,0     8,14            —
+ *   la source             —            —       6,82            —
+ *
+ * +1,2 point de blanc, et les fissures restent SOUS les siennes. La borne de
+ * pente n'a pas eu a bouger: au-dela de 1,6 l'optimum ne remonte plus, la
+ * fidelite des niveaux se degraderait ailleurs plus qu'elle ne gagnerait ici.
+ *
+ * CE QUI RESTE — 2,3 points — EST BIEN SON MASQUE, ET C'EST DEMONTRE. Au MEME
+ * niveau d'entree (L > 72), sa sortie vaut:
+ *
+ *     48,6  en haut du cadre
+ *     62,1  sur la bande des enseignes
+ *     60,8  en bas
+ *
+ * Treize points d'ecart pour une meme entree, selon l'endroit. Une courbe rend
+ * une valeur par niveau: elle prend la mediane, et les 2,3 points qui manquent
+ * sont exactement ce que cette mediane coute. Aucune table de couleurs ne les
+ * rendra.
+ *
+ * Seule la COURBE change; virage, melangeur et ciel sont ceux de `powV9` et
+ * `powV10` au chiffre pres.
+ * ======================================================================= */
+
+const V11_COURBE = [
+    0, 4.12, 5.82, 7.87, 10.13, 12.49, 14.90, 17.35, 19.80, 22.26, 24.71,
+    28.49, 34.38, 41.60, 49.49, 57.43, 64.91, 71.45, 76.70, 80.35, 82.16,
+];
+
+const powV11Transform = construirePowV2(V11_COURBE, {
+    virageA: V9_VIRAGE_A,
+    virageB: V9_VIRAGE_B,
+    melangeur: V9_MELANGEUR,
+    cielCible: 228,
+    cielChroma: 0.828,
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -2923,6 +2970,33 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 80 },
         recommendedIntensity: 100,
         transform: powV10Transform,
+    },
+    {
+        id: 'powV11',
+        label: 'PowV11',
+        hint: 'Le dernier point de blanc que la courbe pouvait rendre',
+        description: '`PowV10` posait les blancs des enseignes à 57,5 quand les siens '
+            + 'sont à 61,0, et j\'avais mis tout l\'écart sur le compte de son masque. '
+            + 'C\'était vrai pour l\'essentiel et faux pour un cinquième : la grille de '
+            + 'recherche de sa courbe était trop grossière et avait manqué un meilleur '
+            + 'point. `PowV11` remonte les blancs à **58,7** avec une pente de 1,59, et '
+            + 'les artefacts restent **sous les siens** (7,95 contre 8,14 ; la source '
+            + 'est à 6,82). **Ce qui reste — 2,3 points — est bien son masque, et c\'est '
+            + 'démontré** : au MÊME niveau d\'entrée, sa sortie vaut 48,6 en haut du '
+            + 'cadre, 62,1 sur les enseignes et 60,8 en bas. Treize points d\'écart '
+            + 'pour une même entrée, selon l\'endroit. Une courbe rend une valeur par '
+            + 'niveau : elle prend la médiane, et les 2,3 points manquants sont '
+            + 'exactement ce que cette médiane coûte. Seule la courbe change ; le '
+            + 'virage, le mélangeur et le ciel sont ceux de `PowV9` et `PowV10` au '
+            + 'chiffre près. RÉSERVE : la même que `PowV9` — il verdit l\'ocre et le '
+            + 'jaune.',
+        bestFor: 'la scène pour laquelle il a été mesuré : station-service la nuit, '
+            + 'enseignes éclairées, sol de béton mouillé au premier plan',
+        avoidFor: 'tout le reste, et surtout les scènes où le jaune ou l\'ocre compte. '
+            + 'Pour le style, `PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV11Transform,
     },
     {
         id: 'powlisher-showcase',
