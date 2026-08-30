@@ -2070,6 +2070,39 @@ function teinteLab(rgb) {
     check('powV11 : et il garde sa teinte de sol',
         Math.abs(teinte(v11, betonSombre) - teinte(v10, betonSombre)), 0, 2, '°');
 
+    /* 4 bis. LE LETTRAGE DES ENSEIGNES NE MOUCHETTE PLUS.
+     *
+     * Le defaut, vu a l'ecran sur le logo « Synergy » de sa station: nos lettres
+     * etaient granuleuses la ou les siennes sont lisses. La cause, mesuree: dans
+     * un blanc, la chroma qui reste (7 a 13) vient du panneau rouge qui bave
+     * dans le JPEG, et sa TEINTE est du bruit — deux pixels voisins de la meme
+     * lettre pointent jusqu'a 92 degres l'un de l'autre. Or le melangeur donne
+     * un gain de luminance de 1,569 entre 15 et 45 degres, et 1,000 au-dela:
+     * deux voisins identiques sortaient 11,29 L* d'ecart.
+     *
+     * Le controle rejoue exactement ca: deux couleurs de MEME niveau et MEME
+     * chroma, separees de 30 degres de teinte. Elles doivent sortir ensemble.
+     * `powV10` sert de temoin: sans lui, un controle qui passe ne prouverait
+     * pas qu'il mesure quelque chose. Valeurs RELEVEES: 0,01 et 11,29.
+     */
+    /* Lab -> sRGB, l'inverse de `versLab`, pour fabriquer les deux voisins. */
+    const labVersRgb = (L, a, b) => {
+        const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+        const f = (t) => (t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787);
+        const X = f(fx) * 0.95047, Y = f(fy), Z = f(fz) * 1.08883;
+        const lin = [3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+            -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+            0.0557 * X - 0.2040 * Y + 1.0570 * Z];
+        return lin.map((v) => {
+            const u = Math.max(0, Math.min(1, v));
+            return u <= 0.0031308 ? u * 12.92 : 1.055 * u ** (1 / 2.4) - 0.055;
+        });
+    };
+    const voisin = (L, c, h) => labVersRgb(L, c * Math.cos(h * Math.PI / 180), c * Math.sin(h * Math.PI / 180));
+    const ecartVoisins = (f) => Math.abs(versLab(f(voisin(59, 12, 25)))[0] - versLab(f(voisin(59, 12, 55)))[0]);
+    check('powV11 : deux voisins d\'une lettre sortent ensemble', ecartVoisins(v11), 0, 0.5, ' L*');
+    check('powV11 : et le témoin powV10, lui, les séparait', ecartVoisins(v10), 5, 20, ' L*');
+
     /* 5. ET `powV10` N'A PAS BOUGE. Valeurs RELEVEES. */
     let derive = 0;
     for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 47, 60]], [[0.8, 0.2, 0.2], [169, 12, 13]],

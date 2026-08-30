@@ -1797,6 +1797,52 @@ function construirePowV2(courbe, reglages = {}) {
     const fonduClair = reglages.fonduClair || [45, 65];
     const cielCible = reglages.cielCible ?? MAIN_CIEL_CIBLE;
     const cielChroma = reglages.cielChroma ?? MAIN_CIEL_CHROMA;
+    /*
+     * LES BLANCS BRUITES, option fermee par defaut.
+     *
+     * Ce qu'on a mesure sur le lettrage « Synergy » de l'enseigne: apres la
+     * courbe, ces pixels sont a L* 27-39 pour une chroma de 7 a 13. Cette
+     * chroma n'est pas une couleur de la scene, c'est le rouge du panneau qui
+     * bave dans le JPEG — et sa TEINTE est du bruit: deux pixels voisins de la
+     * meme lettre pointent a 90 degres l'un de l'autre. Le melangeur, lui,
+     * tourne la teinte de pres de 20 degres et n'applique pas la meme rotation
+     * selon la teinte lue: il rend donc deux pixels voisins de deux couleurs
+     * differentes. A l'ecran, les lettres sont mouchetees, la ou les siennes
+     * sont lisses. Le garde-fou de chroma existant (4 a 11) ne protege pas ces
+     * pixels: a chroma 10 il est deja grand ouvert.
+     *
+     * On ferme donc le melangeur sur les pixels A LA FOIS clairs et peu
+     * colores. Les deux conditions comptent: le L* seul fermerait aussi sur
+     * une enseigne franchement coloree, et la chroma seule fermerait sur le
+     * sol (chroma 9-11, mais L* 13-19), qu'on a justement regle par le
+     * melangeur. Sur cette photo les zones se separent net: lettrage L* 34,
+     * ciel L* 21, sol L* 16, auvent L* 18.
+     *
+     * Fermer ne suffit pas: le melangeur donnait a ces pixels un gain de
+     * luminance de 1,569 une fois sur deux, et les lettres perdent 10 L* quand
+     * on le retire. On rend donc ce niveau par un gain CONSTANT, le meme pour
+     * tous les pixels de la zone — c'est la difference qui compte: erratique il
+     * mouchette, constant il eclaircit.
+     *
+     * DEUX PRECAUTIONS, toutes deux trouvees par la fumee.
+     *
+     * 1. La part detournee est prise SUR le garde-fou de chroma, pas a cote:
+     *    un pixel gris neutre ne recevait rien du melangeur, il ne doit rien
+     *    recevoir ici non plus. Sans ca le gain constant s'appliquait a toute
+     *    la rampe grise — une courbe deguisee en regle de couleur, qui faisait
+     *    monter la pente a 2,0.
+     * 2. La bande de niveau se REFERME en haut. Ouverte jusqu'a L* 100, elle
+     *    poussait un blanc a 96,8 puis a l'ecretage.
+     *
+     * `[L0, L1, L2, L3, C0, C1, gainL, gainChroma]`: le traitement constant
+     * monte entre L0 et L1, redescend entre L2 et L3, et s'efface au-dessus de
+     * la chroma C0..C1 (la, la teinte est une vraie couleur, pas du bruit). Les
+     * deux gains valent 1 par defaut. Le virage, lui, continue de s'appliquer:
+     * c'est un decalage lisse par niveau, il ne cree pas de mouchetures.
+     */
+    const blancsBruites = reglages.blancsBruites || null;
+    const blancGainL = blancsBruites?.[6] ?? 1;
+    const blancGainC = blancsBruites?.[7] ?? 1;
     return function transform(input) {
     let [r, g, b] = input;
 
@@ -1823,7 +1869,15 @@ function construirePowV2(courbe, reglages = {}) {
      * la teinte est du bruit, et une regle qui s'y fie trace un contour. */
     let [L, A, Bb] = rgbToLab01(r, g, b);
     const c = Math.hypot(A, Bb);
-    const aUneTeinte = smoothstep(4, 11, c);
+    let aUneTeinte = smoothstep(4, 11, c);
+    let blanc = 0;
+    if (blancsBruites) {
+        const bande = smoothstep(blancsBruites[0], blancsBruites[1], L)
+            * (1 - smoothstep(blancsBruites[2], blancsBruites[3], L));
+        blanc = aUneTeinte * bande
+            * (1 - smoothstep(blancsBruites[4], blancsBruites[5], c));
+        aUneTeinte -= blanc;
+    }
     if (aUneTeinte > 0 && c > 1e-6) {
         let h = Math.atan2(Bb, A) * 180 / Math.PI;
         if (h < 0) h += 360;
@@ -1848,6 +1902,16 @@ function construirePowV2(courbe, reglages = {}) {
          * pixel sans teinte fiable ne doit pas changer de niveau, sinon la
          * regle trace un contour la ou la photo etait lisse. */
         if (gainL !== 1) L = Math.min(100, L * (1 + (gainL - 1) * aUneTeinte));
+    }
+
+    /* La part fermee ci-dessus recoit son traitement constant, sans teinte. */
+    if (blanc > 0) {
+        if (blancGainL !== 1) L = Math.min(100, L * (1 + (blancGainL - 1) * blanc));
+        if (blancGainC !== 1) {
+            const g = 1 + (blancGainC - 1) * blanc;
+            A *= g;
+            Bb *= g;
+        }
     }
 
     A += fonduParL(virageA, L);
@@ -2505,6 +2569,10 @@ const powV11Transform = construirePowV2(V11_COURBE, {
     fonduClair: [45, 65],
     cielCible: 228,
     cielChroma: 0.828,
+    /* Releve sur le lettrage de l'enseigne, apres la courbe: L* 27-39 pour une
+       chroma de 7 a 13, quand le sol est a L* 13-19 et le ciel a L* 21 pour une
+       chroma de 20. Les bornes passent entre les deux. */
+    blancsBruites: [22, 34, 44, 60, 20, 34, 1.34, 1.18],
 });
 
 export const VISION_PRESETS = [

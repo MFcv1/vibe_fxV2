@@ -618,6 +618,49 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
+## Journal — 2026-08-30 (`powV11` : les lettres des enseignes cessent de moucheter)
+
+Corrige EN PLACE dans `powV11`, sans nouveau preset et sans toucher aux autres.
+
+**Le defaut.** Sur le logo « Synergy » de sa station, nos lettres etaient
+granuleuses la ou les siennes sont lisses — visible sans zoomer.
+
+**La cause, mesuree.** Dans un blanc, la chroma qui reste (7 a 13 apres la
+courbe) vient du panneau rouge qui bave dans le JPEG, et sa TEINTE est du
+bruit : deux pixels voisins de la meme lettre pointent jusqu'a 92 degres l'un de
+l'autre. Or `V9_MELANGEUR` donne un gain de LUMINANCE de 1,569 entre 15 et 45
+degres et 1,000 au-dela. Deux voisins identiques sortaient donc 11,29 L*
+d'ecart. Le garde-fou de chroma existant (`smoothstep(4, 11, c)`) ne les protege
+pas : a chroma 10 il est deja grand ouvert.
+
+**La correction.** `construirePowV2` accepte une option `blancsBruites`, fermee
+par defaut, donc inerte pour `powV2`..`powV10`. Elle detourne une part du
+garde-fou vers un traitement CONSTANT (gain de clarte et de chroma fixes, sans
+teinte) pour les pixels a la fois clairs et peu colores. Erratique, le gain
+mouchette ; constant, il eclaircit.
+
+Deux precautions trouvees par la fumee, pas par moi :
+
+- la part detournee se prend SUR le garde-fou, pas a cote — sinon un gris neutre
+  recevait le gain, ce qui deformait la courbe (pente montee a 2,0) ;
+- la bande de niveau se referme en haut — ouverte jusqu'a L* 100, elle poussait
+  un blanc a 96,8 puis a l'ecretage.
+
+**Reglage retenu** : `blancsBruites: [22, 34, 44, 60, 20, 34, 1.34, 1.18]`. Les
+bornes sortent d'un releve : apres la courbe, le lettrage est a L* 27-39 pour
+une chroma de 7 a 13, quand le sol est a L* 13-19, le ciel a L* 21 pour une
+chroma de 20, l'auvent a L* 18.
+
+**Resultat.** Lettrage a L* 46,6 contre ses 46,6 (avant : 48,8 et mouchete).
+Variation de clarte entre voisins dans le trait : x1,80 la source avant, x1,33
+apres, ce qui est exactement la pente de la courbe a ce niveau — le reste
+releverait du debruitage, pas d'un preset. dE76 median sur ses trois paires :
+p1 2,37 -> 2,36, p2 8,14 -> 8,13, p3 15,52 -> 12,90.
+
+Fichiers touches : `src/features/vibefx-studio/utils/visionPresets.js`,
+`scripts/smoke-vision-preset.mjs` (330 controles, +2). `npm run lint` vert.
+
+
 ## Journal — 2026-08-27 ter (`couchant` : un tas neutre de couchants, et trois registres abandonnes)
 
 **Ce qui a change dans l'arbre** : `scripts/verifier-neutre.mjs`,
