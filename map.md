@@ -3295,6 +3295,57 @@ comme dans le verdict — un halo « max 32 » etait en fait la position du curs
   (ils ont par construction l'aspect du repli). Passer à du vrai rush est un
   changement de données.
 
+## Journal — 2026-08-29 terdecies (le blanc des enseignes : `powV11` corrige EN PLACE)
+
+**Ce qui a change dans l'arbre** : `visionPresets.js` (`construirePowV2` accepte
+un SECOND melangeur pour les niveaux clairs ; `powV11` corrige en place, a la
+demande du porteur du projet — aucun preset de plus),
+`scripts/smoke-vision-preset.mjs` (+3 verifications, 328 au total).
+
+**Le symptome**: « le blanc des enseignes tourne au gris, alors que le sien est
+propre ». **Deux hypotheses ecartees par la mesure avant de trouver la bonne**:
+
+- *la LUT 33^3 echantillonnerait mal une rotation forte pres du gris*: non — la
+  fonction pure et la LUT donnent la meme dispersion (8,34 contre 8,13) ;
+- *le garde-fou de chroma couperait en plein dans les blancs*: non plus — 8 %
+  seulement de ces pixels sont dans sa zone de transition. Et surtout, **nos
+  blancs ne sont pas plus taches que les siens**: ecart-type 8,1 contre 20,4.
+
+**La vraie cause**: nos blancs sont DESATURES. Chroma 14,2 contre ses 18,6, a\*
+-0,95 contre ses +1,83. Un blanc neutre et sombre se lit « gris »; un blanc
+creme se lit « propre ». Et la cause de la desaturation, c'est **ma correction du
+sol de `powV9`**: elle passe par les secteurs chauds du melangeur (rotation +19
+et +33, chroma x0,50 et x0,65) — et les enseignes partagent ces memes secteurs.
+
+**Sa regle a lui depend du NIVEAU.** Mesure sur 122 000 pixels (teinte Lab
+55-105, chroma > 10, son degrade retire de sa sortie):
+
+| L d'entree | teinte | chroma |
+|---|---|---|
+| 0 - 55 | 70 -> 125 | **x0,52** |
+| 55 - 70 | 84 -> 73 | **x1,01** |
+| 70 - 100 | 86 -> 84 | **x1,26** |
+
+Le sol sombre est tourne de +50 degres et desature de moitie; les enseignes
+claires ne sont pas tournees et gagnent un quart de chroma. **Une table indexee
+par la seule teinte ne sait pas faire les deux.**
+
+**Le melangeur a donc deux jeux**, un sombre et un clair, fondus entre L 45 et
+65. Absent, le second vaut le premier: aucun preset existant ne bouge (verifie
+par test). Ajuste sur les 14 174 pixels chauds et clairs de la photo, et sur les
+deux SEULS secteurs que la mesure soutient — en ajuster trois depasse la cible
+(chroma 19,4 contre 18,6) et demande -35 degres sur le troisieme sans aucun
+appui.
+
+**Controle croise**: les valeurs trouvees par l'ajustement (-19,4 / x1,00 et
+-4,7 / x1,29) retombent d'elles-memes sur la mesure directe (-11 / x1,01 et
+-2 / x1,26). Deux chemins independants, le meme resultat.
+
+**Resultat**: blancs a chroma **18,7** contre ses 18,6 et a\* **+1,80** contre
+ses +1,83 — et le sol ne bouge pas d'un degre (teinte 126, la sienne).
+
+**Gates** : `npm run lint` vert, `npm run test:vision-preset` 328/328.
+
 ## Journal — 2026-08-29 duodecies (`powV11` : le dernier point de blanc, et la preuve du reste)
 
 **Ce qui a change dans l'arbre** : `visionPresets.js` (+`powV11`, 31e preset),

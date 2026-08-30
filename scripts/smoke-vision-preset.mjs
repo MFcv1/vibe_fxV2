@@ -2050,7 +2050,27 @@ function teinteLab(rgb) {
     check('powV11 : n\'ajoute pas de saturation',
         Math.max(...echantillons.map((rgb) => chromaDe(v11(rgb)) / chromaDe(rgb))), 0, 1.3, '×');
 
-    /* 4. ET `powV10` N'A PAS BOUGE. Valeurs RELEVEES. */
+    /* 4. LE MELANGEUR A DEUX JEUX, un sombre et un clair, et c'est ce qui a
+     * degrise le blanc des enseignes. Le controle tient en deux couleurs de la
+     * MEME famille de teinte: la claire doit gagner de la couleur, la sombre ne
+     * doit pas bouger. Sans la seconde, on ne saurait pas si le jeu clair a bien
+     * ete separe du sombre — et c'est justement leur confusion qui desaturait
+     * les enseignes en meme temps que le sol. */
+    const chromaDe2 = (f, c) => Math.hypot(...versLab(f(c)).slice(1));
+    const enseigne = [0.86, 0.82, 0.70];
+    const betonSombre = [0.34, 0.31, 0.26];
+    check('powV11 : l\'enseigne claire regagne de la couleur',
+        chromaDe2(v11, enseigne) / chromaDe2(v10, enseigne), 1.02, 1.15, '×');
+    check('powV11 : le béton sombre ne bouge pas',
+        chromaDe2(v11, betonSombre) / chromaDe2(v10, betonSombre), 0.98, 1.02, '×');
+    const teinte = (f, c) => {
+        const [, a, b] = versLab(f(c));
+        return ((Math.atan2(b, a) * 180 / Math.PI) + 360) % 360;
+    };
+    check('powV11 : et il garde sa teinte de sol',
+        Math.abs(teinte(v11, betonSombre) - teinte(v10, betonSombre)), 0, 2, '°');
+
+    /* 5. ET `powV10` N'A PAS BOUGE. Valeurs RELEVEES. */
     let derive = 0;
     for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 47, 60]], [[0.8, 0.2, 0.2], [169, 12, 13]],
         [[0.5, 0.5, 0.5], [70, 64, 60]], [[1, 1, 1], [206, 198, 187]]]) {

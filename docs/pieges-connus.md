@@ -22,6 +22,17 @@
   (`~/Desktop/devimage/`). `node scripts/planche-presets.mjs <photo...>` pour la
   couleur, `node scripts/planche-showcase.mjs` pour les effets (grain, vignetage,
   relief) — le premier ne montre que la LUT.
+- **« Le blanc tourne au gris » n'est pas forcement un probleme de niveau ni de
+  bandes: verifier la CHROMA.** Nos blancs n'etaient ni plus sombres de beaucoup
+  ni plus taches que les siens (ecart-type 8,1 contre 20,4) — ils etaient
+  DESATURES: chroma 14,2 contre 18,6, a* -0,95 contre +1,83. Un blanc neutre se
+  lit « gris », un blanc creme se lit « propre ».
+- **Une regle par TEINTE frappe tout ce qui partage la teinte, a tous les
+  niveaux.** La correction du sol (secteurs chauds, chroma x0,5) desaturait les
+  enseignes, qui sont dans les memes secteurs. Avant de corriger une matiere
+  sombre par la teinte, regarder ce que la meme teinte fait ailleurs dans
+  l'image — et si la mesure montre deux regimes selon le niveau, il en faut
+  deux.
 - **« C'est le masque » se DEMONTRE, ca ne s'invoque pas.** La demonstration
   tient en une mesure: MEME niveau d'entree, sorties differentes selon
   l'endroit (48,6 en haut du cadre, 62,1 sur les enseignes, 60,8 en bas). Sans

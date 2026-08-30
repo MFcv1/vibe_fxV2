@@ -36,7 +36,7 @@ trois photos y sont muettes, le mélangeur y est à l'identité.
 `powV2` (trois photos, le style), `powV3` (sa densité de nuit), `powV4` (la
 couleur de nuit remesurée), `powV5` (le niveau de son image), `powV6` (plus le
 dégradé du bas), `powV7` (plus le relevé des hautes lumières), `powV8` (plus la
-luminance par teinte), `powV9` (plus le sol dégrisé), `powV10` (courbe plus douce : blancs des enseignes, plus d'artefacts), `powV11` (le dernier point de blanc). **`powV11` est le bout de la série** : ce qui reste est démontré hors de portée d'une table de couleurs. Chacun bat le précédent sur la photo de
+luminance par teinte), `powV9` (plus le sol dégrisé), `powV10` (courbe plus douce : blancs des enseignes, plus d'artefacts), `powV11` (le dernier point de blanc, puis le blanc des enseignes dégrisé le 2026-08-29 terdecies — le mélangeur a désormais **deux jeux**, un sombre et un clair). **`powV11` est le bout de la série** : ce qui reste est démontré hors de portée d'une table de couleurs. Chacun bat le précédent sur la photo de
 nuit et perd ailleurs : 8,52 → 7,39 → 7,09 → 2,92 → 2,48 → 2,42 → **2,45**
 (`powV8` s'arrête là parce qu'il ne cherchait plus la moyenne mais deux détails
 que l'œil voit).
@@ -96,7 +96,7 @@ eu, ils n'entrent pas dans `docs/presets-valides.md`.
 ## État des gates
 
 - `npm run lint` : vert (5 warnings préexistants, sans rapport).
-- `npm run test:vision-preset` : **325/325**, dont 17 pour `powlishermain`, 17
+- `npm run test:vision-preset` : **328/328**, dont 17 pour `powlishermain`, 17
   pour `powV2`, 9 pour `powV3` et 13 pour `powV4` (y compris un contrôle de non-
   régression sur `powV3`, qui partage désormais la même fabrique).
 - `npm run build` : **échec PRÉEXISTANT et sans rapport** — `better-sqlite3` est

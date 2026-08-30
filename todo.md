@@ -21,6 +21,15 @@
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
 
+> **2026-08-29 terdecies** — le blanc des enseignes, **corrigé dans `powV11`
+> lui-même** (pas de preset de plus). Ce n'était ni la LUT ni le garde-fou —
+> deux hypothèses écartées par la mesure — mais une **désaturation** : chroma
+> 14,2 contre ses 18,6. Ma correction du sol passait par les secteurs chauds du
+> mélangeur, et les enseignes partagent ces secteurs. **Sa règle à lui dépend du
+> niveau** (mesuré sur 122 000 pixels) : sous L 55 il désature le chaud de
+> moitié, au-dessus il l'enrichit d'un quart. Le mélangeur a donc deux jeux.
+> Blancs à chroma **18,7** contre ses 18,6, et le sol ne bouge pas d'un degré.
+
 > **2026-08-29 duodecies** — **`powV11`** : il restait **+1,2 point de blanc**
 > sur les enseignes, et ce n'était pas son masque comme je l'avais annoncé —
 > c'était ma grille de recherche, trop grossière. Les artefacts restent **sous
@@ -166,7 +175,7 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
-| `powV11` | 2026-08-29 duodecies | **Le bout de la série, pour de bon.** Identique à `powV10` sauf les blancs des enseignes, +1,2 point. Même réserve : il verdit l'ocre. |
+| `powV11` | 2026-08-29 duodecies, corrigé le terdecies | **Le bout de la série.** Blancs des enseignes crème comme les siens (chroma 18,7 contre 18,6). Réserve : il verdit l'ocre, mais **seulement dans les niveaux sombres** depuis la correction. |
 | `powV10` | 2026-08-29 undecies | **Le dernier de la série.** Mêmes couleurs que `powV9`, courbe plus douce : blancs plus clairs, plus d'artefacts autour des enseignes. Même réserve — il verdit l'ocre. |
 | `powV9` | 2026-08-29 decies | **Le plus proche de sa photo de nuit** (2,12). Ses deux secteurs chauds sont tournés de 19 à 33° et désaturés de moitié : sur un ocre franc la rotation vaut +46° — **il verdit le sable, le bois, les murs**. À regarder en gardant ça en tête. |
 | `powV8` | 2026-08-29 nonies | **Le bout de la série.** Rouge et sol calés sur les siens. Sa luminance ×1,57 sur les rouges et son a\* −3,2 dans les ombres sont les leviers les plus forts de la famille : sur une autre photo, ça se verra. |

@@ -1773,6 +1773,28 @@ function construirePowV2(courbe, reglages = {}) {
     const virageA = reglages.virageA || V2_VIRAGE_A;
     const virageB = reglages.virageB || V2_VIRAGE_B;
     const melangeur = reglages.melangeur || V2_MELANGEUR;
+    /*
+     * UN SECOND MELANGEUR POUR LES NIVEAUX CLAIRS, et une mesure qui l'impose.
+     *
+     * Sur sa photo de nuit, sa regle des teintes CHAUDES change de signe selon
+     * le niveau. Mesure sur 122 000 pixels (teinte Lab 55-105, chroma > 10,
+     * son degrade retire de sa sortie):
+     *
+     *     L d'entree     teinte           chroma
+     *      0 - 55        70 -> 125         x0,52
+     *     55 - 70        84 ->  73         x1,01
+     *     70 - 100       86 ->  84         x1,26
+     *
+     * Le sol sombre est tourne de +50 degres et desature de moitie; les
+     * enseignes claires ne sont PAS tournees et gagnent un quart de chroma. Une
+     * table indexee par la seule teinte ne sait pas faire les deux — elle
+     * desaturait les enseignes en meme temps que le sol, et c'est ce qui
+     * faisait « virer le blanc au gris ».
+     *
+     * Absent, ce second jeu vaut le premier: aucun preset existant ne bouge.
+     */
+    const melangeurClair = reglages.melangeurClair || null;
+    const fonduClair = reglages.fonduClair || [45, 65];
     const cielCible = reglages.cielCible ?? MAIN_CIEL_CIBLE;
     const cielChroma = reglages.cielChroma ?? MAIN_CIEL_CHROMA;
     return function transform(input) {
@@ -1805,7 +1827,16 @@ function construirePowV2(courbe, reglages = {}) {
     if (aUneTeinte > 0 && c > 1e-6) {
         let h = Math.atan2(Bb, A) * 180 / Math.PI;
         if (h < 0) h += 360;
-        const [dh, gain, gainL] = melangeurLab(melangeur, h);
+        let [dh, gain, gainL] = melangeurLab(melangeur, h);
+        if (melangeurClair) {
+            const versClair = smoothstep(fonduClair[0], fonduClair[1], L);
+            if (versClair > 0) {
+                const [dhC, gainC, gainLC] = melangeurLab(melangeurClair, h);
+                dh += (dhC - dh) * versClair;
+                gain += (gainC - gain) * versClair;
+                gainL += (gainLC - gainL) * versClair;
+            }
+        }
         const ciel = bandeCielLab(h);
         const rotation = dh * (1 - ciel) + (cielCible - h) * ciel;
         const gainC = gain * (1 - ciel) + cielChroma * ciel;
@@ -2426,10 +2457,52 @@ const V11_COURBE = [
     28.49, 34.38, 41.60, 49.49, 57.43, 64.91, 71.45, 76.70, 80.35, 82.16,
 ];
 
+/* LE JEU CLAIR DU MELANGEUR — corrige le 2026-08-29 terdecies, dans `powV11`
+ * lui-meme et pas dans un preset de plus, a la demande du porteur du projet.
+ *
+ * Le probleme: « le blanc des enseignes tourne au gris ». Ni la LUT ni le
+ * garde-fou n'y etaient pour rien — mesure faite, nos blancs n'etaient pas plus
+ * tachetes que les siens (ecart-type 8,1 contre 20,4). Ils etaient DESATURES:
+ * chroma 14,2 contre ses 18,6, et a* -0,95 contre ses +1,83. Un blanc neutre et
+ * sombre se lit « gris »; un blanc creme se lit « propre ».
+ *
+ * La cause: la correction du SOL de `powV9` passe par les secteurs chauds du
+ * melangeur (rotation +19 et +33, chroma x0,50 et x0,65) — et les enseignes
+ * partagent ces memes secteurs. Je desaturais les enseignes de moitie en
+ * corrigeant le sol.
+ *
+ * Sa regle a lui, elle, depend du NIVEAU. Mesure sur 122 000 pixels (teinte Lab
+ * 55-105, chroma > 10, son degrade retire de sa sortie):
+ *
+ *     L d'entree     teinte           chroma
+ *      0 - 55        70 -> 125         x0,52
+ *     55 - 70        84 ->  73         x1,01
+ *     70 - 100       86 ->  84         x1,26
+ *
+ * D'ou ce second jeu, ajuste sur les 14 174 pixels chauds et clairs de la photo,
+ * et sur les deux SEULS secteurs que la mesure couvre — les autres gardent le
+ * jeu sombre. Les valeurs trouvees (-17,6 / x0,98 et -2,8 / x1,27) retombent
+ * d'elles-memes sur la mesure directe (-11 / x1,01 et -2 / x1,26), ce qui est le
+ * meilleur controle qu'on puisse avoir: deux chemins independants, le meme
+ * resultat.
+ *
+ * DEUX SECTEURS ET PAS TROIS. La mesure couvre les teintes 55 a 105, soit trois
+ * secteurs; en ajuster trois donne chroma 19,4 et a* 2,18 — au-dela de la cible
+ * — et demande -35 degres sur le troisieme, sans aucun appui independant. Deux
+ * secteurs suffisent et tombent pile: chroma 18,7 contre ses 18,6, a* +1,80
+ * contre ses +1,83. Et le sol ne bouge pas d'un degre (teinte 126, la sienne). */
+const V11_MELANGEUR_CLAIR = V9_MELANGEUR.map((v, i) => {
+    if (i === 4) return [-19.44, 0.997, 1];
+    if (i === 5) return [-4.72, 1.288, 1];
+    return v;
+});
+
 const powV11Transform = construirePowV2(V11_COURBE, {
     virageA: V9_VIRAGE_A,
     virageB: V9_VIRAGE_B,
     melangeur: V9_MELANGEUR,
+    melangeurClair: V11_MELANGEUR_CLAIR,
+    fonduClair: [45, 65],
     cielCible: 228,
     cielChroma: 0.828,
 });

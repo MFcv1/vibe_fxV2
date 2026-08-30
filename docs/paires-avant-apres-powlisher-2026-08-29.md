@@ -842,3 +842,66 @@ rendra.
 
 Seule la **courbe** change ; virage, mélangeur et ciel sont ceux de `PowV9` et
 `PowV10` au chiffre près, vérifié par test.
+
+---
+
+# Le blanc des enseignes — corrigé dans `powV11` (2026-08-29 terdecies)
+
+**Le symptôme :** « le blanc des enseignes tourne au gris, alors que le sien est
+propre. »
+
+## Deux hypothèses écartées par la mesure
+
+| hypothèse | mesure | verdict |
+|---|---|---|
+| la LUT 33³ échantillonne mal | fonction pure 8,34 / LUT 8,13 de dispersion | **non** |
+| le garde-fou de chroma coupe dedans | 8 % des pixels seulement dans sa zone de transition | **non** |
+
+Et surtout : **nos blancs ne sont pas plus tachés que les siens** — écart-type
+8,1 contre 20,4.
+
+## La vraie cause : ils sont désaturés
+
+| | chroma | a\* |
+|---|---|---|
+| lui | **18,6** | **+1,83** |
+| `powV11` (avant) | 14,2 | −0,95 |
+
+*Un blanc neutre et sombre se lit « gris » ; un blanc crème se lit « propre ».*
+
+Et la cause de la désaturation, c'est **ma correction du sol de `powV9`** : elle
+passe par les secteurs chauds du mélangeur (rotation +19 et +33°, chroma ×0,50 et
+×0,65) — et les enseignes partagent ces mêmes secteurs.
+
+## Sa règle à lui dépend du NIVEAU
+
+Mesure sur **122 000 pixels** (teinte Lab 55-105, chroma > 10, son dégradé retiré
+de sa sortie) :
+
+| L d'entrée | teinte | chroma |
+|---|---|---|
+| 0 - 55 | 70 → 125 | **×0,52** |
+| 55 - 70 | 84 → 73 | **×1,01** |
+| 70 - 100 | 86 → 84 | **×1,26** |
+
+Le sol sombre est tourné de +50° et désaturé de moitié ; les enseignes claires ne
+sont pas tournées et gagnent un quart de chroma. **Une table indexée par la seule
+teinte ne sait pas faire les deux.**
+
+## Le mélangeur a donc deux jeux
+
+Un sombre, un clair, fondus entre L 45 et 65. Absent, le second vaut le premier :
+aucun preset existant ne bouge (vérifié par test).
+
+Ajusté sur les 14 174 pixels chauds et clairs de la photo, et sur les **deux
+seuls** secteurs que la mesure soutient — en ajuster trois dépasse la cible
+(chroma 19,4 contre 18,6) et demande −35° sur le troisième sans aucun appui.
+
+**Contrôle croisé** : les valeurs trouvées par l'ajustement (−19,4 / ×1,00 et
+−4,7 / ×1,29) retombent d'elles-mêmes sur la mesure directe (−11 / ×1,01 et
+−2 / ×1,26). *Deux chemins indépendants, le même résultat.*
+
+## Résultat
+
+Blancs à chroma **18,7** contre ses 18,6, a\* **+1,80** contre ses +1,83 — et le
+sol ne bouge pas d'un degré (teinte 126, la sienne).
