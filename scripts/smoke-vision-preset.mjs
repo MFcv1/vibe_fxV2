@@ -2113,6 +2113,91 @@ function teinteLab(rgb) {
     check('powV10 n\'a pas bougé en accueillant powV11', derive, 0, 1);
 }
 
+/* ---------- powV12 : les taches du lettrage, et le poteau ------------------
+ *
+ * Deux defauts vus a l'ecran sur sa station de nuit, et un troisieme constat
+ * qui dit ou s'arreter.
+ *
+ * 1. LES TACHES. Elles sont de BASSE frequence: entre pixels voisins `powV11`
+ *    est propre, c'est en moyennes de blocs 4x4 que ca se voit. Dispersion
+ *    relevee sur le lettrage: source 5,4 %, lui 8,0 %, `powV11` 12,4 %,
+ *    `powV12` 9,6 %. Deux causes, toutes deux corrigees ici — le relevement
+ *    des blancs etait MULTIPLICATIF (il multiplie donc aussi les ecarts) et il
+ *    est maintenant additif; et la courbe amplifiait x1,29 au niveau du
+ *    lettrage, ses trois noeuds L* 55/60/65 sont redresses.
+ *
+ * 2. LE POTEAU. `powV11` le poussait a 60,4 quand le sien est a 39,5, parce
+ *    que sa bande de relevement ne se refermait qu'apres lui. Elle se referme
+ *    avant: 11,7 L* repris.
+ *
+ * 3. CE QUI RESTE N'EST PAS REPRODUCTIBLE, et c'est montre deux fois: ce n'est
+ *    pas une regle de teinte (a niveau egal il descend les warm-neutres MOINS
+ *    que les autres teintes, sur les trois paires) et ce n'est pas un
+ *    vignetage (plat du centre au bord sur le restaurant; non monotone avec le
+ *    rayon sur la station). Ce sont des objets peints a la main.
+ *
+ * Toutes les valeurs ci-dessous sont RELEVEES.
+ */
+{
+    const v12 = getPresetTransform('powV12');
+    const v11b = getPresetTransform('powV11');
+    if (!v12) { console.error('ECHEC: powV12 introuvable.'); process.exit(1); }
+    const labVersRgb2 = (L, a, b) => {
+        const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+        const f = (t) => (t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787);
+        const X = f(fx) * 0.95047, Y = f(fy), Z = f(fz) * 1.08883;
+        return [3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+            -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+            0.0557 * X - 0.2040 * Y + 1.0570 * Z].map((v) => {
+            const u = Math.max(0, Math.min(1, v));
+            return u <= 0.0031308 ? u * 12.92 : 1.055 * u ** (1 / 2.4) - 0.055;
+        });
+    };
+    const coul = (L, c, h) => labVersRgb2(L, c * Math.cos(h * Math.PI / 180), c * Math.sin(h * Math.PI / 180));
+    const clarte = (f, c) => versLab(f(c))[0];
+
+    /* 1. LE POTEAU redescend. Sa couleur relevee: L* 70,7, chroma 15,6, 84°. */
+    const poteau = coul(70.7, 15.6, 84);
+    check('powV12 : le poteau blanc redescend', clarte(v11b, poteau) - clarte(v12, poteau), 9, 14, ' L*');
+    check('powV12 : et le témoin powV11, lui, le gonflait', clarte(v11b, poteau), 58, 65, ' L*');
+
+    /* 2. LA TACHE: l'amplification locale au niveau du lettrage. La source vaut
+     *    1,00 par definition, lui 1,05. Relevé: powV11 1,83, powV12 1,28. */
+    const ampli = (f) => Math.abs(clarte(f, coul(63, 12, 29)) - clarte(f, coul(57, 12, 29))) / 6;
+    check('powV12 : amplification locale sur le lettrage', ampli(v12), 1.1, 1.4, '×');
+    check('powV12 : et le témoin powV11 amplifiait plus', ampli(v11b), 1.6, 2.1, '×');
+
+    /* 3. LE RELEVEMENT EST ADDITIF, donc il ne mouchette pas non plus sur la
+     *    teinte: deux voisins que separe 30° de bruit sortent ensemble. */
+    const ecart = Math.abs(clarte(v12, coul(59, 12, 25)) - clarte(v12, coul(59, 12, 55)));
+    check('powV12 : deux voisins d\'une lettre sortent ensemble', ecart, 0, 0.5, ' L*');
+
+    /* 4. ET LES GARDE-FOUS ORDINAIRES. Valeurs relevées. */
+    let maxi = 0;
+    let croissant = 1;
+    let precedent = -1;
+    for (let i = 0; i <= 255; i += 1) {
+        const gris = [i / 255, i / 255, i / 255];
+        maxi = Math.max(maxi, ...v12(gris).map((v) => Math.round(v * 255)));
+        const L = versLab(v12(gris))[0];
+        if (L < precedent - 1e-9) croissant = 0;
+        precedent = L;
+    }
+    check('powV12 : n\'écrête pas', maxi, 0, 254);
+    check('powV12 : rampe grise croissante', croissant, 1, 1);
+    check('powV12 : le noir pur reste noir', Math.max(...v12([0, 0, 0]).map((v) => Math.round(v * 255))), 0, 1);
+    check('powV12 : les ombres ne bougent pas', Math.abs(clarte(v12, coul(20, 0, 0)) - 10.13), 0, 0.5, ' L*');
+
+    /* 5. ET `powV11` N'A PAS BOUGE. Valeurs RELEVEES. */
+    let derive12 = 0;
+    for (const [rgb, attendu] of [[[0.2, 0.3, 0.5], [0, 47, 61]], [[0.8, 0.2, 0.2], [169, 12, 13]],
+        [[0.5, 0.5, 0.5], [70, 64, 60]], [[1, 1, 1], [211, 204, 192]]]) {
+        const o = v11b(rgb).map((v) => Math.round(v * 255));
+        derive12 = Math.max(derive12, Math.max(...o.map((v, i) => Math.abs(v - attendu[i]))));
+    }
+    check('powV11 n\'a pas bougé en accueillant powV12', derive12, 0, 1);
+}
+
 /* ---------- rapport ---------- */
 
 console.log('\nSmoke preset Vision — cibles de docs/audit-preset-powlisher-2026-08-11.md §7\n');

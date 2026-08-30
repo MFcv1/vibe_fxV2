@@ -21,6 +21,18 @@
 > refabriquées à la demande. En-tête VibeOS inchangé. Détail et pièges : journal
 > du 2026-08-29 dans `map.md`.
 
+> **2026-08-30 bis** — **`powV12`**. Ma mesure de la veille etait la mauvaise :
+> j'avais regardé la variation entre pixels **voisins**, or une tache est un
+> défaut de **basse fréquence**. En blocs 4×4 : source 5,4 %, lui 8,0 %,
+> `powV11` **12,4 %**. Trois causes, deux réparables — le relèvement était
+> multiplicatif (donc il multipliait les écarts), la courbe amplifiait ×1,29 au
+> niveau du lettrage, et la bande de relèvement ne se refermait qu'**après** le
+> poteau blanc. `powV12` : taches **9,6 %**, poteau 60,4 → **50,6**. Les dix
+> points qui restent sur le poteau ne sont **pas reproductibles** : ni règle de
+> teinte (il descend les warm-neutres *moins* que les autres, sur les trois
+> paires), ni vignetage (plat sur le restaurant, non monotone sur la station).
+> Peint à la main. 340 contrôles.
+
 > **2026-08-30** — le lettrage des enseignes **cessait d'être net** : nos lettres
 > mouchetées là où les siennes sont lisses, visible sans zoomer. Cause mesurée :
 > dans un blanc, la chroma qui reste vient du rouge qui bave dans le JPEG et sa
@@ -189,7 +201,8 @@ gardés entrent dans [docs/presets-valides.md](docs/presets-valides.md).
 | Preset | Livré | Ce qu'il faut regarder |
 |---|---|---|
 | `couchant` | 2026-08-27 ter | **Le seul preset du projet mesuré contre des COUCHANTS.** Il retire la saturation « carte postale » (×0,71 dans les médians) : sur un ciel magenta c'est net, sur un soleil doré il éteint l'or. C'est le point à trancher à l'œil. |
-| `powV11` | 2026-08-29 duodecies, corrigé les terdecies et 2026-08-30 | **Le bout de la série.** Blancs des enseignes crème comme les siens (chroma 18,7 contre 18,6). Lettrage des enseignes lisse depuis le 2026-08-30 (option `blancsBruites`). Réserve : il verdit l'ocre, mais **seulement dans les niveaux sombres** depuis la correction. |
+| `powV11` | 2026-08-29 duodecies, corrigé les terdecies et 2026-08-30 |  Blancs des enseignes crème comme les siens (chroma 18,7 contre 18,6). Lettrage des enseignes lisse depuis le 2026-08-30 (option `blancsBruites`). Réserve : il verdit l'ocre, mais **seulement dans les niveaux sombres** depuis la correction. |
+| `powV12` | 2026-08-30 bis | **Le bout de la série.** Corrige deux défauts vus à l'œil sur `powV11` : les **taches** de gris dans le lettrage des enseignes (dispersion en blocs 4×4 : 12,4 % → **9,6 %**, la sienne est à 8,0 %) et le **poteau blanc** qui sortait à 60,4 pour un sien à 39,5 (**50,6** maintenant). Réserve mesurée : les dix points qui restent sur le poteau ne sont pas reproductibles par un preset — ni règle de teinte, ni vignetage, c'est peint à la main. |
 | `powV10` | 2026-08-29 undecies | **Le dernier de la série.** Mêmes couleurs que `powV9`, courbe plus douce : blancs plus clairs, plus d'artefacts autour des enseignes. Même réserve — il verdit l'ocre. |
 | `powV9` | 2026-08-29 decies | **Le plus proche de sa photo de nuit** (2,12). Ses deux secteurs chauds sont tournés de 19 à 33° et désaturés de moitié : sur un ocre franc la rotation vaut +46° — **il verdit le sable, le bois, les murs**. À regarder en gardant ça en tête. |
 | `powV8` | 2026-08-29 nonies | **Le bout de la série.** Rouge et sol calés sur les siens. Sa luminance ×1,57 sur les rouges et son a\* −3,2 dans les ombres sont les leviers les plus forts de la famille : sur une autre photo, ça se verra. |

@@ -1843,6 +1843,26 @@ function construirePowV2(courbe, reglages = {}) {
     const blancsBruites = reglages.blancsBruites || null;
     const blancGainL = blancsBruites?.[6] ?? 1;
     const blancGainC = blancsBruites?.[7] ?? 1;
+    /*
+     * MEME ZONE, MAIS UN RELEVEMENT ADDITIF — et c'est `powV12` qui l'emploie.
+     *
+     * Le gain multiplicatif ci-dessus a un defaut mesure sur le lettrage de
+     * l'enseigne: multiplier le niveau multiplie AUSSI les ecarts locaux. Avec
+     * 1,34, la dispersion des moyennes de blocs 4x4 passe de 5,4 % dans la
+     * source a 12,4 %, quand la sienne est a 8,0 %. A l'oeil, ce sont des
+     * taches de gris dans le blanc. Un decalage additif atteint le meme niveau
+     * sans toucher aux ecarts.
+     *
+     * La bande de niveau est aussi plus PLATE: elle doit couvrir tout le
+     * lettrage (L* 27 a 39 apres la courbe) sans varier a l'interieur, sinon
+     * c'est la rampe elle-meme qui recree du contraste local. Elle se referme
+     * avant le poteau blanc (L* 49,5), qui n'a pas a etre releve.
+     *
+     * `[L0, L1, L2, L3, C0, C1, decalageL, gainChroma]`.
+     */
+    const blancsLisses = reglages.blancsLisses || null;
+    const blancDeltaL = blancsLisses?.[6] ?? 0;
+    const blancLisseC = blancsLisses?.[7] ?? 1;
     return function transform(input) {
     let [r, g, b] = input;
 
@@ -1871,12 +1891,20 @@ function construirePowV2(courbe, reglages = {}) {
     const c = Math.hypot(A, Bb);
     let aUneTeinte = smoothstep(4, 11, c);
     let blanc = 0;
+    let lisse = 0;
     if (blancsBruites) {
         const bande = smoothstep(blancsBruites[0], blancsBruites[1], L)
             * (1 - smoothstep(blancsBruites[2], blancsBruites[3], L));
         blanc = aUneTeinte * bande
             * (1 - smoothstep(blancsBruites[4], blancsBruites[5], c));
         aUneTeinte -= blanc;
+    }
+    if (blancsLisses) {
+        const bande = smoothstep(blancsLisses[0], blancsLisses[1], L)
+            * (1 - smoothstep(blancsLisses[2], blancsLisses[3], L));
+        lisse = aUneTeinte * bande
+            * (1 - smoothstep(blancsLisses[4], blancsLisses[5], c));
+        aUneTeinte -= lisse;
     }
     if (aUneTeinte > 0 && c > 1e-6) {
         let h = Math.atan2(Bb, A) * 180 / Math.PI;
@@ -1902,6 +1930,16 @@ function construirePowV2(courbe, reglages = {}) {
          * pixel sans teinte fiable ne doit pas changer de niveau, sinon la
          * regle trace un contour la ou la photo etait lisse. */
         if (gainL !== 1) L = Math.min(100, L * (1 + (gainL - 1) * aUneTeinte));
+    }
+
+    /* La part fermee en additif: on DECALE le niveau, on ne le multiplie pas. */
+    if (lisse > 0) {
+        if (blancDeltaL !== 0) L = Math.max(0, Math.min(100, L + blancDeltaL * lisse));
+        if (blancLisseC !== 1) {
+            const g = 1 + (blancLisseC - 1) * lisse;
+            A *= g;
+            Bb *= g;
+        }
     }
 
     /* La part fermee ci-dessus recoit son traitement constant, sans teinte. */
@@ -2575,6 +2613,66 @@ const powV11Transform = construirePowV2(V11_COURBE, {
     blancsBruites: [22, 34, 44, 60, 20, 34, 1.34, 1.18],
 });
 
+/* ==========================================================================
+ * POWV12 — les taches du lettrage, et le poteau qu'on avait gonfle
+ *
+ * DEUX DEFAUTS VUS A L'ECRAN sur sa station de nuit, et un seul est reparable.
+ *
+ * 1. LES TACHES. Dans le blanc du logo « Synergy », `powV11` laisse des plaques
+ *    de gris. La mesure qui le montre n'est pas celle que j'avais prise: entre
+ *    pixels VOISINS `powV11` est propre, mais une tache est un defaut de BASSE
+ *    frequence. En dispersion des moyennes de blocs 4x4, la source est a 5,4 %,
+ *    lui a 8,0 %, `powV11` a 12,4 %. La cause est son relevement des blancs
+ *    bruites, qui est MULTIPLICATIF: x1,34 sur le niveau, donc x1,34 sur les
+ *    ecarts locaux aussi. `powV12` fait le meme relevement en ADDITIF, et sur
+ *    une bande de niveau plate d'un bout a l'autre du lettrage — une bande qui
+ *    monte au milieu des lettres recreerait le contraste qu'on veut retirer.
+ *
+ * 2. LE POTEAU. Il sort a L* 60,4 quand le sien est a 39,5, pour une entree de
+ *    70,7. Sur ces 20,9 points, ONZE viennent du meme relevement, qui attrapait
+ *    le poteau en plein: la bande de `powV11` ne se refermait qu'a L* 44-60, et
+ *    le poteau est a 49,5 apres la courbe. `powV12` referme a 42-50, et le
+ *    poteau retrouve le niveau que la courbe seule lui donne.
+ *
+ * LES DIX POINTS QUI RESTENT NE SONT PAS REPARABLES PAR UN PRESET, et c'est
+ * montre deux fois plutot qu'affirme:
+ *
+ * - ce n'est pas une regle de teinte. Sur ses trois paires, a niveau d'entree
+ *   egal (L* 60-80), il descend les warm-neutres de 17,0 / 3,9 / 8,7 et les
+ *   autres teintes de 20,8 / 6,5 / 10,4. Il les descend MOINS, pas plus;
+ * - ce n'est pas un vignetage. Sur le restaurant, son assombrissement est plat
+ *   du centre au bord (-8 a -10). Sur la station il vaut -15, -15, -14, -13,
+ *   -16, -31, -16, -32, -31 du centre au bord: un vignetage est monotone avec
+ *   le rayon, ceci ne l'est pas. Ce sont des objets, pas une distance.
+ *
+ * Le poteau est donc peint a la main dans SA retouche, comme le reste du masque
+ * deja demontre sur cette photo. `powV12` rend ce qu'une fonction peut rendre.
+ */
+/*
+ * LA COURBE DE `POWV12`, aplatie la ou vivent les blancs d'enseigne.
+ *
+ * Troisieme cause des taches, et la principale: la courbe elle-meme. Sur le
+ * lettrage (entree L* 59,8), `V11_COURBE` amplifie les ecarts locaux x1,29
+ * quand lui est a x1,05. Les trois noeuds L* 55, 60 et 65 sont donc redresses
+ * pour une pente locale de 1,06 autour de 60. Les noeuds L* 50 et 70 ne bougent
+ * pas: la courbe doit toujours passer de 24,71 a 49,49, et ce qu'on retire de
+ * pente ici se repaie juste avant — c'est un choix, pas un gain gratuit.
+ */
+const V12_COURBE = V11_COURBE.map((v, i) => (i === 11 ? 31.0 : i === 12 ? 36.3 : v));
+
+const powV12Transform = construirePowV2(V12_COURBE, {
+    virageA: V9_VIRAGE_A,
+    virageB: V9_VIRAGE_B,
+    melangeur: V9_MELANGEUR,
+    melangeurClair: V11_MELANGEUR_CLAIR,
+    fonduClair: [45, 65],
+    cielCible: 228,
+    cielChroma: 0.828,
+    /* Bande PLATE sur tout le lettrage (L* 27-39 apres la courbe), refermee
+       avant le poteau (49,5). Le decalage est additif. */
+    blancsLisses: [16, 24, 42, 50, 20, 34, 9, 1.18],
+});
+
 export const VISION_PRESETS = [
     {
         id: 'couchant',
@@ -3138,6 +3236,35 @@ export const VISION_PRESETS = [
         spatialFilters: { degradeBas: 80 },
         recommendedIntensity: 100,
         transform: powV11Transform,
+    },
+    {
+        id: 'powV12',
+        label: 'PowV12',
+        hint: 'Le blanc des enseignes sans les taches de gris',
+        description: 'Deux défauts vus à l\'écran sur sa station de nuit. **Les taches** '
+            + 'de gris dans le blanc du logo : `PowV11` relevait ces blancs par un gain '
+            + 'multiplicatif, qui multiplie aussi les écarts locaux. Dispersion des '
+            + 'moyennes de blocs 4×4 dans le lettrage : la source est à 5,4 %, lui à '
+            + '8,0 %, `PowV11` à **12,4 %**. `PowV12` fait le même relèvement en '
+            + '**additif**, sur une bande de niveau plate d\'un bout à l\'autre des '
+            + 'lettres. **Le poteau blanc** : il sortait à 60,4 quand le sien est à '
+            + '39,5 — onze de ces points venaient du même relèvement, dont la bande ne '
+            + 'se refermait qu\'après le poteau. Elle se referme maintenant avant. '
+            + 'RÉSERVE, et elle est mesurée : les dix points qui restent sur le poteau '
+            + 'ne sont **pas reproductibles par un preset**. Ce n\'est pas une règle de '
+            + 'teinte (à niveau égal il descend les warm-neutres MOINS que les autres '
+            + 'teintes, sur les trois paires) et ce n\'est pas un vignetage (sur le '
+            + 'restaurant son assombrissement est plat du centre au bord ; sur la '
+            + 'station il fait −15, −13, −31, −16, −32, ce qui n\'est pas monotone avec '
+            + 'le rayon). Ce sont des objets peints à la main. Le reste — courbe, '
+            + 'virage, mélangeur, ciel — est celui de `PowV11`.',
+        bestFor: 'la scène pour laquelle il a été mesuré : station-service la nuit, '
+            + 'enseignes éclairées, sol de béton mouillé au premier plan',
+        avoidFor: 'tout le reste, et surtout les scènes où le jaune ou l\'ocre compte. '
+            + 'Pour le style, `PowV2`',
+        spatialFilters: { degradeBas: 80 },
+        recommendedIntensity: 100,
+        transform: powV12Transform,
     },
     {
         id: 'powlisher-showcase',
