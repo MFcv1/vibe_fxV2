@@ -162,7 +162,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la série `powV2` … `powV11`** — 2026-08-29 duodecies](docs/prompt-reprise-2026-08-29-duodecies.md),
+[**après la correction du lettrage de `powV11`** — 2026-08-30](docs/prompt-reprise-2026-08-30.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
