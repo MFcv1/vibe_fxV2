@@ -618,53 +618,66 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/legal/confidentialite`
 - `/legal/conditions`
 
-## Journal — 2026-08-30 bis (`powV12` : les taches du lettrage, et le poteau)
+## Journal — 2026-08-30 bis (`powV12` : le blanc du logo, et le poteau)
 
 Nouveau preset. `powV11` n'est pas touche.
 
-**Ma mesure de la veille etait la mauvaise.** J'avais mesure la variation entre
-pixels VOISINS et conclu que le lettrage etait propre. Une tache est un defaut
-de BASSE frequence: en dispersion des moyennes de blocs 4x4 sur le lettrage, la
-source est a 5,4 %, lui a 8,0 %, `powV11` a 12,4 %. Le porteur du projet voyait
-juste.
+**DEUX FOIS J'AI MESURE A COTE, et c'est le porteur du projet qui a corrige.**
 
-**Trois causes, deux reparables.**
+Premiere fois: j'avais mesure la variation entre pixels VOISINS et conclu que le
+lettrage etait propre. Une tache est un defaut de BASSE frequence.
 
-1. Le relevement des blancs de `powV11` est MULTIPLICATIF (x1,34): il multiplie
-   donc aussi les ecarts locaux. `powV12` le fait en ADDITIF, sur une bande de
-   niveau plate d'un bout a l'autre du lettrage (une bande qui monte au milieu
-   des lettres recreerait le contraste qu'on retire).
-2. La courbe amplifie x1,29 au niveau du lettrage quand lui est a x1,05. Les
-   noeuds L* 55 et 60 passent de 28,49/34,38 a 31,0/36,3, pour une pente locale
-   de 1,06. Ce qu'on retire de pente ici se repaie juste avant: c'est un choix.
-3. Le poteau blanc sortait a 60,4 pour un sien a 39,5. ONZE de ces points
-   venaient de la bande de `powV11`, qui ne se refermait qu'a L* 44-60 quand le
-   poteau est a 49,5 apres la courbe. Elle se referme a 42-50.
+Deuxieme fois: la version suivante ameliorait la dispersion en blocs 4x4 (12,4
+-> 9,6 %) et il n'a vu AUCUNE difference sur le logo. La carte des ecarts lui a
+donne raison, sans appel: le lettrage bougeait de **-0,60 L\***, le CIEL de
+**+5,28**. Ma bande attrapait le ciel et ratait les lettres.
 
-**LE RESTE N'EST PAS REPRODUCTIBLE, et c'est montre, pas affirme.**
+**LE VRAI DEFAUT, une fois cherche au bon endroit.** Dans le trait des lettres:
 
-- Pas une regle de teinte: sur ses trois paires, a entree L* 60-80, il descend
-  les warm-neutres de 17,0 / 3,9 / 8,7 et les autres teintes de 20,8 / 6,5 /
-  10,4. Il les descend MOINS.
-- Pas un vignetage: sur le restaurant son assombrissement est plat du centre au
-  bord (-8 a -10); sur la station il fait -15, -15, -14, -13, -16, -31, -16,
-  -32, -31 du centre au bord. Un vignetage est monotone avec le rayon.
-- La texture negative ne le rattrape pas non plus: a -50 elle fait passer la
-  dispersion de 4,50 a 4,11 (la sienne est a 3,36) et coute du contour.
+| | L\* | chroma |
+|---|---|---|
+| la source | 62,1 | 10,0 |
+| LUI | 46,1 | **18,0** |
+| `powV11` | 43,2 | **14,5** |
+| `powV12` | 46,2 | 16,0 |
 
-Ce sont des objets peints a la main, comme le masque deja demontre sur cette
-photo.
+Son blanc est CREME, le notre est GRIS: plus sombre et moins colore. C'est ca,
+« le blanc melange avec du gris ».
 
-**Resultat.** Taches 12,4 % -> 9,6 % (lui 8,0 %). Poteau 60,4 -> 50,6 (lui
-39,8). Lettrage 41,4 (lui 43,2). dE76 median: p1 2,36 -> 2,89, p2 8,13 -> 8,14,
-p3 12,90 -> 12,59. Le dE de p1 monte un peu, et c'est assume: il est domine par
-son masque, qu'on a prouve irreproductible, alors que les deux defauts vus a
-l'oeil, eux, reculent.
+**Ce que `powV12` change, et rien d'autre** (ecart mesure contre `powV11`):
+lettrage +3,38 L\*, poteau -7,66, ciel +0,09, sol 0,00, moto 0,00, auvent 0,00.
+
+Trois leviers:
+
+1. relevement ADDITIF (16 L\*) et non multiplicatif — multiplier le niveau
+   multiplie aussi les ecarts locaux;
+2. fenetre de chroma 12-20, qui separe le lettrage (chroma 10) du ciel (20);
+   c'est elle qui VISE, et c'est elle que j'avais mal posee;
+3. courbe redressee aux noeuds L\* 55 et 60 (28,49/34,38 -> 31,0/36,3): elle
+   amplifiait les ecarts locaux x1,29 au niveau du lettrage quand lui est a
+   x1,05. Dispersion 12,4 -> 9,6 % (la sienne 8,0 %, la source 5,4 %).
+
+**Le poteau**: 60,4 -> 50,6 pour un sien a 39,5. Dix des vingt points venaient de
+la bande de `powV11`, qui ne se refermait qu'apres lui.
+
+**CE QUI RESTE N'EST PAS REPRODUCTIBLE**, montre et non affirme: pas une regle de
+teinte (a entree L\* 60-80 il descend les warm-neutres de 17,0 / 3,9 / 8,7 sur ses
+trois paires et les autres teintes de 20,8 / 6,5 / 10,4 — il les descend MOINS);
+pas un vignetage (plat du centre au bord sur le restaurant, -8 a -10; et -15,
+-15, -14, -13, -16, -31, -16, -32, -31 sur la station, ce qui n'est pas monotone
+avec le rayon); et la texture negative ne rattrape pas (a -50 la dispersion passe
+de 4,50 a 4,11 pour une sienne a 3,36, et le contour se ramollit).
+
+**Ecart connu, NON corrige**: il desature le rouge (moto 40,6 -> 31,4 de chroma)
+quand nous le gardons a 39,0. Ce n'est pas dans la demande, et le changer
+deplacerait le look entier.
+
+dE76 median: p1 2,36 -> 2,39, p2 8,13 -> 8,14, p3 12,90 -> 13,85. Le cout est
+sur p3, le restaurant, que ce preset ne vise pas.
 
 Fichiers touches : `src/features/vibefx-studio/utils/visionPresets.js`,
-`scripts/smoke-vision-preset.mjs` (340 controles, +10),
+`scripts/smoke-vision-preset.mjs` (343 controles),
 `scripts/verifier-presets-sur-paires.mjs`. `npm run lint` vert.
-
 
 ## Journal — 2026-08-30 (`powV11` : les lettres des enseignes cessent de moucheter)
 

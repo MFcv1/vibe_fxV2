@@ -2172,6 +2172,39 @@ function teinteLab(rgb) {
     const ecart = Math.abs(clarte(v12, coul(59, 12, 25)) - clarte(v12, coul(59, 12, 55)));
     check('powV12 : deux voisins d\'une lettre sortent ensemble', ecart, 0, 0.5, ' L*');
 
+    /* 3 bis. ET LA CORRECTION VA BIEN SUR LE LETTRAGE, PAS AILLEURS.
+     *
+     * Premiere version de `powV12`: la mesure disait « mieux », l'ecran disait
+     * « aucune difference ». La carte des ecarts a tranche — le lettrage
+     * bougeait de -0,60 L*, le CIEL de +5,28. La bande attrapait le ciel et
+     * ratait les lettres. Le garde-fou de chroma se ferme donc a 12-20, ce qui
+     * separe le lettrage (chroma 10) du ciel (chroma 20).
+     *
+     * Couleurs relevees dans la source: lettrage L* 62,1 / chroma 10,0 / 29°,
+     * ciel L* 42,1 / chroma 32,3 / 283°.
+     */
+    const lettrage = coul(62.1, 10.0, 29);
+    const cielNuit = coul(42.1, 32.3, 283);
+    check('powV12 : le lettrage de l\'enseigne monte',
+        clarte(v12, lettrage) - clarte(v11b, lettrage), 2, 4.5, ' L*');
+    check('powV12 : et le ciel ne bouge pas',
+        Math.abs(clarte(v12, cielNuit) - clarte(v11b, cielNuit)), 0, 0.5, ' L*');
+
+    /* 3 ter. LE GAIN DE CHROMA NE RETOURNE PAS L'ORDRE. Un gain applique dans
+     * une fenetre de chroma peut rendre un pixel PLUS colore qu'un pixel qui
+     * l'etait davantage au depart: la fonction cesse d'etre croissante et trace
+     * un contour. C'est ce qui a fait refuser un gain de 2,20 (chroma 12 sortait
+     * a 26, chroma 20 restait a 20) au profit de 1,55. Relevé: 0,16. */
+    let reculChroma = 0;
+    let chromaPrec = -1;
+    for (let c = 0; c <= 45; c += 0.25) {
+        const [, a, b] = versLab(v12(coul(34, c, 29)));
+        const sortie = Math.hypot(a, b);
+        if (sortie < chromaPrec) reculChroma = Math.max(reculChroma, chromaPrec - sortie);
+        chromaPrec = sortie;
+    }
+    check('powV12 : la chroma de sortie reste croissante', reculChroma, 0, 0.4);
+
     /* 4. ET LES GARDE-FOUS ORDINAIRES. Valeurs relevées. */
     let maxi = 0;
     let croissant = 1;

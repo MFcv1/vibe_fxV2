@@ -2618,21 +2618,31 @@ const powV11Transform = construirePowV2(V11_COURBE, {
  *
  * DEUX DEFAUTS VUS A L'ECRAN sur sa station de nuit, et un seul est reparable.
  *
- * 1. LES TACHES. Dans le blanc du logo « Synergy », `powV11` laisse des plaques
- *    de gris. La mesure qui le montre n'est pas celle que j'avais prise: entre
- *    pixels VOISINS `powV11` est propre, mais une tache est un defaut de BASSE
- *    frequence. En dispersion des moyennes de blocs 4x4, la source est a 5,4 %,
- *    lui a 8,0 %, `powV11` a 12,4 %. La cause est son relevement des blancs
- *    bruites, qui est MULTIPLICATIF: x1,34 sur le niveau, donc x1,34 sur les
- *    ecarts locaux aussi. `powV12` fait le meme relevement en ADDITIF, et sur
- *    une bande de niveau plate d'un bout a l'autre du lettrage — une bande qui
- *    monte au milieu des lettres recreerait le contraste qu'on veut retirer.
+ * 1. LE BLANC DU LOGO. Il est GRIS chez nous et CREME chez lui, et c'est la
+ *    mesure qui le dit, pas une impression: dans le trait des lettres, il sort
+ *    a L* 46,1 pour une chroma de 18,0, `powV11` a 43,2 pour 14,5. Plus sombre
+ *    ET moins colore — d'ou « le blanc est melange avec du gris ». `powV12`
+ *    releve ces pixels de 16 L* et leur rend de la chroma, ce qui les pose a
+ *    46,2 / 16,0.
+ *
+ *    LE RELEVEMENT EST ADDITIF, pas multiplicatif comme celui de `powV11`:
+ *    multiplier le niveau multiplie AUSSI les ecarts locaux. Et la bande de
+ *    niveau est PLATE d'un bout a l'autre du lettrage — une bande qui monte au
+ *    milieu des lettres recreerait le contraste qu'on veut retirer.
+ *
+ *    LA FENETRE DE CHROMA (12 a 20) EST CE QUI VISE. Premiere version de ce
+ *    preset: elle etait a 20-34, et la carte des ecarts a montre qu'elle
+ *    attrapait le CIEL (+5,28 L*) en ratant le lettrage (-0,60 L*). Le
+ *    lettrage est a chroma 10 apres la courbe, le ciel a 20: la fenetre passe
+ *    entre les deux. C'est le porteur du projet qui a vu que la correction
+ *    n'etait pas au bon endroit, quand la mesure de dispersion, elle, disait
+ *    « mieux ».
  *
  * 2. LE POTEAU. Il sort a L* 60,4 quand le sien est a 39,5, pour une entree de
- *    70,7. Sur ces 20,9 points, ONZE viennent du meme relevement, qui attrapait
- *    le poteau en plein: la bande de `powV11` ne se refermait qu'a L* 44-60, et
- *    le poteau est a 49,5 apres la courbe. `powV12` referme a 42-50, et le
- *    poteau retrouve le niveau que la courbe seule lui donne.
+ *    70,7. Sur ces 20,9 points, DIX viennent du relevement de `powV11`, qui
+ *    attrapait le poteau en plein: sa bande ne se refermait qu'a L* 44-60, et
+ *    le poteau est a 49,5 apres la courbe. `powV12` referme a 42-50 et le pose
+ *    a 50,6.
  *
  * LES DIX POINTS QUI RESTENT NE SONT PAS REPARABLES PAR UN PRESET, et c'est
  * montre deux fois plutot qu'affirme:
@@ -2669,8 +2679,10 @@ const powV12Transform = construirePowV2(V12_COURBE, {
     cielCible: 228,
     cielChroma: 0.828,
     /* Bande PLATE sur tout le lettrage (L* 27-39 apres la courbe), refermee
-       avant le poteau (49,5). Le decalage est additif. */
-    blancsLisses: [16, 24, 42, 50, 20, 34, 9, 1.18],
+       avant le poteau (49,5). Le garde-fou de chroma se ferme a 12-20, ce qui
+       laisse le CIEL dehors: il est a chroma 20 quand le lettrage est a 10.
+       Sans ca, la correction du lettrage eclaircissait le ciel de 5 L*. */
+    blancsLisses: [18, 26, 42, 50, 12, 20, 16, 1.55],
 });
 
 export const VISION_PRESETS = [
@@ -3240,24 +3252,29 @@ export const VISION_PRESETS = [
     {
         id: 'powV12',
         label: 'PowV12',
-        hint: 'Le blanc des enseignes sans les taches de gris',
-        description: 'Deux défauts vus à l\'écran sur sa station de nuit. **Les taches** '
-            + 'de gris dans le blanc du logo : `PowV11` relevait ces blancs par un gain '
-            + 'multiplicatif, qui multiplie aussi les écarts locaux. Dispersion des '
-            + 'moyennes de blocs 4×4 dans le lettrage : la source est à 5,4 %, lui à '
-            + '8,0 %, `PowV11` à **12,4 %**. `PowV12` fait le même relèvement en '
-            + '**additif**, sur une bande de niveau plate d\'un bout à l\'autre des '
-            + 'lettres. **Le poteau blanc** : il sortait à 60,4 quand le sien est à '
-            + '39,5 — onze de ces points venaient du même relèvement, dont la bande ne '
-            + 'se refermait qu\'après le poteau. Elle se referme maintenant avant. '
-            + 'RÉSERVE, et elle est mesurée : les dix points qui restent sur le poteau '
+        hint: 'Le blanc des enseignes crème au lieu de gris',
+        description: 'Deux défauts vus à l\'écran sur sa station de nuit. **Le blanc du '
+            + 'logo** : le sien est crème, le nôtre gris. Mesuré dans le trait des '
+            + 'lettres, il sort à L\* 46,1 pour une chroma de 18,0 ; `PowV11` à 43,2 '
+            + 'pour 14,5 — plus sombre ET moins coloré. `PowV12` les pose à **46,2 / '
+            + '16,0**, par un relèvement **additif** (multiplier le niveau multiplierait '
+            + 'aussi les écarts locaux) sur une bande plate d\'un bout à l\'autre des '
+            + 'lettres. La fenêtre de chroma (12 à 20) est ce qui vise : le lettrage est '
+            + 'à chroma 10 après la courbe, le ciel à 20. **Le poteau blanc** : il '
+            + 'sortait à 60,4 pour un sien à 39,5, et dix de ces points venaient du '
+            + 'relèvement de `PowV11`, dont la bande ne se refermait qu\'après lui. '
+            + '**50,6** maintenant. La courbe est aussi redressée aux nœuds L\* 55 et 60, '
+            + 'où elle amplifiait les écarts locaux ×1,29 quand lui est à ×1,05. '
+            + 'RÉSERVE, et elle est mesurée : les onze points qui restent sur le poteau '
             + 'ne sont **pas reproductibles par un preset**. Ce n\'est pas une règle de '
             + 'teinte (à niveau égal il descend les warm-neutres MOINS que les autres '
-            + 'teintes, sur les trois paires) et ce n\'est pas un vignetage (sur le '
-            + 'restaurant son assombrissement est plat du centre au bord ; sur la '
-            + 'station il fait −15, −13, −31, −16, −32, ce qui n\'est pas monotone avec '
-            + 'le rayon). Ce sont des objets peints à la main. Le reste — courbe, '
-            + 'virage, mélangeur, ciel — est celui de `PowV11`.',
+            + 'teintes, sur les trois paires) et ce n\'est pas un vignetage (plat du '
+            + 'centre au bord sur le restaurant ; −15, −13, −31, −16, −32 sur la '
+            + 'station, ce qui n\'est pas monotone avec le rayon). Ce sont des objets '
+            + 'peints à la main. AUTRE ÉCART CONNU, non corrigé : il **désature le '
+            + 'rouge** (la moto passe de 40,6 à 31,4 de chroma) quand nous le gardons à '
+            + '39,0 — ça n\'a pas été touché ici, c\'est un changement de look que '
+            + 'personne n\'a demandé.',
         bestFor: 'la scène pour laquelle il a été mesuré : station-service la nuit, '
             + 'enseignes éclairées, sol de béton mouillé au premier plan',
         avoidFor: 'tout le reste, et surtout les scènes où le jaune ou l\'ocre compte. '
