@@ -196,7 +196,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- creer/                      # Surface VibeOS (redesign en side-build, phase A). Toutes les pages noindex, derriere StudioAuthGate
 |   |   |   |-- layout.js               # Charge vibeos.css (seule feuille de style), monte StudioAuthGate + VibeOsShell (providers projet/audio/toasts)
 |   |   |   |-- page.js                 # Accueil incubateur (HomeScreen)
-|   |   |   |-- bibliotheque/page.js    # Photothèque VibeOS : monte `features/vibeos/library/LibraryScreen` (grille masonry, carrousel)
+|   |   |   |-- bibliotheque/page.js    # Photothèque VibeOS : monte `features/vibeos/library/LibraryScreen` (dossiers, grille masonry, carrousel)
 |   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
 |   |   |   |-- studio/page.js          # Espace Studio : monte `features/vibeos/studio/StudioScreen`
 |   |   |   |-- vision/page.js          # Espace Vision : monte `features/vibeos/vision/VisionScreen`
@@ -379,13 +379,20 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant + « Nouvel espace vierge », 6 cartes d'espaces (Bibliothèque/Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
-|   |   |-- library/                    # Photothèque VibeOS (2026-08-11) : les photos importees vivent ici et ne sont jamais reimportees
-|   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` (store photos, index addedAt + exif.device), separee de la base des projets : supprimer un projet ne doit pas effacer les photos
+|   |   |-- library/                    # Photothèque VibeOS (2026-08-11 ; dossiers + sauvegarde compte le 2026-08-31) : les photos importees vivent ici et ne sont jamais reimportees
+|   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` v2 : stores `photos` (index addedAt, exif.device, folderId) et `folders`. Base separee de celle des projets. La migration v1 -> v2 range les photos deja presentes dans un dossier de reprise, et `deleteFolderDeep` supprime dossier + photos dans une seule transaction
 |   |   |   |-- exif.js                 # Lecteur EXIF maison, sans dependance : APP1 JPEG / TIFF, marque, modele, objectif, ISO, ouverture, vitesse, focale, orientation, date de prise de vue. Ne lit que les 128 premiers Ko et ne rejette jamais
-|   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 720px stockee une fois pour toutes, EXIF, dimensions. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari)
+|   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 1600px stockee une fois pour toutes, EXIF, dimensions, `folderId`, etat de sauvegarde. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari)
+|   |   |   |-- platform.js             # Reconnaissance iPhone / Android / Mac / Windows / Linux et sources d'import qui vont avec (photothèque, appareil photo, fichiers, dossier entier). Module pur, teste hors navigateur
+|   |   |   |-- folderNaming.js         # Nommage a la mode OS : nom du dossier choisi (webkitRelativePath), sinon la date en toutes lettres, suffixe « (2) » si le nom est pris, nettoyage des separateurs. Module pur, teste hors navigateur
+|   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. Module pur, teste hors navigateur
+|   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. La fiche Firestore est ecrite EN DERNIER : un envoi coupe ne laisse jamais de fiche sans fichier
+|   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement de l'original a la retouche, arret apres 3 echecs. Ne fait rien sans compte reel (le contournement dev est ignore)
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
-|   |   |   |-- useLibrary.js           # Etat de la photothèque : chargement, import sequentiel avec progression, suppression, filtres appareil/look/recherche, tris, cache des URLs d'objet
-|   |   |   |-- LibraryScreen.jsx       # Barre d'outils (recherche, appareils EXIF, looks, tri, densite − ▦ +, Importer), grille masonry positionnee en transform, puces appareil/look au survol, selection multiple, depot de fichiers. La largeur de la grille est mesuree par un ref de rappel (la grille n'existe pas quand la bibliotheque est vide : un effet ne se rejouerait pas a son apparition)
+|   |   |   |-- useLibrary.js           # Etat : dossiers + photos, import sequentiel avec progression dans un dossier, renommage, suppression profonde, filtres appareil/look/recherche, tris, quota, cache des URLs d'objet
+|   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul ecran : cartes de DOSSIERS (recherche, quota, Importer) et GRILLE masonry d'un dossier (recherche, appareils EXIF, looks, tri, densite − ▦ +, selection multiple, depot de fichiers). Un import cree un dossier et y entre tout de suite
+|   |   |   |-- FolderCard.jsx          # Carte de dossier : dos + onglet, deux epaisseurs de tirages, couverture, rabat translucide portant le compteur ; renommage sur place, suppression, pastille de sauvegarde
+|   |   |   |-- ImportSheet.jsx         # Fenetre d'import : destination (nouveau dossier nomme ou dossier existant), sources adaptees a l'appareil, jauge de quota. Montee seulement quand elle est ouverte
 |   |   |   |-- Lightbox.jsx            # Carrousel plein ecran : zoom partage FLIP depuis la tuile, vignette affichee avant la pleine resolution, rail de 3 diapositives, glissement au doigt, frise, clavier
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
@@ -626,6 +633,53 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-31 (bibliothèque : dossiers, import et sauvegarde compte)
+
+La bibliothèque n'est plus un tas de photos : **elle s'ouvre sur des dossiers**.
+Un import = un dossier, nommé comme sur un OS (le nom du dossier choisi, sinon
+la date en toutes lettres, suffixe « (2) » si le nom est pris). Cliquer sur un
+dossier ouvre la grille masonry existante, intacte — mêmes vagues d'apparition,
+même carrousel, mêmes filtres.
+
+Fichiers ajoutés : `platform.js`, `folderNaming.js`, `libraryQuota.js`,
+`FolderCard.jsx`, `ImportSheet.jsx`, `libraryCloud.js`, `useLibrarySync.js`.
+Fichiers touchés : `libraryDb.js` (v2, store `folders`, migration), `useLibrary.js`,
+`photoImport.js`, `LibraryScreen.jsx`, `library.module.css`, `firestore.rules`,
+`storage.rules`, `scripts/smoke-vibeos-library.mjs`,
+`scripts/smoke-vibeos-library-ui.spec.cjs`.
+
+- **Le web n'ouvre pas la galerie d'un téléphone.** Il n'existe aucune API pour
+  ça. Ce qu'on peut faire — et ce que fait `platform.js` — c'est demander le bon
+  SÉLECTEUR : `accept="image/*"` ouvre la photothèque système sur iOS/Android,
+  `capture="environment"` l'appareil photo, `webkitdirectory` un dossier entier
+  sur ordinateur. La détection d'appareil ne change donc pas le comportement,
+  elle **nomme les boutons avec les mots du système** de l'utilisateur.
+- **Le quota se vérifie AVANT l'import**, pas après : refuser en cours de route
+  obligerait à effacer ce qu'on vient d'écrire. Deux plafonds, et il faut les
+  deux — 1000 photos borne le nombre de documents, 5 Go borne la facture.
+- **La carte de dossier est dessinée en quatre couches** (dos + onglet, deux
+  épaisseurs de tirages, couverture, rabat translucide). Au survol comme à
+  l'apparition, rien ne bouge d'autre que `transform` et `opacity`.
+- **La sauvegarde envoie l'original ET l'aperçu.** L'aperçu 1600 px parce que
+  sans lui la grille redescendrait des fichiers de 8 Mo par tuile ; l'original
+  parce que le but est de ne plus jamais réimporter une photo depuis l'appareil
+  pour la retoucher. La fiche Firestore est écrite en dernier : un envoi coupé
+  ne laisse jamais de fiche pointant vers un fichier absent.
+- **Un envoi à la fois.** Deux cents photos en parallèle saturent le lien
+  montant pendant que l'import décode encore des images.
+- **Rien ne part sans compte réel** : le contournement d'authentification de
+  développement fabrique un utilisateur inconnu de Firebase, `cloudUid` le
+  rejette au lieu de laisser les règles refuser une requête sur deux.
+
+Vérifié bout en bout sur les émulateurs Firebase (auth + Firestore + Storage) :
+9 photos et 2 dossiers montés dans le compte, puis **IndexedDB effacé** — les
+deux dossiers et leurs photos redescendent, s'affichent, s'ouvrent en carrousel,
+et « Retoucher » rapatrie l'original et ouvre Vision.
+
+Gates : `test:vibeos-library` (37 vérifications hors navigateur + smoke
+navigateur 1/1), `npm run lint` 0 erreur (5 avertissements préexistants),
+`npm run build` vert sous Node 22. Aucun déploiement.
 
 ## Journal — 2026-08-31 (performance des miniatures Vision)
 

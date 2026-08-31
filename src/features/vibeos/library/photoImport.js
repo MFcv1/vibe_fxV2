@@ -106,7 +106,7 @@ export async function makePreview(blob, maxSide = PREVIEW_MAX) {
  * Rend un enregistrement pret a stocker, ou `null` si le fichier n'est pas une
  * image decodable par ce navigateur (cas typique: HEIC hors Safari).
  */
-export async function buildPhotoRecord(file) {
+export async function buildPhotoRecord(file, { folderId = null } = {}) {
     let bitmap = null;
     try {
         bitmap = await decode(file);
@@ -127,7 +127,10 @@ export async function buildPhotoRecord(file) {
     const now = Date.now();
     return {
         id: createPhotoId(),
-        name: file.name || 'photo',
+        /* Le selecteur de dossier renvoie un chemin relatif ("ete/img.jpg"):
+           on garde le nom du fichier, le dossier est porte par `folderId`. */
+        name: (file.name || 'photo').split('/').pop(),
+        folderId,
         blob: file,
         thumbBlob: thumbBlob || file,
         bytes: file.size || 0,
@@ -147,6 +150,9 @@ export async function buildPhotoRecord(file) {
         /* Rempli quand la photo revient de Vision avec un preset applique. */
         preset: null,
         favorite: false,
+        /* Etat de sauvegarde dans le compte utilisateur. `local` tant que rien
+           n'est parti; voir `libraryCloud.js`. */
+        cloud: { state: 'local' },
     };
 }
 

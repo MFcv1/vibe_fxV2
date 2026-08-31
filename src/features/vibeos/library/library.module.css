@@ -1128,3 +1128,676 @@
         transform: none;
     }
 }
+
+/* =========================================================================
+   DOSSIERS
+   =========================================================================
+   Un dossier se lit avant d'etre lu: on doit voir "des photos rangees dedans"
+   sans avoir a decoder le libelle. D'ou le dessin en quatre couches, dans
+   l'ordre de la profondeur reelle d'une pochette:
+
+     1. `.folderBack`  le dos, avec son onglet - c'est lui qui dit "dossier";
+     2. `.folderSheet` deux epaisseurs de tirages qui depassent;
+     3. `.folderCover` la photo de couverture, nette et devant;
+     4. `.folderPocket` la poche translucide qui repasse par-dessus le bas des
+        tirages, et qui porte le compteur.
+
+   Toutes les couches sont en `position: absolute` dans un cadre a rapport fixe:
+   au survol comme a l'apparition, rien ne bouge d'autre que `transform` et
+   `opacity`, donc une page de cinquante dossiers ne coute rien a animer. */
+
+.folderGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: var(--vo-space-6) var(--vo-space-5);
+    padding: var(--vo-space-1) 0 var(--vo-space-12);
+    align-content: start;
+}
+
+.folderCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+    transition:
+        opacity 620ms var(--vo-ease) var(--vo-reveal-delay, 0ms),
+        transform 760ms var(--vo-ease-reveal) var(--vo-reveal-delay, 0ms);
+}
+
+.folderCard[data-in="true"] {
+    opacity: 1;
+    transform: none;
+}
+
+.folderOpen {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--vo-radius-lg);
+}
+
+.folderOpen:focus-visible {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: 3px;
+}
+
+.folderStack {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    /* Le survol est porte par le cadre: les couches ne font que suivre. */
+    --lift: 0px;
+    --fan: 0deg;
+}
+
+.folderOpen:hover .folderStack,
+.folderOpen:focus-visible .folderStack {
+    --lift: -7px;
+    --fan: 3deg;
+}
+
+/* 1. Le dos et son onglet. Teinte d'accent basse: le dossier appartient a
+      VibeOS, mais il ne doit jamais concurrencer les photos qu'il contient. */
+.folderBack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 17%;
+    bottom: 0;
+    border-radius: 3px 11px 11px 11px;
+    background: linear-gradient(168deg, rgba(91, 124, 250, 0.26), rgba(91, 124, 250, 0.09));
+    border: 1px solid rgba(91, 124, 250, 0.34);
+    box-shadow: var(--vo-shadow-2);
+}
+
+/* L'onglet monte a gauche, la ou les tirages ne vont pas: c'est le seul endroit
+   du dessin ou il reste lisible a 190 px de large. */
+.folderBack::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: -13%;
+    width: 34%;
+    height: 14%;
+    border-radius: 5px 10px 0 0;
+    background: linear-gradient(180deg, rgba(91, 124, 250, 0.3), rgba(91, 124, 250, 0.24));
+    border: 1px solid rgba(91, 124, 250, 0.34);
+    border-bottom: 0;
+}
+
+/* 2 et 3. Les tirages. Decales vers la droite pour laisser l'onglet visible, et
+      ils depassent par le haut: c'est ce depassement qui fait comprendre qu'il
+      y a quelque chose dedans. */
+.folderSheet,
+.folderCover {
+    position: absolute;
+    left: 23%;
+    right: 5%;
+    top: 4%;
+    bottom: 34%;
+    border-radius: 6px;
+    background-color: var(--vo-surface-2);
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.9);
+    transition: transform var(--vo-dur-4) var(--vo-ease-out);
+}
+
+.folderSheet {
+    opacity: 0.75;
+    filter: saturate(0.75) brightness(0.7);
+}
+
+.folderSheet[data-depth="2"] {
+    transform:
+        translate(-9%, 3%)
+        rotate(calc(-7deg - var(--fan)))
+        translateY(calc(var(--lift) * 0.4))
+        scale(0.93);
+}
+
+.folderSheet[data-depth="1"] {
+    transform:
+        translate(7%, 1%)
+        rotate(calc(5deg + var(--fan)))
+        translateY(calc(var(--lift) * 0.7))
+        scale(0.95);
+}
+
+.folderCover {
+    transform: translateY(var(--lift));
+}
+
+.folderEmpty {
+    position: absolute;
+    left: 23%;
+    right: 5%;
+    top: 4%;
+    bottom: 34%;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+    color: var(--vo-text-3);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* 4. Le rabat avant. Meme famille de couleur que le dos, en plus clair, avec
+      une arete franche en haut: c'est cette arete qui fait lire "les photos
+      sont GLISSEES dedans" plutot que "posees dessus". Le flou derriere laisse
+      deviner le bas des tirages sans le montrer. */
+.folderPocket {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 48%;
+    border-radius: 2px 2px 11px 11px;
+    background: linear-gradient(178deg, rgba(112, 142, 255, 0.34), rgba(74, 104, 224, 0.2));
+    border: 1px solid rgba(91, 124, 250, 0.34);
+    border-top: 1px solid rgba(190, 208, 255, 0.5);
+    backdrop-filter: blur(8px) saturate(1.2);
+    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: var(--vo-space-2);
+}
+
+.folderPocketCount {
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 7px;
+    border-radius: var(--vo-radius-pill);
+    color: var(--vo-text);
+    background: rgba(0, 0, 0, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Le reflet passe en travers du rabat: il donne l'inclinaison de la lumiere,
+   et c'est ce qui empeche l'aplat de couleur de paraitre plat. */
+.folderGloss {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 48%;
+    border-radius: 2px 2px 11px 11px;
+    pointer-events: none;
+    background: linear-gradient(112deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.02) 38%, rgba(255, 255, 255, 0) 62%);
+}
+
+.folderMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 0 2px;
+}
+
+.folderName {
+    margin: 0;
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+    color: var(--vo-text);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folderNameInput {
+    width: 100%;
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--vo-text);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-accent-line);
+    border-radius: var(--vo-radius-sm);
+    padding: 3px 6px;
+}
+
+.folderNameInput:focus {
+    outline: none;
+    border-color: var(--vo-accent);
+}
+
+.folderStats {
+    margin: 0;
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+    color: var(--vo-text-3);
+}
+
+/* Les outils n'apparaissent qu'au survol: une grille de dossiers au repos ne
+   doit montrer que des dossiers. Ils restent atteignables au clavier. */
+.folderTools {
+    position: absolute;
+    top: var(--vo-space-2);
+    right: var(--vo-space-2);
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease);
+}
+
+.folderCard:hover .folderTools,
+.folderCard:focus-within .folderTools {
+    opacity: 1;
+    transform: none;
+}
+
+.folderTool {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--vo-radius-sm);
+    color: var(--vo-text-2);
+    background: rgba(10, 10, 12, 0.72);
+    border: 1px solid var(--vo-line-strong);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+
+.folderTool:hover {
+    color: var(--vo-text);
+    background: rgba(10, 10, 12, 0.9);
+}
+
+.folderCloud {
+    position: absolute;
+    left: var(--vo-space-2);
+    top: var(--vo-space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: var(--vo-radius-pill);
+    font-size: 10px;
+    color: var(--vo-text-2);
+    background: rgba(10, 10, 12, 0.7);
+    border: 1px solid var(--vo-line-strong);
+}
+
+.folderCloud[data-state="synced"] { color: var(--vo-success); }
+.folderCloud[data-state="error"] { color: var(--vo-danger); }
+
+/* La carte "Nouveau dossier": meme empreinte que les autres, en creux. */
+.folderNew {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vo-space-2);
+    aspect-ratio: 4 / 3;
+    border-radius: var(--vo-radius-lg);
+    border: 1px dashed var(--vo-line-strong);
+    background: rgba(255, 255, 255, 0.015);
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-sm);
+    cursor: pointer;
+    transition: color var(--vo-dur-2) var(--vo-ease), border-color var(--vo-dur-2) var(--vo-ease);
+}
+
+.folderNew:hover {
+    color: var(--vo-text);
+    border-color: var(--vo-accent-line);
+}
+
+.folderNewIcon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+}
+
+/* Retour a la vue dossiers, dans la barre d'outils. */
+.backLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    margin-bottom: 1px;
+    border: 0;
+    background: none;
+    color: var(--vo-text-3);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.backLink:hover {
+    color: var(--vo-accent);
+}
+
+/* =========================================================================
+   QUOTA
+   ========================================================================= */
+
+.quota {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 190px;
+}
+
+.quota[data-compact="true"] {
+    min-width: 150px;
+}
+
+.quotaTrack {
+    display: block;
+    height: 4px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-3);
+    overflow: hidden;
+}
+
+.quotaFill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--vo-accent);
+    transition: width var(--vo-dur-4) var(--vo-ease-out);
+}
+
+.quota[data-tone="warn"] .quotaFill { background: var(--vo-warning); }
+.quota[data-tone="full"] .quotaFill { background: var(--vo-danger); }
+
+.quotaLabel {
+    font-family: var(--vo-font-numeric);
+    font-size: 10px;
+    color: var(--vo-text-3);
+}
+
+.quotaDot {
+    padding: 0 5px;
+    color: var(--vo-text-3);
+}
+
+.quotaAlert {
+    margin: 0;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-danger);
+}
+
+/* Bandeau de sauvegarde, sous la barre d'outils. */
+.syncBar {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-2) var(--vo-space-4);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+    background: var(--vo-surface);
+    border-bottom: 1px solid var(--vo-line);
+}
+
+.syncBar[data-tone="danger"] {
+    color: var(--vo-danger);
+    background: var(--vo-danger-quiet);
+}
+
+/* =========================================================================
+   FENETRE D'IMPORT
+   ========================================================================= */
+
+.modalBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: var(--vo-space-4);
+    background: rgba(4, 4, 6, 0.68);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: libFade var(--vo-dur-3) var(--vo-ease) both;
+}
+
+.modal {
+    width: min(520px, 100%);
+    max-height: min(88vh, 760px);
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--vo-radius-xl);
+    background: var(--vo-surface);
+    border: 1px solid var(--vo-line-strong);
+    box-shadow: var(--vo-shadow-3);
+    overflow: hidden;
+    animation: libRise var(--vo-dur-4) var(--vo-ease-out) both;
+}
+
+@keyframes libFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes libRise {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+}
+
+.modalHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-5) var(--vo-space-5) var(--vo-space-3);
+}
+
+.modalTitle {
+    margin: 0;
+    font-size: var(--vo-text-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.modalHint {
+    margin: 2px 0 0;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+.modalClose {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--vo-radius-sm);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-2);
+    cursor: pointer;
+}
+
+.modalClose:hover {
+    color: var(--vo-text);
+    background: var(--vo-surface-3);
+}
+
+.modalBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-5);
+    padding: 0 var(--vo-space-5) var(--vo-space-5);
+    overflow-y: auto;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.fieldLabel {
+    padding: 0;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vo-text-3);
+}
+
+.segment {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface-2);
+    border: 1px solid var(--vo-line);
+}
+
+.segment button {
+    flex: 1 1 auto;
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: none;
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    font-family: inherit;
+    cursor: pointer;
+    transition: background var(--vo-dur-2) var(--vo-ease), color var(--vo-dur-2) var(--vo-ease);
+}
+
+.segment button[data-active="true"] {
+    background: var(--vo-surface-3);
+    color: var(--vo-text);
+}
+
+.segment button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.textInput {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line-strong);
+    background: var(--vo-bg-sunken);
+    color: var(--vo-text);
+    font-family: inherit;
+    font-size: var(--vo-text-sm);
+}
+
+.textInput:focus {
+    outline: none;
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+}
+
+.sourceList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.source {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    width: 100%;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        transform var(--vo-dur-2) var(--vo-ease-out),
+        border-color var(--vo-dur-2) var(--vo-ease),
+        background var(--vo-dur-2) var(--vo-ease);
+}
+
+.source:hover {
+    transform: translateY(-1px);
+    border-color: var(--vo-accent-line);
+    background: var(--vo-surface-3);
+}
+
+.sourceIcon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+}
+
+.sourceText {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.sourceTitle {
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+.sourceHint {
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+.modalDrop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-3);
+}
+
+.modalFoot {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--vo-space-3) var(--vo-space-5);
+    border-top: 1px solid var(--vo-line);
+    background: var(--vo-bg);
+}
+
+/* Le mouvement reduit coupe les apparitions, ici comme pour les tuiles. */
+@media (prefers-reduced-motion: reduce) {
+    .folderCard,
+    .folderSheet,
+    .folderCover,
+    .modal,
+    .modalBackdrop {
+        transition: none !important;
+        animation: none !important;
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .folderGrid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: var(--vo-space-5) var(--vo-space-4);
+    }
+
+    .quota[data-compact="true"] {
+        display: none;
+    }
+}

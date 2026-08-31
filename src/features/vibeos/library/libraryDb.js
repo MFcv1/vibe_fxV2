@@ -8,14 +8,57 @@
  * photos importees, et faire evoluer le schema de l'une ne doit pas forcer une
  * migration de l'autre.
  *
- * Un enregistrement = la photo pleine resolution (Blob), sa vignette (Blob) et
- * ses metadonnees EXIF. Jamais de dataURL: une photo de telephone en base64
- * pese ~33% de plus et sature le quota.
+ * Deux magasins:
+ * - `photos`: la photo pleine resolution (Blob), sa vignette (Blob), ses EXIF
+ *   et le dossier qui la contient. Jamais de dataURL: une photo de telephone en
+ *   base64 pese ~33% de plus et sature le quota.
+ * - `folders`: les dossiers d'import. Un import = un dossier, comme sur un OS.
+ *   C'est la seule unite que l'utilisateur deplace, renomme ou supprime en bloc.
  */
 
 const DB_NAME = 'vibeos-library';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PHOTOS_STORE = 'photos';
+const FOLDERS_STORE = 'folders';
+
+/* Dossier d'accueil des photos importees AVANT l'arrivee des dossiers. Elles
+   ne peuvent pas rester sans parent: l'ecran ne montre que des dossiers. */
+export const LEGACY_FOLDER_ID = 'fd-import-initial';
+const LEGACY_FOLDER_NAME = 'Photos importées';
+
+/*
+ * Migration v1 -> v2: chaque photo deja stockee rejoint le dossier de reprise,
+ * et ce dossier n'est cree que s'il y a vraiment une photo a y mettre - une
+ * bibliotheque vide ne doit pas gagner un dossier fantome.
+ */
+function adoptOrphans(tx) {
+    const photos = tx.objectStore(PHOTOS_STORE);
+    const folders = tx.objectStore(FOLDERS_STORE);
+    let adopted = 0;
+    let oldest = Date.now();
+    photos.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (!cursor) {
+            if (!adopted) return;
+            folders.put({
+                id: LEGACY_FOLDER_ID,
+                name: LEGACY_FOLDER_NAME,
+                createdAt: oldest,
+                updatedAt: Date.now(),
+                source: 'files',
+                coverId: null,
+            });
+            return;
+        }
+        const photo = cursor.value;
+        if (!photo.folderId) {
+            oldest = Math.min(oldest, photo.addedAt || Date.now());
+            adopted += 1;
+            cursor.update({ ...photo, folderId: LEGACY_FOLDER_ID });
+        }
+        cursor.continue();
+    };
+}
 
 function openDb() {
     return new Promise((resolve, reject) => {
@@ -24,13 +67,24 @@ function openDb() {
             return;
         }
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
+        request.onupgradeneeded = (event) => {
             const db = request.result;
-            if (!db.objectStoreNames.contains(PHOTOS_STORE)) {
+            const tx = request.transaction;
+            const fresh = !db.objectStoreNames.contains(PHOTOS_STORE);
+            if (fresh) {
                 const store = db.createObjectStore(PHOTOS_STORE, { keyPath: 'id' });
                 store.createIndex('addedAt', 'addedAt');
                 store.createIndex('device', 'exif.device');
+                store.createIndex('folderId', 'folderId');
+            } else {
+                const store = tx.objectStore(PHOTOS_STORE);
+                if (!store.indexNames.contains('folderId')) store.createIndex('folderId', 'folderId');
             }
+            if (!db.objectStoreNames.contains(FOLDERS_STORE)) {
+                const folders = db.createObjectStore(FOLDERS_STORE, { keyPath: 'id' });
+                folders.createIndex('createdAt', 'createdAt');
+            }
+            if (!fresh && event.oldVersion < 2) adoptOrphans(tx);
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -44,11 +98,13 @@ function requestToPromise(request) {
     });
 }
 
-async function withStore(mode, run) {
+async function withStores(names, mode, run) {
     const db = await openDb();
     try {
-        const tx = db.transaction(PHOTOS_STORE, mode);
-        const result = await run(tx.objectStore(PHOTOS_STORE));
+        const list = Array.isArray(names) ? names : [names];
+        const tx = db.transaction(list, mode);
+        const stores = list.map((name) => tx.objectStore(name));
+        const result = await run(...stores);
         await new Promise((resolve, reject) => {
             tx.oncomplete = resolve;
             tx.onerror = () => reject(tx.error);
@@ -60,12 +116,26 @@ async function withStore(mode, run) {
     }
 }
 
-export function createPhotoId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return `ph-${crypto.randomUUID()}`;
-    }
-    return `ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+function withStore(mode, run) {
+    return withStores(PHOTOS_STORE, mode, run);
 }
+
+export function createPhotoId() {
+    return `ph-${randomSuffix()}`;
+}
+
+export function createFolderId() {
+    return `fd-${randomSuffix()}`;
+}
+
+function randomSuffix() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/* ---------- Photos ---------- */
 
 export async function putPhoto(photo) {
     try {
@@ -112,6 +182,56 @@ export async function clearPhotos() {
         return false;
     }
 }
+
+/* ---------- Dossiers ---------- */
+
+export async function putFolder(folder) {
+    try {
+        await withStores(FOLDERS_STORE, 'readwrite', (store) => requestToPromise(store.put(folder)));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function listFolders() {
+    try {
+        const all = await withStores(FOLDERS_STORE, 'readonly', (store) => requestToPromise(store.getAll()));
+        return (all || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } catch {
+        return [];
+    }
+}
+
+/*
+ * Supprime un dossier ET ses photos, dans une seule transaction: un dossier a
+ * moitie supprime laisserait des photos orphelines, donc invisibles et
+ * impossibles a effacer depuis l'ecran.
+ */
+export async function deleteFolderDeep(folderId) {
+    try {
+        return await withStores([FOLDERS_STORE, PHOTOS_STORE], 'readwrite', async (folders, photos) => {
+            const removed = [];
+            await new Promise((resolve, reject) => {
+                const cursorRequest = photos.index('folderId').openCursor(IDBKeyRange.only(folderId));
+                cursorRequest.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (!cursor) { resolve(); return; }
+                    removed.push(cursor.value.id);
+                    cursor.delete();
+                    cursor.continue();
+                };
+                cursorRequest.onerror = () => reject(cursorRequest.error);
+            });
+            await requestToPromise(folders.delete(folderId));
+            return removed;
+        });
+    } catch {
+        return [];
+    }
+}
+
+/* ---------- Poids ---------- */
 
 /* Poids total occupe, pour l'afficher honnetement a l'utilisateur. */
 export function totalBytes(photos) {

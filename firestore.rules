@@ -40,6 +40,50 @@ service cloud.firestore {
         ]);
     }
 
+    function isLibraryFolderValid(userId) {
+      return ownsUserDoc(userId)
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'createdAt',
+          'updatedAt',
+          'source',
+          'coverId',
+          'ownerUid',
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60;
+    }
+
+    function isLibraryPhotoValid(userId) {
+      return ownsUserDoc(userId)
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'folderId',
+          'name',
+          'bytes',
+          'type',
+          'width',
+          'height',
+          'ratio',
+          'thumbWidth',
+          'thumbHeight',
+          'addedAt',
+          'takenAt',
+          'exif',
+          'preset',
+          'favorite',
+          'previewPath',
+          'previewUrl',
+          'originalPath',
+          'originalUrl',
+          'originalSkipped',
+          'updatedAt',
+        ]);
+    }
+
     function isSoundtrackTrackValid(userId) {
       return ownsUserDoc(userId)
         && request.resource.data.ownerUid == userId
@@ -161,6 +205,22 @@ service cloud.firestore {
       match /rightsManifests/{manifestId} {
         allow read: if ownsUserDoc(userId);
         allow create, update: if isUserRightsManifestValid(userId);
+        allow delete: if ownsUserDoc(userId);
+      }
+
+      // Bibliotheque photo VibeOS: dossiers d'import et fiches de photos.
+      // Donnees strictement personnelles, jamais lisibles par un autre compte.
+      // Le quota (nombre de photos et volume) est tenu cote client: ces regles
+      // garantissent la propriete, pas le plafond.
+      match /libraryFolders/{folderId} {
+        allow read: if ownsUserDoc(userId);
+        allow create, update: if isLibraryFolderValid(userId);
+        allow delete: if ownsUserDoc(userId);
+      }
+
+      match /libraryPhotos/{photoId} {
+        allow read: if ownsUserDoc(userId);
+        allow create, update: if isLibraryPhotoValid(userId);
         allow delete: if ownsUserDoc(userId);
       }
     }

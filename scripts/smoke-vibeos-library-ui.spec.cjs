@@ -2,12 +2,15 @@
  * Smoke de l'ecran Bibliotheque (/creer/bibliotheque).
  *
  * Ce qui est verifie, dans l'ordre du parcours reel:
- *  1. import de plusieurs photos d'un coup, avec persistance IndexedDB;
+ *  1. import de plusieurs photos d'un coup: un DOSSIER est cree, et on entre
+ *     dedans tout de suite;
  *  2. grille masonry: une tuile par photo, aucun chevauchement, rapports gardes;
  *  3. densite: le nombre de colonnes change vraiment;
  *  4. filtres: la recherche reduit la grille;
  *  5. carrousel: ouverture, navigation clavier, fermeture;
- *  6. les photos survivent a un rechargement de page.
+ *  6. retour a la vue dossiers: une carte, son compte de photos, son renommage;
+ *  7. la fenetre d'import propose les bonnes sources et un nom de dossier;
+ *  8. dossiers et photos survivent a un rechargement de page.
  */
 
 const { test, expect } = require("@playwright/test");
@@ -75,7 +78,7 @@ async function readSettledTiles(page) {
   return readTiles(page);
 }
 
-test("bibliotheque VibeOS: import, masonry, densite, carrousel, persistance", async ({ page }) => {
+test("bibliotheque VibeOS: dossiers, import, masonry, densite, carrousel, persistance", async ({ page }) => {
   test.setTimeout(180_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
@@ -85,14 +88,15 @@ test("bibliotheque VibeOS: import, masonry, densite, carrousel, persistance", as
   await page.setViewportSize({ width: 1440, height: 900 });
   await openLibrary(page);
 
-  // Etat vide honnete.
+  // Etat vide honnete: aucun dossier, donc aucune grille.
   await expect(page.getByText("Ta bibliothèque est vide")).toBeVisible({ timeout: 20000 });
 
-  // 1. Import multiple.
+  // 1. Import multiple: un dossier est cree, et on y entre directement.
   await page.getByTestId("vibeos-library-input")
     .setInputFiles(PHOTOS.map((photo) => path.join(dir, photo.file)));
   const tiles = page.getByTestId("vibeos-library-tile");
   await expect(tiles).toHaveCount(PHOTOS.length, { timeout: 60000 });
+  await expect(page.getByTestId("vibeos-library-folder-title")).toBeVisible();
 
   // 2. Masonry: aucune superposition, aucun debordement horizontal.
   const rects = await readSettledTiles(page);
@@ -137,11 +141,41 @@ test("bibliotheque VibeOS: import, masonry, densite, carrousel, persistance", as
   await page.keyboard.press("Escape");
   await expect(lightbox).toBeHidden({ timeout: 10000 });
 
-  // 6. Persistance: les photos sont toujours la apres rechargement.
+  // 6. Retour aux dossiers: une carte, le bon compte, et le renommage tient.
+  await page.getByRole("button", { name: "Bibliothèque" }).click();
+  const folders = page.getByTestId("vibeos-library-folder");
+  await expect(folders).toHaveCount(1, { timeout: 10000 });
+  await expect(folders.first()).toContainText(`${PHOTOS.length} photos`);
+
+  const originalName = (await folders.first().locator("h3").textContent()).trim();
+  await folders.first().getByRole("button", { name: /^Renommer / }).click();
+  const nameField = folders.first().getByRole("textbox");
+  await nameField.fill("Mes essais");
+  await nameField.press("Enter");
+  await expect(folders.first().locator("h3")).toHaveText("Mes essais", { timeout: 10000 });
+  expect(originalName).not.toBe("Mes essais");
+
+  // 7. Fenetre d'import: sources adaptees a l'appareil, nom de dossier propose.
+  await page.getByTestId("vibeos-library-import").click();
+  const sheet = page.getByTestId("vibeos-library-import-sheet");
+  await expect(sheet).toBeVisible({ timeout: 10000 });
+  /* Chromium de bureau: photos ou dossier entier, jamais l'appareil photo. */
+  await expect(page.getByTestId("vibeos-library-source-files")).toBeVisible();
+  await expect(page.getByTestId("vibeos-library-source-directory")).toBeVisible();
+  await expect(page.getByTestId("vibeos-library-source-camera")).toHaveCount(0);
+  await expect(page.getByTestId("vibeos-library-folder-name")).not.toHaveValue("");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden({ timeout: 10000 });
+
+  // 8. Persistance: dossier et photos sont toujours la apres rechargement.
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: /contourner.*authentification/i })
     .click({ timeout: 15000 })
     .catch(() => {});
+  await expect(page.getByTestId("vibeos-library-folder")).toHaveCount(1, { timeout: 30000 });
+  await expect(page.getByTestId("vibeos-library-folder").first()).toContainText("Mes essais");
+  await page.getByTestId("vibeos-library-folder").first()
+    .getByRole("button", { name: /^Ouvrir le dossier / }).click();
   await expect(page.getByTestId("vibeos-library-tile"))
     .toHaveCount(PHOTOS.length, { timeout: 30000 });
 });

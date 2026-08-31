@@ -15,6 +15,12 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|jpg|png|webp|avif)');
     }
 
+    function isSafeLibraryUpload(maxBytes) {
+      return request.resource != null
+        && request.resource.size <= maxBytes
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp|avif|gif|heic|heif|tiff)');
+    }
+
     function isSafeAudioUpload(maxBytes) {
       return request.resource != null
         && request.resource.size <= maxBytes
@@ -38,6 +44,17 @@ service firebase.storage {
       allow get: if ownsPath(userId);
       allow list: if false;
       allow create, update: if ownsPath(userId) && isSafeImageUpload(20 * 1024 * 1024);
+      allow delete: if ownsPath(userId);
+    }
+
+    // Bibliotheque photo VibeOS: un dossier par photo, avec l'apercu 1600 px
+    // (affiche par la grille) et l'original (rapatrie a la retouche). La borne
+    // a 25 Mo est la meme que celle appliquee cote client: au-dela, seul
+    // l'apercu est sauvegarde et la photo le dit.
+    match /users/{userId}/library/{photoId}/{fileName} {
+      allow get: if ownsPath(userId);
+      allow list: if false;
+      allow create, update: if ownsPath(userId) && isSafeLibraryUpload(25 * 1024 * 1024);
       allow delete: if ownsPath(userId);
     }
 

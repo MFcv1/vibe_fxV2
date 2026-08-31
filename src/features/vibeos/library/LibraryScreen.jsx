@@ -5,11 +5,14 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    Camera, Check, Grid2x2, Images, Minus, Plus, Trash2, Upload, Wand2, X,
+    Camera, Check, ChevronLeft, FolderPlus, Grid2x2, Images, Minus, Plus, Trash2, Upload, Wand2, X,
 } from 'lucide-react';
 import { Button, SearchField, useToast } from '../primitives';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
 import Lightbox from './Lightbox';
+import FolderCard from './FolderCard';
+import ImportSheet, { QuotaBar } from './ImportSheet';
+import useLibrarySync from './useLibrarySync';
 import { DENSITY_MAX, DENSITY_MIN, layoutMasonry, resolveColumns } from './masonry';
 import { formatBytes, totalBytes } from './libraryDb';
 import { ACCEPTED_TYPES, deviceLabel } from './photoImport';
@@ -17,7 +20,13 @@ import useLibrary, { SORTS, thumbUrl } from './useLibrary';
 import styles from './library.module.css';
 
 /*
- * Bibliotheque photo - la grille masonry de VibeOS.
+ * Bibliotheque photo VibeOS - dossiers, puis grille masonry.
+ *
+ * Deux vues dans un seul ecran, parce que c'est un seul lieu: la vue DOSSIERS
+ * (ce qu'on possede, range par import) et la vue GRILLE (l'interieur d'un
+ * dossier). Entrer dans un dossier ne change pas de page: la barre d'outils
+ * change de role, la grille prend la place des cartes, et le carrousel reste
+ * exactement le meme.
  *
  * Ce que l'ecran garantit :
  * - les photos importees restent (IndexedDB), on ne re-importe jamais deux fois;
@@ -229,14 +238,58 @@ const Tile = React.memo(function Tile({
     );
 });
 
-function Toolbar({
-    count, weight, density, onDensity, devices, deviceFilter, onDeviceFilter,
-    presets, presetFilter, onPresetFilter, sort, onSort, search, onSearch, onImport,
-}) {
+
+/* Barre du dessus, vue DOSSIERS: ce qu'on possede et par ou on entre. */
+function FolderToolbar({ folderCount, photoCount, weight, quota, search, onSearch, onImport }) {
     return (
         <header className={styles.toolbar}>
             <div className={styles.toolbarLead}>
                 <span className={styles.wordmark}>Bibliothèque</span>
+                <span className={styles.toolbarCount} data-numeric>
+                    {folderCount} dossier{folderCount > 1 ? 's' : ''} · {photoCount} photo{photoCount > 1 ? 's' : ''} · {weight}
+                </span>
+            </div>
+
+            <div className={styles.toolbarMain}>
+                <SearchField
+                    value={search}
+                    onChange={onSearch}
+                    placeholder="Chercher un dossier"
+                    label="Chercher un dossier"
+                    className={styles.toolbarSearch}
+                />
+                <QuotaBar quota={quota} compact />
+            </div>
+
+            <Button
+                variant="primary"
+                size="sm"
+                icon={<Upload size={13} />}
+                onClick={onImport}
+                data-testid="vibeos-library-import"
+            >
+                Importer
+            </Button>
+        </header>
+    );
+}
+
+/* Barre du dessus, vue GRILLE: on est dans un dossier, on le dit, et on garde
+   tous les reglages de lecture de la grille. */
+function Toolbar({
+    folder, count, weight, density, onDensity, devices, deviceFilter, onDeviceFilter,
+    presets, presetFilter, onPresetFilter, sort, onSort, search, onSearch, onImport, onBack,
+}) {
+    return (
+        <header className={styles.toolbar}>
+            <div className={styles.toolbarLead}>
+                <button type="button" className={styles.backLink} onClick={onBack}>
+                    <ChevronLeft size={14} />
+                    Bibliothèque
+                </button>
+                <span className={styles.wordmark} data-testid="vibeos-library-folder-title">
+                    {folder ? folder.name : 'Toutes les photos'}
+                </span>
                 <span className={styles.toolbarCount} data-numeric>
                     {count} photo{count > 1 ? 's' : ''} · {weight}
                 </span>
@@ -339,11 +392,18 @@ export default function LibraryScreen() {
     const { createProject } = useVibeOsProject();
     const library = useLibrary();
     const {
-        visible, photos, status, importState, devices, presets,
+        visible, photos, folders, folderCards, folderPhotos, status, importState,
+        devices, presets, quota,
+        activeFolderId, setActiveFolderId, activeFolder,
         search, setSearch, deviceFilter, setDeviceFilter,
         presetFilter, setPresetFilter, sort, setSort,
-        importFiles, removePhoto, removeAll, ensurePreview,
+        importFiles, renameFolder, removeFolder,
+        removePhoto, removeAll, ensurePreview,
     } = library;
+
+    /* Sauvegarde dans le compte utilisateur. Le hook ne fait rien tant que
+       personne n'est connecte: la bibliotheque reste utilisable hors ligne. */
+    const sync = useLibrarySync(library);
 
     /* Densite relue au premier rendu client. Le rendu serveur part de 4: sans
        photo ni largeur mesuree, la grille est vide des deux cotes, donc aucune
@@ -361,11 +421,14 @@ export default function LibraryScreen() {
     const [zoomedOut, setZoomedOut] = useState(false);
     const [selection, setSelection] = useState(() => new Set());
     const [isDropping, setIsDropping] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
 
     const gridRef = useRef(null);
     const gridObserver = useRef(null);
     const inputRef = useRef(null);
     const dragDepth = useRef(0);
+
+    const inFolder = Boolean(activeFolderId);
 
     /* Un seul observateur pour toute la grille, cree au premier rendu client. */
     const [revealer] = useState(createRevealer);
@@ -440,6 +503,30 @@ export default function LibraryScreen() {
         gridObserver.current = observer;
     }, []);
 
+    /*
+     * Pastille de sauvegarde des dossiers. Elle n'existe que si un compte est
+     * connecte: sans compte, annoncer "non sauvegarde" sur chaque dossier
+     * serait un reproche permanent pour un service que l'utilisateur n'a pas
+     * demande.
+     */
+    const cards = useMemo(() => folderCards.map((folder) => {
+        if (!sync.enabled || !folder.count) return folder;
+        if (folder.errorCount) {
+            return { ...folder, cloudBadge: { state: 'error', label: 'Échec', title: 'La sauvegarde a échoué' } };
+        }
+        if (folder.syncedCount >= folder.count) {
+            return { ...folder, cloudBadge: { state: 'synced', label: 'Sauvegardé', title: 'Copié dans ton compte' } };
+        }
+        return {
+            ...folder,
+            cloudBadge: {
+                state: 'syncing',
+                label: `${folder.syncedCount}/${folder.count}`,
+                title: 'Sauvegarde en cours',
+            },
+        };
+    }), [folderCards, sync.enabled]);
+
     const columns = resolveColumns(density, containerWidth);
     const { rects, height } = useMemo(
         () => layoutMasonry(visible, { containerWidth, columns, gap: GAP }),
@@ -447,16 +534,27 @@ export default function LibraryScreen() {
     );
 
     /* ---------- Import ---------- */
-    const handleFiles = useCallback(async (files) => {
-        const { added, skipped } = await importFiles(files);
-        if (added && skipped) {
+    const handleFiles = useCallback(async (files, options = {}) => {
+        const result = await importFiles(files, options);
+        const { added, skipped, message, folderId } = result;
+        if (result.blocked) {
+            push(message, { tone: 'danger', duration: 6000 });
+            return result;
+        }
+        /* On entre dans le dossier des la fin de l'import: on veut voir ce
+           qu'on vient d'importer, pas une carte de plus. */
+        if (added && folderId) setActiveFolderId(folderId);
+        if (message) {
+            push(message, { tone: 'danger', duration: 6000 });
+        } else if (added && skipped) {
             push(`${added} photo(s) ajoutée(s), ${skipped} illisible(s) par ce navigateur.`, { tone: 'success' });
         } else if (added) {
             push(`${added} photo${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''}.`, { tone: 'success' });
         } else if (skipped) {
             push(`${skipped} fichier(s) illisible(s) : essaie en JPEG ou PNG.`, { tone: 'danger' });
         }
-    }, [importFiles, push]);
+        return result;
+    }, [importFiles, push, setActiveFolderId]);
 
     /* Depot de fichiers n'importe ou sur l'ecran. Le compteur de profondeur
        evite le clignotement quand le curseur passe au-dessus d'un enfant. */
@@ -470,11 +568,15 @@ export default function LibraryScreen() {
         dragDepth.current = Math.max(0, dragDepth.current - 1);
         if (!dragDepth.current) setIsDropping(false);
     };
+    /* Un depot dans un dossier ouvert y ajoute les photos; un depot sur la vue
+       dossiers en cree un nouveau, date du jour. */
     const onDrop = (event) => {
         event.preventDefault();
         dragDepth.current = 0;
         setIsDropping(false);
-        if (event.dataTransfer?.files?.length) handleFiles(event.dataTransfer.files);
+        if (event.dataTransfer?.files?.length) {
+            handleFiles(event.dataTransfer.files, activeFolderId ? { folderId: activeFolderId } : {});
+        }
     };
 
     /* ---------- Selection ---------- */
@@ -492,25 +594,59 @@ export default function LibraryScreen() {
         if (!ids.length) return;
         if (!window.confirm(`Supprimer ${ids.length} photo(s) de la bibliothèque ?`)) return;
         await removeAll(ids);
+        await sync.forgetPhotos(ids);
         setSelection(new Set());
         push('Photos supprimées.');
-    }, [selection, removeAll, push]);
+    }, [selection, removeAll, sync, push]);
+
+    /* ---------- Dossiers ---------- */
+    const openFolder = useCallback((folderId) => {
+        setSearch('');
+        setDeviceFilter('all');
+        setPresetFilter('all');
+        setSelection(new Set());
+        setActiveFolderId(folderId);
+    }, [setActiveFolderId, setSearch, setDeviceFilter, setPresetFilter]);
+
+    const backToFolders = useCallback(() => {
+        setSearch('');
+        setSelection(new Set());
+        setActiveFolderId(null);
+    }, [setActiveFolderId, setSearch]);
+
+    const handleFolderDelete = useCallback(async (folder) => {
+        const label = folder.count
+            ? `Supprimer « ${folder.name} » et ses ${folder.count} photo(s) ?`
+            : `Supprimer « ${folder.name} » ?`;
+        if (!window.confirm(label)) return;
+        const removed = await removeFolder(folder.id);
+        await sync.forgetFolder(folder.id, removed);
+        push('Dossier supprimé.');
+    }, [removeFolder, sync, push]);
 
     /* ---------- Retouche ---------- */
     const openInVision = useCallback(async (photo) => {
+        /* Une photo encore uniquement dans le compte n'a pas de fichier ici: on
+           le rapatrie avant d'ouvrir Vision, sinon l'editeur ouvrirait du vide. */
+        const ready = photo.blob ? photo : await sync.hydrate(photo);
+        if (!ready?.blob) {
+            push('Photo indisponible hors ligne.', { tone: 'danger' });
+            return;
+        }
         /* Un nouvel espace par photo: retoucher une photo ne doit jamais ecraser
            la composition en cours dans Layout. */
         await createProject({
-            title: photo.name,
-            images: [{ id: photo.id, name: photo.name, slotId: null, blob: photo.blob }],
+            title: ready.name,
+            images: [{ id: ready.id, name: ready.name, slotId: null, blob: ready.blob }],
             thumbnail: null,
         });
         router.push('/creer/vision');
-    }, [createProject, router]);
+    }, [createProject, router, sync, push]);
 
     const handleDelete = useCallback(async (photo) => {
         if (!window.confirm(`Supprimer « ${photo.name} » ?`)) return;
         await removePhoto(photo.id);
+        await sync.forgetPhotos([photo.id]);
         /* Si le carrousel est ouvert: il se ferme sur la derniere photo, sinon
            il reste sur la place liberee (donc sur la photo suivante). */
         setLightboxIndex((current) => {
@@ -523,7 +659,7 @@ export default function LibraryScreen() {
             }
             return Math.min(current, visible.length - 2);
         });
-    }, [removePhoto, visible.length]);
+    }, [removePhoto, sync, visible.length]);
 
     /*
      * Position de la grille relevee A L'OUVERTURE, quand elle est encore a
@@ -560,19 +696,23 @@ export default function LibraryScreen() {
 
     const closeLightbox = useCallback(() => setLightboxIndex(-1), []);
 
-    const weight = formatBytes(totalBytes(photos));
-    const isEmpty = status === 'ready' && !photos.length;
+    const weight = formatBytes(totalBytes(inFolder ? folderPhotos : photos));
+    const noFolder = status === 'ready' && !folders.length;
 
     return (
         <div
             className={styles.screen}
             data-testid="vibeos-library-screen"
+            data-view={inFolder ? 'gallery' : 'folders'}
             data-lightbox={zoomedOut ? 'true' : 'false'}
             onDragEnter={onDragEnter}
             onDragOver={(event) => event.preventDefault()}
             onDragLeave={onDragLeave}
             onDrop={onDrop}
         >
+            {/* Entree directe, sans fenetre: le depot de fichiers et les tests
+                passent par ici. La fenetre d'import a son propre input, parce
+                qu'elle doit changer ses attributs selon la source choisie. */}
             <input
                 ref={inputRef}
                 type="file"
@@ -580,29 +720,43 @@ export default function LibraryScreen() {
                 multiple
                 className={styles.hiddenInput}
                 onChange={(event) => {
-                    handleFiles(event.target.files);
+                    handleFiles(event.target.files, activeFolderId ? { folderId: activeFolderId } : {});
                     event.target.value = '';
                 }}
                 data-testid="vibeos-library-input"
             />
 
-            <Toolbar
-                count={photos.length}
-                weight={weight}
-                density={density}
-                onDensity={changeDensity}
-                devices={devices}
-                deviceFilter={deviceFilter}
-                onDeviceFilter={setDeviceFilter}
-                presets={presets}
-                presetFilter={presetFilter}
-                onPresetFilter={setPresetFilter}
-                sort={sort}
-                onSort={setSort}
-                search={search}
-                onSearch={setSearch}
-                onImport={() => inputRef.current?.click()}
-            />
+            {inFolder ? (
+                <Toolbar
+                    folder={activeFolder}
+                    count={folderPhotos.length}
+                    weight={weight}
+                    density={density}
+                    onDensity={changeDensity}
+                    devices={devices}
+                    deviceFilter={deviceFilter}
+                    onDeviceFilter={setDeviceFilter}
+                    presets={presets}
+                    presetFilter={presetFilter}
+                    onPresetFilter={setPresetFilter}
+                    sort={sort}
+                    onSort={setSort}
+                    search={search}
+                    onSearch={setSearch}
+                    onImport={() => setImportOpen(true)}
+                    onBack={backToFolders}
+                />
+            ) : (
+                <FolderToolbar
+                    folderCount={folders.length}
+                    photoCount={photos.length}
+                    weight={weight}
+                    quota={quota}
+                    search={search}
+                    onSearch={setSearch}
+                    onImport={() => setImportOpen(true)}
+                />
+            )}
 
             {importState ? (
                 <div className={styles.importBar} role="status">
@@ -612,7 +766,15 @@ export default function LibraryScreen() {
                     />
                     <span className={styles.importLabel} data-numeric>
                         Import {importState.done}/{importState.total}
+                        {importState.folderName ? ` · ${importState.folderName}` : ''}
                     </span>
+                </div>
+            ) : null}
+
+            {sync.banner ? (
+                <div className={styles.syncBar} role="status" data-tone={sync.banner.tone}>
+                    {sync.banner.icon}
+                    <span>{sync.banner.label}</span>
                 </div>
             ) : null}
 
@@ -621,25 +783,52 @@ export default function LibraryScreen() {
                 <span className={styles.topVeil} aria-hidden="true" />
 
                 <div className={styles.body}>
-                    {isEmpty ? (
+                    {!inFolder && noFolder ? (
                         <div className={styles.empty}>
                             <span className={styles.emptyIcon} aria-hidden="true"><Images size={26} /></span>
                             <h2 className={styles.emptyTitle}>Ta bibliothèque est vide</h2>
                             <p className={styles.emptyBody}>
-                                Dépose tes photos ici, ou importe un dossier entier. Elles restent
-                                enregistrées sur cet appareil : tu les retrouves à chaque ouverture,
-                                sans jamais les réimporter.
+                                Chaque import crée un dossier, avec son nom et son compte de photos.
+                                Dépose tes photos ici, ou choisis-les dans ton appareil : elles restent
+                                enregistrées, tu les retrouves à chaque ouverture.
                             </p>
                             <Button
                                 variant="primary"
                                 size="lg"
                                 icon={<Upload size={15} />}
-                                onClick={() => inputRef.current?.click()}
+                                onClick={() => setImportOpen(true)}
                             >
                                 Importer des photos
                             </Button>
                         </div>
-                    ) : (
+                    ) : null}
+
+                    {!inFolder && !noFolder ? (
+                        <div className={styles.folderGrid} data-testid="vibeos-library-folders">
+                            {cards.map((folder, folderIndex) => (
+                                <FolderCard
+                                    key={folder.id}
+                                    folder={folder}
+                                    position={folderIndex}
+                                    revealer={revealer}
+                                    onOpen={openFolder}
+                                    onRename={renameFolder}
+                                    onDelete={handleFolderDelete}
+                                />
+                            ))}
+                            <button
+                                type="button"
+                                className={styles.folderNew}
+                                onClick={() => setImportOpen(true)}
+                                data-testid="vibeos-library-new-folder"
+                            >
+                                <span className={styles.folderNewIcon}><FolderPlus size={20} /></span>
+                                <span>Nouveau dossier</span>
+                            </button>
+                        </div>
+                    ) : null}
+
+                    {inFolder ? (
                         <div
                             ref={attachGrid}
                             className={styles.grid}
@@ -666,10 +855,32 @@ export default function LibraryScreen() {
                                 );
                             })}
                         </div>
-                    )}
+                    ) : null}
 
-                    {status === 'ready' && photos.length > 0 && visible.length === 0 ? (
+                    {inFolder && folderPhotos.length > 0 && visible.length === 0 ? (
                         <p className={styles.noMatch}>Aucune photo ne correspond à ce filtre.</p>
+                    ) : null}
+
+                    {inFolder && status === 'ready' && folderPhotos.length === 0 ? (
+                        <div className={styles.empty}>
+                            <span className={styles.emptyIcon} aria-hidden="true"><Images size={26} /></span>
+                            <h2 className={styles.emptyTitle}>Ce dossier est vide</h2>
+                            <p className={styles.emptyBody}>
+                                Ajoute des photos ici : elles rejoindront « {activeFolder?.name} ».
+                            </p>
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                icon={<Upload size={15} />}
+                                onClick={() => setImportOpen(true)}
+                            >
+                                Importer des photos
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    {!inFolder && !noFolder && folderCards.length === 0 ? (
+                        <p className={styles.noMatch}>Aucun dossier ne correspond à cette recherche.</p>
                     ) : null}
                 </div>
             </div>
@@ -690,9 +901,21 @@ export default function LibraryScreen() {
 
             {isDropping ? (
                 <div className={styles.dropVeil} aria-hidden="true">
-                    <span><Upload size={20} /> Dépose tes photos</span>
+                    <span>
+                        <Upload size={20} />
+                        {activeFolder ? `Ajouter à « ${activeFolder.name} »` : 'Dépose tes photos'}
+                    </span>
                 </div>
             ) : null}
+
+            <ImportSheet
+                open={importOpen}
+                onClose={() => setImportOpen(false)}
+                folders={folderCards}
+                quota={quota}
+                defaultFolderId={activeFolderId}
+                onFiles={handleFiles}
+            />
 
             {lightboxIndex >= 0 && visible[lightboxIndex] ? (
                 <Lightbox

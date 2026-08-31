@@ -111,6 +111,15 @@ try {
     const masonryModule = await importAppModule(
         p("src", "features", "vibeos", "library", "masonry.js"), "masonry",
     );
+    const namingModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "folderNaming.js"), "folderNaming",
+    );
+    const quotaModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "libraryQuota.js"), "libraryQuota",
+    );
+    const platformModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "platform.js"), "platform",
+    );
 
     /* ---------- 1. Lecture EXIF ---------- */
     console.log("EXIF");
@@ -215,6 +224,129 @@ try {
         assert.equal(masonryModule.resolveColumns(8, 360), 3);
         assert.equal(masonryModule.resolveColumns(4, 1200), 4);
         assert.equal(masonryModule.resolveColumns(8, 0), 8);
+    });
+
+    /* ---------- 3. Nommage des dossiers ---------- */
+    console.log("Dossiers");
+    const { directoryNameOf, sanitizeFolderName, suggestFolderName, uniqueFolderName } = namingModule;
+
+    check("un dossier choisi donne son nom", () => {
+        assert.equal(directoryNameOf([
+            { webkitRelativePath: "Vacances 2026/a.jpg" },
+            { webkitRelativePath: "Vacances 2026/b.jpg" },
+        ]), "Vacances 2026");
+    });
+
+    check("des fichiers isoles n'inventent aucun nom de dossier", () => {
+        assert.equal(directoryNameOf([{ name: "a.jpg" }, { name: "b.jpg" }]), "");
+    });
+
+    check("deux dossiers sources differents ne se melangent pas", () => {
+        assert.equal(directoryNameOf([
+            { webkitRelativePath: "ete/a.jpg" },
+            { webkitRelativePath: "hiver/b.jpg" },
+        ]), "");
+    });
+
+    check("un nom saisi est nettoye, jamais recopie tel quel", () => {
+        assert.equal(sanitizeFolderName("  mes/photos:2026  "), "mes photos 2026");
+        assert.equal(sanitizeFolderName("a".repeat(120)).length, 60);
+        assert.equal(sanitizeFolderName("   "), "");
+    });
+
+    check("un nom deja pris recoit un suffixe, comme sur un bureau", () => {
+        assert.equal(uniqueFolderName("Ete", ["Ete"]), "Ete (2)");
+        assert.equal(uniqueFolderName("Ete", ["Ete", "Ete (2)"]), "Ete (3)");
+        assert.equal(uniqueFolderName("Ete", ["Autre"]), "Ete");
+    });
+
+    check("la comparaison des noms ignore la casse et les accents", () => {
+        assert.equal(uniqueFolderName("Été", ["ete"]), "Été (2)");
+    });
+
+    check("sans dossier source, le nom propose est la date du jour", () => {
+        const at = new Date(2026, 7, 31, 12).getTime();
+        assert.equal(suggestFolderName({ files: [{ name: "a.jpg" }], taken: [], at }), "31 août 2026");
+    });
+
+    /* ---------- 4. Quota ---------- */
+    console.log("Quota");
+    const { LIBRARY_QUOTA, checkImport, quotaState } = quotaModule;
+
+    check("une bibliotheque vide n'est ni pleine ni en alerte", () => {
+        const state = quotaState({ photoCount: 0, bytes: 0 });
+        assert.equal(state.full, false);
+        assert.equal(state.warning, false);
+        assert.equal(state.photosLeft, LIBRARY_QUOTA.photos);
+    });
+
+    check("le plafond qui parle est celui qui est le plus proche", () => {
+        const state = quotaState({ photoCount: 10, bytes: LIBRARY_QUOTA.bytes * 0.9 });
+        assert.equal(state.driver, "bytes");
+        assert.equal(state.warning, true);
+    });
+
+    check("un import qui depasse le nombre de photos est coupe net", () => {
+        const files = Array.from({ length: 5 }, () => ({ size: 1024 }));
+        const gate = checkImport({ photoCount: LIBRARY_QUOTA.photos - 2, bytes: 0, files });
+        assert.equal(gate.accepted, 2);
+        assert.equal(gate.rejected, 3);
+        assert.equal(gate.blockedBy, "photos");
+        assert.match(gate.message, /1000 photos/);
+    });
+
+    check("un import qui depasse le volume est coupe net", () => {
+        const files = Array.from({ length: 3 }, () => ({ size: LIBRARY_QUOTA.bytes / 2 }));
+        const gate = checkImport({ photoCount: 0, bytes: 0, files });
+        assert.equal(gate.accepted, 2);
+        assert.equal(gate.blockedBy, "bytes");
+    });
+
+    check("bibliotheque pleine: rien ne passe, et on le dit", () => {
+        const gate = checkImport({ photoCount: LIBRARY_QUOTA.photos, bytes: 0, files: [{ size: 10 }] });
+        assert.equal(gate.ok, false);
+        assert.equal(gate.accepted, 0);
+        assert.match(gate.message, /pleine/);
+    });
+
+    /* ---------- 5. Reconnaissance de l'appareil ---------- */
+    console.log("Appareil");
+    const { detectPlatform, importSources, isMobilePlatform } = platformModule;
+
+    const asNav = (userAgent, maxTouchPoints = 0) => ({ userAgent, maxTouchPoints });
+
+    check("un iPhone est reconnu", () => {
+        assert.equal(detectPlatform(asNav("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)")).id, "ios");
+    });
+
+    check("un Android est reconnu", () => {
+        assert.equal(detectPlatform(asNav("Mozilla/5.0 (Linux; Android 14; Pixel 8)")).id, "android");
+    });
+
+    check("un Mac est reconnu", () => {
+        assert.equal(detectPlatform(asNav("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).id, "macos");
+    });
+
+    check("un iPad qui se declare Macintosh est rattrape par le tactile", () => {
+        assert.equal(detectPlatform(asNav("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 5)).id, "ios");
+    });
+
+    check("Windows est reconnu", () => {
+        assert.equal(detectPlatform(asNav("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).id, "windows");
+    });
+
+    check("le telephone se voit proposer la photothèque et l'appareil photo", () => {
+        const sources = importSources(detectPlatform(asNav("iPhone")));
+        assert.deepEqual(sources.map((source) => source.id), ["gallery", "camera", "files"]);
+        assert.equal(sources[1].input.capture, "environment");
+    });
+
+    check("l'ordinateur se voit proposer le dossier entier, pas l'appareil photo", () => {
+        const platform = detectPlatform(asNav("Mozilla/5.0 (Windows NT 10.0)"));
+        const sources = importSources(platform);
+        assert.deepEqual(sources.map((source) => source.id), ["files", "directory"]);
+        assert.equal(sources[1].input.webkitdirectory, true);
+        assert.equal(isMobilePlatform(platform), false);
     });
 } finally {
     await rm(tempDir, { recursive: true, force: true });
