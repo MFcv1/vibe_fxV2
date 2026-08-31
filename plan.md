@@ -4,6 +4,13 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Correctif Storage/Safari du 2026-08-31 : le bucket Bibliothèque porte enfin
+> un CORS explicite pour App Hosting, les domaines Firebase et localhost. Le
+> rapatriement utilise le chemin Storage authentifié avant l'URL tokenisée. Si
+> un aperçu échoue, le carrousel essaie l'original et ne laisse jamais Safari
+> dessiner son icône d'image cassée. Les objets existants n'ont été ni modifiés
+> ni remplacés.
+
 > Correctif Bibliothèque du 2026-08-31 : « Retoucher » depuis le carrousel
 > ouvre Vision dès que le fichier distant est disponible. La régénération de
 > vignette et la persistance IndexedDB ne bloquent plus la navigation ; un état

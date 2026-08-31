@@ -4,7 +4,7 @@ import {
     collection, deleteDoc, doc, onSnapshot, setDoc,
 } from 'firebase/firestore';
 import {
-    deleteObject, getDownloadURL, ref, uploadBytes,
+    deleteObject, getBlob, getDownloadURL, ref, uploadBytes,
 } from 'firebase/storage';
 import { auth, db, firebaseReady, storage } from '@/lib/firebase';
 
@@ -166,7 +166,19 @@ export function subscribeLibrary(uid, { onFolders, onPhotos, onError }) {
 }
 
 /* Rapatrie le fichier d'origine d'une photo qui n'existe que dans le compte. */
-export async function fetchBlob(url) {
+export async function fetchBlob(url, storagePath = null) {
+    /* Le chemin Storage est la source la plus durable : il passe par le SDK,
+       l'utilisateur Firebase et les règles owner-scoped. L'URL avec token
+       reste le repli pour les anciennes fiches qui ne portaient pas encore le
+       chemin. Les deux requêtes exigent le CORS du bucket sur App Hosting. */
+    if (storagePath && storage) {
+        try {
+            return await getBlob(ref(storage, storagePath));
+        } catch {
+            /* Une ancienne fiche ou un objet déplacé peut encore avoir une URL
+               valide : on la tente avant de déclarer la photo absente. */
+        }
+    }
     if (!url) return null;
     const response = await fetch(url);
     if (!response.ok) return null;

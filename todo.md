@@ -6,6 +6,18 @@
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
 >
+> **2026-08-31 — régression Safari Storage diagnostiquée et corrigée.** Le
+> bucket `vibefx-v2.firebasestorage.app` n'avait aucune configuration CORS :
+> les objets et leurs URLs étaient valides (37 originaux + 37 aperçus, HTTP
+> 200), mais Safari interdisait leur téléchargement JavaScript depuis App
+> Hosting. Le CORS explicite est maintenant appliqué au bucket et vérifié sur
+> `IMG_0421.JPG`. Le code télécharge d'abord par le chemin Firebase Storage
+> owner-scoped, garde l'URL tokenisée en repli, et le carrousel remplace un
+> aperçu cassé par l'original puis démonte l'image si les deux échouent : plus
+> d'icône « ? ». Gates : bibliothèque 36/36 + navigateur 1/1 avec aperçu
+> volontairement absent, lint sans erreur (5 avertissements préexistants),
+> build Node 22 vert. Déploiement front à faire dans ce lot.
+>
 > **2026-08-31 — carrousel Bibliothèque vers Vision corrigé localement.** Pour
 > une photo présente seulement dans le compte, « Retoucher » attendait le
 > décodage, la nouvelle vignette et sa copie IndexedDB avant de naviguer ; sur

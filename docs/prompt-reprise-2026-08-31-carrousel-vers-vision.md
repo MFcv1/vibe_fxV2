@@ -36,3 +36,18 @@ réel, `IMG_0421.JPG` a été ouverte dans le carrousel puis « Retoucher » a m
 La connexion Google Safari reste un chantier distinct : ne pas supposer qu'elle
 est close uniquement à partir des notes précédentes ; la retester sur le live
 si l'utilisateur la remet dans le scope.
+
+## Correctif Safari Storage ajouté ensuite
+
+Le premier rollout ne suffisait pas sur un navigateur sans copie locale : le
+bucket n'avait aucun CORS. Les 37 originaux et 37 aperçus étaient intacts et
+répondaient 200, mais Safari refusait `fetch()` depuis App Hosting.
+
+`storage.cors.json` est appliqué au bucket et l'en-tête CORS exact a été vérifié
+sur `IMG_0421.JPG`. Le client lit désormais par chemin Firebase Storage
+authentifié avant l'URL tokenisée. Le carrousel retente l'original si l'aperçu
+échoue et démonte l'image après deux échecs, donc plus d'icône « ? ».
+
+Gates locales : bibliothèque 36/36, navigateur 1/1 avec aperçu 404 volontaire,
+lint sans erreur, build Node 22 vert. Le front de ce second correctif doit être
+déployé puis retesté dans Safari après rechargement.

@@ -125,7 +125,13 @@ function slideSize(photo, stageW, stageH) {
  */
 function Slide({ photo, position, distance, width, height, onNeedPixels }) {
     const [fullState, setFullState] = useState('idle'); // idle | ready | failed
+    const [thumbState, setThumbState] = useState('preview'); // preview | original | failed
     const centre = distance < 0.5;
+    const previewSrc = thumbUrl(photo);
+    const originalSrc = fullUrl(photo);
+    const thumbSrc = thumbState === 'preview'
+        ? previewSrc
+        : (thumbState === 'original' ? originalSrc : null);
 
     /* L'apercu stocke peut dater d'avant le passage a 1600 px: on le refait
        demander ici aussi, sinon les voisines resteraient molles pour toujours. */
@@ -147,16 +153,32 @@ function Slide({ photo, position, distance, width, height, onNeedPixels }) {
         >
             <div className={styles.slideEnter} data-enter>
                 <div className={styles.slideFrame}>
-                    <img
-                        src={thumbUrl(photo)}
-                        alt=""
-                        aria-hidden="true"
-                        className={styles.slideThumb}
-                        onLoad={askForPixels}
-                    />
+                    {thumbSrc ? (
+                        <img
+                            src={thumbSrc}
+                            alt=""
+                            aria-hidden="true"
+                            className={styles.slideThumb}
+                            data-testid="vibeos-library-lightbox-thumb"
+                            data-source={thumbState}
+                            onLoad={askForPixels}
+                            onError={() => {
+                                /* Safari dessine une icone « ? » dans un <img>
+                                   casse, meme avec alt="". On essaie l'original
+                                   si l'apercu a eu un echec transitoire, puis on
+                                   demonte l'element plutot que d'afficher cette
+                                   icone par-dessus le carrousel. */
+                                setThumbState((current) => (
+                                    current === 'preview' && originalSrc && originalSrc !== previewSrc
+                                        ? 'original'
+                                        : 'failed'
+                                ));
+                            }}
+                        />
+                    ) : null}
                     {centre ? (
                         <img
-                            src={fullUrl(photo)}
+                            src={originalSrc}
                             alt=""
                             aria-hidden="true"
                             className={styles.slideFull}

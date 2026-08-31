@@ -210,10 +210,16 @@ export default function useLibrarySync(library) {
         /* L'URL de l'original peut avoir expire alors que l'apercu reste
            disponible. On tente les deux, dans cet ordre, afin que Retoucher ne
            reste jamais bloque sur une seule URL distante devenue invalide. */
-        const sources = [...new Set([photo.originalUrl, photo.previewUrl].filter(Boolean))];
+        const sources = [
+            { url: photo.originalUrl, path: photo.cloud?.originalPath },
+            { url: photo.previewUrl, path: photo.cloud?.previewPath },
+        ].filter((source, index, list) => (
+            (source.url || source.path)
+            && list.findIndex((item) => item.url === source.url && item.path === source.path) === index
+        ));
         let blob = null;
         for (const source of sources) {
-            blob = await fetchBlob(source).catch(() => null);
+            blob = await fetchBlob(source.url, source.path).catch(() => null);
             if (blob) break;
         }
         if (!blob) return photo;

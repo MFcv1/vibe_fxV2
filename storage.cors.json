@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://vibefx-v2-web--vibefx-v2.europe-west4.hosted.app",
+      "https://vibefx-v2.web.app",
+      "https://vibefx-v2.firebaseapp.com",
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "ETag"],
+    "maxAgeSeconds": 3600
+  }
+]

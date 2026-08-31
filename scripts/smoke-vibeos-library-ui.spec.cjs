@@ -201,7 +201,7 @@ test("bibliotheque VibeOS: dossiers, import, masonry, densite, carrousel, persis
         thumbBlob: null,
         remote: true,
         originalUrl: "/assets/vibefx/demo-astronaut.png",
-        previewUrl: "/assets/vibefx/demo-astronaut.png",
+        previewUrl: "/assets/vibefx/apercu-absent.webp",
       });
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
@@ -218,6 +218,9 @@ test("bibliotheque VibeOS: dossiers, import, masonry, densite, carrousel, persis
     .getByRole("button", { name: /^Ouvrir le dossier / }).click();
   await page.getByRole("button", { name: `Ouvrir ${remotePhotoName}` }).click();
   await expect(page.getByTestId("vibeos-library-lightbox")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(
+    '[data-testid="vibeos-library-lightbox-thumb"][data-source="original"]',
+  )).toHaveCount(1, { timeout: 10000 });
   await page.getByTestId("vibeos-library-lightbox-edit").click();
   await expect(page).toHaveURL(/\/creer\/vision$/, { timeout: 30000 });
   await expect(page.getByTestId("vibeos-vision-screen")).toBeVisible({ timeout: 30000 });

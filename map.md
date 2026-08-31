@@ -386,14 +386,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- platform.js             # Reconnaissance iPhone / Android / Mac / Windows / Linux et sources d'import qui vont avec (photothèque, appareil photo, fichiers, dossier entier). Module pur, teste hors navigateur
 |   |   |   |-- folderNaming.js         # Nommage a la mode OS : nom du dossier choisi (webkitRelativePath), sinon la date en toutes lettres, suffixe « (2) » si le nom est pris, nettoyage des separateurs. Module pur, teste hors navigateur
 |   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. Module pur, teste hors navigateur
-|   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. La fiche Firestore est ecrite EN DERNIER : un envoi coupe ne laisse jamais de fiche sans fichier
+|   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. Lecture Blob par chemin SDK authentifié puis URL tokenisée en repli ; la fiche Firestore est écrite EN DERNIER
 |   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
 |   |   |   |-- useLibrary.js           # Etat : dossiers + photos, import sequentiel avec progression dans un dossier, renommage, suppression profonde, filtres appareil/look/recherche, tris, quota, cache des URLs d'objet
 |   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul écran : cartes de DOSSIERS et GRILLE masonry. « Retoucher » crée un projet photo puis pousse /creer/vision, avec état Ouverture, verrou anti-double-clic et erreur explicite
 |   |   |   |-- FolderCard.jsx          # Carte de dossier : dos + onglet, deux epaisseurs de tirages, couverture, rabat translucide portant le compteur ; renommage sur place, suppression, pastille de sauvegarde
 |   |   |   |-- ImportSheet.jsx         # Fenetre d'import : destination (nouveau dossier nomme ou dossier existant), sources adaptees a l'appareil, jauge de quota. Montee seulement quand elle est ouverte
-|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP depuis la tuile, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier et état « Ouverture… » du passage à Vision
+|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier. Un aperçu cassé retente l'original puis est démonté : Safari n'affiche jamais son icône « ? »
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
 |   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
@@ -472,6 +472,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |-- .gitignore
 |-- AGENTS.md                           # Regles agents du projet
 |-- apphosting.yaml                     # Base Firebase App Hosting + variables publiques App Hosting, dont NEXT_PUBLIC_VIBECUT_EXPORT_MODE=firebase
+|-- storage.cors.json                   # CORS du bucket Bibliothèque : App Hosting, domaines Firebase et localhost autorisés en GET/HEAD pour le rapatriement des originaux dans Vision
 |-- fav.md                              # Tache et plan favoris permanents de la bibliotheque
 |-- CLAUDE.md                           # Fichier genere, non encore enrichi
 |-- eslint.config.mjs
@@ -649,6 +650,23 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - Commit `a8b6993` poussé sur `master`, rollout App Hosting terminé. Contrôle
   live avec le compte réel : `IMG_0421.JPG` ouverte dans le carrousel,
   « Retoucher » mène à `/creer/vision` et l'écran Vision est visible.
+
+### Correctif Safari Storage après contrôle réel
+
+- Le contrôle Safari sur un second appareil ne retrouvait que les 37 photos
+  déjà synchronisées et reproduisait deux symptômes liés : « Retoucher » ne
+  quittait pas le carrousel et `IMG_0421.JPG` montrait l'icône « ? ».
+- Les 74 objets Storage existent (original + aperçu pour chaque photo) et les
+  URLs de `IMG_0421.JPG`/`IMG_0422.JPG` répondent 200. La cause était le bucket
+  sans CORS (`cors_config: null`) : un `<img>` pouvait charger cross-origin,
+  mais `fetch()` ne pouvait pas remettre le Blob à Vision.
+- `storage.cors.json` est appliqué au bucket. Une requête avec l'Origin App
+  Hosting reçoit désormais `access-control-allow-origin` exact.
+- `libraryCloud.fetchBlob` privilégie `getBlob(ref(storage, path))`, donc les
+  règles et l'identité Firebase, avant l'ancienne URL tokenisée. `Lightbox`
+  essaie l'original si l'aperçu échoue et démonte l'élément après deux échecs.
+- Le smoke navigateur force un aperçu 404 et exige le repli original avant le
+  passage à Vision. Gates locales : 36/36 + 1/1, lint 0 erreur, build vert.
 
 ## Pages cible a creer plus tard
 
