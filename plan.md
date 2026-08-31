@@ -14,6 +14,11 @@
 > écarts. Le diagnostic, les corrections et les preuves sont dans
 > `docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md`.
 
+> Release du 2026-08-31 : le lot VibeFX Vision + Studio est publié sur Firebase
+> App Hosting ; Firestore, Storage et Functions ont été redéployés avec succès.
+> `firebase.json` conserve désormais une cible App Hosting locale reproductible
+> pour ne plus dépendre du dépôt GitHub historique relié en lecture seule.
+
 > Lot transverse Vision du 2026-08-30 : les familles Lightroom Cloud
 > « Style : cinéma » (CN01–CN10) et « Style : cinéma II » (CN11–CN18) sont
 > complètes dans VibeFX. La première ne porte aucun grain ; la seconde inclut

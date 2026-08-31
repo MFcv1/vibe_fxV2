@@ -18,6 +18,35 @@
       ]
     }
   ],
+  "apphosting": {
+    "backendId": "vibefx-v2-web",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".next",
+      ".env",
+      ".env.*",
+      "presets-lightroom",
+      "docs",
+      "scripts/midjourney-scraper/downloads",
+      "functions",
+      "render-service",
+      "infra",
+      "test-fixtures",
+      "videotest",
+      "vibecut-video-samples",
+      ".firebase",
+      ".agents",
+      ".codex-remote-attachments",
+      "tmp-*.png",
+      "*.log",
+      "test-results",
+      "playwright-report",
+      "coverage"
+    ],
+    "alwaysDeployFromSource": true
+  },
   "emulators": {
     "auth": {
       "port": 9099

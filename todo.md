@@ -16,7 +16,9 @@
 > écarts. `test:vision-preset` passe 436/436, lint passe avec cinq avertissements
 > préexistants et le build Node 22 passe. Les smokes navigateur restent bloqués
 > par le contournement d'authentification Dev qui ne ferme plus la modale, sans
-> rapport avec les presets. Aucun déploiement. Rapport :
+> rapport avec les presets. Release `7401cd0` poussée sur GitHub et mise en
+> ligne le 2026-08-31 avec le backend Firebase complet sur
+> `https://vibefx-v2-web--vibefx-v2.europe-west4.hosted.app`. Rapport :
 > [docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md](docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md).
 > Reprise : [docs/prompt-reprise-2026-08-31-correction-vintage-bw.md](docs/prompt-reprise-2026-08-31-correction-vintage-bw.md).
 >
