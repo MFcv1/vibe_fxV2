@@ -16,7 +16,9 @@
 > être chargé. Le smoke simule maintenant une photo sans Blob local et vérifie
 > le passage réel du carrousel à `/creer/vision`. Gates : bibliothèque 36/36 +
 > navigateur 1/1, lint sans erreur (5 avertissements préexistants), build Node
-> 22 vert. **Pas encore déployé** : ce correctif attend une demande explicite.
+> 22 vert. **Déployé** depuis le commit `a8b6993` sur App Hosting. Le contrôle
+> live avec le compte réel ouvre `IMG_0421.JPG` dans le carrousel, clique
+> « Retoucher » et retrouve `/creer/vision` avec l'écran Vision visible.
 >
 > **2026-08-31 — connexion Google Safari corrigée, publication en cours.** Le
 > popup s'ouvrait sur le helper Firebase avec `fac={error: UNKNOWN_ERROR}` : la

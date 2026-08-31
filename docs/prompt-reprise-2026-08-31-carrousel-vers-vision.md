@@ -28,8 +28,10 @@ le bouton du carrousel atteint `/creer/vision` avec l'écran Vision visible.
 
 ## État de livraison
 
-Le correctif n'est pas encore déployé. Ne lancer Firebase App Hosting que sur
-demande explicite, après vérification de l'arbre Git et des gates ciblés.
+Le commit `a8b6993` est poussé sur `master` et le rollout Firebase App Hosting
+est terminé. L'URL live répond 200 et sert le nouveau bundle. Avec le compte
+réel, `IMG_0421.JPG` a été ouverte dans le carrousel puis « Retoucher » a mené
+à `/creer/vision`, écran Vision visible.
 
 La connexion Google Safari reste un chantier distinct : ne pas supposer qu'elle
 est close uniquement à partir des notes précédentes ; la retester sur le live

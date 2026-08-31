@@ -10,7 +10,8 @@
 > « Ouverture… », un verrou anti-double-clic et un repli original -> aperçu
 > rendent le parcours explicite et robuste sur Safari. Le smoke navigateur
 > couvre maintenant une photo simulée sans Blob local. Correctif vérifié en
-> local, non déployé.
+> local puis déployé depuis le commit `a8b6993`. Le smoke live sur le compte
+> réel confirme le trajet carrousel -> `/creer/vision` avec la photo choisie.
 
 > Correctif Auth du 2026-08-31 : le domaine App Hosting est ajouté aux domaines
 > autorisés de la clé reCAPTCHA App Check. `AuthContext` initialise aussi le

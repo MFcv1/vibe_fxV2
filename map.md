@@ -646,7 +646,9 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
   sans Blob, clique « Retoucher » dans le carrousel et exige `/creer/vision` +
   l'écran Vision. Gates : bibliothèque pure 36/36, navigateur 1/1, lint 0
   erreur (5 avertissements préexistants), build Node 22 vert.
-- Correctif local uniquement, pas de déploiement sans demande explicite.
+- Commit `a8b6993` poussé sur `master`, rollout App Hosting terminé. Contrôle
+  live avec le compte réel : `IMG_0421.JPG` ouverte dans le carrousel,
+  « Retoucher » mène à `/creer/vision` et l'écran Vision est visible.
 
 ## Pages cible a creer plus tard
 
