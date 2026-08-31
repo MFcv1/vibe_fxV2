@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onAuthStateChanged,
   sendEmailVerification,
   signInWithEmailAndPassword,
@@ -31,16 +32,39 @@ const getActionCodeSettings = () => ({
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(auth));
+  const [googleAuthReady, setGoogleAuthReady] = useState(!auth);
   const devAuthBypassRef = useRef(false);
 
   useEffect(() => {
     if (!auth) {
       return;
     }
-    return onAuthStateChanged(auth, (u) => {
+
+    /*
+     * Firebase initialise son resolver popup de facon asynchrone au premier
+     * appel. Safari peut alors considerer que window.open ne vient plus du
+     * clic utilisateur et bloquer la fenetre. getRedirectResult initialise le
+     * meme resolver au chargement, avant que le bouton Google soit activable.
+     * Il est sans effet quand aucun retour de redirection n'est en attente.
+     */
+    let active = true;
+    getRedirectResult(auth)
+      .catch((error) => {
+        console.error("Google auth initialization error:", error?.code || error);
+      })
+      .finally(() => {
+        if (active) setGoogleAuthReady(true);
+      });
+
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u || (devAuthBypassRef.current ? makeMockUser() : null));
       setLoading(false);
     });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
@@ -99,6 +123,7 @@ export function AuthProvider({ children }) {
       loading,
       isAnonymous,
       isSignedIn,
+      googleAuthReady,
       signInWithGoogle,
       signUpWithEmail,
       signInWithEmail,

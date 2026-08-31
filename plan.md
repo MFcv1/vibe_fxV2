@@ -4,6 +4,12 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Correctif Auth du 2026-08-31 : le domaine App Hosting est ajouté aux domaines
+> autorisés de la clé reCAPTCHA App Check. `AuthContext` initialise aussi le
+> resolver Google avant le premier clic afin que Safari conserve le geste
+> utilisateur nécessaire au popup. Le flux reste `signInWithPopup` ; aucun
+> contournement des protections Safari ni désactivation App Check.
+
 > Lot Vision du 2026-08-31 : les presets ont des favoris propres à chaque
 > compte Firebase. L'étoile de chaque carte ne déclenche jamais l'application
 > du preset ; le filtre Favoris se combine à la recherche et se met à jour en

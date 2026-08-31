@@ -1,10 +1,22 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-31 — les favoris de presets Vision sont liés au compte.**
+> **Point d'étape : 2026-08-31 — correction de la connexion Google Safari.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
+>
+> **2026-08-31 — connexion Google Safari corrigée, publication en cours.** Le
+> popup s'ouvrait sur le helper Firebase avec `fac={error: UNKNOWN_ERROR}` : la
+> clé reCAPTCHA App Check n'autorisait pas le domaine App Hosting réellement
+> utilisé. Le domaine `vibefx-v2-web--vibefx-v2.europe-west4.hosted.app` est
+> désormais autorisé sans désactiver App Check. Un second défaut Safari a été
+> reproduit : au premier clic, Firebase initialisait son resolver trop tard et
+> Safari classait l'ouverture comme popup bloqué. `AuthContext` prépare
+> maintenant le resolver avec `getRedirectResult()` au chargement et le bouton
+> Google reste désactivé jusqu'à sa disponibilité. Les erreurs Firebase ne sont
+> plus masquées. Gates : smoke Studio/Vision ciblé 1/1, lint sans erreur (5
+> avertissements préexistants), build Node 22 vert.
 >
 > **2026-08-31 — favoris de presets Vision prêts à publier.** Chaque carte de
 > `/creer/vision` porte une étoile indépendante du bouton qui applique le
@@ -113,6 +125,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
+[**après la correction Google Safari** — 2026-08-31](docs/prompt-reprise-2026-08-31-auth-google-safari.md),
 [**après les favoris de presets Vision** — 2026-08-31](docs/prompt-reprise-2026-08-31-favoris-presets-vision.md),
 [**après les dossiers de la bibliothèque** — 2026-08-31](docs/prompt-reprise-2026-08-31-bibliotheque-dossiers.md),
 [après le recentrage du Studio — 2026-08-30 decies](docs/prompt-reprise-2026-08-30-decies.md),
