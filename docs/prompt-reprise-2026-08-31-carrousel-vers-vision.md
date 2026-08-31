@@ -48,6 +48,8 @@ sur `IMG_0421.JPG`. Le client lit désormais par chemin Firebase Storage
 authentifié avant l'URL tokenisée. Le carrousel retente l'original si l'aperçu
 échoue et démonte l'image après deux échecs, donc plus d'icône « ? ».
 
-Gates locales : bibliothèque 36/36, navigateur 1/1 avec aperçu 404 volontaire,
-lint sans erreur, build Node 22 vert. Le front de ce second correctif doit être
-déployé puis retesté dans Safari après rechargement.
+Gates : bibliothèque 36/36, navigateur 1/1 avec aperçu 404 volontaire, lint
+sans erreur et build Node 22 vert. Les commits `32b63d1` puis `45de224` sont
+poussés sur `master` et le second rollout App Hosting est terminé. Dans Safari
+avec le compte réel, « Retoucher » télécharge `IMG_0421.JPG`, ouvre
+`/creer/vision` et la photo apparaît réellement dans Vision.

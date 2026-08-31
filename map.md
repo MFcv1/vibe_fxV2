@@ -668,6 +668,11 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
   Safari, essaie l'original si l'aperçu échoue et démonte l'élément en dernier.
 - Le smoke navigateur force un aperçu 404 et exige le repli original avant le
   passage à Vision. Gates locales : 36/36 + 1/1, lint 0 erreur, build vert.
+- Correctifs poussés sur `master` dans `32b63d1` (lecture Storage authentifiée,
+  CORS et repli sans icône cassée) puis `45de224` (requêtes versionnées contre
+  le cache négatif Safari). Le rollout App Hosting final est terminé. Contrôle
+  Safari avec le compte réel : `IMG_0421.JPG` est téléchargée par « Retoucher »,
+  `/creer/vision` s'ouvre et la photo réelle apparaît dans Vision.
 
 ## Pages cible a creer plus tard
 

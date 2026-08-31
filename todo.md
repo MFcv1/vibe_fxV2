@@ -16,7 +16,10 @@
 > aperçu cassé par une requête versionnée, puis l'original, avant de démonter
 > l'image si tout échoue : plus d'icône « ? » ni de cache négatif Safari. Gates : bibliothèque 36/36 + navigateur 1/1 avec aperçu
 > volontairement absent, lint sans erreur (5 avertissements préexistants),
-> build Node 22 vert. Déploiement front à faire dans ce lot.
+> build Node 22 vert. CORS Storage appliqué ; commits `32b63d1` et `45de224`
+> poussés sur `master`, puis rollout App Hosting terminé. Dans Safari avec le
+> compte réel, « Retoucher » télécharge `IMG_0421.JPG`, ouvre `/creer/vision`
+> et la photo apparaît dans Vision.
 >
 > **2026-08-31 — carrousel Bibliothèque vers Vision corrigé localement.** Pour
 > une photo présente seulement dans le compte, « Retoucher » attendait le
