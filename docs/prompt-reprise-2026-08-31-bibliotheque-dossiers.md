@@ -5,7 +5,7 @@ Colle ce texte dans un chat neuf pour repartir sans rien relire d'autre.
 ---
 
 Projet : `/Users/matthis/Desktop/mes projets mac/vibe_fxV2` (macOS, branche
-`presets-mesures-sur-corpus`, distante GitHub à jour, Node 22 pour builder —
+`master`, distante GitHub à jour au commit `6030055`, Node 22 pour builder —
 Node 26 casse `better-sqlite3` au moment de `Collecting page data`, c'est un
 blocage local connu et sans rapport avec le code).
 
@@ -45,13 +45,19 @@ store `folders`, migration des photos existantes), `useLibrary.js`,
 - `npm run build` : vert sous Node 22.
 - Émulateurs Firebase (auth + Firestore + Storage) : montée et descente
   vérifiées à la main, IndexedDB effacé puis tout revenu.
-- **Aucun déploiement.** Les règles ajoutées ne sont pas en ligne.
+- Règles Firestore/Storage publiées, avec refus inter-comptes vérifiés sur les
+  émulateurs avant publication.
+- Front publié par le rollout App Hosting `build-2026-08-31-004`.
+- La page live s'ouvre avec un vrai compte connecté. L'import live de trois
+  images reste bloqué par l'extension Chrome tant que « Allow access to file
+  URLs » n'est pas activé ; aucun fichier n'a été envoyé pendant cet essai.
 
 ## Mission suivante, dans l'ordre
 
-1. **Déployer quand l'utilisateur le demande** : `firebase deploy --only
-   firestore:rules,storage:rules` avant tout usage réel de la sauvegarde,
-   sinon chaque envoi sera refusé en production.
+1. **Finir le smoke live bibliothèque** : activer l'accès aux URL de fichiers
+   pour l'extension Chrome, importer trois images de démonstration, attendre la
+   pastille « Sauvegardé », puis constater les objets sous
+   `users/{uid}/library/` dans le bucket.
 2. **Compteur de quota serveur** : aujourd'hui le plafond est tenu côté client.
    Une Function `onFinalize` sur `users/{uid}/library/**` qui agrège
    photos + octets dans `users/{uid}` rendrait le plafond étanche. À faire avant

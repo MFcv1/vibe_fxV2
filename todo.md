@@ -21,8 +21,12 @@
 > dossiers et leurs neuf photos reviennent, s'ouvrent, et « Retoucher » rapatrie
 > l'original dans Vision. Gates : `test:vibeos-library` (37 vérifications hors
 > navigateur, smoke navigateur 1/1), lint 0 erreur (5 avertissements
-> préexistants), build Node 22 vert. **Aucun déploiement** : les règles
-> Firestore/Storage ajoutées attendent le prochain `firebase deploy`.
+> préexistants), build Node 22 vert. **Déployé le 2026-08-31** : règles
+> Firestore/Storage d'abord, puis commit `6030055` sur `master` et rollout App
+> Hosting `build-2026-08-31-004`. Les refus inter-comptes passent sur les
+> émulateurs. La page live s'ouvre avec un compte réel ; l'import live de trois
+> images reste à finir après autorisation d'accès aux fichiers dans l'extension
+> Chrome.
 > Détail : journal `map.md` du 2026-08-31 (bibliothèque).
 >
 > > **2026-08-31 — corrections Vintage et Noir et blanc livrées.** Les dix
@@ -238,9 +242,9 @@ sur deux images très différentes), et un panneau **Masquage** non vide.
    la propriété et la taille d'UN fichier (25 Mo), pas le total. Un plafond
    vraiment étanche demande un compteur serveur (Function `onFinalize` qui
    agrège dans `users/{uid}`). À faire avant d'ouvrir à d'autres comptes.
-2. **Les règles ajoutées ne sont pas encore en ligne.** `firestore.rules` et
-   `storage.rules` portent `libraryFolders`, `libraryPhotos` et
-   `users/{uid}/library/…` ; elles partent au prochain déploiement voulu.
+2. **Les règles sont en ligne.** `firestore.rules` et `storage.rules` portent
+   `libraryFolders`, `libraryPhotos` et `users/{uid}/library/…`. Les lectures et
+   écritures inter-comptes ont été refusées sur les émulateurs avant publication.
 3. **Une suppression faite hors ligne peut revenir.** La photo est effacée en
    local et à distance dans la foulée ; si le réseau manque au moment du geste,
    l'écoute Firestore la remontera à la reconnexion. Pas de corbeille ni de

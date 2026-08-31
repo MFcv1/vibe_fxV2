@@ -19,6 +19,14 @@
 > `firebase.json` conserve désormais une cible App Hosting locale reproductible
 > pour ne plus dépendre du dépôt GitHub historique relié en lecture seule.
 
+> Release bibliothèque du 2026-08-31 : les dossiers, l'import et la sauvegarde
+> compte sont sur `master` (`6030055`) et publiés sur Firebase App Hosting via
+> le rollout `build-2026-08-31-004`. Les règles Firestore et Storage ont été
+> publiées avant le front et leurs refus inter-comptes ont été rejoués sur les
+> émulateurs. Le smoke live atteint la bibliothèque avec un compte réel ; son
+> import de fichiers reste à finir après autorisation d'accès aux fichiers pour
+> l'extension Chrome.
+
 > Lot transverse Vision du 2026-08-30 : les familles Lightroom Cloud
 > « Style : cinéma » (CN01–CN10) et « Style : cinéma II » (CN11–CN18) sont
 > complètes dans VibeFX. La première ne porte aucun grain ; la seconde inclut

@@ -679,7 +679,12 @@ et « Retoucher » rapatrie l'original et ouvre Vision.
 
 Gates : `test:vibeos-library` (37 vérifications hors navigateur + smoke
 navigateur 1/1), `npm run lint` 0 erreur (5 avertissements préexistants),
-`npm run build` vert sous Node 22. Aucun déploiement.
+`npm run build` vert sous Node 22. Les règles Firestore/Storage ont compilé et
+été publiées avant le front ; un second compte est refusé en lecture et écriture
+sur les deux services. Commit `6030055` poussé sur `master`, rollout App Hosting
+`build-2026-08-31-004` réussi. La page live s'ouvre avec le compte réel déjà
+connecté. L'import live de trois images de démonstration reste à conclure :
+l'extension Chrome doit d'abord autoriser l'accès aux URL de fichiers.
 
 ## Journal — 2026-08-31 (performance des miniatures Vision)
 
