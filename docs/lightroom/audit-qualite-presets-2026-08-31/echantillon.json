@@ -1,0 +1,383 @@
+{
+  "generatedAt": "2026-08-31T13:44:10.481Z",
+  "seed": "vibefx-lightroom-quality-audit-2026-08-31",
+  "method": "SHA-256(seed\\0collectionId\\0presetId), tri croissant, deux premiers par famille",
+  "importedPresetCount": 235,
+  "familyCount": 22,
+  "families": [
+    {
+      "collectionId": "architecture-urbaine",
+      "family": "Architecture urbaine",
+      "count": 10,
+      "selected": [
+        {
+          "id": "ua02",
+          "file": "ua02.js",
+          "draw": "032f2dd407eed40451f0f8c19c096f0a27f7cfa917c8014eb73e79e5e1834bf3"
+        },
+        {
+          "id": "ua01",
+          "file": "ua01.js",
+          "draw": "1d7fc012dea1e5f423858e0bf331c9861a0f526ceb3a9b10cc973aeda8a3de6a"
+        }
+      ]
+    },
+    {
+      "collectionId": "auto-retro",
+      "family": "Auto rétro",
+      "count": 11,
+      "selected": [
+        {
+          "id": "ar07",
+          "file": "ar07.js",
+          "draw": "1cbbe2aa58065b215e69239958159536cf569c12509f5572460d329f1915693e"
+        },
+        {
+          "id": "ar04",
+          "file": "ar04.js",
+          "draw": "49161bce747ff9c2c44f9226a9287bac10b906300212282f819162e4d9ca88b8"
+        }
+      ]
+    },
+    {
+      "collectionId": "automne",
+      "family": "Automne",
+      "count": 12,
+      "selected": [
+        {
+          "id": "tm10",
+          "file": "tm10.js",
+          "draw": "295cadc95eeb68ce28258ca26758c31feff521245a9c8c9ee5fd766a27ff4e64"
+        },
+        {
+          "id": "tm05",
+          "file": "tm05.js",
+          "draw": "3cbf8fa132eb3803a6f7471033d4d0751ba9df28dbcff62b0a4d8b56d7367e33"
+        }
+      ]
+    },
+    {
+      "collectionId": "cinema",
+      "family": "Cinéma",
+      "count": 10,
+      "selected": [
+        {
+          "id": "cn10",
+          "file": "cn10.js",
+          "draw": "2c674da7117c7f1aca3d6d611b67f0aa029483a0bd6dede1e3a660800acd2e2c"
+        },
+        {
+          "id": "cn09",
+          "file": "cn09.js",
+          "draw": "2f30a523bb851a6ae580350bc8416c6425f65f3c7f6b4ecfc80b29e98f405c97"
+        }
+      ]
+    },
+    {
+      "collectionId": "cinema-ii",
+      "family": "Cinéma II",
+      "count": 8,
+      "selected": [
+        {
+          "id": "cn16",
+          "file": "cn16.js",
+          "draw": "0be9159e1bd3f2a28f7acf2ffa300e7e5415c56a3f73f6caebfbc8d3e3cbde79"
+        },
+        {
+          "id": "cn15",
+          "file": "cn15.js",
+          "draw": "4ddbf0535f60e1d38d11e0899bf78e8857f45c610d41247974a0c03ac80dd916"
+        }
+      ]
+    },
+    {
+      "collectionId": "ete",
+      "family": "Été",
+      "count": 11,
+      "selected": [
+        {
+          "id": "sm05",
+          "file": "sm05.js",
+          "draw": "13dee634b0be87b9218f354697cd2f6acf75ff2dac6a53d530ab0d0744ccc5ac"
+        },
+        {
+          "id": "sm06",
+          "file": "sm06.js",
+          "draw": "3e5669db5f18f138a5629e3707011d56346659ea17e90e5eea88186b02a9bf08"
+        }
+      ]
+    },
+    {
+      "collectionId": "futuriste",
+      "family": "Futuriste",
+      "count": 12,
+      "selected": [
+        {
+          "id": "ft11",
+          "file": "ft11.js",
+          "draw": "0b0cb736dec4e6dbdf1f77379401884c686a4e44a08898a57822bd16758ce4b9"
+        },
+        {
+          "id": "ft05",
+          "file": "ft05.js",
+          "draw": "10ccc6cd45b52e195f7a01c1baf543663aab724ba36cf919dff4f5afc2797405"
+        }
+      ]
+    },
+    {
+      "collectionId": "hiver",
+      "family": "Hiver",
+      "count": 10,
+      "selected": [
+        {
+          "id": "wn02",
+          "file": "wn02.js",
+          "draw": "1beee64bc0840c37a2ef18d7cf7a5afe7b31509f8236e76d638ba2b807002e59"
+        },
+        {
+          "id": "wn01",
+          "file": "wn01.js",
+          "draw": "21a76e7908eacd1f24b4a6511f41f0760cd98749b1076a274e8d25532c7a51c8"
+        }
+      ]
+    },
+    {
+      "collectionId": "inspire-d-un-film",
+      "family": "Inspiré d’un film",
+      "count": 12,
+      "selected": [
+        {
+          "id": "film-or-riche",
+          "file": "film-or-riche.js",
+          "draw": "2220aa930b08d8fa8ce5269df0a70651d99ac1aa0936d6efff0ed0ea4c199a6f"
+        },
+        {
+          "id": "film-braise-puissante",
+          "file": "film-braise-puissante.js",
+          "draw": "33b970207fe65514765d68561e6a3846daa3cdc83a69baa842672fbf7223af3f"
+        }
+      ]
+    },
+    {
+      "collectionId": "noir-et-blanc",
+      "family": "Noir et blanc",
+      "count": 12,
+      "selected": [
+        {
+          "id": "bw01",
+          "file": "bw01.js",
+          "draw": "36665ca63361097f567707ad30d6c1e27658f7416c8625a14683f0a532ce19eb"
+        },
+        {
+          "id": "bw10",
+          "file": "bw10.js",
+          "draw": "8e5ef11f55d07bc45bb489c3f3ae1d3f4956e1c25b70f9544e3451980144958f"
+        }
+      ]
+    },
+    {
+      "collectionId": "paysage",
+      "family": "Paysage",
+      "count": 10,
+      "selected": [
+        {
+          "id": "ln01",
+          "file": "ln01.js",
+          "draw": "1da859cef9ec59050201b05130f986c8726966b9bd3d58e7a42c905233627b26"
+        },
+        {
+          "id": "ln06",
+          "file": "ln06.js",
+          "draw": "5afa09e9e7ec4ec3937f5dce09f677948b507f352a66eb9e17498393dc178f60"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-audacieux",
+      "family": "Portrait audacieux",
+      "count": 12,
+      "selected": [
+        {
+          "id": "pe05",
+          "file": "pe05.js",
+          "draw": "27ef6e07e191694d359575fea288588ec5d6a01b7196a24437508dd89da4676d"
+        },
+        {
+          "id": "pe10",
+          "file": "pe10.js",
+          "draw": "29f67da85ee1cf97b05b8cdd180c90e0819866f7d4c525524556fe60d147bb20"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-groupe",
+      "family": "Portrait groupe",
+      "count": 8,
+      "selected": [
+        {
+          "id": "pg08",
+          "file": "pg08.js",
+          "draw": "0a27cdefa524e6c0eb272a3d838442e3d74021f6ab61c4d70ed49768763e4c23"
+        },
+        {
+          "id": "pg01",
+          "file": "pg01.js",
+          "draw": "108127bf91af6bc66265094351825ef4a44b4243fa633f2a76692bc3268d127f"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-noir-et-blanc",
+      "family": "Portrait noir et blanc",
+      "count": 12,
+      "selected": [
+        {
+          "id": "pb12",
+          "file": "pb12.js",
+          "draw": "06fa5f5798a42403bb9211a358056fa460962bf7f263455c444738cdd4fb05d2"
+        },
+        {
+          "id": "pb10",
+          "file": "pb10.js",
+          "draw": "0af0920fc36fa87c7949c0ffd6e9f6cb3f88206716b89154d4ae03886202ac76"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-peau-claire",
+      "family": "Portrait peau claire",
+      "count": 11,
+      "selected": [
+        {
+          "id": "pl11",
+          "file": "pl11.js",
+          "draw": "37b1b182daf2aadc2b3d06fa89a1a43d5a8841cd2dd6417056ffd3f0e19a8fdd"
+        },
+        {
+          "id": "pl01",
+          "file": "pl01.js",
+          "draw": "43c989338ba0bdf37dbfcde2d405bae1110d325a10631dbbb48efdc113b4013e"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-peau-foncee",
+      "family": "Portrait peau foncée",
+      "count": 15,
+      "selected": [
+        {
+          "id": "pd04-orange",
+          "file": "pd04-orange.js",
+          "draw": "1dd720ce230448629fc8d60330b2cbdf4e62edcecf289b9293e8e42a57b466fe"
+        },
+        {
+          "id": "pd01-rouge",
+          "file": "pd01-rouge.js",
+          "draw": "28ab46a78e7a942d4a27085ab8f53070588a0dcef518b2c7e4e3969486406ff5"
+        }
+      ]
+    },
+    {
+      "collectionId": "portrait-peau-intermediaire",
+      "family": "Portrait peau intermédiaire",
+      "count": 11,
+      "selected": [
+        {
+          "id": "pm10",
+          "file": "pm10.js",
+          "draw": "1285dbfa2433c392fc0f64c66d7caa427bdd76766a96d94239c4f2a1a4f3b3d2"
+        },
+        {
+          "id": "pm01",
+          "file": "pm01.js",
+          "draw": "210757293eb359af7bf09574c377752fb62883a1e81b8c27e3cfdbc0a35edc4f"
+        }
+      ]
+    },
+    {
+      "collectionId": "printemps",
+      "family": "Printemps",
+      "count": 12,
+      "selected": [
+        {
+          "id": "sp05",
+          "file": "sp05.js",
+          "draw": "0664924f583f384f3263f0b6b9e9e87f27a2f3e79d2ade73847cb695d9b2a0ce"
+        },
+        {
+          "id": "sp11",
+          "file": "sp11.js",
+          "draw": "0e625eacb0b1285a0ecb3b5b9e953ffbee254cb458503e8dd7ded72b2ea1196e"
+        }
+      ]
+    },
+    {
+      "collectionId": "style-de-vie",
+      "family": "Style de vie",
+      "count": 8,
+      "selected": [
+        {
+          "id": "lf01",
+          "file": "lf01.js",
+          "draw": "10289c3529bca25e2ca1b29f1a8996b3ee2f36374690d95c06c58092b8b029df"
+        },
+        {
+          "id": "lf04",
+          "file": "lf04.js",
+          "draw": "3ac729fe165c08694f7bea52e1bf9d87b90daf0d930667e1f4872cfa21bf6cd4"
+        }
+      ]
+    },
+    {
+      "collectionId": "vintage",
+      "family": "Vintage",
+      "count": 10,
+      "selected": [
+        {
+          "id": "vn04",
+          "file": "vn04.js",
+          "draw": "0349d6fc2abd45ed0da9d81801873fe47615dd97e41c819b1e554159c4cd31c5"
+        },
+        {
+          "id": "vn03",
+          "file": "vn03.js",
+          "draw": "0ab3a4f851465992fceef35bc117770f54ac439070f2b2217d77513577d0f406"
+        }
+      ]
+    },
+    {
+      "collectionId": "voyage",
+      "family": "Voyage",
+      "count": 10,
+      "selected": [
+        {
+          "id": "tr08",
+          "file": "tr08.js",
+          "draw": "1e23d699a00a1c739c55277e5628ce5258ab500d6c348f6fff1600dc6c5d2a77"
+        },
+        {
+          "id": "tr03",
+          "file": "tr03.js",
+          "draw": "271c9c4abcb58b64212757d94bbdae92b75cbdea05f226af99a696a7ba4a2060"
+        }
+      ]
+    },
+    {
+      "collectionId": "voyage-ii",
+      "family": "Voyage II",
+      "count": 8,
+      "selected": [
+        {
+          "id": "tr13",
+          "file": "tr13.js",
+          "draw": "1e3fec9c5851b218c46bfc36c07c5653306f2b4ea57660e037a839e53078389c"
+        },
+        {
+          "id": "tr18",
+          "file": "tr18.js",
+          "draw": "31228b4024cf4c828030b4db49afb3b96ae94ce36d56668c98aefd98441a578e"
+        }
+      ]
+    }
+  ]
+}

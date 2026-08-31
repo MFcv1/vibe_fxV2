@@ -87,26 +87,45 @@ function toSpatialFilters(values) {
         const valeur = number(values, xmpKey);
         if (valeur) filters[cle] = valeur;
     };
+    /* Taille et cassure ont des valeurs neutres non nulles (25 et 50). Leur
+       valeur 0 est donc un vrai reglage, pas une absence de reglage. */
+    const copierMemeZero = (cle, xmpKey) => {
+        if (!(xmpKey in values)) return;
+        filters[cle] = number(values, xmpKey);
+    };
 
     copier('clarity', 'Clarity2012');
     /* La texture a son propre etage depuis le 2026-08-16. Avant, elle etait
        melangee a la clarte faute de reglage dedie — deux effets d'echelles
        differentes empiles sur un seul curseur. */
     copier('texture', 'Texture');
+    copier('noiseReductionLuminance', 'LuminanceSmoothing');
+    copier('noiseReductionColor', 'ColorNoiseReduction');
     copier('sharpness', 'Sharpness');
     copier('grain', 'GrainAmount');
+    copierMemeZero('grainSize', 'GrainSize');
+    copierMemeZero('grainRoughness', 'GrainFrequency');
 
     /* Le voile n'est PAS calibre: Lightroom l'estime a partir du contenu de
        l'image, donc aucune mire ne le capture (cf. 4-synchro-effets.md). On
        recopie le nombre faute de mieux, en sachant que c'est le seul de la
        liste dont l'echelle n'a pas ete verifiee. */
     const dehaze = number(values, 'Dehaze');
-    if (dehaze > 0) filters.dehaze = dehaze;
+    if (dehaze !== 0) filters.dehaze = dehaze;
 
-    /* Le vignetage Lightroom est signe (negatif = sombre). Le moteur n'assombrit
-       que dans un sens: un vignetage clair n'est pas transposable. */
+    /* Le vignetage Lightroom est signe: negatif = sombre, positif = clair.
+       Le moteur stocke l'intensite en valeur absolue et garde le sens dans un
+       marqueur distinct afin de ne pas changer les anciens looks VibeFX. */
     const vignette = number(values, 'PostCropVignetteAmount');
-    if (vignette < 0) filters.vignette = -vignette;
+    if (vignette !== 0) {
+        filters.vignette = Math.abs(vignette);
+        filters.vignetteLightroomV2 = true;
+        if (vignette > 0) filters.vignetteLighten = true;
+    }
+    copierMemeZero('vignetteMidpoint', 'PostCropVignetteMidpoint');
+    copierMemeZero('vignetteRoundness', 'PostCropVignetteRoundness');
+    copierMemeZero('vignetteFeather', 'PostCropVignetteFeather');
+    copierMemeZero('vignetteHighlights', 'PostCropVignetteHighlightContrast');
 
     return filters;
 }
@@ -130,28 +149,17 @@ export function verifierDomaineSpatial(spatial = {}, valeursXmp = null) {
     const alertes = [];
     const nombre = (v) => (Number.isFinite(v) ? v : 0);
 
-    if (valeursXmp) {
-        const vignette = number(valeursXmp, 'PostCropVignetteAmount');
-        if (vignette > 0) {
-            alertes.push(`vignetage POSITIF (+${vignette}) : il eclaircit les coins, notre moteur ne sait qu'assombrir. IGNORE.`);
-        }
-        const voile = number(valeursXmp, 'Dehaze');
-        if (voile < 0) {
-            alertes.push(`voile NEGATIF (${voile}) : notre moteur ne sait qu'en enlever, pas en ajouter. IGNORE.`);
-        }
-    }
-
     const clarity = nombre(spatial.clarity);
     if (clarity < 0) {
         alertes.push(`clarte NEGATIVE (${clarity}) : calee sur Lightroom le 2026-08-19, mais notre masque flou a UN seul rayon est plat la ou le sien mord moins sur les grandes structures — jusqu'a 6 % d'ecart a -100. A regarder a l'oeil.`);
     }
 
     const dehaze = nombre(spatial.dehaze);
-    if (dehaze > 0) {
-        alertes.push(`voile ${dehaze} : le SEUL reglage dont l'echelle n'est pas calibree (11,8/255 d'ecart mesure a 50, ~18 % trop fort). Lightroom l'estime depuis le contenu de l'image; aucune mire ne le capture.`);
+    if (dehaze !== 0) {
+        alertes.push(`voile ${dehaze} : il est reproduit dans les deux sens, mais son echelle reste la seule non calibree sur photo (11,8/255 d'ecart mesure a +50). Lightroom l'estime depuis le contenu; controle visuel obligatoire.`);
     }
-    if (dehaze > 50) {
-        alertes.push(`voile ${dehaze} au-dela de notre plafond (50) : il sera ramene a 50.`);
+    if (dehaze > 35 || dehaze < -20) {
+        alertes.push(`voile ${dehaze} hors garde-fou (-20 a +35) : il sera borne en mode smartphone sur.`);
     }
 
     const sharpness = nombre(spatial.sharpness);
@@ -161,7 +169,7 @@ export function verifierDomaineSpatial(spatial = {}, valeursXmp = null) {
 
     const texture = nombre(spatial.texture);
     if (Math.abs(texture) > 0 || Math.abs(clarity) > 0) {
-        alertes.push('texture / clarte : nos deux effets de matiere touchent les ARETES FRANCHES que Lightroom epargne (1,10 contre 1,01 a +50). Visible sur un toit contre le ciel, un poteau, un cable.');
+        alertes.push('texture / clarte : le profil Lightroom protege les aretes franches et applique le detail avant la conversion couleur. Le moteur sait le faire pour les imports calibres; controle visuel obligatoire pour un ancien preset sans marqueur de profil.');
     }
 
     return alertes;
@@ -185,6 +193,16 @@ function toSummary(values, curves) {
     push('texture', 'Texture');
     push('clarté', 'Clarity2012');
     push('voile', 'Dehaze');
+    push('netteté', 'Sharpness');
+    push('réduction du bruit luminance', 'LuminanceSmoothing');
+    push('réduction du bruit couleur', 'ColorNoiseReduction');
+    push('grain', 'GrainAmount');
+    push('taille du grain', 'GrainSize');
+    push('cassure du grain', 'GrainFrequency');
+    push('milieu du vignettage', 'PostCropVignetteMidpoint');
+    push('arrondi du vignettage', 'PostCropVignetteRoundness');
+    push('contour progressif du vignettage', 'PostCropVignetteFeather');
+    push('hautes lumières du vignettage', 'PostCropVignetteHighlightContrast');
     push('vibrance', 'Vibrance');
     push('saturation', 'Saturation');
 

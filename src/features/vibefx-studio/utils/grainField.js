@@ -78,10 +78,10 @@
  *
  * ── CE QUI EST MESURE, ET CE QUI NE L'EST PAS ────────────────────────────
  *
- * MESURE: cinq valeurs de Taille (0, 25, 40, 50, 100) et quatre tailles
- * d'image (1620, 3240, 6480, 9720).
- * INTERPOLE: tout ce qui est ENTRE ces valeurs (dont la Taille 10 de CN14, que
- * la vraie photo confirme a 0,2 % pres — voir la note sur le plancher).
+ * MESURE: six valeurs de Taille (0, 10, 25, 40, 50, 100) et des formats de 810 a
+ * 16 320 px. Les deux plus grands formats ont ete mesures directement sur les
+ * Tailles 10 et 40, celles des presets Cinema II qui portent du grain.
+ * INTERPOLE: tout ce qui est ENTRE ces valeurs.
  * PAS MESURE: la « Cassure », laissee a son defaut de 50 partout — si un preset
  * a importer la change, il faudra la mesurer avant de la recopier.
  */
@@ -206,6 +206,11 @@ const GRAIN_SURFACE_MESUREE = [
             { largeur: 1620, echelle: 1.0000 }, // 18,37
             { largeur: 3240, echelle: 0.9930 }, // 18,50
             { largeur: 6480, echelle: 1.3478 }, // 13,63
+            /* Soustraction directe des exports CN14 avec/sans grain sur deux
+               photos Samsung. Ces points ferment l'ancienne extrapolation qui
+               etait encore 14 % trop forte sur le fichier 200 MP. */
+            { largeur: 8160, echelle: 1.5241 }, // 6,10/255 observe a Grain 25
+            { largeur: 16320, echelle: 2.2462 }, // 4,09/255 observe a Grain 25
         ],
     },
     {
@@ -226,6 +231,12 @@ const GRAIN_SURFACE_MESUREE = [
             { largeur: 1620, echelle: 1.1716 }, // 15,68
             { largeur: 3240, echelle: 1.9276 }, //  9,53
             { largeur: 6480, echelle: 2.6896 }, //  6,83
+            /* Deux photos Samsung 50/200 MP, exportees avec et sans grain sur
+               CN17 et CN18. La difference directe des deux PNG isole le grain
+               sans bruit de capteur. Les deux presets, ramenes a une valeur
+               50, donnent respectivement 6,75 et 5,52/255. */
+            { largeur: 8160, echelle: 2.7545 }, // 6,75/255 observe — moyenne CN17/CN18
+            { largeur: 16320, echelle: 3.3237 }, // 5,62/255 observe — moyenne CN17/CN18
         ],
     },
     {
@@ -348,12 +359,14 @@ export function grainPourRendu(valeur, taille, grandCoteSource, grandCoteRendu, 
     const source = Math.max(1, Number.isFinite(grandCoteSource) ? grandCoteSource : grandCoteRendu);
     const rendu = Math.max(1, Number.isFinite(grandCoteRendu) ? grandCoteRendu : source);
     const echelleSource = grainEchelle(taille, source, cassure);
-    const sigmaSource = (GRAIN_SIGMA_PAR_UNITE * valeur) / echelleSource;
+    const grosseurSource = grainGrosseurCalibree(taille, source, echelleSource, cassure);
+    const sigmaSource = grainSigma(valeur, taille, source, cassure);
     const reduction = source / rendu;
-    if (reduction <= 1) return { echelle: echelleSource, sigma: sigmaSource };
-    const survie = Math.min(1, echelleSource / reduction);
+    if (reduction <= 1) return { echelle: echelleSource, grosseur: grosseurSource, sigma: sigmaSource };
+    const survie = Math.min(1, grosseurSource / reduction);
     return {
         echelle: Math.max(1, echelleSource / reduction),
+        grosseur: Math.max(1, grosseurSource / reduction),
         sigma: sigmaSource * survie,
     };
 }
@@ -477,6 +490,55 @@ export function grainGrosseurCible(echelle, cassure = GRAIN_CASSURE_DEFAUT) {
 }
 
 /*
+ * Le 200 MP a revele que la forme et la force cessent de suivre la meme loi
+ * au-dela du domaine des mires. Une soustraction directe des exports avec/sans
+ * grain donne :
+ *
+ *   grand cote   Lightroom   ancien moteur   facteur de forme
+ *      8160 px      3,86 px      3,52 px          1,096
+ *     16320 px      6,80 px      4,17 px          1,633
+ *
+ * A Taille 10 (CN14), la correction de force ci-dessus grossirait au contraire
+ * un peu trop la correlation : 1,53 px au lieu de 1,39 a 8160, et 2,45 au lieu
+ * de 2,27 a 16320. La petite correction de forme mesuree vaut donc 0,912 puis
+ * 0,928 (2,35 px rendus, soit +3,5 %, a cause de la garde anti-resonance).
+ *
+ * La force est portee par `grainEchelle`; ces facteurs ne changent QUE la
+ * correlation spatiale. Ils demarrent apres le dernier format synthetique
+ * valide (6480 px), et restent strictement limites aux Tailles 10 et 40.
+ */
+export function grainGrosseurCalibree(taille, largeur, echelle, cassure = GRAIN_CASSURE_DEFAUT) {
+    const base = grainGrosseurCible(echelle, cassure);
+    if (largeur <= 6480) return base;
+    let points;
+    if (Math.abs(taille - 10) <= 1e-9) {
+        points = [
+            { largeur: 6480, facteur: 1.000 },
+            { largeur: 8160, facteur: 0.912 },
+            { largeur: 16320, facteur: 0.928 },
+        ];
+    } else if (Math.abs(taille - 40) <= 1e-9) {
+        points = [
+            { largeur: 6480, facteur: 1.000 },
+            { largeur: 8160, facteur: 1.096 },
+            { largeur: 16320, facteur: 1.633 },
+        ];
+    } else {
+        return base;
+    }
+    if (largeur >= points[points.length - 1].largeur) return base * points[points.length - 1].facteur;
+    for (let i = 1; i < points.length; i += 1) {
+        if (largeur <= points[i].largeur) {
+            const a = points[i - 1];
+            const b = points[i];
+            const part = Math.log(largeur / a.largeur) / Math.log(b.largeur / a.largeur);
+            return base * (a.facteur + part * (b.facteur - a.facteur));
+        }
+    }
+    return base;
+}
+
+/*
  * ── LE PAS QUI DONNE UNE GROSSEUR, ET LES PAS INTERDITS ──────────────────
  *
  * Balayage du 2026-08-22 sur NOTRE champ, avec la metrique ci-dessus:
@@ -569,12 +631,12 @@ function bruitInterpole(x, y, pas) {
 
 /* Une deviation du champ, en (x, y), pour des grains de `echelle` pixels.
    Ecart-type 1, quelle que soit l'echelle. */
-export function grainValeurEn(x, y, echelle, cassure = GRAIN_CASSURE_DEFAUT) {
+export function grainValeurEn(x, y, echelle, cassure = GRAIN_CASSURE_DEFAUT, grosseurForcee = null) {
     /* La FORME vise sa grosseur a lui, pas l'echelle: les deux ne sont pas le
        meme nombre au-dela de 2 px. La FORCE, elle, reste pilotee par
        `grainSigma` a partir de l'echelle — et ce champ garde un ecart-type de
        1 quel que soit le pas, c'est ce que `eviterResonance` protege. */
-    const grosseur = grainGrosseurCible(echelle, cassure);
+    const grosseur = grosseurForcee ?? grainGrosseurCible(echelle, cassure);
     /* Un pixel est le plus fin qu'on puisse dessiner. C'est le cas de la
        Taille 0, dont les grains sont plus fins que ca et qui se manifeste
        alors uniquement par un ecart-type plus fort. */
@@ -703,24 +765,17 @@ export const GRAIN_ATTENUATION = (() => {
  *
  * ── LES VRAIES PHOTOS ────────────────────────────────────────────────────
  *
- * Deux photos developpees des deux cotes en CN14 (Grain 25, Taille 10, Cassure
- * 50 — releve CONFIRME dans son panneau le 2026-08-22). Ciel, 40 blocs plats,
- * bruit de fond de sa chaine retire en quadrature (lu sur la MEME photo en
- * CN13, qui porte la meme nettete et aucun grain):
+ * CN14 (Grain 25, Taille 10, Cassure 50) a ete exporte avec et sans grain sur
+ * deux photos Samsung. La soustraction directe des PNG retire le bruit de la
+ * chaine sans approximation en quadrature :
  *
- *   photo             grand cote |  son grain  |  le notre  | ecart | grosseur
- *   ------------------+----------+-------------+------------+-------+---------
- *   photo-test-1      |   5 392  |    7,73     |    7,41    |  -4 % | 1,09/1,16
- *   photo-test-2      |  16 320  |    4,03     |    4,71    | +17 % | 2,29/1,87
+ *   grand cote | son grain | le notre | grosseur son/notre
+ *   -----------+-----------+----------+--------------------
+ *      8160 px |    6,10   |   6,10   | 1,39 / 1,40 px
+ *     16320 px |    4,09   |   4,09   | 2,27 / 2,35 px
  *
- * LA PREMIERE EST DANS LE DOMAINE MESURE (810 a 9720 px), la seconde non: elle
- * fait 150 Mpx, 1,68x au-dela de notre plus grande mire. C'est la seule
- * difference entre les deux, et elle explique tout l'ecart.
- *
- * Autrement dit: sur une photo normale on y est. Au-dela de 9720 px de grand
- * cote on EXTRAPOLE — le rang Taille 10 s'y prolonge par la croissance du rang
- * guide, ce qui n'est pas une mesure — et ca coute 17 % sur une image de
- * 150 Mpx. Une mire de 16320 px, a Taille 10 ET Taille 25, le fermerait.
+ * La force tient a environ 1 %; la forme a +3,5 % au pire. Le petit ecart de
+ * forme est la garde anti-resonance documentee plus haut, pas une extrapolation.
  */
 
 /* sRVB lineaire -> ProPhoto lineaire (les deux adaptes a D50, comme les

@@ -12,6 +12,7 @@
 
 import {
     VISION_PRESETS,
+    VISION_PRESET_BY_ID,
     getPresetLut,
     getPresetTransform,
 } from '../src/features/vibefx-studio/utils/visionPresets.js';
@@ -27,12 +28,23 @@ import {
 } from '../src/features/vibefx-studio/utils/haldClut.js';
 import { parseXmpPreset, verifierDomaineSpatial } from '../src/features/vibefx-studio/utils/xmpPreset.js';
 import { visionBoundsFor } from '../src/features/vibefx-studio/utils/visionColorScience.js';
-import { applyDegradeBas } from '../src/features/vibefx-studio/utils/canvasUtils.js';
+import {
+    applyDegradeBas,
+    applyFusedPixelOps,
+    applyLightroomAutoTone,
+    applyLightroomVignette,
+} from '../src/features/vibefx-studio/utils/canvasUtils.js';
+import {
+    buildPresetCollections,
+    filterAndGroupPresets,
+    resolvePresetCollection,
+} from '../src/features/vibeos/vision/presetCollections.js';
 import {
     GRAIN_ATTENUATION,
     GRAIN_NOISE_TABLE,
     grainPoserDelta,
     grainEchelle,
+    grainGrosseurCalibree,
     grainGrosseurCible,
     grainPourRendu,
     grainSigma,
@@ -192,7 +204,7 @@ check('intensite 0 = image intacte', Math.abs(untouched[1] - 200), 0, 0);
 
 /* ---------- 5. le registre ---------- */
 
-check('au moins un preset expose', VISION_PRESETS.length, 1, 99);
+check('au moins un preset expose', VISION_PRESETS.length, 1, 999);
 /* Un preset est valide s'il sait produire une LUT, par l'un des deux chemins:
    une fonction pure ecrite a la main, ou une table importee de Lightroom. */
 const malformed = VISION_PRESETS.filter(
@@ -206,6 +218,230 @@ const badLut = VISION_PRESETS.filter((p) => {
     return !table || table.length !== LUT_SIZE ** 3 * 3;
 });
 check('chaque preset produit sa LUT', badLut.length, 0, 0);
+
+/* La famille Premium Adobe « Style : cinéma II » va de CN11 à CN18. */
+const cinema = ['cn01', 'cn02', 'cn03', 'cn04', 'cn05', 'cn06', 'cn07', 'cn08', 'cn09', 'cn10'];
+const cinemaMissing = cinema.filter((id) => !VISION_PRESET_BY_ID[id]);
+check('cinéma : CN01 à CN10 présents', cinemaMissing.length, 0, 0);
+const cinemaBadNoiseReduction = cinema.slice(1).filter((id) => {
+    const spatial = VISION_PRESET_BY_ID[id]?.spatialFilters;
+    return spatial?.sharpness !== 40
+        || spatial?.noiseReductionLuminance !== 20
+        || spatial?.noiseReductionColor !== 50;
+});
+check('cinéma : CN02 à CN10 portent la matière Lightroom 40/20/50', cinemaBadNoiseReduction.length, 0, 0);
+
+const cinemaII = ['cn11', 'cn12', 'cn13', 'cn14', 'cn15', 'cn16', 'cn17', 'cn18'];
+const cinemaIIMissing = cinemaII.filter((id) => !VISION_PRESET_BY_ID[id]);
+check('cinéma II : CN11 à CN18 présents', cinemaIIMissing.length, 0, 0);
+const cinemaIIBadNoiseReduction = cinemaII.filter((id) => {
+    const spatial = VISION_PRESET_BY_ID[id]?.spatialFilters;
+    return spatial?.noiseReductionLuminance !== 20 || spatial?.noiseReductionColor !== 50;
+});
+check('cinéma II : réduction du bruit Lightroom 20/50 relevée partout', cinemaIIBadNoiseReduction.length, 0, 0);
+const presetCollections = buildPresetCollections(VISION_PRESETS);
+const cinemaCollection = presetCollections.find((item) => item.id === 'cinema');
+const cinemaIICollection = presetCollections.find((item) => item.id === 'cinema-ii');
+const importedCollectionCounts = {
+    futuriste: 12,
+    'inspire-d-un-film': 12,
+    'noir-et-blanc': 12,
+    vintage: 10,
+    'architecture-urbaine': 10,
+    paysage: 10,
+    'style-de-vie': 8,
+    voyage: 10,
+    'voyage-ii': 8,
+    printemps: 12,
+    ete: 11,
+    automne: 12,
+    hiver: 10,
+    'portrait-peau-foncee': 15,
+    'portrait-peau-intermediaire': 11,
+    'portrait-peau-claire': 11,
+    'portrait-audacieux': 12,
+    'portrait-groupe': 8,
+    'portrait-noir-et-blanc': 12,
+    'auto-retro': 11,
+};
+check('bibliothèque : collection Cinéma complète', cinemaCollection?.count ?? -1, 10, 10);
+check('bibliothèque : collection Cinéma II complète', cinemaIICollection?.count ?? -1, 8, 8);
+check('bibliothèque : 261 presets exposés', VISION_PRESETS.length, 261, 261);
+for (const [collectionId, expectedCount] of Object.entries(importedCollectionCounts)) {
+    const collection = presetCollections.find((item) => item.id === collectionId);
+    check(
+        `bibliothèque : collection ${collection?.label || collectionId} complète`,
+        collection?.count ?? -1,
+        expectedCount,
+        expectedCount,
+    );
+}
+check(
+    'bibliothèque : Cinéma précède Cinéma II',
+    presetCollections.findIndex((item) => item.id === 'cinema')
+        < presetCollections.findIndex((item) => item.id === 'cinema-ii') ? 1 : 0,
+    1,
+    1,
+);
+check(
+    'bibliothèque : aucun preset ne reste dans Imports',
+    presetCollections.some((item) => item.id === 'imports') ? 1 : 0,
+    0,
+    0,
+);
+check(
+    'bibliothèque : un import peut déclarer sa collection',
+    resolvePresetCollection({ collection: { id: 'portrait', label: 'Portraits' } }).id === 'portrait' ? 1 : 0,
+    1,
+    1,
+);
+const searchedCinemaII = filterAndGroupPresets(VISION_PRESETS, { collectionId: 'cinema-ii', query: 'CN17' });
+check('bibliothèque : filtre collection + recherche', searchedCinemaII[0]?.presets.length ?? 0, 1, 1);
+
+/* Les presets Style : Noir et blanc doivent embarquer la conversion N&B dans
+   leur Hald. Une capture faite sans appliquer réellement le preset laisse les
+   couleurs d'origine intactes : c'est précisément la régression vue le
+   2026-08-31. On sonde plusieurs couleurs très saturées ; les virages sépia,
+   rose, vert ou bleu restent autorisés, mais jamais une chroma de photo couleur. */
+const bwIds = Array.from({ length: 12 }, (_, index) => `bw${String(index + 1).padStart(2, '0')}`);
+const bwColorProbes = [
+    [230, 40, 30], [30, 210, 50], [30, 80, 230],
+    [230, 210, 30], [210, 30, 200], [30, 220, 220],
+];
+const bwTooColorful = bwIds.filter((id) => {
+    const table = getPresetLut(id);
+    if (!table) return true;
+    return bwColorProbes.some((probeRgb) => {
+        const pixel = new Uint8ClampedArray([...probeRgb, 255]);
+        applyLut3dToData(pixel, table, LUT_SIZE, 1);
+        return Math.max(pixel[0], pixel[1], pixel[2]) - Math.min(pixel[0], pixel[1], pixel[2]) > 40;
+    });
+});
+check('BW01 à BW12 : aucune couleur d’origine ne traverse la LUT', bwTooColorful.length, 0, 0);
+
+const bwNeutral = (id) => {
+    const pixel = new Uint8ClampedArray([128, 128, 128, 255]);
+    applyLut3dToData(pixel, getPresetLut(id), LUT_SIZE, 1);
+    return pixel;
+};
+const bw01Neutral = bwNeutral('bw01');
+const bw02Neutral = bwNeutral('bw02');
+const bw03Neutral = bwNeutral('bw03');
+const bw04Neutral = bwNeutral('bw04');
+const bw11Neutral = bwNeutral('bw11');
+const bw12Neutral = bwNeutral('bw12');
+check('BW01 : neutre gris', Math.max(...bw01Neutral.slice(0, 3)) - Math.min(...bw01Neutral.slice(0, 3)), 0, 2);
+check('BW02 : virage sépia', bw02Neutral[0] - bw02Neutral[2], 15, 35);
+check('BW03 : virage rosé', bw03Neutral[0] - bw03Neutral[2], 20, 40);
+check('BW04 : virage vert', bw04Neutral[1] - bw04Neutral[2], 12, 30);
+check('BW11 : virage brun chaud', bw11Neutral[0] - bw11Neutral[2], 8, 20);
+check('BW12 : virage bleu', bw12Neutral[2] - bw12Neutral[0], 15, 35);
+
+/* Une Hald ne peut pas capturer un effet qui dépend de la position ou des
+   pixels voisins. Les XMP Premium embarqués dans Lightroom sont donc la source
+   de vérité. BW01 à BW12 ne déclarent aucun PostCropVignetteAmount. */
+const bwSpatial = Object.fromEntries(
+    bwIds.map((id) => [id, VISION_PRESET_BY_ID[id]?.spatialFilters || {}]),
+);
+check(
+    'BW01 à BW12 : aucun vignettage absent des XMP Adobe',
+    bwIds.filter((id) => (
+        !Object.hasOwn(bwSpatial[id], 'vignette')
+        && !Object.hasOwn(bwSpatial[id], 'vignetteLightroomV2')
+    )).length,
+    12,
+    12,
+);
+check(
+    'BW01 à BW09 : aucun grain Lightroom',
+    bwIds.slice(0, 9).filter((id) => bwSpatial[id].grain === 0).length,
+    9,
+    9,
+);
+check(
+    'BW10 à BW12 : grain Lightroom 75/10/60',
+    bwIds.slice(9).filter((id) => (
+        bwSpatial[id].grain === 75
+        && bwSpatial[id].grainSize === 10
+        && bwSpatial[id].grainRoughness === 60
+    )).length,
+    3,
+    3,
+);
+check(
+    'BW01 à BW04 : clarté et texture -10',
+    bwIds.slice(0, 4).filter((id) => (
+        bwSpatial[id].clarity === -10 && bwSpatial[id].texture === -10
+    )).length,
+    4,
+    4,
+);
+check(
+    'BW05 à BW06 : clarté +10 sans texture',
+    bwIds.slice(4, 6).filter((id) => (
+        bwSpatial[id].clarity === 10 && bwSpatial[id].texture === 0
+    )).length,
+    2,
+    2,
+);
+check(
+    'BW07 à BW09 : texture +20 sans clarté ni voile',
+    bwIds.slice(6, 9).filter((id) => (
+        bwSpatial[id].clarity === 0
+        && bwSpatial[id].texture === 20
+        && bwSpatial[id].dehaze === 0
+    )).length,
+    3,
+    3,
+);
+
+const vintageIds = Array.from({ length: 10 }, (_, index) => `vn${String(index + 1).padStart(2, '0')}`);
+const vintageSpatial = Object.fromEntries(
+    vintageIds.map((id) => [id, VISION_PRESET_BY_ID[id]?.spatialFilters || {}]),
+);
+check(
+    'Vintage VN01/03/04/05/06/07 : grain Adobe 22/17/50',
+    ['vn01', 'vn03', 'vn04', 'vn05', 'vn06', 'vn07'].filter((id) => (
+        vintageSpatial[id].grain === 22
+        && vintageSpatial[id].grainSize === 17
+        && vintageSpatial[id].grainRoughness === 50
+    )).length,
+    6,
+    6,
+);
+check(
+    'Vintage VN02/VN10 : grain Adobe 18/16/50',
+    ['vn02', 'vn10'].filter((id) => (
+        vintageSpatial[id].grain === 18
+        && vintageSpatial[id].grainSize === 16
+        && vintageSpatial[id].grainRoughness === 50
+    )).length,
+    2,
+    2,
+);
+check(
+    'Vintage VN08/VN09 : grain Adobe 27/17/50',
+    ['vn08', 'vn09'].filter((id) => (
+        vintageSpatial[id].grain === 27
+        && vintageSpatial[id].grainSize === 17
+        && vintageSpatial[id].grainRoughness === 50
+    )).length,
+    2,
+    2,
+);
+check(
+    'Vintage VN06 : texture -15 et correction du voile +14',
+    vintageSpatial.vn06.texture === -15 && vintageSpatial.vn06.dehaze === 14 ? 1 : 0,
+    1,
+    1,
+);
+
+check('CN12 : Netteté Lightroom relevée', VISION_PRESET_BY_ID.cn12?.spatialFilters?.sharpness ?? -1, 40, 40);
+check('CN15 : Netteté Lightroom relevée', VISION_PRESET_BY_ID.cn15?.spatialFilters?.sharpness ?? -1, 40, 40);
+check('CN18 : Grain Lightroom relevé', VISION_PRESET_BY_ID.cn18?.spatialFilters?.grain ?? -1, 20, 20);
+check('CN18 : Taille du grain relevée', VISION_PRESET_BY_ID.cn18?.spatialFilters?.grainSize ?? -1, 40, 40);
+check('CN18 : Cassure du grain relevée', VISION_PRESET_BY_ID.cn18?.spatialFilters?.grainRoughness ?? -1, 50, 50);
+check('CN18 : Netteté Lightroom relevée', VISION_PRESET_BY_ID.cn18?.spatialFilters?.sharpness ?? -1, 40, 40);
 
 /* ---------- 6. import Lightroom : Hald CLUT ---------- */
 
@@ -275,8 +511,17 @@ const sampleXmp = `<?xpacket begin="\ufeff"?>
    crs:Highlights2012="-30"
    crs:Clarity2012="20"
    crs:Texture="10"
+   crs:LuminanceSmoothing="20"
+   crs:ColorNoiseReduction="50"
    crs:GrainAmount="24"
+   crs:GrainSize="40"
+   crs:GrainFrequency="0"
+   crs:Dehaze="-10"
    crs:PostCropVignetteAmount="-40"
+   crs:PostCropVignetteMidpoint="35"
+   crs:PostCropVignetteRoundness="20"
+   crs:PostCropVignetteFeather="70"
+   crs:PostCropVignetteHighlightContrast="15"
    crs:HueAdjustmentBlue="-38"
    crs:SaturationAdjustmentGreen="-55">
    <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">CN11</rdf:li></rdf:Alt></crs:Name>
@@ -299,7 +544,16 @@ check('.xmp : courbe maître', parsed.curves.master?.length || 0, 3, 3);
 /* Les reglages spatiaux sont le vrai apport du .xmp: une Hald CLUT ne les voit pas. */
 check('.xmp : grain transposé', parsed.spatialFilters.grain || 0, 1, 60);
 check('.xmp : vignetage transposé', parsed.spatialFilters.vignette || 0, 1, 60);
+check('.xmp : voile négatif transposé', parsed.spatialFilters.dehaze, -10, -10);
+check('.xmp : milieu du vignetage transposé', parsed.spatialFilters.vignetteMidpoint, 35, 35);
+check('.xmp : arrondi du vignetage transposé', parsed.spatialFilters.vignetteRoundness, 20, 20);
+check('.xmp : contour du vignetage transposé', parsed.spatialFilters.vignetteFeather, 70, 70);
+check('.xmp : hautes lumières du vignetage transposées', parsed.spatialFilters.vignetteHighlights, 15, 15);
 check('.xmp : clarté transposée', parsed.spatialFilters.clarity || 0, 1, 40);
+check('.xmp : réduction de bruit luminance transposée', parsed.spatialFilters.noiseReductionLuminance || 0, 20, 20);
+check('.xmp : réduction de bruit couleur transposée', parsed.spatialFilters.noiseReductionColor || 0, 50, 50);
+check('.xmp : taille du grain transposée', parsed.spatialFilters.grainSize ?? -1, 40, 40);
+check('.xmp : cassure du grain à zéro transposée', parsed.spatialFilters.grainRoughness ?? -1, 0, 0);
 check('.xmp : résumé lisible', parsed.summary.length, 3, 99);
 
 let rejected = 0;
@@ -323,12 +577,12 @@ check(
     verifierDomaineSpatial({ grain: 15, sharpness: 40, vignette: 12 }).length, 0, 0,
 );
 check(
-    'domaine : vignetage POSITIF signale (il est jete)',
-    verifierDomaineSpatial({}, { PostCropVignetteAmount: '25' }).length, 1, 1,
+    'domaine : vignetage POSITIF désormais pris en charge',
+    verifierDomaineSpatial({ vignette: 25, vignetteLighten: true }, { PostCropVignetteAmount: '25' }).length, 0, 0,
 );
 check(
-    'domaine : voile NEGATIF signale (il est jete)',
-    verifierDomaineSpatial({}, { Dehaze: '-20' }).length, 1, 1,
+    'domaine : voile NEGATIF conserve mais controle visuel signale',
+    verifierDomaineSpatial({ dehaze: -20 }, { Dehaze: '-20' }).length, 1, 1,
 );
 check(
     'domaine : voile positif signale (echelle non calibree)',
@@ -347,6 +601,95 @@ check(
     Array.isArray(parsed.spatialAlertes) ? 1 : 0, 1, 1,
 );
 
+/* ---------- effets Lightroom qui ne doivent plus etre perdus ---------- */
+const fakeContext = (pixels) => {
+    let current = new Uint8ClampedArray(pixels);
+    return {
+        getImageData: () => ({ data: new Uint8ClampedArray(current) }),
+        putImageData: (imageData) => { current = new Uint8ClampedArray(imageData.data); },
+        pixels: () => current,
+    };
+};
+
+const gray = [128, 128, 128, 255];
+const fogContext = fakeContext(gray);
+applyFusedPixelOps(fogContext, 1, 1, { safeSmartphone: false, dehaze: -10 });
+check('voile negatif : il agit et eclaircit le gris', fogContext.pixels()[0], 129, 255);
+
+const clearContext = fakeContext(gray);
+applyFusedPixelOps(clearContext, 1, 1, { safeSmartphone: false, dehaze: 10 });
+check('voile positif : il agit en sens inverse', clearContext.pixels()[0], 0, 127);
+
+const vignetteSource = new Uint8ClampedArray(9 * 5 * 4);
+for (let i = 0; i < vignetteSource.length; i += 4) {
+    vignetteSource[i] = 192;
+    vignetteSource[i + 1] = 192;
+    vignetteSource[i + 2] = 192;
+    vignetteSource[i + 3] = 255;
+}
+const implicitDefaults = fakeContext(vignetteSource);
+const explicitDefaults = fakeContext(vignetteSource);
+applyLightroomVignette(implicitDefaults, 9, 5, 40);
+applyLightroomVignette(explicitDefaults, 9, 5, 40, {
+    midpoint: 50, roundness: 0, feather: 50, highlights: 0,
+});
+let defaultDifference = 0;
+for (let i = 0; i < vignetteSource.length; i += 1) {
+    defaultDifference += Math.abs(implicitDefaults.pixels()[i] - explicitDefaults.pixels()[i]);
+}
+check('vignetage : les valeurs par defaut gardent le chemin historique exact', defaultDifference, 0, 0);
+
+const shapedVignette = fakeContext(vignetteSource);
+applyLightroomVignette(shapedVignette, 9, 5, 40, {
+    midpoint: 35, roundness: 20, feather: 70, highlights: 15,
+});
+let shapedDifference = 0;
+for (let i = 0; i < vignetteSource.length; i += 1) {
+    shapedDifference += Math.abs(implicitDefaults.pixels()[i] - shapedVignette.pixels()[i]);
+}
+check('vignetage : les quatre sous-reglages modifient vraiment le rendu', shapedDifference, 1, Number.MAX_SAFE_INTEGER);
+
+check('bornes : voile negatif LF03 accepte en mode sur', visionBoundsFor('dehaze').min, -30, -30);
+check('saisons : texture negative TM03 conservee', VISION_PRESET_BY_ID.tm03?.spatialFilters?.texture, -30, -30);
+check('saisons : clarte negative TM03 conservee', VISION_PRESET_BY_ID.tm03?.spatialFilters?.clarity, -30, -30);
+check('saisons : vignette TM07 normalisee en force positive', VISION_PRESET_BY_ID.tm07?.spatialFilters?.vignette, 32, 32);
+check('saisons : vignette positive SP01 garde son sens clair', VISION_PRESET_BY_ID.sp01?.spatialFilters?.vignetteLighten ? 1 : 0, 1, 1);
+check('saisons : clarté TM03 utilise le profil photo Lightroom', VISION_PRESET_BY_ID.tm03?.spatialFilters?.presetClarityScale, 0.18, 0.18);
+check('saisons : texture TM03 protège les arêtes', VISION_PRESET_BY_ID.tm03?.spatialFilters?.presetTextureEdgeAware ? 1 : 0, 1, 1);
+check('saisons : clarte TM09 non tronquee', VISION_PRESET_BY_ID.tm09?.spatialFilters?.clarity, 35, 35);
+check('bornes : vignette TM07 acceptee en mode sur', visionBoundsFor('vignette').max, 32, 32);
+check('bornes : clarte TM09 acceptee en mode sur', visionBoundsFor('clarity').max, 35, 35);
+check('portraits : clarte PB03 non tronquee', VISION_PRESET_BY_ID.pb03?.spatialFilters?.clarity, -33, -33);
+check('portraits : voile PM11 non tronque', VISION_PRESET_BY_ID.pm11?.spatialFilters?.dehaze, 39, 39);
+check('auto retro : les onze presets demandent le calcul adaptatif',
+    Array.from({ length: 11 }, (_, i) => `ar${String(i + 1).padStart(2, '0')}`)
+        .filter((id) => VISION_PRESET_BY_ID[id]?.spatialFilters?.presetAutoTone).length,
+    11,
+    11,
+);
+const autoToneContext = fakeContext(new Uint8ClampedArray([
+    18, 20, 24, 255, 232, 228, 220, 255,
+]));
+applyLightroomAutoTone(autoToneContext, 2, 1);
+check('auto retro : le calcul adaptatif agit sur une plage sombre/claire',
+    autoToneContext.pixels().some((value, index) => index % 4 !== 3 && value !== [18, 20, 24, 232, 228, 220][index - Math.floor(index / 4)]) ? 1 : 0,
+    1,
+    1,
+);
+const saisonIds = [
+    ...Array.from({ length: 12 }, (_, i) => `sp${String(i + 1).padStart(2, '0')}`),
+    ...Array.from({ length: 11 }, (_, i) => `sm${String(i + 1).padStart(2, '0')}`),
+    ...Array.from({ length: 12 }, (_, i) => `tm${String(i + 1).padStart(2, '0')}`),
+    ...Array.from({ length: 10 }, (_, i) => `wn${String(i + 1).padStart(2, '0')}`),
+];
+check(
+    'saisons : aucun grain Lightroom oublie sur les 45 presets',
+    saisonIds.filter((id) => VISION_PRESET_BY_ID[id]?.spatialFilters?.grain !== 0).length,
+    0,
+    0,
+);
+check('bornes : milieu du vignetage expose', visionBoundsFor('vignetteMidpoint').neutre, 50, 50);
+
 /* ---------- la clarte NEGATIVE, calee le 2026-08-19 ----------
  *
  * Elle n'avait ete mesuree qu'au positif. Son dosage lineaire donnait a -100
@@ -357,6 +700,7 @@ check(
 const canvasSource = readFileSync(
     new URL('../src/features/vibefx-studio/utils/canvasUtils.js', import.meta.url), 'utf8',
 );
+check('réduction du bruit : moteur spatial présent', /export function applyNoiseReduction\b/.test(canvasSource) ? 1 : 0, 1, 1);
 const kNeg = Number(/CLARITY_K_NEG = ([\d.]+)/.exec(canvasSource)?.[1]);
 const expNeg = Number(/CLARITY_EXPOSANT_NEG = ([\d.]+)/.exec(canvasSource)?.[1]);
 check('clarté : le dosage négatif est une loi de puissance', Number.isFinite(kNeg) && Number.isFinite(expNeg) ? 1 : 0, 1, 1);
@@ -590,10 +934,19 @@ check('showcase : pas de bandes', sautShowcase, 0, 5, '/255');
  * ramene a 42 en silence et le preset ne rend pas ce qu'il annonce.
  */
 const horsLut = VISION_PRESETS.filter((p) => p.spatialFilters);
-check('au moins un preset porte des effets', horsLut.length, 1, 99);
+check('au moins un preset porte des effets', horsLut.length, 1, 999);
 let horsBornes = 0;
 for (const preset of horsLut) {
     for (const [key, value] of Object.entries(preset.spatialFilters)) {
+        /* Marqueurs de profil du moteur, pas des curseurs numériques. */
+        if ([
+            'vignetteLightroomV2',
+            'vignetteLighten',
+            'presetSpatialBeforeLut',
+            'presetClarityScale',
+            'presetTextureEdgeAware',
+            'presetAutoTone',
+        ].includes(key)) continue;
         const bounds = visionBoundsFor(key, { safe: true });
         if (!bounds || value < bounds.min || value > bounds.max) horsBornes += 1;
     }
@@ -723,6 +1076,8 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
         pire = Math.max(pire, Math.abs(100 * (grainSigma(50, taille, largeur) / sien - 1)));
     }
     check('grain : force, 18 exports Lightroom', pire, 0, 0.5, '%');
+    check('grain : force Taille 40 sur photo 50 MP', grainEchelle(40, 8160), 2.754, 2.755);
+    check('grain : force Taille 40 sur photo 200 MP', grainEchelle(40, 16320), 3.323, 3.325);
 
     /*
      * La CASSURE, son troisieme curseur. Elle valait 50 partout et n'avait
@@ -802,6 +1157,11 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
         new URL('../src/features/vibefx-studio/engine/studioRenderer.js', import.meta.url),
         'utf8',
     );
+    const nrPos = moteur.lastIndexOf('applyNoiseReduction(');
+    const clarityPos = moteur.lastIndexOf('applyClarity(');
+    const sharpPos = moteur.lastIndexOf('applySharpness(');
+    check('réduction du bruit : appliquée avant clarté et netteté',
+        nrPos >= 0 && nrPos < clarityPos && nrPos < sharpPos ? 1 : 0, 1, 1);
     check('recadrage : le moteur prend le grand cote echantillonne',
         /grandCoteImage\s*=\s*Math\.max\(sWidth,\s*sHeight\)/.test(moteur) ? 1 : 0, 1, 1);
     /*
@@ -829,10 +1189,12 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
  */
 {
     const N = 256;
-    const longueurDuChamp = (echelle) => {
+    const longueurDuChamp = (echelle, grosseur = null) => {
         const v = new Float64Array(N * N);
         for (let y = 0; y < N; y += 1) {
-            for (let x = 0; x < N; x += 1) v[y * N + x] = grainValeurEn(x, y, echelle);
+            for (let x = 0; x < N; x += 1) {
+                v[y * N + x] = grainValeurEn(x, y, echelle, undefined, grosseur);
+            }
         }
         let somme = 0;
         for (let i = 0; i < v.length; i += 1) somme += v[i];
@@ -860,6 +1222,20 @@ check('effets des presets dans les garde-fous', horsBornes, 0, 0);
         pire = Math.max(pire, Math.abs(100 * (longueurDuChamp(echelle) / sienne - 1)));
     }
     check('grain : grosseur des grains, 6 exports', pire, 0, 6, '%');
+    const e8160 = grainEchelle(40, 8160);
+    const e16320 = grainEchelle(40, 16320);
+    const e10_8160 = grainEchelle(10, 8160);
+    const e10_16320 = grainEchelle(10, 16320);
+    check('grain CN14 : force photo 50 MP', grainSigma(25, 10, 8160), 6.0, 6.2, '/255');
+    check('grain CN14 : force photo 200 MP', grainSigma(25, 10, 16320), 4.0, 4.2, '/255');
+    check('grain CN14 : grosseur photo 50 MP',
+        longueurDuChamp(e10_8160, grainGrosseurCalibree(10, 8160, e10_8160)), 1.3, 1.5, 'px');
+    check('grain CN14 : grosseur photo 200 MP',
+        longueurDuChamp(e10_16320, grainGrosseurCalibree(10, 16320, e10_16320)), 2.15, 2.45, 'px');
+    check('grain : grosseur photo 50 MP',
+        longueurDuChamp(e8160, grainGrosseurCalibree(40, 8160, e8160)), 3.6, 4.1, 'px');
+    check('grain : grosseur photo 200 MP',
+        longueurDuChamp(e16320, grainGrosseurCalibree(40, 16320, e16320)), 6.3, 7.3, 'px');
 
     /* Le champ doit garder un ecart-type de 1 QUEL QUE SOIT le pas: aux pas
        entiers et demi-entiers le reseau se cale sur la grille des pixels et le

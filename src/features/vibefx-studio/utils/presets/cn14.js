@@ -31,7 +31,7 @@ export const preset = {
     recommendedIntensity: 100,
     /* Reglages que la table ne peut pas porter (ils dependent des pixels
        voisins ou de la position dans l'image), lus dans le .xmp. */
-    spatialFilters: {"grain":25,"grainSize":10,"sharpness":40},
+    spatialFilters: {"grain":25,"grainSize":10,"noiseReductionLuminance":20,"noiseReductionColor":50,"sharpness":40},
     /* La table elle-meme, decodee au premier usage. */
     getLut() {
         if (!cached) cached = lutFromBase64(LUT_BASE64);

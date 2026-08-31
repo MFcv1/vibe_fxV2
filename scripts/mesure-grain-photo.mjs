@@ -32,10 +32,11 @@
  * LE BRUIT DE FOND DE SA CHAINE. Le JPEG d'origine a son propre bruit, et sa
  * chaine l'amplifie: il s'ajoute a son grain et gonfle SA colonne, jamais la
  * notre. Pour le retirer, developper la MEME photo avec un preset qui ne pose
- * AUCUN grain (CN01 par exemple) et le passer en `--sansgrain <photo.png>`: le
- * script lit alors les MEMES blocs dessus et retire ce plancher en quadrature.
- * Sur `photo-test-2` il vaut ~1/255, ce qui suffit a expliquer la plus grande
- * part des 5 % qu'on croyait etre un ecart de notre grain.
+ * AUCUN grain et le passer en `--sansgrain <photo.png>`. Les deux exports etant
+ * parfaitement alignes, leur difference isole directement le grain Lightroom:
+ * ni bruit du telephone, ni nettete, ni detail de la photo ne restent dans la
+ * mesure. La soustraction en quadrature historique reste affichee uniquement
+ * comme diagnostic; la calibration doit utiliser `SON GRAIN DIRECT`.
  */
 
 import path from 'node:path';
@@ -44,6 +45,7 @@ import {
     GRAIN_ATTENUATION,
     GRAIN_TAILLE_DEFAUT,
     grainEchelle,
+    grainGrosseurCalibree,
     grainPoserDelta,
     grainSigma,
     grainValeurEn,
@@ -84,12 +86,13 @@ const notre = Buffer.from(lisse);
        portrait — voir `studioRenderer.js`. */
     const grandCote = Math.max(W, H);
     const echelle = grainEchelle(taille, grandCote);
+    const grosseur = grainGrosseurCalibree(taille, grandCote, echelle);
     const sigma = grainSigma(grain, taille, grandCote);
     for (let y = 0; y < H; y += 1) {
         for (let x = 0; x < W; x += 1) {
             const i = (y * W + x) * 3;
             const luma = (notre[i] * 77 + notre[i + 1] * 150 + notre[i + 2] * 29) >> 8;
-            const delta = grainValeurEn(x, y, echelle) * sigma * GRAIN_ATTENUATION[luma];
+            const delta = grainValeurEn(x, y, echelle, undefined, grosseur) * sigma * GRAIN_ATTENUATION[luma];
             grainPoserDelta(notre[i], notre[i + 1], notre[i + 2], delta, PIXEL);
             for (let c = 0; c < 3; c += 1) notre[i + c] = Math.round(PIXEL[c]);
         }
@@ -184,6 +187,26 @@ function residu(image, flou, bloc) {
     return [0, 1, 2].map((c) => Math.sqrt(Math.max(0, carres[c] / n - (somme[c] / n) ** 2)));
 }
 
+/* Le grain Lightroom traverse ensuite sa conversion couleur. Les trois canaux
+   peuvent donc diverger selon le preset et la teinte du bloc alors que la
+   texture visible reste monochrome. Cette mesure de luminance est le juge de
+   force le plus stable sur une vraie photo. */
+function residuLuma(image, base, bloc) {
+    let somme = 0;
+    let carres = 0;
+    for (let y = bloc.by; y < bloc.by + BLOC; y += 1) {
+        for (let x = bloc.bx; x < bloc.bx + BLOC; x += 1) {
+            const i = (y * W + x) * 3;
+            const d = 0.299 * (image[i] - base[i]) + 0.587 * (image[i + 1] - base[i + 1])
+                + 0.114 * (image[i + 2] - base[i + 2]);
+            somme += d;
+            carres += d * d;
+        }
+    }
+    const n = BLOC * BLOC;
+    return Math.sqrt(Math.max(0, carres / n - (somme / n) ** 2));
+}
+
 console.log(`\n${path.basename(photoPath)} — ${W}x${H}, Grain ${grain}, Taille ${taille}`);
 console.log(`Les ${choisis.length} blocs de ${BLOC}x${BLOC} les plus plats au-dessus de la luminosite ${clairMin}, flou de ${rayon} px.\n`);
 console.log('bloc      couleur du bloc     LUI  sigma RGB      NOUS sigma RGB      ecart %');
@@ -241,23 +264,59 @@ console.log(
 );
 if (plancher) {
     const sol = [0, 0, 0];
+    const direct = [0, 0, 0];
+    const notreDirect = [0, 0, 0];
+    let grossLuiDirect = 0;
+    let grossNousDirect = 0;
+    let lumaLuiDirect = 0;
+    let lumaNousDirect = 0;
     for (const bloc of choisis) {
         const p = residu(plancher.image, plancher.flou, bloc);
-        for (let c = 0; c < 3; c += 1) sol[c] += p[c];
+        const d = residu(sien, plancher.image, bloc);
+        const n = residu(notre, lisse, bloc);
+        for (let c = 0; c < 3; c += 1) {
+            sol[c] += p[c];
+            direct[c] += d[c];
+            notreDirect[c] += n[c];
+        }
+        grossLuiDirect += grosseur(sien, plancher.image, bloc);
+        grossNousDirect += grosseur(notre, lisse, bloc);
+        lumaLuiDirect += residuLuma(sien, plancher.image, bloc);
+        lumaNousDirect += residuLuma(notre, lisse, bloc);
     }
     const fond = moy(sol);
     const luiSeul = lui.map((v, c) => Math.sqrt(Math.max(0, v * v - fond[c] * fond[c])));
+    const luiDirect = moy(direct);
+    const nousDirect = moy(notreDirect);
     console.log(
         'son bruit de fond'.padEnd(26)
         + fond.map((v) => v.toFixed(2).padStart(6)).join(' '),
     );
     console.log(
-        'SON GRAIN SEUL'.padEnd(26)
+        'grain seul (quadrature)'.padEnd(26)
         + luiSeul.map((v) => v.toFixed(2).padStart(6)).join(' ') + '   '
         + nous.map((v) => v.toFixed(2).padStart(6)).join(' ') + '   '
         + luiSeul.map((v, c) => `${(100 * (nous[c] / v - 1)).toFixed(0)}`.padStart(5)).join(' '),
     );
-    console.log('\n(le bruit de fond se retire EN QUADRATURE: deux bruits s\'ajoutent en carres.)');
+    console.log(
+        'SON GRAIN DIRECT'.padEnd(26)
+        + luiDirect.map((v) => v.toFixed(2).padStart(6)).join(' ') + '   '
+        + nousDirect.map((v) => v.toFixed(2).padStart(6)).join(' ') + '   '
+        + luiDirect.map((v, c) => `${(100 * (nousDirect[c] / v - 1)).toFixed(0)}`.padStart(5)).join(' '),
+    );
+    console.log(
+        `GROSSEUR DIRECTE          ${(grossLuiDirect / choisis.length).toFixed(2)} chez lui`
+        + `   ${(grossNousDirect / choisis.length).toFixed(2)} chez nous`
+        + '   (mesure de calibration)',
+    );
+    const lumaLui = lumaLuiDirect / choisis.length;
+    const lumaNous = lumaNousDirect / choisis.length;
+    console.log(
+        `LUMINANCE DIRECTE         ${lumaLui.toFixed(2)} chez lui`
+        + `   ${lumaNous.toFixed(2)} chez nous`
+        + `   (${(100 * (lumaNous / lumaLui - 1)).toFixed(1)} %)`,
+    );
+    console.log('\nLa ligne DIRECTE soustrait les deux exports pixel a pixel; la quadrature reste un controle secondaire.');
 }
 console.log(
     `\nGROSSEUR des grains       ${(grossLui / choisis.length).toFixed(2)} chez lui`

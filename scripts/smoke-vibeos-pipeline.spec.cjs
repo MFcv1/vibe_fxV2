@@ -2,10 +2,8 @@
  * Smoke du PIPELINE VibeOS (phase F, plan §4.3).
  *
  * Ce que le test prouve, dans l'ordre du produit:
- *   1. la composition faite dans Mise en page circule: Vision et Studio
- *      travaillent dessus, plus sur la photo brute;
- *   2. les etages s'enchainent: le Studio recoit la composition DEJA passee par
- *      les filtres Vision (pixels mesures, pas seulement un libelle);
+ *   1. la composition faite dans Mise en page circule jusqu'a Vision;
+ *   2. le Studio recentre ouvre ses deux generateurs de fond;
  *   3. « Publier » rend le projet complet et ouvre le vrai composeur de
  *      publication avec le visuel dedans.
  *
@@ -101,7 +99,7 @@ async function composeInLayout(page, dir) {
   return canvas;
 }
 
-test("pipeline VibeOS: composition -> Vision -> Studio -> publication", async ({ page }) => {
+test("pipeline VibeOS: composition -> Vision -> generateurs Studio -> publication", async ({ page }) => {
   test.setTimeout(240_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
@@ -130,39 +128,14 @@ test("pipeline VibeOS: composition -> Vision -> Studio -> publication", async ({
   await expect(page.getByTestId("vibeos-vision-message")).toBeVisible();
   await expect.poll(async () => distance(await readCanvasStats(page), compositionStats), { timeout: 20000 })
     .toBeGreaterThan(2);
-  const visionStats = await readCanvasStats(page);
   /* Laisse la sauvegarde debouncee ecrire les filtres Vision dans le projet. */
   await page.waitForTimeout(2500);
 
-  /* ---------- Etage 3: le Studio recoit composition + Vision ---------- */
+  /* ---------- Etage 3: le Studio porte les generateurs de fond ---------- */
   await page.getByRole("link", { name: "Studio" }).first().click();
   await expect(page.getByTestId("vibeos-studio-screen")).toBeVisible({ timeout: 30000 });
-  const studioSource = page.getByTestId("vibeos-studio-source");
-  await expect(studioSource).toHaveAttribute("data-source-kind", "composition", { timeout: 30000 });
-  await expect(studioSource).toContainText("Vision");
-
-  await expect.poll(async () => page.locator("canvas").first().evaluate((node) => node.width), { timeout: 20000 })
-    .toBeGreaterThan(0);
-  const studioBaseStats = await readCanvasStats(page);
-
-  /* Le Studio ne part PAS de la composition nue: son image de travail porte
-     deja le preset Vision. On le mesure des deux cotes plutot que de croire le
-     libelle. */
-  expect(
-    distance(studioBaseStats, compositionStats),
-    "le Studio devrait partir de la composition filtree par Vision",
-  ).toBeGreaterThan(2);
-  expect(
-    distance(studioBaseStats, visionStats),
-    "l'image de travail du Studio devrait ressembler au rendu Vision",
-  ).toBeLessThan(distance(studioBaseStats, compositionStats) + 8);
-
-  // Une ambiance s'applique par-dessus: troisieme etage.
-  const ambiances = page.getByTestId("vibeos-studio-ambiances");
-  await ambiances.locator("button").first().click();
-  await expect.poll(async () => distance(await readCanvasStats(page), studioBaseStats), { timeout: 20000 })
-    .toBeGreaterThan(2);
-  await page.waitForTimeout(2500);
+  await expect(page.getByTestId("vibeos-studio-module-gradient")).toBeVisible();
+  await expect(page.getByTestId("vibeos-studio-module-lumen")).toBeVisible();
 
   /* ---------- Etage 4: publication ---------- */
   await page.getByTestId("vibeos-publish").click();
@@ -195,8 +168,8 @@ test("pipeline VibeOS: la composition circule aussi sur mobile", async ({ page }
 
   await page.getByRole("link", { name: "Studio" }).last().click();
   await expect(page.getByTestId("vibeos-studio-screen")).toBeVisible({ timeout: 30000 });
-  await expect(page.getByTestId("vibeos-studio-source"))
-    .toHaveAttribute("data-source-kind", "composition", { timeout: 30000 });
+  await expect(page.getByTestId("vibeos-studio-module-gradient")).toBeVisible();
+  await expect(page.getByTestId("vibeos-studio-module-lumen")).toBeVisible();
 
   const horizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,

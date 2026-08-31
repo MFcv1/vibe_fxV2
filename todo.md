@@ -1,16 +1,167 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-27 ter.**
+> **Point d'étape : 2026-08-31 — Vintage et Noir et blanc fiabilisés après audit.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
 >
+> **2026-08-31 — corrections Vintage et Noir et blanc livrées.** Les dix
+> Vintage ont été recapturés depuis une mire réinitialisée avant chaque preset :
+> l'ancienne mire avait conservé un état noir et blanc. Les douze Noir et blanc
+> ne portent plus le vignettage 25 absent de leurs XMP Adobe. Sur les contrôles
+> réels, Vintage tombe à 2,04–4,32/255 sur la couleur seule ; BW01/BW04/BW05 à
+> 2,64–3,32/255 et BW10 à 3,87/255 hors hasard du grain. Les 22 familles sont
+> maintenant cohérentes : quatorze conformes et huit à surveiller pour de petits
+> écarts. `test:vision-preset` passe 436/436, lint passe avec cinq avertissements
+> préexistants et le build Node 22 passe. Les smokes navigateur restent bloqués
+> par le contournement d'authentification Dev qui ne ferme plus la modale, sans
+> rapport avec les presets. Aucun déploiement. Rapport :
+> [docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md](docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md).
+> Reprise : [docs/prompt-reprise-2026-08-31-correction-vintage-bw.md](docs/prompt-reprise-2026-08-31-correction-vintage-bw.md).
+>
+> **2026-08-31 — performance des miniatures Vision livrée.** Les cartes dans
+> le viewport passent avant tout le reste via `IntersectionObserver`; la marge
+> suivante est préchargée au repos, une file devenue inutile est annulée, et le
+> cache photo + preset + intensité conseillée + version moteur survit aux
+> changements de collection. La source 192×116 est réduite une fois, le rendu
+> reste le pipeline complet (LUT + effets), et les JPEG sont des Blob URLs.
+> Cause principale corrigée : chaque miniature terminée recréait des objets du
+> renderer et relançait aussi la grande image jusqu'à 3 Mpx.
+> Mesure reproductible : première miniature 454 ms depuis l'import (23 ms après
+> disponibilité de la photo), 10/10 visibles en 852 ms (421 ms après photo),
+> scroll rapide 284 ms, 14 rendus lancés avant scroll, 0 doublon React, 4,7 ms
+> de pipeline moyen par preset. Une collection Cinéma n'en lance que 10.
+> Gates : performance 3/3, smoke Vision navigateur 3/3, moteur 426/426, lint
+> sans erreur (5 avertissements préexistants). Le build compile puis garde son
+> blocage ABI local `better-sqlite3` (127 contre Node 26/147). Aucun déploiement.
+> Reprise : [docs/prompt-reprise-2026-08-31-performance-miniatures-vision.md](docs/prompt-reprise-2026-08-31-performance-miniatures-vision.md).
+>
+> **2026-08-31 — retrait propre de VibeMask.** La segmentation ciel/eau,
+> l'overlay de masque, les presets ciel locaux, le Worker DeepLab et les
+> dépendances TensorFlow.js ont été retirés : leur résultat n'était pas assez
+> fiable pour ce stade du produit. Vision conserve ses presets classiques,
+> l'amélioration automatique, les réglages, l'historique et le même pipeline
+> pour l'aperçu et l'export.
+> Gates du retrait : pipeline 2/2, lint 0 erreur (5 avertissements déjà
+> présents), build Node 22 vert. Le smoke moteur Vision conservait son unique
+> échec antérieur sur 12 presets hors garde-fous. Le plafond navigateur de
+> 173/261 miniatures en 20 s a été résolu par le lot performance ci-dessus.
+>
 > **Ce qui est livré** — redesign VibeOS (`/creer`, `/publier`, `/video`), moteur
 > de LUT 3D 33³, chaîne d'import Lightroom, six réglages avancés alignés, et
-> **31 presets** dont les douze derniers — `couchant`, `powlishermain` et la série
+> **261 presets** dont les douze derniers VibeFX — `couchant`, `powlishermain` et la série
 > `powV2` à `powV11` — attendent un regard. Le détail est
 > dans [l'archive du 2026-08-27](docs/archive-calages-lightroom-2026-08-27.md).
+>
+> **2026-08-30 ter — Cinéma II complet.** Lightroom Cloud confirme que la
+> famille Adobe va de CN11 à CN18. Les trois absents **CN12, CN15, CN18** sont
+> importés par mires 2048 en blocs ; leurs réglages avancés sont relevés et
+> verrouillés par le smoke. La réduction du bruit 20/50 est reproduite pour les
+> huit presets, et le grain Taille 10/40 est recalé jusque 16 320 px sur quatre
+> photos téléphone et trois reflex du dossier `~/Desktop/maroc`. Les contrôles
+> finaux LUT + effets valent **1,68 à 1,97/255** et ont été regardés à l'œil.
+> Vision rangeait alors les 35 presets en collections recherchables : les
+> huit CN11-CN18 étaient ensemble dans `Cinéma II`, avec filtres Apple-dark,
+> compteurs et état vide. Les prochains imports acceptent `--collection`.
+> Audit complet :
+> [docs/lightroom/audit-cinema-II-2026-08-30.md](docs/lightroom/audit-cinema-II-2026-08-30.md).
+> Les gates ciblés passent. Deux réserves hors lot restent consignées dans
+> l'audit : le smoke global `PowV3` sous son seuil de contraste, et le build
+> bloqué après compilation par l'ABI locale de `better-sqlite3`.
+>
+> **2026-08-30 quater — Cinéma complet.** La famille Lightroom Cloud
+> `Style : cinéma` est CN01–CN10. CN01 quitte `Imports` sans modification de sa
+> LUT ; CN02–CN10 sont importés par mires propres et rangés dans `Cinéma`.
+> Aucun ne porte de grain. CN02–CN10 reproduisent Netteté 40 et réduction du
+> bruit 20/50. Les contrôles CN02/CN10 sur téléphone et reflex valent
+> **1,23 à 1,98/255**, verdict identique à l'œil. Audit :
+> [docs/lightroom/audit-cinema-2026-08-30.md](docs/lightroom/audit-cinema-2026-08-30.md).
+>
+> **2026-08-30 — neuf familles Premium supplémentaires.** Les 92 looks
+> `Futuriste` (FT01–FT12), `Inspiré d’un film` (12), `Noir et blanc`
+> (BW01–BW12), `Vintage` (VN01–VN10) et `Architecture urbaine` (UA01–UA10)
+> ainsi que `Paysage` (LN01–LN10), `Style de vie` (LF01–LF08), `Voyage`
+> (TR01–TR10) et `Voyage II` (TR11–TR18) sont capturés depuis Lightroom Cloud,
+> indexés et visibles dans leurs filtres.
+> Les valeurs avancées explicites sont conservées ; le vignetage Lightroom
+> négatif est normalisé vers la force positive attendue par le moteur VibeFX.
+> LF03 conserve notamment son voile à −28 grâce à une borne sûre étendue à −30.
+> **Correction BW du 2026-08-31 :** la première capture BW01–BW12 avait exporté
+> une mire encore colorée. Les douze Hald ont été recapturées après clic réel du
+> preset dans Lightroom Cloud ; VibeFX retrouve désormais dans le bon ordre gris,
+> sépia, rose, vert, gris neutres, brun et bleu. Un second audit dans
+> l'application Lightroom a réparé les effets hors LUT : vignette -25 complète
+> sur BW01–BW12, suppression du faux grain de BW03–BW09, retrait du faux voile
+> de BW08 et restauration des trois groupes clarté/texture. Le moteur passe
+> 433 vérifications, le smoke Vision 3/3 et les réglages avancés 1/1 ; lint reste
+> à 0 erreur avec 5 avertissements préexistants. Le build compile puis rencontre
+> toujours le blocage ABI local préexistant `better-sqlite3` (127 contre 147).
+> Reprise : [docs/prompt-reprise-2026-08-31-bw-effets-lightroom.md](docs/prompt-reprise-2026-08-31-bw-effets-lightroom.md).
+> les quatre nouvelles familles ont aussi été regardées sur une photo téléphone
+> et une photo reflex du dossier `~/Desktop/maroc`.
+>
+> **2026-08-30 — quatre familles saisonnières.** Printemps SP01–SP12, Été
+> SM01–SM11, Automne TM01–TM12 et Hiver WN01–WN10 ajoutent 45 presets, soit 181
+> au total. Aucun ne porte de grain. Le contrôle téléphone + reflex a corrigé
+> le vignettage positif, l'ordre du détail avant LUT, le dosage photo de la
+> clarté et la protection des arêtes de la texture, sans modifier les anciens
+> presets validés. Audit :
+> [docs/lightroom/audit-saisons-2026-08-30.md](docs/lightroom/audit-saisons-2026-08-30.md).
+>
+> **2026-08-30 decies — Studio recentré.** `/creer/studio` est maintenant un
+> lanceur Apple-dark avec seulement **Gradient** et **Lumen**. Les ambiances et
+> Mesh ont quitté cette surface ; les presets photo restent dans Vision et Mesh
+> reste dans Layout. Chaque mini-app s'ouvre bord à bord sous le bandeau VibeOS,
+> jusqu'aux côtés et au bas, sur desktop comme mobile. Le pont `postMessage`
+> persiste toujours le rendu en Blob dans le projet. Le smoke Studio passe 2/2.
+>
+> **2026-08-30 nonies — Gradient Builder : chantier clos.** Les quatre moteurs
+> qui manquaient sont ecrits — **Glassy**, **Glint**, **Mist**, **Skyline** (5
+> villes) — donc **les 28 types rendent leur vrai dessin**. Ajoutes aussi : le
+> **panneau Forms complet** (35 silhouettes, 12 gammes, 13 fonds, transformation
+> a la main sur le canvas, Form treatment), l'**onglet Image** (logo ou photo
+> posee, taille/rotation/opacite/fusion), et les **exports PNG / SVG / CSS /
+> JSON / video** dans une feuille dediee. L'animation couvre maintenant les
+> types calcules pixel par pixel, en resolution reduite. Reste en dehors :
+> la page « What's new », que tu n'as pas demandee. `npm run lint` passe.
+
+> **2026-08-30 octies — Gradient Builder, tranche 2 : les moteurs.** Le retour
+> etait : l'UI est bonne, les types ne valent pas ceux du site. C'etait juste —
+> 18 types sur 28 retombaient sur une rampe lineaire. **Il en reste 4** :
+> Glassy, Glint, Mist, Skyline. Ecrits dans cette tranche : **Sky** et
+> **Aurora** en WebGL (vrais nuages, vraie aurore, et elles s'animent),
+> **Lines** (13 formes de trait + les 8 arrangements du site), **Forms**
+> (35 silhouettes SVG), **Still**, **Retro**, **Noise**, **Prism**, **Rings**,
+> **Beehive**, **Blocks**, **Balls**, **Pixel**, **Arch**. Le **texte** accepte
+> maintenant plusieurs boites deplacables, et les presets apportent les leurs.
+> Chaque type a son groupe de reglages propre. `npm run lint` passe (0 erreur).
+
+> **2026-08-30 septies — Gradient Builder, tranche 1.** Nouveau chantier, sans
+> rapport avec Lightroom. Reconstruction de l'ecran Studio de
+> `feralui.dev/gradients` en app autonome dans
+> `public/vendor/gradient-builder/`, ouverte plein ecran depuis « Fond genere »
+> du Studio (bouton `Gradient`, a cote de Mesh et Lumen) et rendue au parent par
+> `postMessage`, comme Lumen. **Livre** : la coquille complete (entete, modes,
+> panneau vitre, dock des 28 types en 5 familles, bandes, barre du bas, clair et
+> sombre), les donnees du site (208 presets de panneau, 69 degrades de galerie,
+> 12 gammes de palette, nuancier de 102 couleurs), et **10 moteurs de rendu
+> ecrits** : Flow, Mesh, Linear, iOS, Radial, Conic, Waves, Stripes, Bars,
+> Columns. **Reste** : les 18 autres types (dont Sky en WebGL, Lines, Forms,
+> Glassy, Pixel, Prism, Blocks, Rings, Mist, Glint, Skyline...), l'onglet Image,
+> et les exports SVG / CSS / JSON / MP4. Les types sans moteur apparaissent dans
+> le dock et retombent sur la rampe lineaire. `npm run lint` passe (0 erreur).
+
+> **2026-08-30 quinquies — miniatures et vignettage Lightroom.** Les cartes de
+> presets ne rendent plus la LUT seule : elles passent par le même pipeline que
+> la grande photo, donc texture, clarté, voile, réduction du bruit, netteté,
+> vignetage et grain sont visibles avant le clic. Le calcul se fait par lots de
+> quatre pour rester fluide au-delà de 100 presets. L'import porte aussi les
+> quatre sous-réglages Adobe du vignetage (milieu, arrondi, contour progressif,
+> hautes lumières), le voile négatif et un profil radial mesuré sur quatre
+> exports Lightroom. Le chemin historique des presets déjà validés reste
+> bit-à-bit inchangé. Les smokes ciblés et le lint passent ; le build compile
+> puis reste bloqué par l'ABI locale préexistante de `better-sqlite3`.
 >
 > **2026-08-29** — la **bibliothèque** (`/creer/bibliotheque`) a le mouvement de
 > la référence `@powl_d` : apparition des tuiles en vague lente, rejeu complet au
@@ -172,7 +323,11 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la correction du lettrage de `powV11`** — 2026-08-30](docs/prompt-reprise-2026-08-30.md),
+[**après le recentrage du Studio** — 2026-08-30 decies](docs/prompt-reprise-2026-08-30-decies.md),
+[**après la clôture du Gradient Builder** — 2026-08-30 nonies](docs/prompt-reprise-2026-08-30-nonies.md),
+[après les moteurs du Gradient Builder — 2026-08-30 octies](docs/prompt-reprise-2026-08-30-octies.md),
+[après la tranche 1 du Gradient Builder — 2026-08-30 septies](docs/prompt-reprise-2026-08-30-septies.md),
+[après l'import des quatre saisons — 2026-08-30](docs/prompt-reprise-2026-08-30.md),
 [après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
 [après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
 [la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
@@ -264,9 +419,11 @@ comment il se désactive, et comment le figer dans un smoke.
 
 ### Puis — importer d'autres presets Lightroom
 
-**Série en cours (favoris de Matthis)** : faits `cn01`, `cn11`, `cn13`, `cn14`,
-`cn16`, `cn17`. Restent CN18, FT01, FT11, LN02, LN05, LN06, TR04, TR13,
-TR14, TR15, VCR11, VCR12. Le circuit de dossiers est décrit dans le prompt de
+**Série en cours (favoris de Matthis)** : les familles **Cinéma, Cinéma II,
+Futuriste, Inspiré d’un film, Noir et blanc, Vintage, Architecture urbaine,
+Paysage, Style de vie, Voyage, Voyage II, Printemps, Été, Automne et Hiver sont
+complètes**. Restent hors de ces
+familles : VCR11 et VCR12. Le circuit de dossiers est décrit dans le prompt de
 reprise.
 
 **À chaque preset qui porte du grain** : ouvrir le triangle du panneau Grain et
@@ -339,7 +496,7 @@ npm run dev                    # http://localhost:3000 -> /creer
 npm run lint                   # 0 erreur (5 warnings préexistants)
 npm run build
 npm run test:scope
-npm run test:vision-preset     # 98 vérifications (Node, 3 s)
+npm run test:vision-preset     # 426 vérifications (Node)
 npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
@@ -373,8 +530,6 @@ Tous verts au 2026-08-17, les deux audits de réglages compris.
 (3) et `test:vibecut-export-local-mp4` — fixtures manquantes, chemins Windows
 d'origine, pointeurs Git LFS ([archive](docs/archive-vibecut-2026-08-04.md#commandes)).
 
-**`npm run build` échoue depuis la machine, pas depuis le code** (vu le
-2026-08-19, reproduit sans aucune modification) : le code compile, mais la
-collecte de page casse sur `/api/catalog/[jobId]` parce que `better-sqlite3` a
-été compilé pour un autre Node (NODE_MODULE_VERSION 127 contre 147). Correctif :
-`npm rebuild better-sqlite3`.
+**Node 22 est requis.** Le build passe sous Node 22. Sous un Node plus récent,
+`better-sqlite3` peut encore échouer sur une incompatibilité ABI ; revenir à la
+version du projet avant d'en conclure à une erreur applicative.

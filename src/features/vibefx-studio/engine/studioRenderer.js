@@ -5,11 +5,14 @@ import {
     applyFusedPixelOps,
     applyClarity,
     applyTexture,
+    applyNoiseReduction,
     applySharpness,
     applyHalation,
     applyPerceptualIntensityBlend,
     applySmartphoneOutputGuards,
-    applySafeGlobalTint
+    applySafeGlobalTint,
+    applyLightroomAutoTone,
+    applyLightroomBasicTone
 } from '../utils/canvasUtils';
 import { normalizeVisionFilters } from '../utils/visionColorScience';
 import { applyLut3d, LUT_SIZE } from '../utils/lut3d';
@@ -105,7 +108,16 @@ export function renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
 
 
     // ═══════════════════════════════════════════════════════
-    applyFiltersPro(ctx, targetCanvas, w, h, quality, filters, grandCoteImage, grandCoteRendu);
+    applyFiltersPro(
+        ctx,
+        targetCanvas,
+        w,
+        h,
+        quality,
+        filters,
+        grandCoteImage,
+        grandCoteRendu,
+    );
 }
 
 /**
@@ -139,14 +151,15 @@ function renderCropGrid(ctx, w, h) {
  *  2. Fused Pixel Ops (curves + temperature + highlights/shadows + dehaze +
  *     faded blacks + split toning + vibrance) — SINGLE getImageData pass
  *  3. Legacy Tint (backward compat overlay tint)
- *  4. Clarity (spatial high-pass mid-frequency boost)
- *  5. Sharpness (unsharp mask, small radius)
- *  6. Halation (glow around highlights — CineStill)
- *  7. Vignette (radial gradient)
- *  8. Grain (noise pattern)
- *  9. Intensity Blend (original/filtered mix)
+ *  4. Noise reduction (luminance/chroma, edge aware)
+ *  5. Clarity + texture (spatial detail)
+ *  6. Sharpness (unsharp mask, small radius)
+ *  7. Halation (glow around highlights — CineStill)
+ *  8. Vignette (radial gradient)
+ *  9. Grain (noise pattern)
+ * 10. Intensity Blend (original/filtered mix)
  */
-function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
+export function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
     grandCoteImage = Math.max(w, h), grandCoteRendu = Math.max(w, h)) {
     const safeFilters = normalizeVisionFilters(filters);
     const intensity = safeFilters.filterIntensity !== undefined ? safeFilters.filterIntensity : 100;
@@ -187,6 +200,31 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
 
     const doPixelOps = doColorPixelOps;
     const doSpatialPixelOpsForQuality = doSpatialPixelOps;
+    const clarityForRender = safeFilters.clarity * (
+        Number.isFinite(safeFilters.presetClarityScale)
+            ? safeFilters.presetClarityScale
+            : 1
+    );
+
+    /* Les profils Lightroom calculent leurs reglages de detail dans l'espace
+       de developpement, avant la conversion couleur finale capturee par notre
+       LUT. Le marqueur est reserve aux imports mesures; les anciens looks
+       VibeFX conservent strictement leur ordre historique. */
+    if (doSpatialPixelOpsForQuality && safeFilters.presetSpatialBeforeLut) {
+        applyNoiseReduction(
+            ctx,
+            targetCanvas,
+            w,
+            h,
+            safeFilters.noiseReductionLuminance,
+            safeFilters.noiseReductionColor,
+        );
+        applyClarity(ctx, targetCanvas, w, h, clarityForRender);
+        applyTexture(ctx, targetCanvas, w, h, safeFilters.texture, {
+            edgeAware: safeFilters.presetTextureEdgeAware,
+        });
+        applySharpness(ctx, targetCanvas, w, h, safeFilters.sharpness);
+    }
 
     // ── Stage 1.5: Preset (LUT 3D) ───────────────────────
     // Le preset pose le look de base; les reglages manuels des etapes suivantes
@@ -196,6 +234,11 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
     if (presetLut) {
         applyLut3d(ctx, w, h, presetLut, LUT_SIZE, 1);
     }
+
+    /* Le profil/courbes du preset forment la LUT. Les curseurs Lumiere du
+       panneau Lightroom sont poses ensuite dans son pipeline de developpement. */
+    applyLightroomBasicTone(ctx, w, h, safeFilters);
+    if (safeFilters.presetAutoTone) applyLightroomAutoTone(ctx, w, h);
 
     if (doPixelOps) {
         // ── Stage 2: Fused Pixel Ops (single pass) ───────
@@ -207,9 +250,19 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
         applySafeGlobalTint(ctx, w, h, safeFilters.tintColor, safeFilters.tintIntensity, safeFilters.safeSmartphone !== false);
     }
 
-    if (doSpatialPixelOpsForQuality) {
+    if (doSpatialPixelOpsForQuality && !safeFilters.presetSpatialBeforeLut) {
+        // Detail Lightroom: reduction du bruit avant les renforcements locaux.
+        applyNoiseReduction(
+            ctx,
+            targetCanvas,
+            w,
+            h,
+            safeFilters.noiseReductionLuminance,
+            safeFilters.noiseReductionColor,
+        );
+
         // ── Stage 4: Clarity ─────────────────────────────
-        applyClarity(ctx, targetCanvas, w, h, safeFilters.clarity);
+        applyClarity(ctx, targetCanvas, w, h, clarityForRender);
 
         // ── Stage 4 bis: Texture ─────────────────────────
         /*
@@ -218,7 +271,9 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
          * preset qui en portait rendait moins de matiere, en silence. Le detail
          * de la mesure est dans `applyTexture`.
          */
-        applyTexture(ctx, targetCanvas, w, h, safeFilters.texture);
+        applyTexture(ctx, targetCanvas, w, h, safeFilters.texture, {
+            edgeAware: safeFilters.presetTextureEdgeAware,
+        });
 
         // ── Stage 5: Sharpness ───────────────────────────
         applySharpness(ctx, targetCanvas, w, h, safeFilters.sharpness);
@@ -235,7 +290,14 @@ function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
      * La mesure est dans `applyLightroomVignette`.
      */
     if (safeFilters.vignette > 0) {
-        applyLightroomVignette(ctx, w, h, safeFilters.vignette);
+        applyLightroomVignette(ctx, w, h, safeFilters.vignette, {
+            midpoint: safeFilters.vignetteMidpoint,
+            roundness: safeFilters.vignetteRoundness,
+            feather: safeFilters.vignetteFeather,
+            highlights: safeFilters.vignetteHighlights,
+            measuredProfile: safeFilters.vignetteLightroomV2,
+            lighten: safeFilters.vignetteLighten,
+        });
     }
 
     // ── Stage 7 bis: Degrade du bas ──────────────────────

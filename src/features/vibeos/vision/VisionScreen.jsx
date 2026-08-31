@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, ShieldCheck, Sparkles, Undo2, Upload,
-    ZoomIn, ZoomOut,
+    Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, Search,
+    ShieldCheck, Sparkles, Undo2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -14,9 +14,63 @@ import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import PipelineSourceNote from '../project/PipelineSourceNote';
 import useVisionEditor from './useVisionEditor';
 import { describeSignals } from './autoEnhance';
+import {
+    buildPresetCollections, filterAndGroupPresets, PRESET_COLLECTION_ALL,
+} from './presetCollections';
 import styles from './vision.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
+
+function PresetCard({ preset, preview, active, onApply, requestPreview, releasePreview }) {
+    const cardRef = useRef(null);
+
+    useEffect(() => {
+        const card = cardRef.current;
+        if (!card || typeof IntersectionObserver === 'undefined') {
+            requestPreview(preset.id, 'urgent');
+            return () => releasePreview(preset.id);
+        }
+        const root = card.closest(`.${styles.panel}`);
+        const observer = new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) {
+                releasePreview(preset.id);
+                return;
+            }
+            const cardBox = entry.boundingClientRect;
+            const rootBox = root?.getBoundingClientRect() || {
+                top: 0, bottom: window.innerHeight,
+            };
+            const visibleNow = cardBox.bottom > rootBox.top && cardBox.top < rootBox.bottom;
+            requestPreview(preset.id, visibleNow ? 'urgent' : 'idle');
+        }, { root, rootMargin: '500px 0px' });
+        observer.observe(card);
+        return () => {
+            observer.disconnect();
+            releasePreview(preset.id);
+        };
+    }, [preset.id, requestPreview, releasePreview]);
+
+    return (
+        <button
+            ref={cardRef}
+            type="button"
+            className={cx(styles.lookCard, active && styles.lookCardActive)}
+            onClick={() => onApply(preset)}
+            title={preset.description}
+            aria-pressed={active}
+            data-preset-id={preset.id}
+            data-preview-ready={preview ? 'true' : 'false'}
+        >
+            <span className={styles.lookThumb}>
+                {preview
+                    ? <img src={preview} alt="" />
+                    : <span className={styles.lookThumbEmpty} />}
+            </span>
+            <span className={styles.lookLabel}>{preset.label}</span>
+            <span className={styles.lookHint}>{preset.hint}</span>
+        </button>
+    );
+}
 
 /*
  * Reglages fins: exactement les cles supportees par le moteur Vision v3
@@ -61,7 +115,13 @@ const ADVANCED_GROUPS = [
             { key: 'sharpness', label: 'Netteté' },
             { key: 'dehaze', label: 'Voile atmosphérique' },
             { key: 'grain', label: 'Grain' },
+            { key: 'grainSize', label: 'Taille du grain', requires: 'grain' },
+            { key: 'grainRoughness', label: 'Cassure du grain', requires: 'grain' },
             { key: 'vignette', label: 'Vignettage' },
+            { key: 'vignetteMidpoint', label: 'Milieu du vignettage', requires: 'vignette' },
+            { key: 'vignetteRoundness', label: 'Arrondi du vignettage', requires: 'vignette' },
+            { key: 'vignetteFeather', label: 'Contour progressif', requires: 'vignette' },
+            { key: 'vignetteHighlights', label: 'Hautes lumières du vignettage', requires: 'vignette' },
         ],
     },
 ];
@@ -72,7 +132,7 @@ export default function VisionScreen() {
         image, metrics, signals, sourceKind,
         filters, setFilters,
         intensity, setIntensity,
-        presets, previews, activePresetId,
+        presets, previews, requestPresetPreview, releasePresetPreview, activePresetId,
         autoMessage, isLoadingImage,
         canvasRef, handleImageUpload, detachComposition, clearImage,
         autoEnhance, applyPreset, resetFilters,
@@ -153,6 +213,8 @@ export default function VisionScreen() {
        choisi (rideau / cote a cote / maintien) est un reglage a part entiere. */
     const [isComparing, setIsComparing] = useState(false);
     const [compareMode, setCompareMode] = useState('slider');
+    const [presetCollection, setPresetCollection] = useState(PRESET_COLLECTION_ALL);
+    const [presetQuery, setPresetQuery] = useState('');
     const importRef = useRef(null);
 
     const {
@@ -162,6 +224,15 @@ export default function VisionScreen() {
     } = exportController;
 
     const signalTags = useMemo(() => (signals ? describeSignals(signals) : []), [signals]);
+    const presetCollections = useMemo(() => buildPresetCollections(presets), [presets]);
+    const presetGroups = useMemo(() => filterAndGroupPresets(presets, {
+        collectionId: presetCollection,
+        query: presetQuery,
+    }), [presets, presetCollection, presetQuery]);
+    const visiblePresetCount = useMemo(
+        () => presetGroups.reduce((total, group) => total + group.presets.length, 0),
+        [presetGroups],
+    );
     const safeSmartphone = filters.safeSmartphone !== false;
     const isMono = (filters.saturation ?? 100) === 0;
 
@@ -231,6 +302,7 @@ export default function VisionScreen() {
                 accentTitle={pilote ? `Réglage posé par le preset « ${activePresetLabel} »` : null}
                 onInteractStart={startAdjusting}
                 onInteractEnd={stopAdjusting}
+                disabled={Boolean(control.requires && !(Number(filters[control.requires]) > 0))}
                 formatValue={(value) => `${value}${control.unit || ''}`}
             />
         );
@@ -454,28 +526,120 @@ export default function VisionScreen() {
                             {activePresetId ? 'Reclique pour comparer' : 'Le look de base'}
                         </span>
                     </div>
-                    <div className={styles.lookGrid} data-testid="vibeos-vision-presets">
-                        {presets.map((preset) => (
+                    <div className={styles.presetTools}>
+                        <div className={styles.presetSearch}>
+                            <Search size={14} aria-hidden="true" />
+                            <label className={styles.srOnly} htmlFor="vision-preset-search">
+                                Rechercher un preset
+                            </label>
+                            <input
+                                id="vision-preset-search"
+                                type="search"
+                                value={presetQuery}
+                                onChange={(event) => setPresetQuery(event.target.value)}
+                                placeholder="Rechercher un preset"
+                                data-testid="vibeos-vision-preset-search"
+                            />
+                            {presetQuery ? (
+                                <button
+                                    type="button"
+                                    className={styles.presetSearchClear}
+                                    onClick={() => setPresetQuery('')}
+                                    aria-label="Effacer la recherche"
+                                >
+                                    <X size={13} />
+                                </button>
+                            ) : null}
+                        </div>
+
+                        <div
+                            className={styles.presetCollectionRail}
+                            role="tablist"
+                            aria-label="Collections de presets"
+                            data-testid="vibeos-vision-preset-collections"
+                        >
                             <button
-                                key={preset.id}
                                 type="button"
+                                role="tab"
+                                aria-selected={presetCollection === PRESET_COLLECTION_ALL}
                                 className={cx(
-                                    styles.lookCard,
-                                    preset.id === activePresetId && styles.lookCardActive,
+                                    styles.presetCollectionChip,
+                                    presetCollection === PRESET_COLLECTION_ALL && styles.presetCollectionChipActive,
                                 )}
-                                onClick={() => applyPreset(preset)}
-                                title={preset.description}
-                                aria-pressed={preset.id === activePresetId}
+                                onClick={() => setPresetCollection(PRESET_COLLECTION_ALL)}
                             >
-                                <span className={styles.lookThumb}>
-                                    {previews[preset.id]
-                                        ? <img src={previews[preset.id]} alt="" />
-                                        : <span className={styles.lookThumbEmpty} />}
-                                </span>
-                                <span className={styles.lookLabel}>{preset.label}</span>
-                                <span className={styles.lookHint}>{preset.hint}</span>
+                                Tous <span>{presets.length}</span>
                             </button>
-                        ))}
+                            {presetCollections.map((collection) => (
+                                <button
+                                    key={collection.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={presetCollection === collection.id}
+                                    className={cx(
+                                        styles.presetCollectionChip,
+                                        presetCollection === collection.id && styles.presetCollectionChipActive,
+                                    )}
+                                    onClick={() => setPresetCollection(collection.id)}
+                                >
+                                    {collection.label} <span>{collection.count}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className={styles.presetResultMeta} aria-live="polite">
+                            <span>{visiblePresetCount} preset{visiblePresetCount > 1 ? 's' : ''}</span>
+                            {(presetCollection !== PRESET_COLLECTION_ALL || presetQuery) ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPresetCollection(PRESET_COLLECTION_ALL);
+                                        setPresetQuery('');
+                                    }}
+                                >
+                                    Tout afficher
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <div className={styles.presetGroups} data-testid="vibeos-vision-presets">
+                        {presetGroups.length ? presetGroups.map((group) => (
+                            <section className={styles.presetGroup} key={group.collection.id}>
+                                <div className={styles.presetGroupHead}>
+                                    <h4>{group.collection.label}</h4>
+                                    <span>{group.presets.length}</span>
+                                </div>
+                                <div className={styles.lookGrid}>
+                                    {group.presets.map((preset) => (
+                                        <PresetCard
+                                            key={preset.id}
+                                            preset={preset}
+                                            preview={previews[preset.id]}
+                                            active={preset.id === activePresetId}
+                                            onApply={applyPreset}
+                                            requestPreview={requestPresetPreview}
+                                            releasePreview={releasePresetPreview}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        )) : (
+                            <div className={styles.presetEmpty}>
+                                <Search size={17} aria-hidden="true" />
+                                <strong>Aucun preset trouvé</strong>
+                                <span>Essaie un autre nom ou affiche toutes les collections.</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPresetCollection(PRESET_COLLECTION_ALL);
+                                        setPresetQuery('');
+                                    }}
+                                >
+                                    Réinitialiser
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </section>
 

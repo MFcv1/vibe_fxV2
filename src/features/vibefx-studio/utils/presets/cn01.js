@@ -8,11 +8,13 @@
  * approximation des calculs d'Adobe, c'est leur resultat mesure sur toute la
  * grille RVB (ecart moyen a l'identite: 36.0/255, max 219/255).
  *
- * Reglages lus dans le .xmp:
- *   (aucun .xmp fourni : reglages Lightroom inconnus)
+ * Reglages lus dans le .xmp ou releves dans Lightroom:
+ *   (aucun .xmp fourni : preset Premium Adobe relève à l’écran)
+ * Reglages hors LUT effectivement importes:
+ *   - aucun effet spatial actif
  *
  * Source Hald : cn01-bloc4.png (niveau 8, cube 64)
- * Importe le  : 2026-08-19
+ * Importe le  : 2026-08-30
  */
 
 import { lutFromBase64 } from '../haldClut.js';
@@ -24,6 +26,7 @@ let cached = null;
 export const preset = {
     id: 'cn01',
     label: "CN01",
+    collection: {"id":"cinema","label":"Cinéma"},
     hint: "Terres rosées, ciel bleu profond",
     description: "Capturé depuis Lightroom par table de conversion complète.",
     bestFor: "paysage, désert, architecture, mer",

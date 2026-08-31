@@ -11,7 +11,7 @@ const LUMEN_EMBED_SRC = '/vendor/lumen/index.html?embed=vibefx';
  * Lumen shader studio — meme app embarquee (public/vendor/lumen) et meme
  * protocole postMessage que l'ancien LumenShaderModal, habillage VibeOS.
  */
-export default function LumenSheet({ open, onClose, onUseBackground }) {
+export default function LumenSheet({ open, onClose, onUseBackground, immersive = false }) {
     const iframeRef = useRef(null);
     const [isApplying, setIsApplying] = useState(false);
 
@@ -24,14 +24,17 @@ export default function LumenSheet({ open, onClose, onUseBackground }) {
 
     useEffect(() => {
         if (!open) return undefined;
-        const handleMessage = (event) => {
+        const handleMessage = async (event) => {
             if (event.origin !== window.location.origin) return;
             const data = event.data || {};
             if (data.source !== 'lumen-shaders') return;
             if (data.type === 'lumen:use-background') {
+                const applied = await onUseBackground?.({
+                    ...(data.payload || {}),
+                    generator: 'lumen',
+                });
                 setIsApplying(false);
-                onUseBackground?.(data.payload);
-                onClose?.();
+                if (applied !== false) onClose?.();
             }
             if (data.type === 'lumen:error') setIsApplying(false);
         };
@@ -48,8 +51,9 @@ export default function LumenSheet({ open, onClose, onUseBackground }) {
         <Sheet
             open={open}
             onClose={handleClose}
-            title="Fond Lumen shader"
-            wide
+            title="Lumen"
+            wide={!immersive}
+            immersive={immersive}
             actions={(
                 <Button
                     variant="primary"
@@ -62,7 +66,7 @@ export default function LumenSheet({ open, onClose, onUseBackground }) {
                 </Button>
             )}
         >
-            <div className={styles.lumenFrame}>
+            <div className={`${styles.lumenFrame} ${immersive ? styles.immersiveFrame : ''}`}>
                 <iframe
                     ref={iframeRef}
                     title="Lumen shader studio"

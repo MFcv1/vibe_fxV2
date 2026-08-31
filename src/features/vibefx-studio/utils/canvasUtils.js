@@ -135,13 +135,15 @@ export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
        la dessine (zoom compris). Un apercu « Adapter » montre donc
        le grain moyenne par la reduction, un zoom 100 % le montre entier —
        exactement comme l'ecran de Lightroom. Voir `grainPourRendu`. */
-    const { echelle, sigma } = grainPourRendu(grain, taille, grandCoteImage, grandCoteRendu, cassure);
+    const { echelle, grosseur, sigma } = grainPourRendu(
+        grain, taille, grandCoteImage, grandCoteRendu, cassure,
+    );
     const imageData = ctx.getImageData(0, 0, w, h);
     const d = imageData.data;
     /* Sous le pixel il n'y a rien a interpoler: on garde le chemin direct, qui
        est aussi le plus rapide, et qui reste celui des rendus a la taille de
        reference. */
-    const grainsFins = echelle <= 1;
+    const grainsFins = grosseur <= 1.02;
     for (let y = 0; y < h; y += 1) {
         const ligne = (y % GRAIN_NOISE_SIZE) * GRAIN_NOISE_SIZE;
         for (let x = 0; x < w; x += 1) {
@@ -151,7 +153,7 @@ export function applyFilmGrain(ctx, w, h, grain, taille = GRAIN_TAILLE_DEFAUT,
             const luma = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
             const bruit = grainsFins
                 ? GRAIN_NOISE_TABLE[ligne + (x % GRAIN_NOISE_SIZE)]
-                : grainValeurEn(x, y, echelle, cassure);
+                : grainValeurEn(x, y, echelle, cassure, grosseur);
             /* Le meme ecart sur les trois canaux — le grain est monochrome,
                c'est mesure — mais pose DANS SON ESPACE DE TRAVAIL, pas en
                sRVB. C'est le detour qui rend le grain plus fort sur les
@@ -546,6 +548,163 @@ export function applySmartphoneOutputGuards(ctx, w, h, filters = {}) {
     ctx.putImageData(imageData, 0, 0);
 }
 
+/*
+ * Etage Auto des presets Lightroom « Auto+ ».
+ *
+ * Adobe recalcule Lumiere/Couleur pour chaque photo : figer les nombres lus
+ * sur une mire donnerait donc un resultat faux partout ailleurs. On mesure ici
+ * la distribution de luminance et la saturation de la photo courante, puis on
+ * reproduit les invariants observes sur mire, telephone et reflex : contraste
+ * leger, recuperation croissante des hautes lumieres, ouverture des ombres,
+ * blancs tenus, noirs ancres et vibrance protegee. L'etage intervient avant la
+ * LUT retro, comme le developpement Auto dans Lightroom.
+ */
+export function applyLightroomAutoTone(ctx, w, h) {
+    if (!w || !h) return;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    const histogram = new Uint32Array(256);
+    let count = 0;
+    let saturationSum = 0;
+    const step = Math.max(1, Math.floor(Math.sqrt((w * h) / 90000)));
+
+    for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+            const i = (y * w + x) * 4;
+            if (d[i + 3] === 0) continue;
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const lum = Math.max(0, Math.min(255, Math.round(0.299 * r + 0.587 * g + 0.114 * b)));
+            histogram[lum] += 1;
+            const maxC = Math.max(r, g, b);
+            saturationSum += maxC > 0 ? (maxC - Math.min(r, g, b)) / maxC : 0;
+            count += 1;
+        }
+    }
+    if (!count) return;
+
+    const quantile = (ratio) => {
+        const target = count * ratio;
+        let seen = 0;
+        for (let i = 0; i < histogram.length; i += 1) {
+            seen += histogram[i];
+            if (seen >= target) return i;
+        }
+        return 255;
+    };
+    const ratioBelow = (limit) => {
+        let total = 0;
+        for (let i = 0; i <= limit; i += 1) total += histogram[i];
+        return total / count;
+    };
+    const ratioAbove = (limit) => {
+        let total = 0;
+        for (let i = limit; i < histogram.length; i += 1) total += histogram[i];
+        return total / count;
+    };
+
+    const p10 = quantile(0.10);
+    const p50 = quantile(0.50);
+    const p90 = quantile(0.90);
+    const darkRatio = ratioBelow(64);
+    const deepDarkRatio = ratioBelow(24);
+    const highlightRatio = ratioAbove(224);
+    const clippedRatio = ratioAbove(248);
+    const averageSaturation = saturationSum / count;
+
+    const clampAuto = (value, min, max) => Math.max(min, Math.min(max, value));
+    const exposureStops = clampAuto(Math.log2(118 / Math.max(72, p50)) * 0.16, -0.16, 0.16);
+    const exposureGain = 2 ** exposureStops;
+    const shadows = clampAuto(30 + darkRatio * 62 + Math.max(0, 55 - p10) * 0.22, 30, 68);
+    const highlights = clampAuto(33 + highlightRatio * 105 + clippedRatio * 360 + Math.max(0, p90 - 225) * 0.55, 33, 91);
+    const whites = clampAuto(10 + Math.max(0, p90 - 188) * 0.45 + highlightRatio * 18, 10, 33);
+    const blacks = clampAuto(18 + deepDarkRatio * 22, 18, 20);
+    const vibrance = clampAuto(8 + Math.max(0, 0.38 - averageSaturation) * 34, 8, 15) / 100;
+
+    for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;
+        let r = d[i] * exposureGain;
+        let g = d[i + 1] * exposureGain;
+        let b = d[i + 2] * exposureGain;
+        let lum = Math.max(0, Math.min(255, 0.299 * r + 0.587 * g + 0.114 * b));
+        const ln = lum / 255;
+        const shadowWeight = (1 - ln) ** 2.15;
+        const highlightWeight = ln ** 2.35;
+        const blackWeight = (1 - ln) ** 3.2;
+        const whiteWeight = ln ** 3.1;
+        const toneShift = (shadows / 100) * 70 * shadowWeight
+            - (highlights / 100) * 42 * highlightWeight
+            - (blacks / 100) * 22 * blackWeight
+            + (whites / 100) * 20 * whiteWeight;
+        r += toneShift; g += toneShift; b += toneShift;
+
+        /* Contraste +6/+7 observe sur les trois references Adobe. */
+        r = 128 + (r - 128) * 1.065;
+        g = 128 + (g - 128) * 1.065;
+        b = 128 + (b - 128) * 1.065;
+
+        const maxC = Math.max(r, g, b);
+        const minC = Math.min(r, g, b);
+        const currentSat = maxC > 0 ? (maxC - minC) / maxC : 0;
+        const avg = (r + g + b) / 3;
+        const amount = vibrance * (1 - currentSat) * 0.72;
+        r += (r - avg) * amount;
+        g += (g - avg) * amount;
+        b += (b - avg) * amount;
+
+        d[i] = Math.max(0, Math.min(255, Math.round(r)));
+        d[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
+        d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+/* Curseurs fixes du panneau Lumiere Lightroom, isoles de la LUT parce que les
+   quatre plages tonales sont adaptees au contenu par Adobe. Les nombres restent
+   ceux affiches dans Lightroom; cette fonction ne sert qu'aux imports mesures. */
+export function applyLightroomBasicTone(ctx, w, h, filters = {}) {
+    const exposure = Number(filters.lightroomExposure) || 0;
+    const contrast = Number(filters.lightroomContrast) || 0;
+    const highlights = Number(filters.lightroomHighlights) || 0;
+    const shadows = Number(filters.lightroomShadows) || 0;
+    const whites = Number(filters.lightroomWhites) || 0;
+    const blacks = Number(filters.lightroomBlacks) || 0;
+    if (!exposure && !contrast && !highlights && !shadows && !whites && !blacks) return;
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    const gain = 2 ** exposure;
+    const contrastGain = 1 + contrast * 0.009;
+    const smooth = (a, b, x) => {
+        const t = Math.max(0, Math.min(1, (x - a) / Math.max(1e-6, b - a)));
+        return t * t * (3 - 2 * t);
+    };
+
+    for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;
+        let r = d[i] * gain;
+        let g = d[i + 1] * gain;
+        let b = d[i + 2] * gain;
+        let lum = Math.max(0, Math.min(255, 0.299 * r + 0.587 * g + 0.114 * b));
+        const ln = lum / 255;
+        const shadowMask = (1 - smooth(0.08, 0.62, ln)) ** 1.35;
+        const highlightMask = smooth(0.38, 0.94, ln) ** 1.35;
+        const blackMask = (1 - smooth(0.02, 0.48, ln)) ** 1.7;
+        const whiteMask = smooth(0.52, 0.98, ln) ** 1.7;
+        const shift = (shadows / 100) * 72 * shadowMask
+            + (highlights / 100) * 62 * highlightMask
+            + (blacks / 100) * 28 * blackMask
+            + (whites / 100) * 250 * whiteMask;
+        r += shift; g += shift; b += shift;
+        r = 128 + (r - 128) * contrastGain;
+        g = 128 + (g - 128) * contrastGain;
+        b = 128 + (b - 128) * contrastGain;
+        d[i] = Math.max(0, Math.min(255, Math.round(r)));
+        d[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
+        d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
 // ═══════════════════════════════════════════════════════════
 //  FUSED PIXEL OPS — Single getImageData/putImageData pass
 //  Merges: Curves + Highlights/Shadows + Temperature +
@@ -641,7 +800,10 @@ export function applyFusedPixelOps(ctx, w, h, filters) {
             }
         }
 
-        // 4. Dehaze
+        // 4. Dehaze. Le negatif est un vrai reglage Lightroom: il ajoute un
+        // voile atmospherique et comprime le contraste. L'ancienne condition
+        // `dh > 0` le jetait entierement, ce qui rendait FT07, FT10 et « Or
+        // riche » plus durs que leur source Adobe.
         if (dh > 0) {
             const minCh = Math.min(r, g, b);
             const haze = minCh * dhAmt * 0.4;
@@ -649,6 +811,19 @@ export function applyFusedPixelOps(ctx, w, h, filters) {
             r += (r - 128) * dhAmt * 0.15;
             g += (g - 128) * dhAmt * 0.15;
             b += (b - 128) * dhAmt * 0.15;
+        } else if (dh < 0) {
+            /* Branche inverse, bornee par les hautes lumieres presentes: le
+               voile comble d'abord l'espace qui reste jusqu'au blanc, puis
+               ramene doucement les tons vers le milieu. Elle conserve la
+               teinte (meme ajout sur R/V/B), contrairement a un simple
+               melange vers du gris qui dessaturerait trop les peaux. */
+            const fog = -dhAmt;
+            const maxCh = Math.max(r, g, b);
+            const haze = (255 - maxCh) * fog * 0.4;
+            r += haze; g += haze; b += haze;
+            r -= (r - 128) * fog * 0.15;
+            g -= (g - 128) * fog * 0.15;
+            b -= (b - 128) * fog * 0.15;
         }
 
         // 5. Faded Blacks
@@ -782,6 +957,72 @@ const VIGNETTE_GAIN_100 = [
 const VIGNETTE_PAS = 0.05;
 
 /*
+ * PROFILS FAIBLES MESURES LE 2026-08-30 dans Lightroom Cloud, sur la meme
+ * Hald 2048 px exportee avec et sans vignette. L'ancienne interpolation ne
+ * connaissait que -50 et -100; a -17 elle assombrissait trop les coins
+ * (6,39/255 de MAE). Or les presets Premium de ce lot vivent precisement entre
+ * -10 et -30. Chaque ligne ci-dessous est le gain lineaire observe tous les
+ * 0,05 rayon, avec Milieu 50, Arrondi 0, Contour 50, Hautes lumieres 0.
+ */
+const VIGNETTE_GAINS_MESURES = {
+    10: [
+        1, 1, 1, 1, 0.9999, 0.9996, 0.9990, 0.9982, 0.9964, 0.9935,
+        0.9889, 0.9822, 0.9732, 0.9611, 0.9417, 0.9169, 0.8845, 0.8488,
+        0.8087, 0.7619, 0.7214, 0.6931, 0.6585, 0.6414, 0.6097, 0.5862,
+        0.5802, 0.5259, 0.4683,
+    ],
+    17: [
+        1, 1, 1, 1, 0.9998, 0.9993, 0.9984, 0.9971, 0.9943, 0.9894,
+        0.9822, 0.9707, 0.9563, 0.9365, 0.9053, 0.8660, 0.8161, 0.7636,
+        0.7083, 0.6450, 0.5903, 0.5506, 0.5103, 0.4856, 0.4557, 0.4301,
+        0.4203, 0.3803, 0.3515,
+    ],
+    25: [
+        1, 1, 1, 1, 0.9997, 0.9991, 0.9978, 0.9959, 0.9922, 0.9853,
+        0.9749, 0.9593, 0.9389, 0.9113, 0.8688, 0.8155, 0.7497, 0.6849,
+        0.6178, 0.5422, 0.4804, 0.4337, 0.3943, 0.3703, 0.3405, 0.3208,
+        0.3206, 0.2950, 0.2775,
+    ],
+    30: [
+        1, 1, 1, 0.9999, 0.9997, 0.9990, 0.9974, 0.9951, 0.9909, 0.9829,
+        0.9706, 0.9527, 0.9290, 0.8969, 0.8483, 0.7876, 0.7139, 0.6435,
+        0.5705, 0.4906, 0.4265, 0.3787, 0.3411, 0.3168, 0.2899, 0.2753,
+        0.2753, 0.2576, 0.2435,
+    ],
+};
+const VIGNETTE_ANCRAGES_MESURES = [0, 10, 17, 25, 30, 50, 100];
+
+function gainProfilVignette(profile, r) {
+    const position = Math.max(0, r) / VIGNETTE_PAS;
+    const index = Math.floor(position);
+    if (index >= profile.length - 1) return profile[profile.length - 1];
+    const t = position - index;
+    return profile[index] * (1 - t) + profile[index + 1] * t;
+}
+
+function gainVignetteMesure(r, amount) {
+    const bounded = Math.max(0, Math.min(100, amount));
+    let upperIndex = VIGNETTE_ANCRAGES_MESURES.findIndex((anchor) => anchor >= bounded);
+    if (upperIndex < 0) upperIndex = VIGNETTE_ANCRAGES_MESURES.length - 1;
+    const upper = VIGNETTE_ANCRAGES_MESURES[upperIndex];
+    const lower = upperIndex === 0 ? upper : VIGNETTE_ANCRAGES_MESURES[upperIndex - 1];
+    const gainAt = (anchor) => {
+        if (anchor === 0) return 1;
+        if (anchor === 100) return gainProfilVignette(VIGNETTE_GAIN_100, r);
+        if (anchor === 50) return gainProfilVignette(VIGNETTE_GAIN_100, r) ** 0.57;
+        return gainProfilVignette(VIGNETTE_GAINS_MESURES[anchor], r);
+    };
+    const lowGain = gainAt(lower);
+    if (upper === lower) return lowGain;
+    const highGain = gainAt(upper);
+    const t = (bounded - lower) / (upper - lower);
+    /* Le vignetage est une exposition: interpoler son gain en logarithme evite
+       le palier perceptuel qu'une moyenne lineaire creerait entre deux doses. */
+    return Math.exp(Math.log(Math.max(1e-6, lowGain)) * (1 - t)
+        + Math.log(Math.max(1e-6, highGain)) * t);
+}
+
+/*
  * Le dosage n'est PAS proportionnel: il agit comme un EXPOSANT sur ce gain.
  * Mesure du rapport ln(gain a -50) / ln(gain a -100) entre r = 0,6 et r = 1,0 :
  * 0,586 · 0,581 · 0,576 · 0,573 · 0,572 · 0,569 · 0,565 — constant a 0,57.
@@ -864,9 +1105,78 @@ function gainVignette(r, dosage) {
     return base ** dosage;
 }
 
-export function applyLightroomVignette(ctx, w, h, vignette) {
-    if (!vignette || vignette <= 0) return;
+/* Expose la courbe mesuree pour les scripts de calibration. Le moteur de rendu
+   reste l'unique source de verite: les outils ne recopient pas ses 29 points. */
+export function lightroomVignetteGainAtRadius(radius, vignette) {
+    if (!vignette || vignette <= 0) return 1;
     const dosage = (Math.min(100, vignette) / 100) ** VIGNETTE_DOSAGE_EXPOSANT;
+    return gainVignette(Math.max(0, radius), dosage);
+}
+
+export function lightroomVignetteMeasuredGainAtRadius(radius, vignette) {
+    return gainVignetteMesure(Math.max(0, radius), vignette);
+}
+
+const clampVignetteOption = (value, min, max, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
+};
+
+const VIGNETTE_HL_FORCES_MESUREES = [
+    [0, 0.88], [10, 0.917], [17, 0.967], [25, 1.007], [30, 1.025], [100, VIGNETTE_HL_FORCE],
+];
+
+function vignetteHighlightForce(amount) {
+    const bounded = Math.max(0, Math.min(100, amount));
+    const upperIndex = VIGNETTE_HL_FORCES_MESUREES.findIndex(([anchor]) => anchor >= bounded);
+    const safeUpper = upperIndex < 0 ? VIGNETTE_HL_FORCES_MESUREES.length - 1 : upperIndex;
+    const [upperAmount, upperForce] = VIGNETTE_HL_FORCES_MESUREES[safeUpper];
+    if (safeUpper === 0) return upperForce;
+    const [lowerAmount, lowerForce] = VIGNETTE_HL_FORCES_MESUREES[safeUpper - 1];
+    const t = (bounded - lowerAmount) / (upperAmount - lowerAmount);
+    return lowerForce * (1 - t) + upperForce * t;
+}
+
+function vignetteChannel(
+    value,
+    gain,
+    highlights,
+    nativeHighlightForce = VIGNETTE_HL_FORCE,
+    lighten = false,
+) {
+    const source = SRGB_VERS_LINEAIRE[value];
+    if (lighten) {
+        /* Le montant positif de Lightroom utilise la meme geometrie que le
+           montant negatif, mais ajoute de l'exposition aux bords. L'inverse
+           du gain mesure conserve cette symetrie en diaphragmes et evite le
+           vieux contresens qui assombrissait un +9. */
+        const lin = source / Math.max(0.001, gain);
+        const srgb = lin <= 0.0031308 ? lin * 12.92 : 1.055 * lin ** (1 / 2.4) - 0.055;
+        return Math.max(0, Math.min(255, Math.round(srgb * 255)));
+    }
+    const poidsHL = Math.max(0, Math.min(1,
+        (source - VIGNETTE_HL_DEBUT) / (VIGNETTE_HL_FIN - VIGNETTE_HL_DEBUT)));
+    let effectif = gain * (1 + nativeHighlightForce * (1 - gain) * poidsHL);
+    /* Le curseur Lightroom « Hautes lumieres » du vignetage est distinct de
+       la protection native mesuree ci-dessus. A 100 il recupere presque tout
+       le vignetage sur les zones claires, sans relever les tons moyens. */
+    if (highlights > 0) {
+        effectif += (1 - effectif) * (highlights / 100) * poidsHL * 0.88;
+    }
+    const lin = source * Math.min(1, effectif);
+    const srgb = lin <= 0.0031308 ? lin * 12.92 : 1.055 * lin ** (1 / 2.4) - 0.055;
+    return Math.max(0, Math.min(255, Math.round(srgb * 255)));
+}
+
+export function applyLightroomVignette(ctx, w, h, vignette, options = {}) {
+    if (!vignette || vignette <= 0) return;
+    const lighten = options.lighten === true;
+    /* Sur SP01 (+9) et SP08 (+3), croises sur une photo reflex et une photo de
+       telephone, l'eclaircissement Adobe vaut environ 25 % de l'exposition
+       radiale du cote negatif au meme nombre. Cette asymetrie est mesuree, pas
+       supposee: un facteur plus fort surexposait nettement les coins du ciel. */
+    const curveAmount = lighten ? vignette * 0.25 : vignette;
+    const dosage = (Math.min(100, curveAmount) / 100) ** VIGNETTE_DOSAGE_EXPOSANT;
     const imageData = ctx.getImageData(0, 0, w, h);
     const d = imageData.data;
     const cx = (w - 1) / 2;
@@ -874,18 +1184,77 @@ export function applyLightroomVignette(ctx, w, h, vignette) {
     const demiW = w / 2;
     const demiH = h / 2;
 
+    const midpoint = clampVignetteOption(options.midpoint, 0, 100, 50);
+    const roundness = clampVignetteOption(options.roundness, -100, 100, 0);
+    const feather = clampVignetteOption(options.feather, 0, 100, 50);
+    const highlights = clampVignetteOption(options.highlights, 0, 100, 0);
+    const measuredProfile = options.measuredProfile === true
+        || midpoint !== 50 || roundness !== 0 || feather !== 50 || highlights !== 0;
+
+    /* CHEMIN HISTORIQUE BIT-A-BIT. Les presets valides ont ete mesures avec
+       ces quatre valeurs Lightroom par defaut. Il ne faut pas les faire passer
+       dans une nouvelle approximation sous pretexte d'ajouter des options. */
+    if (!lighten && !measuredProfile && midpoint === 50 && roundness === 0 && feather === 50 && highlights === 0) {
+        for (let y = 0; y < h; y += 1) {
+            const dy = (y - cy) / demiH;
+            const dy2 = dy * dy;
+            for (let x = 0; x < w; x += 1) {
+                const dx = (x - cx) / demiW;
+                const r = Math.sqrt(dx * dx + dy2);
+                const palier = Math.round(gainVignette(r, dosage) * VIGNETTE_PALIERS);
+                const lut = VIGNETTE_LUT[palier];
+                const i = (y * w + x) * 4;
+                d[i] = lut[d[i]];
+                d[i + 1] = lut[d[i + 1]];
+                d[i + 2] = lut[d[i + 2]];
+            }
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return;
+    }
+
+    const minHalf = Math.min(demiW, demiH);
+    const radiusExponent = 2 ** (
+        ((midpoint - 50) / 50) * 0.72
+        + ((50 - feather) / 50) * 0.9
+    );
+    /* A Milieu 25 / Contour 73, l'export Adobe donne un rayon effectif tres
+       proche de 1,038 * r^0,5. L'exposant ci-dessus en porte la forme; ce petit
+       facteur porte l'extension supplementaire liee au Milieu. */
+    const midpointScale = 1 + (50 - midpoint) * 0.0015;
+    const nativeHighlightForce = measuredProfile
+        ? vignetteHighlightForce(curveAmount)
+        : VIGNETTE_HL_FORCE;
+
     for (let y = 0; y < h; y += 1) {
         const dy = (y - cy) / demiH;
-        const dy2 = dy * dy;
         for (let x = 0; x < w; x += 1) {
             const dx = (x - cx) / demiW;
-            const r = Math.sqrt(dx * dx + dy2);
-            const palier = Math.round(gainVignette(r, dosage) * VIGNETTE_PALIERS);
-            const lut = VIGNETTE_LUT[palier];
+            const ellipse = Math.sqrt(dx * dx + dy * dy);
+            let radius = ellipse;
+            if (roundness > 0) {
+                const circleDx = (x - cx) / minHalf;
+                const circleDy = (y - cy) / minHalf;
+                const circle = Math.sqrt(circleDx * circleDx + circleDy * circleDy);
+                radius = ellipse + (circle - ellipse) * (roundness / 100);
+            } else if (roundness < 0) {
+                /* Adobe decrit le negatif comme « plus ovale », pas plus
+                   rectangulaire. On serre donc le petit axe de l'ellipse et
+                   on conserve des isolignes parfaitement courbes. */
+                const ovalFactor = 1 + (-roundness / 100);
+                const oval = demiW >= demiH
+                    ? Math.sqrt(dx * dx + dy * dy * ovalFactor)
+                    : Math.sqrt(dx * dx * ovalFactor + dy * dy);
+                radius = ellipse + (oval - ellipse) * (-roundness / 100);
+            }
+            radius = Math.max(0, radius) ** radiusExponent * midpointScale;
+            const gain = measuredProfile
+                ? gainVignetteMesure(radius, curveAmount)
+                : gainVignette(radius, dosage);
             const i = (y * w + x) * 4;
-            d[i] = lut[d[i]];
-            d[i + 1] = lut[d[i + 1]];
-            d[i + 2] = lut[d[i + 2]];
+            d[i] = vignetteChannel(d[i], gain, highlights, nativeHighlightForce, lighten);
+            d[i + 1] = vignetteChannel(d[i + 1], gain, highlights, nativeHighlightForce, lighten);
+            d[i + 2] = vignetteChannel(d[i + 2], gain, highlights, nativeHighlightForce, lighten);
         }
     }
     ctx.putImageData(imageData, 0, 0);
@@ -1165,8 +1534,9 @@ export function applyClarity(ctx, canvas, w, h, clarity) {
  *    zone. Consequence concrete: sur une arete tres marquee — un toit sur le
  *    ciel, un poteau — notre texture positive laisse un halo qu'il n'a pas, et
  *    notre texture negative ramollit un contour qu'il garde net. C'est le
- *    prochain vrai chantier de la texture, et il demande un masque de contours,
- *    pas un coefficient.
+ *    Depuis le 2026-08-30, le moteur applique donc un masque de contours tire
+ *    de l'ecart entre le pixel et le flou fin. Il laisse passer le relief doux
+ *    mais eteint progressivement la texture sur une arete franche.
  */
 const TEXTURE_SIGMA_FIN = 3;
 const TEXTURE_SIGMA_LARGE = 40;
@@ -1176,7 +1546,7 @@ const TEXTURE_EXPOSANT = 0.644;
 const TEXTURE_K_NEG = 0.004339;
 const TEXTURE_EXPOSANT_NEG = 0.7325;
 
-export function applyTexture(ctx, canvas, w, h, texture) {
+export function applyTexture(ctx, canvas, w, h, texture, options = {}) {
     if (!texture) return;
 
     const amount = texture > 0
@@ -1204,9 +1574,25 @@ export function applyTexture(ctx, canvas, w, h, texture) {
     const origData = ctx.getImageData(0, 0, w, h);
     const od = origData.data;
     for (let i = 0; i < od.length; i += 4) {
+        /* `fin` est stable et vient de l'image d'origine. Son ecart au pixel
+           mesure directement si celui-ci appartient a une arete dure. Une loi
+           quadratique preserve les faibles contrastes tout en ramenant les
+           forts contours vers l'identite, comme Lightroom. */
+        const edgeResidual = (
+            Math.abs(od[i] - fin[i])
+            + Math.abs(od[i + 1] - fin[i + 1])
+            + Math.abs(od[i + 2] - fin[i + 2])
+        ) / 3;
+        const edgeRatio = edgeResidual / 18;
+        const edgeWeight = options.edgeAware === true
+            ? 1 / (1 + edgeRatio * edgeRatio)
+            : 1;
         for (let c = 0; c < 3; c += 1) {
             const v = od[i + c];
-            const exces = (v - fin[i + c]) * amount + (v - large[i + c]) * amount;
+            const exces = (
+                (v - fin[i + c]) * amount
+                + (v - large[i + c]) * amount
+            ) * edgeWeight;
             od[i + c] = Math.max(0, Math.min(255, v + exces));
         }
     }
@@ -1259,6 +1645,56 @@ export function applySharpness(ctx, canvas, w, h, sharpness) {
         od[i] = Math.max(0, Math.min(255, od[i] + (od[i] - bd[i]) * amount));
         od[i + 1] = Math.max(0, Math.min(255, od[i + 1] + (od[i + 1] - bd[i + 1]) * amount));
         od[i + 2] = Math.max(0, Math.min(255, od[i + 2] + (od[i + 2] - bd[i + 2]) * amount));
+    }
+
+    ctx.putImageData(origData, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  REDUCTION DE BRUIT — approximation mesuree du panneau Detail
+// ═══════════════════════════════════════════════════════════
+/*
+ * Les presets Cinema II posent Reduction du bruit 20 et Couleur 50 AVANT leur
+ * Nettete 40. L'ignorer amplifiait le bruit deja present dans un JPEG: sur les
+ * zones plates d'un reflex, CN17 rendait 1,44x la matiere Lightroom.
+ *
+ * Ce filtre separe luminance et chroma et protege progressivement les aretes.
+ * Il n'essaie pas de refaire le dematriçage RAW d'Adobe — impossible depuis un
+ * JPEG — mais reproduit son effet visible: lisser le bruit fin sans baver les
+ * contours que la nettete remet ensuite en place.
+ */
+export function applyNoiseReduction(ctx, canvas, w, h, luminance = 0, color = 0) {
+    if ((!luminance || luminance <= 0) && (!color || color <= 0)) return;
+
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = w;
+    blurCanvas.height = h;
+    const blurCtx = blurCanvas.getContext('2d');
+    blurCtx.filter = 'blur(1.2px)';
+    blurCtx.drawImage(canvas, 0, 0);
+
+    const origData = ctx.getImageData(0, 0, w, h);
+    const blurData = blurCtx.getImageData(0, 0, w, h);
+    const od = origData.data;
+    const bd = blurData.data;
+    const lumaAmount = Math.min(0.78, Math.max(0, luminance) * 0.0325);
+    const colorAmount = Math.min(0.88, Math.max(0, color) * 0.017);
+
+    for (let i = 0; i < od.length; i += 4) {
+        const y = 0.299 * od[i] + 0.587 * od[i + 1] + 0.114 * od[i + 2];
+        const by = 0.299 * bd[i] + 0.587 * bd[i + 1] + 0.114 * bd[i + 2];
+        const relief = Math.abs(y - by);
+        const protection = 1 / (1 + (relief / 18) ** 2);
+        const lm = lumaAmount * (0.08 + 0.92 * protection);
+        const cm = colorAmount * (0.10 + 0.90 * protection);
+        const ny = y + (by - y) * lm;
+
+        for (let c = 0; c < 3; c += 1) {
+            const chroma = od[i + c] - y;
+            const chromaFloue = bd[i + c] - by;
+            const nouvelleChroma = chroma + (chromaFloue - chroma) * cm;
+            od[i + c] = Math.max(0, Math.min(255, ny + nouvelleChroma));
+        }
     }
 
     ctx.putImageData(origData, 0, 0);

@@ -1,0 +1,1152 @@
+[
+  {
+    "presetId": "ar04",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 9.25601971128287,
+      "g": 10.134828037459616,
+      "b": 10.294747065799697,
+      "overall": 9.895198271514062
+    },
+    "rgbP95": 16.333333333333332,
+    "luminanceMean": 9.42073808857381,
+    "luminanceP95": 17.291200000000003,
+    "deltaE76Mean": 4.784834367796526,
+    "deltaE76P95": 7.774716886922602,
+    "ssimGlobalLuminance": 0.9850603707656391,
+    "centerRgbMean": 10.733971291866059,
+    "cornersRgbMean": 9.704968715495031,
+    "cornersMinusCenter": -1.0290025763710275,
+    "clippedPercent": {
+      "reference": 0.018198176092912934,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "ar07",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 4.161518014149593,
+      "g": 4.0969983233141125,
+      "b": 4.411203124361019,
+      "overall": 4.223239820608241
+    },
+    "rgbP95": 9,
+    "luminanceMean": 3.646778604263867,
+    "luminanceP95": 8.488199999999996,
+    "deltaE76Mean": 3.002120454251344,
+    "deltaE76P95": 7.344457478027126,
+    "ssimGlobalLuminance": 0.9970032089414449,
+    "centerRgbMean": 4.94750473697817,
+    "cornersRgbMean": 3.777690535585306,
+    "cornersMinusCenter": -1.1698142013928643,
+    "clippedPercent": {
+      "reference": 1.562793931214984,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "bw01",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 11.114076858182823,
+      "g": 11.11407901578719,
+      "b": 11.11408117339156,
+      "overall": 11.11407901578719
+    },
+    "rgbP95": 37,
+    "luminanceMean": 11.114078712859538,
+    "luminanceP95": 36.999999999999986,
+    "deltaE76Mean": 4.752705387040865,
+    "deltaE76P95": 15.137682205834924,
+    "ssimGlobalLuminance": 0.9679182973954351,
+    "centerRgbMean": 2.745513569666277,
+    "cornersRgbMean": 24.49404598017621,
+    "cornersMinusCenter": 21.748532410509934,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "bw04",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 8.403953162724363,
+      "g": 9.251932674113279,
+      "b": 8.387085011769733,
+      "overall": 8.680990282869125
+    },
+    "rgbP95": 30.666666666666668,
+    "luminanceMean": 8.98308292492614,
+    "luminanceP95": 31.286,
+    "deltaE76Mean": 4.400142677011704,
+    "deltaE76P95": 13.444448934868424,
+    "ssimGlobalLuminance": 0.976006300883579,
+    "centerRgbMean": 2.972101747247868,
+    "cornersRgbMean": 18.354909485132517,
+    "cornersMinusCenter": 15.382807737884649,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "bw05",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 13.681459921420048,
+      "g": 13.681464236628786,
+      "b": 13.681464236628786,
+      "overall": 13.681462798225875
+    },
+    "rgbP95": 41,
+    "luminanceMean": 13.681463319215409,
+    "luminanceP95": 40.999999999999986,
+    "deltaE76Mean": 5.8768049496182,
+    "deltaE76P95": 16.874422748639805,
+    "ssimGlobalLuminance": 0.9675809455994049,
+    "centerRgbMean": 3.122939300812304,
+    "cornersRgbMean": 27.760927175110133,
+    "cornersMinusCenter": 24.637987874297828,
+    "clippedPercent": {
+      "reference": 0.010356500969843163,
+      "vibefx": 0.01337714708604742
+    }
+  },
+  {
+    "presetId": "bw10",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 17.360626309396153,
+      "g": 17.360626309396153,
+      "b": 17.360626309396153,
+      "overall": 17.360626309396153
+    },
+    "rgbP95": 48,
+    "luminanceMean": 17.360626309396153,
+    "luminanceP95": 48,
+    "deltaE76Mean": 7.298258900198377,
+    "deltaE76P95": 20.325132618642296,
+    "ssimGlobalLuminance": 0.944527690697835,
+    "centerRgbMean": 14.040747954811064,
+    "cornersRgbMean": 25.038305341409693,
+    "cornersMinusCenter": 10.99755738659863,
+    "clippedPercent": {
+      "reference": 9.45311202066122,
+      "vibefx": 6.799690168012652
+    }
+  },
+  {
+    "presetId": "cn09",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.7165142549757935,
+      "g": 1.3030262278514027,
+      "b": 1.7396694214876034,
+      "overall": 1.5864033014382666
+    },
+    "rgbP95": 4,
+    "luminanceMean": 1.2880400190716186,
+    "luminanceP95": 3.637800000000027,
+    "deltaE76Mean": 1.1817006267327688,
+    "deltaE76P95": 2.8119033067276566,
+    "ssimGlobalLuminance": 0.9986401025361087,
+    "centerRgbMean": 1.6582331220181752,
+    "cornersRgbMean": 1.577527511248466,
+    "cornersMinusCenter": -0.08070561076970928,
+    "clippedPercent": {
+      "reference": 0.003667661010318353,
+      "vibefx": 0.0026488662852299214
+    }
+  },
+  {
+    "presetId": "cn10",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.2403968409213164,
+      "g": 1.3983772637618792,
+      "b": 1.4863889024728185,
+      "overall": 1.3750543357186713
+    },
+    "rgbP95": 3.3333333333333335,
+    "luminanceMean": 1.2335660639472863,
+    "luminanceP95": 3.43840000000003,
+    "deltaE76Mean": 1.0789801936516634,
+    "deltaE76P95": 2.554377150077449,
+    "ssimGlobalLuminance": 0.9985634446440022,
+    "centerRgbMean": 1.3862193102847273,
+    "cornersRgbMean": 1.4319672575486821,
+    "cornersMinusCenter": 0.045747947263954813,
+    "clippedPercent": {
+      "reference": 0.0012225536701061177,
+      "vibefx": 0.0010187947250884313
+    }
+  },
+  {
+    "presetId": "cn14",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 5.867976429165241,
+      "g": 5.856537401991948,
+      "b": 5.894803331866269,
+      "overall": 5.873105721007819
+    },
+    "rgbP95": 14,
+    "luminanceMean": 5.826017680570735,
+    "luminanceP95": 14.21259999999998,
+    "deltaE76Mean": 2.445148317579976,
+    "deltaE76P95": 5.432525691264879,
+    "ssimGlobalLuminance": 0.9724825375530824,
+    "centerRgbMean": 5.908445526436136,
+    "cornersRgbMean": 5.868265842684364,
+    "cornersMinusCenter": -0.04017968375177183,
+    "clippedPercent": {
+      "reference": 4.035649665020294,
+      "vibefx": 0.15526431610347693
+    }
+  },
+  {
+    "presetId": "cn15",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 2.1892900223319804,
+      "g": 1.6915741601056287,
+      "b": 1.9036933346373905,
+      "overall": 1.928185839025
+    },
+    "rgbP95": 4.666666666666667,
+    "luminanceMean": 1.5606098423723418,
+    "luminanceP95": 4.643000000000001,
+    "deltaE76Mean": 1.5439555769294422,
+    "deltaE76P95": 3.3026133619234534,
+    "ssimGlobalLuminance": 0.9986828605113508,
+    "centerRgbMean": 2.163589525739064,
+    "cornersRgbMean": 1.684116658535285,
+    "cornersMinusCenter": -0.4794728672037789,
+    "clippedPercent": {
+      "reference": 0.3327383572138817,
+      "vibefx": 0.23554534044044534
+    }
+  },
+  {
+    "presetId": "cn16",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.8194634619459795,
+      "g": 1.7311685983014655,
+      "b": 1.7247685298384599,
+      "overall": 1.7584668633619682
+    },
+    "rgbP95": 4,
+    "luminanceMean": 1.5899790356501522,
+    "luminanceP95": 3.8555999999999813,
+    "deltaE76Mean": 1.340739604981182,
+    "deltaE76P95": 2.8754480489315366,
+    "ssimGlobalLuminance": 0.9986224762302124,
+    "centerRgbMean": 1.7476608282682906,
+    "cornersRgbMean": 1.7826313221661705,
+    "cornersMinusCenter": 0.03497049389787987,
+    "clippedPercent": {
+      "reference": 0.00815035780070745,
+      "vibefx": 0.0075390809656543925
+    }
+  },
+  {
+    "presetId": "cn18",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 2.6875295450470276,
+      "g": 2.6456387435408413,
+      "b": 2.6975891241625507,
+      "overall": 2.6769191375834733
+    },
+    "rgbP95": 6.333333333333333,
+    "luminanceMean": 2.5568094735684137,
+    "luminanceP95": 6.28479999999999,
+    "deltaE76Mean": 1.5759833360882098,
+    "deltaE76P95": 3.1204882344265554,
+    "ssimGlobalLuminance": 0.9959819999568911,
+    "centerRgbMean": 2.619777029823829,
+    "cornersRgbMean": 2.762535913698684,
+    "cornersMinusCenter": 0.1427588838748548,
+    "clippedPercent": {
+      "reference": 0.001426312615123804,
+      "vibefx": 0.00020375894501768627
+    }
+  },
+  {
+    "presetId": "film-braise-puissante",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 5.653212565024802,
+      "g": 4.933858638076971,
+      "b": 6.088148926483947,
+      "overall": 5.558406709861906
+    },
+    "rgbP95": 14.333333333333334,
+    "luminanceMean": 4.382181405766141,
+    "luminanceP95": 11.166799999999995,
+    "deltaE76Mean": 4.592961233677392,
+    "deltaE76P95": 13.623157874043551,
+    "ssimGlobalLuminance": 0.996167418010044,
+    "centerRgbMean": 3.2326451110245227,
+    "cornersRgbMean": 8.67841409691633,
+    "cornersMinusCenter": 5.445768985891807,
+    "clippedPercent": {
+      "reference": 18.097769684364057,
+      "vibefx": 11.618268004669057
+    }
+  },
+  {
+    "presetId": "film-or-riche",
+    "sampledPixels": 463477,
+    "rgbMean": {
+      "r": 10.138201032629452,
+      "g": 7.480263314037158,
+      "b": 7.3433503712158315,
+      "overall": 8.320604905960813
+    },
+    "rgbP95": 16.666666666666668,
+    "luminanceMean": 7.563768268544699,
+    "luminanceP95": 17.13640000000001,
+    "deltaE76Mean": 5.563290059870763,
+    "deltaE76P95": 8.912605981191495,
+    "ssimGlobalLuminance": 0.9903815028607431,
+    "centerRgbMean": 9.126676189239598,
+    "cornersRgbMean": 7.634235040381788,
+    "cornersMinusCenter": -1.49244114885781,
+    "clippedPercent": {
+      "reference": 16.19648871465035,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "ft05",
+    "sampledPixels": 375360,
+    "rgbMean": {
+      "r": 10.107278346121056,
+      "g": 3.4612505328218246,
+      "b": 6.6541906436487634,
+      "overall": 6.740906507530548
+    },
+    "rgbP95": 11.666666666666666,
+    "luminanceMean": 3.146502401428,
+    "luminanceP95": 7.611400000000003,
+    "deltaE76Mean": 5.640386684347818,
+    "deltaE76P95": 12.29281810576251,
+    "ssimGlobalLuminance": 0.9973797034943471,
+    "centerRgbMean": 5.881944444444444,
+    "cornersRgbMean": 7.685926399545326,
+    "cornersMinusCenter": 1.8039819551008822,
+    "clippedPercent": {
+      "reference": 1.4740515771526002,
+      "vibefx": 8.314684569479965
+    }
+  },
+  {
+    "presetId": "ft11",
+    "sampledPixels": 375360,
+    "rgbMean": {
+      "r": 8.72967284739983,
+      "g": 3.8909047314578005,
+      "b": 4.738546994884911,
+      "overall": 5.78637485791418
+    },
+    "rgbP95": 10.666666666666666,
+    "luminanceMean": 4.198176232417052,
+    "luminanceP95": 8.76339999999999,
+    "deltaE76Mean": 5.0238843933616995,
+    "deltaE76P95": 10.17634976557095,
+    "ssimGlobalLuminance": 0.9962331634959319,
+    "centerRgbMean": 4.762716680875185,
+    "cornersRgbMean": 6.6116332764989725,
+    "cornersMinusCenter": 1.8489165956237876,
+    "clippedPercent": {
+      "reference": 2.89268968456948,
+      "vibefx": 2.0524296675191818
+    }
+  },
+  {
+    "presetId": "lf01",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 3.305658767772512,
+      "g": 2.5896303317535545,
+      "b": 3.8456682464454977,
+      "overall": 3.2469857819905212
+    },
+    "rgbP95": 8,
+    "luminanceMean": 2.4922122761452163,
+    "luminanceP95": 7.506599999999992,
+    "deltaE76Mean": 2.6925013130172735,
+    "deltaE76P95": 5.176196813501978,
+    "ssimGlobalLuminance": 0.9978516492995191,
+    "centerRgbMean": 2.6843812532912037,
+    "cornersRgbMean": 3.2773080568720054,
+    "cornersMinusCenter": 0.5929268035808017,
+    "clippedPercent": {
+      "reference": 0.2695102685624013,
+      "vibefx": 1.7377567140600316
+    }
+  },
+  {
+    "presetId": "lf04",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.446609794628752,
+      "g": 2.239775671406003,
+      "b": 2.200176935229068,
+      "overall": 2.2955208004212744
+    },
+    "rgbP95": 5.666666666666667,
+    "luminanceMean": 2.159920180726994,
+    "luminanceP95": 5.709999999999997,
+    "deltaE76Mean": 1.5326514189796108,
+    "deltaE76P95": 3.5116514653357513,
+    "ssimGlobalLuminance": 0.9988174107076068,
+    "centerRgbMean": 2.082413902053696,
+    "cornersRgbMean": 2.191662980516065,
+    "cornersMinusCenter": 0.10924907846236875,
+    "clippedPercent": {
+      "reference": 0.001263823064770932,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "ln01",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 4.495003830668166,
+      "g": 3.1600159747012895,
+      "b": 3.7181300634097836,
+      "overall": 3.7910499562597466
+    },
+    "rgbP95": 7.666666666666667,
+    "luminanceMean": 3.392789434283548,
+    "luminanceP95": 7.216599999999971,
+    "deltaE76Mean": 2.017862053639741,
+    "deltaE76P95": 3.434736479532635,
+    "ssimGlobalLuminance": 0.9960811200427139,
+    "centerRgbMean": 3.4027024377491526,
+    "cornersRgbMean": 4.037374640863008,
+    "cornersMinusCenter": 0.6346722031138552,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0.00040751789003537253
+    }
+  },
+  {
+    "presetId": "ln06",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 4.213264299802761,
+      "g": 2.402456517841133,
+      "b": 3.479644481392733,
+      "overall": 3.3651217663455424
+    },
+    "rgbP95": 6.666666666666667,
+    "luminanceMean": 2.666107269713226,
+    "luminanceP95": 6.212600000000009,
+    "deltaE76Mean": 2.0033293229948677,
+    "deltaE76P95": 3.6161738825889826,
+    "ssimGlobalLuminance": 0.9971403766507936,
+    "centerRgbMean": 2.866016382371559,
+    "cornersRgbMean": 3.714669051878307,
+    "cornersMinusCenter": 0.8486526695067482,
+    "clippedPercent": {
+      "reference": 0.09250656103802957,
+      "vibefx": 0.0861900337424813
+    }
+  },
+  {
+    "presetId": "pb10",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.013507109004739,
+      "g": 2.313658767772512,
+      "b": 2.401943127962085,
+      "overall": 2.2430363349131124
+    },
+    "rgbP95": 5.333333333333333,
+    "luminanceMean": 2.2466448770925926,
+    "luminanceP95": 5.57480000000001,
+    "deltaE76Mean": 1.1178285988037726,
+    "deltaE76P95": 2.3437347036958913,
+    "ssimGlobalLuminance": 0.9987098981524417,
+    "centerRgbMean": 2.1060853080568167,
+    "cornersRgbMean": 2.409470247498747,
+    "cornersMinusCenter": 0.30338493944193035,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "pb12",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 1.883914691943128,
+      "g": 1.8497187993680884,
+      "b": 2.160372827804107,
+      "overall": 1.9646687730384413
+    },
+    "rgbP95": 5.666666666666667,
+    "luminanceMean": 1.8670827823069207,
+    "luminanceP95": 5.3570000000000135,
+    "deltaE76Mean": 1.0423039119459006,
+    "deltaE76P95": 2.419889275358264,
+    "ssimGlobalLuminance": 0.9986404107168887,
+    "centerRgbMean": 1.764195892575014,
+    "cornersRgbMean": 1.8155618746709372,
+    "cornersMinusCenter": 0.051365982095923135,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "pd01-rouge",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.351649289099526,
+      "g": 1.3084992101105846,
+      "b": 2.438009478672986,
+      "overall": 2.032719325961032
+    },
+    "rgbP95": 3.6666666666666665,
+    "luminanceMean": 0.6917737535546377,
+    "luminanceP95": 1.7203999999999837,
+    "deltaE76Mean": 2.455079202086252,
+    "deltaE76P95": 4.706310153961188,
+    "ssimGlobalLuminance": 0.9998754203337131,
+    "centerRgbMean": 1.961154291732497,
+    "cornersRgbMean": 2.0692912058978346,
+    "cornersMinusCenter": 0.10813691416533766,
+    "clippedPercent": {
+      "reference": 0.04518167456556082,
+      "vibefx": 0.026540284360189573
+    }
+  },
+  {
+    "presetId": "pd04-orange",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 5.913336492890995,
+      "g": 4.778091627172196,
+      "b": 4.768998420221169,
+      "overall": 5.15347551342812
+    },
+    "rgbP95": 15.666666666666666,
+    "luminanceMean": 4.694221308688404,
+    "luminanceP95": 16.289999999999992,
+    "deltaE76Mean": 3.44888497482679,
+    "deltaE76P95": 7.934382688275974,
+    "ssimGlobalLuminance": 0.9959188512426261,
+    "centerRgbMean": 2.5463844128488278,
+    "cornersRgbMean": 7.4519473407054955,
+    "cornersMinusCenter": 4.905562927856668,
+    "clippedPercent": {
+      "reference": 0.08846761453396525,
+      "vibefx": 0.12132701421800948
+    }
+  },
+  {
+    "presetId": "pe05",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.0109036334913113,
+      "g": 1.3266003159557662,
+      "b": 1.5295513428120062,
+      "overall": 1.6223517640863612
+    },
+    "rgbP95": 3.3333333333333335,
+    "luminanceMean": 0.7658227576623509,
+    "luminanceP95": 1.927800000000019,
+    "deltaE76Mean": 1.928916491539777,
+    "deltaE76P95": 4.0522912311038315,
+    "ssimGlobalLuminance": 0.9998510808622778,
+    "centerRgbMean": 1.7970847814639035,
+    "cornersRgbMean": 1.504518167456555,
+    "cornersMinusCenter": -0.2925666140073484,
+    "clippedPercent": {
+      "reference": 1.8824644549763032,
+      "vibefx": 1.4401263823064772
+    }
+  },
+  {
+    "presetId": "pe10",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.230824644549763,
+      "g": 1.3499431279620853,
+      "b": 2.307004739336493,
+      "overall": 1.9625908372827805
+    },
+    "rgbP95": 3.6666666666666665,
+    "luminanceMean": 0.8483270097948882,
+    "luminanceP95": 2.207400000000007,
+    "deltaE76Mean": 2.3018906713751934,
+    "deltaE76P95": 4.42226076425364,
+    "ssimGlobalLuminance": 0.9997998612738044,
+    "centerRgbMean": 2.0478988941548,
+    "cornersRgbMean": 1.8341948393891587,
+    "cornersMinusCenter": -0.21370405476564125,
+    "clippedPercent": {
+      "reference": 0.27014218009478674,
+      "vibefx": 0.24044233807266982
+    }
+  },
+  {
+    "presetId": "pg01",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 3.1842401263823064,
+      "g": 2.137693522906793,
+      "b": 2.7476777251184834,
+      "overall": 2.689870458135861
+    },
+    "rgbP95": 5.666666666666667,
+    "luminanceMean": 2.0695742205371883,
+    "luminanceP95": 5.14439999999999,
+    "deltaE76Mean": 2.2155395896146244,
+    "deltaE76P95": 4.285071976957108,
+    "ssimGlobalLuminance": 0.9990233889507533,
+    "centerRgbMean": 2.4688699315429536,
+    "cornersRgbMean": 2.6427340705634106,
+    "cornersMinusCenter": 0.17386413902045694,
+    "clippedPercent": {
+      "reference": 0.05339652448657188,
+      "vibefx": 0.02590837282780411
+    }
+  },
+  {
+    "presetId": "pg08",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 1.2962622432859399,
+      "g": 1.088218009478673,
+      "b": 1.5091627172195892,
+      "overall": 1.2978809899947341
+    },
+    "rgbP95": 3,
+    "luminanceMean": 0.8108385017378898,
+    "luminanceP95": 2.0722000000000094,
+    "deltaE76Mean": 1.5004281701647337,
+    "deltaE76P95": 4.013757370236761,
+    "ssimGlobalLuminance": 0.9997392070890259,
+    "centerRgbMean": 1.1442738283307208,
+    "cornersRgbMean": 1.3518736176935051,
+    "cornersMinusCenter": 0.20759978936278434,
+    "clippedPercent": {
+      "reference": 0.026540284360189573,
+      "vibefx": 0.018325434439178515
+    }
+  },
+  {
+    "presetId": "pl01",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 2.015437598736177,
+      "g": 0.9185402843601895,
+      "b": 1.3304992101105846,
+      "overall": 1.421492364402317
+    },
+    "rgbP95": 2.6666666666666665,
+    "luminanceMean": 0.7355062085312027,
+    "luminanceP95": 1.8648000000000025,
+    "deltaE76Mean": 1.4631551500116717,
+    "deltaE76P95": 3.040065168537583,
+    "ssimGlobalLuminance": 0.9998391456387817,
+    "centerRgbMean": 1.3033428120063293,
+    "cornersRgbMean": 1.5364128488678355,
+    "cornersMinusCenter": 0.23307003686150618,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "pl11",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 1.0774565560821485,
+      "g": 0.8878894154818325,
+      "b": 1.39973775671406,
+      "overall": 1.1216945760926804
+    },
+    "rgbP95": 3,
+    "luminanceMean": 0.9475581358605771,
+    "luminanceP95": 2.4303999999999917,
+    "deltaE76Mean": 0.9379367404567935,
+    "deltaE76P95": 1.6418272699929732,
+    "ssimGlobalLuminance": 0.9997445074688874,
+    "centerRgbMean": 1.0384707740917194,
+    "cornersRgbMean": 1.3004149552394841,
+    "cornersMinusCenter": 0.26194418114776474,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "pm01",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 7.46426224328594,
+      "g": 6.3823696682464455,
+      "b": 6.97609794628752,
+      "overall": 6.940909952606635
+    },
+    "rgbP95": 21.666666666666668,
+    "luminanceMean": 6.276415100157181,
+    "luminanceP95": 21.648200000000003,
+    "deltaE76Mean": 4.231978240442694,
+    "deltaE76P95": 9.074164311290222,
+    "ssimGlobalLuminance": 0.9900010570992781,
+    "centerRgbMean": 3.0322022116903784,
+    "cornersRgbMean": 6.101510268562368,
+    "cornersMinusCenter": 3.0693080568719897,
+    "clippedPercent": {
+      "reference": 0.02085308056872038,
+      "vibefx": 0.03981042654028436
+    }
+  },
+  {
+    "presetId": "pm10",
+    "sampledPixels": 316500,
+    "rgbMean": {
+      "r": 3.1607235387045813,
+      "g": 3.1607235387045813,
+      "b": 3.1607235387045813,
+      "overall": 3.1607235387045813
+    },
+    "rgbP95": 8,
+    "luminanceMean": 3.1607235387045813,
+    "luminanceP95": 8,
+    "deltaE76Mean": 1.2625370092584594,
+    "deltaE76P95": 3.1819150536133334,
+    "ssimGlobalLuminance": 0.9970382233224391,
+    "centerRgbMean": 2.855178515007899,
+    "cornersRgbMean": 3.7396398104265405,
+    "cornersMinusCenter": 0.8844612954186415,
+    "clippedPercent": {
+      "reference": 0.0022116903633491313,
+      "vibefx": 0.000315955766192733
+    }
+  },
+  {
+    "presetId": "sm05",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.7606545552349748,
+      "g": 1.6055756597714639,
+      "b": 2.3947625800772654,
+      "overall": 1.920330931694568
+    },
+    "rgbP95": 3.3333333333333335,
+    "luminanceMean": 1.4058187600860494,
+    "luminanceP95": 2.787399999999991,
+    "deltaE76Mean": 1.8510797841972915,
+    "deltaE76P95": 3.691243031695481,
+    "ssimGlobalLuminance": 0.9996714883838953,
+    "centerRgbMean": 2.144802627279274,
+    "cornersRgbMean": 1.743611427332326,
+    "cornersMinusCenter": -0.4011911999469482,
+    "clippedPercent": {
+      "reference": 0.07722464016170309,
+      "vibefx": 0.022617242896963177
+    }
+  },
+  {
+    "presetId": "sm06",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 2.7157440461636266,
+      "g": 1.6128376285718944,
+      "b": 1.9235068544509104,
+      "overall": 2.0840295097288104
+    },
+    "rgbP95": 3.3333333333333335,
+    "luminanceMean": 1.3379374341875647,
+    "luminanceP95": 2.5696000000000083,
+    "deltaE76Mean": 2.031616997251357,
+    "deltaE76P95": 4.226515228397159,
+    "ssimGlobalLuminance": 0.9996651910044693,
+    "centerRgbMean": 2.1032013158181537,
+    "cornersRgbMean": 2.095741855044232,
+    "cornersMinusCenter": -0.007459460773921567,
+    "clippedPercent": {
+      "reference": 0.16422970968425513,
+      "vibefx": 0.07233442548127862
+    }
+  },
+  {
+    "presetId": "sp05",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 2.42984172005151,
+      "g": 2.3152680652680653,
+      "b": 2.4375376954048282,
+      "overall": 2.3942158269081344
+    },
+    "rgbP95": 4.666666666666667,
+    "luminanceMean": 1.751597373547486,
+    "luminanceP95": 4.787400000000019,
+    "deltaE76Mean": 2.1141140385294137,
+    "deltaE76P95": 3.8078154787760443,
+    "ssimGlobalLuminance": 0.9982847633455364,
+    "centerRgbMean": 2.3412086356010895,
+    "cornersRgbMean": 2.583439041578522,
+    "cornersMinusCenter": 0.24223040597743273,
+    "clippedPercent": {
+      "reference": 24.49732668264137,
+      "vibefx": 0.9509429963975419
+    }
+  },
+  {
+    "presetId": "sp11",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 4.167167913671411,
+      "g": 3.7957785221771236,
+      "b": 3.256163708086785,
+      "overall": 3.739703381311773
+    },
+    "rgbP95": 9.333333333333334,
+    "luminanceMean": 3.7291590236686663,
+    "luminanceP95": 9.421199999999999,
+    "deltaE76Mean": 2.3084368441463634,
+    "deltaE76P95": 4.891580596343775,
+    "ssimGlobalLuminance": 0.9917065930729845,
+    "centerRgbMean": 2.9165032786527982,
+    "cornersRgbMean": 5.646685097847901,
+    "cornersMinusCenter": 2.730181819195103,
+    "clippedPercent": {
+      "reference": 0.7316983715585115,
+      "vibefx": 16.019528257290496
+    }
+  },
+  {
+    "presetId": "tm05",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 2.053317603142778,
+      "g": 2.8979228813144897,
+      "b": 4.891537075977635,
+      "overall": 3.2809258534783012
+    },
+    "rgbP95": 5.666666666666667,
+    "luminanceMean": 2.780137579669327,
+    "luminanceP95": 4.9358,
+    "deltaE76Mean": 2.1770072626893575,
+    "deltaE76P95": 3.9247328880019827,
+    "ssimGlobalLuminance": 0.9983298558870833,
+    "centerRgbMean": 3.687517700368188,
+    "cornersRgbMean": 2.8586111562854954,
+    "cornersMinusCenter": -0.8289065440826926,
+    "clippedPercent": {
+      "reference": 7.974921349047223,
+      "vibefx": 8.440103020522601
+    }
+  },
+  {
+    "presetId": "tm10",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 4.533695616737575,
+      "g": 6.720285833048071,
+      "b": 5.398945751218479,
+      "overall": 5.550975733668041
+    },
+    "rgbP95": 13,
+    "luminanceMean": 6.053646994149531,
+    "luminanceP95": 14.019599999999997,
+    "deltaE76Mean": 3.277731693992217,
+    "deltaE76P95": 6.496887108103229,
+    "ssimGlobalLuminance": 0.9966108989463945,
+    "centerRgbMean": 6.136080430472936,
+    "cornersRgbMean": 5.349975605789568,
+    "cornersMinusCenter": -0.7861048246833677,
+    "clippedPercent": {
+      "reference": 0.5682836976543271,
+      "vibefx": 0.30624969436158245
+    }
+  },
+  {
+    "presetId": "tr03",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.134344385218511,
+      "g": 0.6517678126069735,
+      "b": 1.0217451546122875,
+      "overall": 0.9359524508125907
+    },
+    "rgbP95": 2,
+    "luminanceMean": 0.5224243259658536,
+    "luminanceP95": 1.3518000000000256,
+    "deltaE76Mean": 0.9952239527016224,
+    "deltaE76P95": 2.4433310074094843,
+    "ssimGlobalLuminance": 0.9997263144018796,
+    "centerRgbMean": 0.8927984009759072,
+    "cornersRgbMean": 1.0248685423104067,
+    "cornersMinusCenter": 0.13207014133449946,
+    "clippedPercent": {
+      "reference": 0.31541884688737837,
+      "vibefx": 0.2765008883890003
+    }
+  },
+  {
+    "presetId": "tr08",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 0.9601651262490424,
+      "g": 0.8956244804146902,
+      "b": 0.9515053710857907,
+      "overall": 0.9357649925831744
+    },
+    "rgbP95": 2,
+    "luminanceMean": 0.6838425619845145,
+    "luminanceP95": 1.5748000000000104,
+    "deltaE76Mean": 0.8839527301698185,
+    "deltaE76P95": 1.8969870173218637,
+    "ssimGlobalLuminance": 0.9997993904221305,
+    "centerRgbMean": 0.9983715661286501,
+    "cornersRgbMean": 0.9290941616522955,
+    "cornersMinusCenter": -0.06927740447635455,
+    "clippedPercent": {
+      "reference": 0.2809835851793894,
+      "vibefx": 0.25429116338207247
+    }
+  },
+  {
+    "presetId": "tr13",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 3.4042883107568422,
+      "g": 3.700981710597095,
+      "b": 3.2583459663879246,
+      "overall": 3.4545386625806205
+    },
+    "rgbP95": 5.333333333333333,
+    "luminanceMean": 3.553025082312057,
+    "luminanceP95": 5.715199999999982,
+    "deltaE76Mean": 1.718812918313003,
+    "deltaE76P95": 2.5621778595411846,
+    "ssimGlobalLuminance": 0.999014009043284,
+    "centerRgbMean": 3.7623357950458747,
+    "cornersRgbMean": 3.1026508375345787,
+    "cornersMinusCenter": -0.659684957511296,
+    "clippedPercent": {
+      "reference": 0,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "tr18",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 0.6611651751511891,
+      "g": 0.6489274129134269,
+      "b": 1.1184654506332827,
+      "overall": 0.809519346232633
+    },
+    "rgbP95": 2,
+    "luminanceMean": 0.6081360017603645,
+    "luminanceP95": 1.71520000000001,
+    "deltaE76Mean": 0.8422283109718262,
+    "deltaE76P95": 1.9202209781738884,
+    "ssimGlobalLuminance": 0.999241043025498,
+    "centerRgbMean": 0.7707965710301267,
+    "cornersRgbMean": 0.9544641405107204,
+    "cornersMinusCenter": 0.1836675694805937,
+    "clippedPercent": {
+      "reference": 0.005297732570459843,
+      "vibefx": 0
+    }
+  },
+  {
+    "presetId": "ua01",
+    "sampledPixels": 375360,
+    "rgbMean": {
+      "r": 7.388541666666667,
+      "g": 5.012931585677749,
+      "b": 5.818273124467178,
+      "overall": 6.073248792270531
+    },
+    "rgbP95": 9.333333333333334,
+    "luminanceMean": 5.487840725701392,
+    "luminanceP95": 8.782200000000017,
+    "deltaE76Mean": 3.0560748668371747,
+    "deltaE76P95": 4.756399357782947,
+    "ssimGlobalLuminance": 0.9989133611287345,
+    "centerRgbMean": 5.740529980108008,
+    "cornersRgbMean": 6.109775504404661,
+    "cornersMinusCenter": 0.36924552429665347,
+    "clippedPercent": {
+      "reference": 13.499840153452686,
+      "vibefx": 6.520407075873828
+    }
+  },
+  {
+    "presetId": "ua02",
+    "sampledPixels": 375360,
+    "rgbMean": {
+      "r": 1.8789402173913043,
+      "g": 1.4095241901108269,
+      "b": 2.288680200341006,
+      "overall": 1.859048202614379
+    },
+    "rgbP95": 3.6666666666666665,
+    "luminanceMean": 1.4136259761295031,
+    "luminanceP95": 3.430399999999999,
+    "deltaE76Mean": 1.5478670217547554,
+    "deltaE76P95": 3.151688016634256,
+    "ssimGlobalLuminance": 0.9993921163766682,
+    "centerRgbMean": 1.9505434782608693,
+    "cornersRgbMean": 1.7710215970446195,
+    "cornersMinusCenter": -0.1795218812162498,
+    "clippedPercent": {
+      "reference": 1.6624040920716112,
+      "vibefx": 1.6085890878090368
+    }
+  },
+  {
+    "presetId": "vn03",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 33.63036028299186,
+      "g": 25.65877192982456,
+      "b": 9.491369157158632,
+      "overall": 22.926833789991683
+    },
+    "rgbP95": 49,
+    "luminanceMean": 24.96526060401325,
+    "luminanceP95": 62.7756,
+    "deltaE76Mean": 21.50179027554188,
+    "deltaE76P95": 44.3059066226953,
+    "ssimGlobalLuminance": 0.9334586407664808,
+    "centerRgbMean": 15.982047192573345,
+    "cornersRgbMean": 29.40999740999745,
+    "cornersMinusCenter": 13.427950217424106,
+    "clippedPercent": {
+      "reference": 1.209054103790946,
+      "vibefx": 4.047356152619311
+    }
+  },
+  {
+    "presetId": "vn04",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 23.044826810616286,
+      "g": 20.33083466241361,
+      "b": 24.28438637386006,
+      "overall": 22.55334928229665
+    },
+    "rgbP95": 34.666666666666664,
+    "luminanceMean": 17.79933736351115,
+    "luminanceP95": 36.789799999999985,
+    "deltaE76Mean": 11.562146129838176,
+    "deltaE76P95": 15.727346109432649,
+    "ssimGlobalLuminance": 0.9743566016613391,
+    "centerRgbMean": 19.61088073719633,
+    "cornersRgbMean": 25.356128082443632,
+    "cornersMinusCenter": 5.745247345247304,
+    "clippedPercent": {
+      "reference": 2.80660859608228,
+      "vibefx": 20.22287653866601
+    }
+  },
+  {
+    "presetId": "vn05",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 32.832940743467056,
+      "g": 30.38594037541406,
+      "b": 19.17082975504028,
+      "overall": 27.463236957973802
+    },
+    "rgbP95": 41,
+    "luminanceMean": 27.449899074971807,
+    "luminanceP95": 43.612599999999986,
+    "deltaE76Mean": 15.124965341515578,
+    "deltaE76P95": 21.330971543352742,
+    "ssimGlobalLuminance": 0.9654407499209746,
+    "centerRgbMean": 24.1042571463623,
+    "cornersRgbMean": 31.103578293052102,
+    "cornersMinusCenter": 6.999321146689802,
+    "clippedPercent": {
+      "reference": 0.4700854700854701,
+      "vibefx": 11.854578170367644
+    }
+  },
+  {
+    "presetId": "vn09",
+    "sampledPixels": 489060,
+    "rgbMean": {
+      "r": 9.60221649695334,
+      "g": 7.9055739582055375,
+      "b": 7.582243487506646,
+      "overall": 8.363344647555174
+    },
+    "rgbP95": 21.666666666666668,
+    "luminanceMean": 8.090146485092795,
+    "luminanceP95": 20.848800000000008,
+    "deltaE76Mean": 4.180390123479913,
+    "deltaE76P95": 10.839890253623512,
+    "ssimGlobalLuminance": 0.9888162128530533,
+    "centerRgbMean": 8.104870568028513,
+    "cornersRgbMean": 8.395098079308596,
+    "cornersMinusCenter": 0.29022751128008295,
+    "clippedPercent": {
+      "reference": 12.040240461293093,
+      "vibefx": 20.554124238334765
+    }
+  },
+  {
+    "presetId": "wn01",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 1.7820451692829316,
+      "g": 2.3143694883205375,
+      "b": 2.174664205258611,
+      "overall": 2.0903596209540267
+    },
+    "rgbP95": 4.666666666666667,
+    "luminanceMean": 2.1836593639452064,
+    "luminanceP95": 4.787399999999963,
+    "deltaE76Mean": 1.0037612999549708,
+    "deltaE76P95": 1.8765638662718451,
+    "ssimGlobalLuminance": 0.9990447347490921,
+    "centerRgbMean": 2.1953657713002386,
+    "cornersRgbMean": 2.1280452106033483,
+    "cornersMinusCenter": -0.0673205606968903,
+    "clippedPercent": {
+      "reference": 0.036269092213148155,
+      "vibefx": 0.08904265897272891
+    }
+  },
+  {
+    "presetId": "wn02",
+    "sampledPixels": 490776,
+    "rgbMean": {
+      "r": 10.34943436516863,
+      "g": 10.320749180889042,
+      "b": 7.135628066572123,
+      "overall": 9.268603870876598
+    },
+    "rgbP95": 14.333333333333334,
+    "luminanceMean": 10.032657466133024,
+    "luminanceP95": 14.503800000000012,
+    "deltaE76Mean": 4.869879446929412,
+    "deltaE76P95": 6.039757733227872,
+    "ssimGlobalLuminance": 0.9956498828341005,
+    "centerRgbMean": 11.218749319216483,
+    "cornersRgbMean": 7.360316040548672,
+    "cornersMinusCenter": -3.8584332786678113,
+    "clippedPercent": {
+      "reference": 6.5490162518134545,
+      "vibefx": 12.675028933770193
+    }
+  }
+]

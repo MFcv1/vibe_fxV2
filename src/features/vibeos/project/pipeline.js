@@ -149,7 +149,10 @@ export function applyVisionStage(sourceImage, project) {
     const hasPreset = Boolean(vision.presetId);
     if (Number(intensity) <= 0) return null;
     if (!hasPreset && isNeutralFilterSet(vision.filters, intensity)) return null;
-    return renderFilterStage(sourceImage, { ...vision.filters, presetId: vision.presetId }, {
+    return renderFilterStage(sourceImage, {
+        ...vision.filters,
+        presetId: vision.presetId,
+    }, {
         intensity,
         safeSmartphone: vision.filters?.safeSmartphone !== false,
     });

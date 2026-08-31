@@ -27,6 +27,7 @@ import {
     GRAIN_ATTENUATION as ATTENUATION,
     GRAIN_TAILLE_DEFAUT,
     grainEchelle,
+    grainGrosseurCalibree,
     grainSigma,
     grainValeurEn,
 } from '../src/features/vibefx-studio/utils/grainField.js';
@@ -76,12 +77,13 @@ function nouveau(data, w, h, grain, tailleGrain = GRAIN_TAILLE_DEFAUT) {
     /* La grosseur des grains depend de la Taille du curseur ET de la largeur de
        l'image; elle pilote a son tour l'ecart-type (voir `grainField.js`). */
     const echelle = grainEchelle(tailleGrain, w);
+    const grosseur = grainGrosseurCalibree(tailleGrain, w, echelle);
     const sigma = grainSigma(grain, tailleGrain, w);
     for (let y = 0; y < h; y += 1) {
         for (let x = 0; x < w; x += 1) {
             const i = (y * w + x) * 3;
             const luma = (out[i] * 77 + out[i + 1] * 150 + out[i + 2] * 29) >> 8;
-            const delta = grainValeurEn(x, y, echelle) * sigma * ATTENUATION[luma];
+            const delta = grainValeurEn(x, y, echelle, undefined, grosseur) * sigma * ATTENUATION[luma];
             for (let c = 0; c < 3; c += 1) out[i + c] = Math.max(0, Math.min(255, Math.round(out[i + c] + delta)));
         }
     }

@@ -11,7 +11,31 @@ export const DEFAULT_FILTERS = {
        « Taille »). 25 est SA valeur par defaut, et celle sur laquelle notre
        grain a ete calibre: voir `grainField.js`. */
     grainSize: 25,
+    grainRoughness: 50,
+    noiseReductionLuminance: 0,
+    noiseReductionColor: 0,
     vignette: 0,
+    vignetteMidpoint: 50,
+    vignetteRoundness: 0,
+    vignetteFeather: 50,
+    vignetteHighlights: 0,
+    /* Active les profils radiaux mesures a -10/-17/-25/-30 pour les imports
+       Lightroom. Faux par defaut pour ne pas modifier les looks historiques
+       deja valides visuellement. */
+    vignetteLightroomV2: false,
+    /* Lightroom accepte aussi un montant positif, qui eclaircit les bords.
+       Le curseur historique VibeFX reste un assombrissement par defaut. */
+    vignetteLighten: false,
+    presetSpatialBeforeLut: false,
+    presetClarityScale: 1,
+    presetTextureEdgeAware: false,
+    presetAutoTone: false,
+    lightroomExposure: 0,
+    lightroomContrast: 0,
+    lightroomHighlights: 0,
+    lightroomShadows: 0,
+    lightroomWhites: 0,
+    lightroomBlacks: 0,
     /* Le degrade du bas (2026-08-29). Au repos c'est 0: il n'existe que si un
        preset le pose ou si l'utilisateur le monte. Sans cette entree,
        `withoutPresetSpatials` remettait la cle a `undefined` au lieu de 0 —

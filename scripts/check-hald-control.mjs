@@ -34,11 +34,26 @@ const expectedSize = haldImageSize(level);
 const image = sharp(file);
 const meta = await image.metadata();
 
+/*
+ * La mire de production est en blocs de 4x4 : chaque couleur du cube occupe
+ * un carre, afin que les traitements de voisinage de Lightroom ne contaminent
+ * pas la couleur suivante. Le controle doit lire exactement comme l'importeur,
+ * sinon il rejette a tort nos exports 2048x2048 en attendant l'ancienne mire
+ * 512x512.
+ */
+const detectedBlock = meta.width && meta.width % expectedSize === 0
+    ? meta.width / expectedSize
+    : 0;
+const block = Number.isInteger(detectedBlock) && detectedBlock >= 1 ? detectedBlock : 0;
+
 console.log(`\nFichier    : ${file}`);
-console.log(`Dimensions : ${meta.width}x${meta.height} (attendu ${expectedSize}x${expectedSize})`);
+console.log(
+    `Dimensions : ${meta.width}x${meta.height}`
+    + ` (mire niveau ${level}, blocs ${block || 'invalides'})`,
+);
 console.log(`Format     : ${meta.format}, ${meta.space}, ${meta.depth}`);
 
-if (meta.width !== expectedSize || meta.height !== expectedSize) {
+if (!block || meta.height !== expectedSize * block) {
     console.error(
         '\nECHEC: la mire a ete redimensionnee a l\'export. Reexporte en « taille d\'origine »,'
         + '\nsans redimensionnement ni nettete de sortie.\n',
@@ -46,7 +61,31 @@ if (meta.width !== expectedSize || meta.height !== expectedSize) {
     process.exit(1);
 }
 
-const { data: pixels } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+const { data } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+let pixels = data;
+if (block > 1) {
+    const margin = block >= 4 ? 1 : 0;
+    const from = margin;
+    const to = block - margin;
+    const count = (to - from) ** 2;
+    pixels = Buffer.alloc(expectedSize * expectedSize * 3);
+    for (let sy = 0; sy < expectedSize; sy += 1) {
+        for (let sx = 0; sx < expectedSize; sx += 1) {
+            const acc = [0, 0, 0];
+            for (let y = from; y < to; y += 1) {
+                for (let x = from; x < to; x += 1) {
+                    const source = ((sy * block + y) * meta.width + (sx * block + x)) * 3;
+                    for (let c = 0; c < 3; c += 1) acc[c] += data[source + c];
+                }
+            }
+            const target = (sy * expectedSize + sx) * 3;
+            for (let c = 0; c < 3; c += 1) pixels[target + c] = Math.round(acc[c] / count);
+        }
+    }
+    console.log(
+        `Lecture     : coeur ${to - from}x${to - from} moyenne de chaque bloc ${block}x${block}`,
+    );
+}
 const { mean, max } = measureHaldDeviation(pixels, level);
 
 console.log(`\nEcart a l'identite : moyen ${mean.toFixed(3)}/255, max ${max}/255`);

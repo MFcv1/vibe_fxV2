@@ -4,7 +4,11 @@ import { renderAssets, renderAssetSelection } from '../engine/assetRenderer';
 import { renderTexts, renderTextSelection } from '../engine/textRenderer';
 import { renderStudio } from '../engine/studioRenderer';
 
-const MAX_INTERACTIVE_PREVIEW_MEGAPIXELS = 3;
+/* L'apercu Vision/Studio occupe au plus environ 1000 px sur cette interface.
+   Calculer 3 Mpx ne montrait aucun detail supplementaire, mais bloquait le
+   thread principal au moment exact ou les premieres cartes de presets doivent
+   apparaitre. L'export conserve evidemment la resolution originale. */
+const MAX_INTERACTIVE_PREVIEW_MEGAPIXELS = 1.25;
 
 /*
  * Resolution de calcul PENDANT qu'on bouge un curseur.

@@ -3385,11 +3385,17 @@ export function getPresetLut(presetId) {
     if (lutCache.has(presetId)) return lutCache.get(presetId);
     const preset = VISION_PRESET_BY_ID[presetId];
     if (!preset) return null;
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : 0;
     /* Preset importe: la table est deja la, il n'y a rien a compiler. */
     const lut = typeof preset.getLut === 'function'
         ? preset.getLut()
         : buildLut3d(preset.transform, LUT_SIZE);
     lutCache.set(presetId, lut);
+    globalThis.__visionPreviewMetrics?.push({
+        type: 'lut',
+        presetId,
+        ms: typeof performance !== 'undefined' ? performance.now() - startedAt : 0,
+    });
     return lut;
 }
 

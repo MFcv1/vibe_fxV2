@@ -113,6 +113,22 @@ async function readCanvasStats(page) {
   });
 }
 
+async function visiblePresetState(presetGrid) {
+  return presetGrid.locator('[data-preset-id]').evaluateAll((cards) => {
+    const visible = cards.filter((card) => {
+      const box = card.getBoundingClientRect();
+      const panel = card.closest('[class*="panel"]')?.getBoundingClientRect();
+      const top = panel?.top ?? 0;
+      const bottom = panel?.bottom ?? innerHeight;
+      return box.bottom > top && box.top < bottom;
+    });
+    return {
+      count: visible.length,
+      ready: visible.filter((card) => card.dataset.previewReady === 'true').length,
+    };
+  });
+}
+
 test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page }) => {
   test.setTimeout(120_000);
   const dir = getFixtures();
@@ -131,10 +147,57 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
 
   // Les presets sont rendus sur la VRAIE photo (vignettes en <img>).
   const presetGrid = page.getByTestId("vibeos-vision-presets");
+  await presetGrid.scrollIntoViewIfNeeded();
   const presetCount = await presetGrid.locator("button").count();
   expect(presetCount).toBeGreaterThan(0);
-  await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 20000 })
-    .toBe(presetCount);
+  /* Contrat utile: les cartes sont la tout de suite, puis seul le viewport et
+     sa zone de prechargement travaillent. Les 261 cartes hors ecran n'ont pas
+     a etre calculees pour que la premiere rangee soit utilisable. */
+  await expect.poll(async () => (await visiblePresetState(presetGrid)).ready, { timeout: 5000 })
+    .toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const state = await visiblePresetState(presetGrid);
+    return state.count > 0 && state.ready === state.count;
+  }, { timeout: 5000 }).toBe(true);
+  expect(await presetGrid.locator("img").count()).toBeLessThan(presetCount);
+
+  // La bibliotheque reste navigable quand les imports s'accumulent.
+  const collectionTabs = page.getByTestId("vibeos-vision-preset-collections");
+  const cinemaTab = collectionTabs.getByRole("tab", { name: /^Cinéma 10$/ });
+  await expect(cinemaTab).toBeVisible();
+  await cinemaTab.click();
+  await expect(presetGrid.locator("button")).toHaveCount(10);
+  await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 5000 }).toBe(10);
+  const presetSearch = page.getByTestId("vibeos-vision-preset-search");
+  await presetSearch.fill("CN01");
+  await expect(presetGrid.locator("button")).toHaveCount(1);
+  await expect(presetGrid.getByRole("button", { name: /CN01/ })).toBeVisible();
+  await presetSearch.fill("");
+
+  const cinemaIITab = collectionTabs.getByRole("tab", { name: /Cinéma II/ });
+  await expect(cinemaIITab).toBeVisible();
+  await cinemaIITab.click();
+  await expect(presetGrid.locator("button")).toHaveCount(8);
+  await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 5000 }).toBe(8);
+  await presetSearch.fill("CN17");
+  await expect(presetGrid.locator("button")).toHaveCount(1);
+  await expect(presetGrid.getByRole("button", { name: /CN17/ })).toBeVisible();
+  await presetSearch.fill("");
+  await cinemaTab.click();
+  /* Retour sur une collection deja visitee: les URLs du cache sont publiees
+     sans repasser par le moteur. */
+  await expect(presetGrid.locator("img")).toHaveCount(10, { timeout: 500 });
+  await collectionTabs.getByRole("tab", { name: /Tous/ }).click();
+  await expect(presetGrid.locator("button")).toHaveCount(presetCount);
+  if (process.env.VIBEFX_PRESET_UI_SCREENSHOT) {
+    await page.screenshot({ path: process.env.VIBEFX_PRESET_UI_SCREENSHOT });
+  }
+  if (process.env.VIBEFX_PRESET_UI_MOBILE_SCREENSHOT) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await presetSearch.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: process.env.VIBEFX_PRESET_UI_MOBILE_SCREENSHOT });
+    await page.setViewportSize({ width: 1280, height: 720 });
+  }
 
   // « Ameliorer ma photo »: phrase humaine + pixels reellement modifies.
   const before = await readCanvasStats(page);
@@ -259,7 +322,10 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
 });
 
 test("vision VibeOS: presets surs sur 5 photos types", async ({ page }) => {
-  test.setTimeout(240_000);
+  /* 181 presets × 5 photos depuis l'ajout des quatre saisons. Le test fait un
+     vrai rendu canvas pour chacun: 240 s suffisait a 136 presets, plus depuis
+     ce lot. La couverture reste exhaustive, seul le plafond suit le volume. */
+  test.setTimeout(420_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
 
@@ -288,7 +354,13 @@ test("vision VibeOS: presets surs sur 5 photos types", async ({ page }) => {
       const context = `${photo.id} / ${label}`;
       expect(stats.mean, `${context}: image trop sombre`).toBeGreaterThan(8);
       expect(stats.mean, `${context}: image cramee`).toBeLessThan(247);
-      expect(stats.stdDev, `${context}: image plate/grise`).toBeGreaterThan(1.5);
+      /* Une source rouge presque uniforme peut garder peu de variation de
+         luminance tout en restant franchement colorée. Elle n'est « grise et
+         plate » que si la variation spatiale ET l'écart entre canaux sont bas. */
+      expect(
+        stats.stdDev > 1.5 || stats.maxChannelSpread > 12,
+        `${context}: image plate/grise`,
+      ).toBe(true);
     }
   }
 });

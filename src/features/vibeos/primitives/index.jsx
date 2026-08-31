@@ -207,6 +207,7 @@ export function Slider({
     accentTitle = null,
     onInteractStart = null,
     onInteractEnd = null,
+    disabled = false,
     formatValue = (v) => String(v),
     className,
 }) {
@@ -266,6 +267,7 @@ export function Slider({
                 onKeyDown={onInteractStart || undefined}
                 onKeyUp={onInteractEnd || undefined}
                 onBlur={onInteractEnd || undefined}
+                disabled={disabled}
             />
         </div>
     );
@@ -299,7 +301,9 @@ export function Tile({ active = false, visual = null, label, hint = null, classN
  * Panneau lateral (desktop) / bottom sheet (mobile). Ferme sur Echap et clic
  * sur le fond. Le contenu scrolle dans `sheetBody`, jamais la page.
  */
-export function Sheet({ open, onClose, title, wide = false, actions = null, children }) {
+export function Sheet({
+    open, onClose, title, wide = false, full = false, immersive = false, actions = null, children,
+}) {
     useEffect(() => {
         if (!open) return undefined;
         const handleKey = (event) => {
@@ -312,24 +316,37 @@ export function Sheet({ open, onClose, title, wide = false, actions = null, chil
     if (!open) return null;
 
     return (
-        <div className={styles.sheetBackdrop} onClick={onClose}>
+        <div className={cx(styles.sheetBackdrop, immersive && styles.sheetBackdropImmersive)} onClick={onClose}>
             <section
                 role="dialog"
                 aria-modal="true"
                 aria-label={typeof title === 'string' ? title : undefined}
-                className={cx(styles.sheetPanel, wide && styles.sheetPanelWide)}
+                className={cx(
+                    styles.sheetPanel,
+                    wide && styles.sheetPanelWide,
+                    full && styles.sheetPanelFull,
+                    immersive && styles.sheetPanelImmersive,
+                )}
                 onClick={(event) => event.stopPropagation()}
             >
-                <header className={styles.sheetHead}>
-                    <h2 className={styles.sheetTitle}>{title}</h2>
-                    <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                        {actions}
-                        <IconButton label="Fermer" onClick={onClose}>
+                {immersive ? (
+                    <div className={styles.sheetImmersiveClose}>
+                        <IconButton label={`Fermer ${title}`} onClick={onClose}>
                             <X size={16} />
                         </IconButton>
                     </div>
-                </header>
-                <div className={styles.sheetBody}>{children}</div>
+                ) : (
+                    <header className={styles.sheetHead}>
+                        <h2 className={styles.sheetTitle}>{title}</h2>
+                        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                            {actions}
+                            <IconButton label="Fermer" onClick={onClose}>
+                                <X size={16} />
+                            </IconButton>
+                        </div>
+                    </header>
+                )}
+                <div className={cx(styles.sheetBody, immersive && styles.sheetBodyImmersive)}>{children}</div>
             </section>
         </div>
     );

@@ -105,7 +105,7 @@ fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quo
 
 | Panneau Lightroom | Réglage | Notre clé |
 |---|---|---|
-| **Effets** | Texture | (pas encore branché) |
+| **Effets** | Texture | `texture` |
 | **Effets** | Clarté | `clarity` |
 | **Effets** | Correction du voile | `dehaze` |
 | **Effets** | Vignette | `vignette` |
@@ -113,8 +113,9 @@ fausse. (C'est ce que détecte la « rugosité » du rapport d'import, et à quo
 | **Effets** | **Grain → Taille** (sous le triangle) | `grainSize` |
 | **Effets** | **Grain → Cassure** (sous le triangle) | `grainRoughness` |
 | **Détail** | Netteté | `sharpness` |
-| **Détail** | Réduction du bruit | (pas branché) |
-| En-tête | **N&B** activé ? | `saturation: 0` |
+| **Détail** | Réduction du bruit luminance | `noiseReductionLuminance` |
+| **Détail** | Réduction du bruit couleur | `noiseReductionColor` |
+| En-tête | **N&B** activé ? | capturé dans la Hald — ne jamais le remplacer par `saturation: 0` |
 | En-tête | Profil (Couleur / autre) | — noter, ça change la base |
 
 #### Les DEUX sous-réglages du grain — Taille et Cassure
@@ -136,13 +137,11 @@ porte du grain.
   jusqu'à 72 %, avec une couleur parfaite : c'est le genre d'erreur qu'aucune
   mesure de couleur ne rattrape.
 
-> ⚠️ **Lightroom n'est pas pilotable** (pas d'AppleScript, pas de CLI sur la
-> version cloud). L'agent ne peut donc PAS lire ces valeurs lui-même : il doit
-> **les demander**, capture d'écran des panneaux à l'appui. Pour le grain, la
-> capture doit montrer **les trois curseurs** — Grain, Taille, Cassure — donc
-> le triangle ouvert. C'est une étape du
-> protocole, pas un détail — un preset importé sans ce relevé rend une couleur
-> juste et un rendu incomplet.
+> ⚠️ Lightroom Cloud n'a toujours ni AppleScript ni CLI, mais l'agent peut
+> maintenant le piloter par l'interface du Mac. Il doit ouvrir et vérifier les
+> panneaux lui-même. Pour le grain, les **trois curseurs** — Grain, Taille,
+> Cassure — doivent être visibles, triangle ouvert. Un preset importé sans ce
+> relevé rend une couleur juste et un rendu incomplet.
 
 #### La Netteté 40 : on la recopie, même si elle n'est pas « dans » le preset
 
@@ -173,8 +172,9 @@ de la sienne sur une image réelle.
 panneau Détail affiche autre chose.
 
 **Le `.xmp`, quand il est disponible**, porte déjà ces valeurs
-(`crs:GrainAmount`, `crs:Texture`, `crs:Clarity2012`, `crs:Dehaze`,
-`crs:PostCropVignetteAmount`, `crs:Sharpness`) et
+(`crs:GrainAmount`, `crs:GrainSize`, `crs:GrainFrequency`, `crs:Texture`,
+`crs:Clarity2012`, `crs:Dehaze`, `crs:PostCropVignetteAmount`, `crs:Sharpness`,
+`crs:LuminanceSmoothing`, `crs:ColorNoiseReduction`) et
 [xmpPreset.js](../../src/features/vibefx-studio/utils/xmpPreset.js) les lit déjà.
 Les presets **Premium** d'Adobe ne s'exportent pas en `.xmp` : pour eux, c'est le
 relevé à l'écran qui fait foi.
@@ -194,6 +194,14 @@ la table, fondu dedans. Inutile de le noter, inutile de le rejouer :
 > partiel**, la conversion **N&B**, et le **Profil** (« Moderne 01 », « Adobe
 > Couleur »…). Un profil est lui-même une table de couleurs : la mire l'avale
 > sans rien de plus.
+
+> **Contrôle obligatoire pour les presets N&B :** après avoir cliqué le preset
+> (un survol ne suffit pas), la mire affichée dans Lightroom doit devenir
+> monochrome ou teintée. Si elle reste une grille RVB colorée, l'export est
+> invalide. Une désaturation ajoutée ensuite dans VibeFX ne répare pas cette
+> erreur : elle perd le mélange N&B Adobe et les virages sépia, rose, vert ou
+> bleu. La famille BW01–BW12 a précisément dû être recapturée pour cette raison
+> le 2026-08-31.
 
 C'est la force de la méthode : elle capture le **résultat**, pas la liste des
 curseurs. La question qui trie, à chaque réglage : *a-t-il besoin de regarder les
@@ -227,11 +235,19 @@ npm run preset:import -- \
   --hald  presets-lightroom/cn11.png \
   --id    cn11 \
   --label "CN11" \
+  --collection "Cinéma II" \
   --hint  "Ciel bleu profond, verts sobres" \
   --bestFor "paysage, mer, ciel dégagé, architecture"
 ```
 
-Le preset apparaît immédiatement dans `/creer/vision`.
+Le preset apparaît immédiatement dans `/creer/vision`, dans la collection
+indiquée. Sans `--collection`, le groupe du XMP est repris ; à défaut, le preset
+va dans « Imports ».
+
+Familles déjà réservées dans l'interface : `--collection "Cinéma"` pour CN01 à
+CN10 et `--collection "Cinéma II"` pour CN11 à CN18. Ne pas laisser un CN dans
+`Imports` : ce groupe sert uniquement aux captures dont la famille n'est pas
+encore identifiée.
 
 **Lire le rapport d'import, deux chiffres comptent :**
 
@@ -251,18 +267,21 @@ de passes réécrit une LUT différente **d'un preset déjà validé**, en silen
 # CN11 — capture propre (aucun grain dans le preset) : PAS de --lisser
 npm run preset:import -- \
   --hald presets-lightroom/cn11-bloc4.png --id cn11 --label "CN11" \
+  --collection "Cinéma II" \
   --hint "Ciel bleu profond, verts sobres" \
   --bestFor "paysage, mer, ciel dégagé, architecture" \
   --avoidFor "portrait rapproché, scène déjà très bleue" \
-  --sharpness 40 --force
+  --noiseReductionLuminance 20 --noiseReductionColor 50 --sharpness 40 --force
 
 # CN17 — capturée AVEC son grain 15, donc bruitée : --lisser 1 obligatoire
 npm run preset:import -- \
   --hald presets-lightroom/cn17-bloc4.png --id cn17 --label "CN17" \
+  --collection "Cinéma II" \
   --hint "Chaud, ciel teal, ombres douces" \
   --bestFor "voyage, lumière du soir, pierre et bois, peau" \
   --avoidFor "photos déjà très chaudes ou jaunies" \
-  --lisser 1 --grain 15 --sharpness 40 --force
+  --lisser 1 --grain 15 --grainSize 40 --grainRoughness 50 \
+  --noiseReductionLuminance 20 --noiseReductionColor 50 --sharpness 40 --force
 ```
 
 **Le contrôle qui va avec**, après toute réimportation d'un preset validé :

@@ -61,3 +61,12 @@ presets-lightroom/
 # `node scripts/fetch-powlisher-corpus.mjs` les retelecharge a la demande.
 docs/lightroom/corpus-powlisher/*
 !docs/lightroom/corpus-powlisher/README.md
+
+# Rendus bruts de l'audit Lightroom : les rapports, metriques et scripts restent
+# versionnes, mais les sources et PNG regenerables (plusieurs Go) restent locaux.
+docs/lightroom/audit-qualite-presets-2026-08-31/sources/
+docs/lightroom/audit-qualite-presets-2026-08-31/lightroom/
+docs/lightroom/audit-qualite-presets-2026-08-31/vibefx/
+docs/lightroom/audit-qualite-presets-2026-08-31/comparaisons/
+docs/lightroom/audit-qualite-presets-2026-08-31/corrections-vintage-bw/comparaisons/
+docs/lightroom/audit-qualite-presets-2026-08-31/corrections-vintage-bw/vibefx/

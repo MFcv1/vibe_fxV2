@@ -1,6 +1,6 @@
 # map.md - Carte vivante Vibe_fx V2
 
-Derniere mise a jour : 2026-08-22
+Derniere mise a jour : 2026-08-31
 
 ## Regle
 
@@ -42,7 +42,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       |-- utilitarian/
 |       `-- vibrant-accents/
 |-- docs/
-|   |-- lightroom/                     # TOUT l'import de presets Lightroom. `README.md` = point d'entree ; `1-procedure.md` = la marche a suivre clic par clic plus une check-list (le seul dont on a besoin en pratique) ; `2-methode-et-pieges.md` = pourquoi la Hald CLUT marche, ce qu'elle ne peut pas capturer, et les pieges MESURES (mire en blocs 4x4, sRVB obligatoire, grain, intensite a 100) ; `3-cn11-cn17-mesures.md` = mesures de CN11/CN17/powlisher, verdict, licence Adobe et les trois erreurs de mesure commises en route ; `4-synchro-effets.md` = le protocole des effets NON captures par la Hald (grain, vignetage, nettete, clarte, texture, voile), mire par mire ; `5-audit-fiabilite-2026-08-19.md` = OU L'ON EN EST face a Lightroom, reglage par reglage, remesure sur les vrais exports : ce qui est fiable, les cinq trous, et quels presets sont importables sans correction
+|   |-- lightroom/                     # TOUT l'import de presets Lightroom. `README.md` = point d'entree ; `1-procedure.md` = la marche a suivre clic par clic plus une check-list ; `2-methode-et-pieges.md` = pourquoi la Hald CLUT marche et ses pieges mesures ; `3-cn11-cn17-mesures.md` = mesures de CN11/CN17/powlisher et licence Adobe ; `4-synchro-effets.md` = protocole des effets hors LUT ; `5-audit-fiabilite-2026-08-19.md` = fiabilite reglage par reglage ; `audit-cinema-2026-08-30.md` = CN01-CN10 ; `audit-cinema-II-2026-08-30.md` = CN11-CN18 et diagnostic du grain CN14/CN17 ; `audit-saisons-2026-08-30.md` = SP/SM/TM/WN et comparaisons telephone/reflex
+|   |-- prompt-reprise-2026-08-31-vision-sans-vibemask.md # Etat de reprise apres retrait de la segmentation intelligente, avec invariants Vision et gates
 |   |-- prompt-reprise-2026-08-19.md      # Prompt de reprise pour un chat neuf, apres l'audit de fiabilite du 2026-08-19 : etat du livre, gates, mission (clarte negative, avertissement a l'import, puis les nouveaux imports), interdits
 |   |-- plan-vibeos-redesign-2026-08-08.md # Plan maitre du redesign VibeOS « incubateur de creation » : decisions validees, inventaire des features a preserver, design system .vibeos (tokens copies de VibeCut), routes /creer/*, store projet commun, specs page par page (accueil, layout, vision, studio, soundtrack Spotify-like), phases A-F et bascule /studio -> /creer
 |   |-- archive-vibecut-2026-08-04.md   # ARCHIVE du chantier VibeCut clos le 2026-08-04, sortie de todo.md le 2026-08-08 : point situationnel, lots B1/B2/B3a/B3b, effets pendant le plan, glitch, bugs 1 a 59 avec causes reelles, problemes connus non resolus, lecons FFmpeg payees, commandes test:vibecut-*. Reference a relire avant toute reprise de /video ou render-service/
@@ -87,7 +88,11 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   `-- vibefx/
 |   |       `-- demo-astronaut.png      # Asset demo pour pages publiques et studio
 |   |-- vendor/
-|   |   `-- lumen/                    # Copie integree de Leonxlnx/lumenshaders pour generer des fonds shader dans Layout, mode safe desktop WebGL
+|   |   |-- lumen/                    # Copie integree de Leonxlnx/lumenshaders pour generer des fonds shader dans Layout, mode safe desktop WebGL
+|   |   `-- gradient-builder/         # Gradient Builder : reconstruction de l'ecran Studio de feralui.dev/gradients (app autonome ES modules, aucune dependance), ouverte plein ecran depuis Studio et rendue au parent par postMessage
+|   |       |-- index.html            # Coquille : entete + modes, canvas, bandes, barre du bas, panneau
+|   |       |-- styles.css            # Feuille reecrite d'apres les mesures du site (tokens --jg-*, clair/sombre)
+|   |       `-- js/                   # color.js (OKLab), names.js (nuancier), export.js (PNG/SVG/CSS/JSON/video), data/ (28 types, 250 presets, 8 arrangements, 35 silhouettes SVG, 5 villes, 69 galerie, 102 noms), render/ (un moteur par type : flow, sky, aurora, fields, strips, prism, still, retro, noise, lines, shapes, tiles, rings, arch, pixel, glassy, glint, mist, skyline, gl), ui/controls.js
 |   |-- music/                         # Pistes audio importees pour le module video Vibe_CUT
 |   |   |-- local-imports/              # Copies audio locales dev Soundtrack (ignorees Git hors .gitkeep) + manifest genere par /api/music/local-file-import
 |   |   `-- pixabay-ai/                # Import local genere par `npm run import:pixabay-ai` : MP3 + manifest droits Pixabay AI Generated
@@ -272,7 +277,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |   `-- textRenderer.js
 |   |   |   |-- hooks/
 |   |   |   |   |-- useCanvasEvents.js
-|   |   |   |   |-- useCanvasRenderer.js
+|   |   |   |   |-- useCanvasRenderer.js # Renderer canvas partagé ; aperçu Vision/Studio plafonné à 1,25 Mpx (export intact) pour libérer le thread principal
 |   |   |   |   |-- useImageUpload.js
 |   |   |   |   `-- useLayoutHelpers.js
 |   |   |   |-- utils/
@@ -414,6 +419,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- beforeAfter.module.css
 |   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS (meshPreviewStyle exporte) ; rendu final par renderLayoutMeshBackground (moteur existant)
 |   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
+|   |   |   |-- GradientSheet.jsx       # Fond Gradient Builder : iframe /vendor/gradient-builder en Sheet `full`, protocole postMessage (vibefx:capture-gradient -> gradient:use-background), reutilise l'emplacement background.lumen
 |   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
 |   |   |   `-- generators.module.css
 |   |   |-- soundtrack/                 # Ecran Soundtrack reel (phase E) - hooks, services et APIs musique existants importes, jamais reecrits
@@ -423,23 +429,25 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- PlayerBar.jsx           # Lecteur fixe 72px desktop (pochette, transport, progression, volume, « Utiliser dans VibeCut ») et mini-barre mobile ouvrant le lecteur plein ecran
 |   |   |   |-- ImportSheet.jsx         # Les 4 sources en Sheet : Import IA (Aitra Free / Pixabay par theme), Pixabay (fichier telecharge + licence pre-remplie), Fichier local (fichiers ou dossier), URL directe - toute la mecanique vient de services/soundtrackImportFlows.js
 |   |   |   `-- soundtrack.module.css
-|   |   |-- studio/                     # Ecran Studio reel (phase D) - moteur de rendu renderStudio importe, jamais reecrit
-|   |   |   |-- ambianceCatalog.js      # Les 10 ambiances « en un clic » : 6 curees depuis PRESET_CATEGORIES (Portra, Gold, Superia, CineStill, Tri-X, Blade Runner) + 4 combinaisons nouvelles (Polaroid delave, VHS chaud, Eclat doux, Brume matin). Meme format que PRESET_CATEGORIES.profiles + famille/force (tri) et palette mesh assortie
-|   |   |   |-- customStyles.js         # Styles perso en localStorage `vibeos.studio.customStyles` (sans vignette : elle se re-rend sur la photo)
-|   |   |   |-- useStudioEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue studio), recadrage (useCanvasEvents), export, mesure (visionMetrics), tirage pondere de « Surprends-moi » (scoreProfileForImage + jitter ±10% sur 3 parametres), 6 variantes visuelles, historique 30 etats, fond genere ecrit dans le projet commun
-|   |   |   |-- StudioScreen.jsx        # Tuiles d'ambiances rendues sur la vraie image, intensite, Surprends-moi, variantes, fond genere (Mesh/Lumen en Sheet partage), avances (garde-fous, recadrage, filtres manuels, teinte, styles perso), sheet d'export
+|   |   |-- studio/                     # Hub creatif Apple-dark : deux mini-apps de fond, Gradient et Lumen
+|   |   |   |-- ambianceCatalog.js      # Ancien catalogue d'ambiances conserve pour compatibilite des projets, plus monte par StudioScreen
+|   |   |   |-- customStyles.js         # Ancien stockage de styles perso, conserve pour ne pas detruire les donnees locales
+|   |   |   |-- useStudioEditor.js      # Ancienne orchestration photo conservee pour compatibilite moteur, plus montee par /creer/studio
+|   |   |   |-- useStudioGenerators.js  # Pont leger mini-app -> Blob IndexedDB -> background.lumen du projet, identification Gradient/Lumen et retrait
+|   |   |   |-- StudioScreen.jsx        # Hero compact + deux grandes cartes Gradient/Lumen ; ouverture immersive bord a bord sous le bandeau VibeOS, Mesh absent
 |   |   |   `-- studio.module.css
 |   |   |-- vision/                     # Ecran Vision reel (phase C) - science des couleurs existante importee, jamais reecrite
-|   |   |   |-- useVisionEditor.js      # Orchestration : rendu photo (useCanvasRenderer vue vision-pro), export, mesure de l'image (visionMetrics), vignettes de presets, historique 30 etats, lien avec le projet commun. Importer une photo EFFACE la composition du projet (sinon elle restait prioritaire et revenait au rechargement), `detachComposition` revient a la photo brute, et le preset applique est reporte sur la fiche de la photothèque
-|   |   |   |-- presetPreview.js        # Vignettes des presets : la photo est reduite UNE fois dans un canvas partage, puis chaque vignette n'est qu'une passe LUT (avant : un drawImage pleine resolution + 4 passes pixel + un encodage JPEG PAR vignette, cause directe des saccades)
+|   |   |   |-- presetCollections.js    # Modele pur de classement/recherche des 181 presets Vision : collections ordonnees dont Cinema, Cinema II, Printemps, Ete, Automne et Hiver, filtrage accent-insensible
+|   |   |   |-- useVisionEditor.js      # Orchestration Vision : catalogue Lightroom, historique, aperçu/export et ordonnanceur de miniatures visible-first avec annulation + cache de session
+|   |   |   |-- presetPreview.js        # Miniatures 192x116 : source réduite une fois, même applyFiltersPro que canvas/export, sortie Blob plutôt que data URL
 |   |   |   |-- autoEnhance.js          # « Ameliorer ma photo » : correction deduite des mesures + phrase humaine. Se cumule au preset, qui porte le look
-|   |   |   |-- VisionScreen.jsx        # Bouton Ameliorer, intensite 0-100, grille de presets (second clic = retrait, comparaison immediate), avant/apres reel (shared/BeforeAfter : rideau / cote a cote / maintien), « Changer de photo » et « Quitter la composition » toujours accessibles, avances (lumiere/couleur/matiere, garde-fous), sheet d'export
+|   |   |   |-- VisionScreen.jsx        # Vision complet + cartes observées par IntersectionObserver : viewport urgent, marge suivante préchargée, cache conservé entre collections
 |   |   |   `-- vision.module.css
 |   |   `-- styles/
 |   |       `-- vibeos.css              # Tokens `--vo-*` copies de vibecut.css, scope strict `.vibeos` (sombre, theme clair pret)
 |   |   |   |-- haldClut.js            # Capture d'un preset externe par Hald CLUT : mire identite, relecture d'une mire traitee vers une LUT 33^3, detection d'une mire non traitee, base64. Depuis le lot J : `measureHaldRoughness` (une table BRUITEE = du grain dans le preset, qui corrompt chaque couleur de la mire) et `smoothHaldCube` (noyau [1,2,1] par axe ; ne deplace une table deja lisse que de 0,05/255). C'est ce qui permet d'importer un preset Lightroom EXACTEMENT, sans reimplementer Camera Raw
-|   |   |   |-- xmpPreset.js           # Lecture d'un .xmp Lightroom/Camera Raw : sert a recuperer les reglages SPATIAUX (clarte, texture, nettete, grain, vignetage) qu'une Hald CLUT ne peut pas capturer, et a produire un resume lisible. La couleur ne vient PAS d'ici
-|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Contient `cn01.js`, `cn13.js`, `cn14.js` et `cn16.js` (2026-08-20), `cn11.js` et `cn17.js`, captures le 2026-08-11 sur un vrai Lightroom cloud — REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/lightroom/3-cn11-cn17-mesures.md)
+|   |   |   |-- xmpPreset.js           # Lecture d'un .xmp Lightroom/Camera Raw : recupere les reglages SPATIAUX qu'une Hald CLUT ne peut pas capturer, dont clarte, texture, nettete, reduction du bruit luminance/couleur, grain et vignetage. La couleur ne vient PAS d'ici
+|   |   |   |-- presets/               # Presets importes de Lightroom (GENERE par scripts/import-lightroom-preset.mjs) : un module par preset, portant sa table en base64 + ses reglages spatiaux. Familles Lightroom Cloud completes au 2026-08-30 : Cinema CN01-CN10, Cinema II CN11-CN18, Futuriste FT01-FT12, 12 looks film, Noir et blanc BW01-BW12, Vintage VN01-VN10, Architecture UA01-UA10, Paysage LN01-LN10, Style de vie LF01-LF08, Voyage TR01-TR18 et Saisons SP01-SP12 / SM01-SM11 / TM01-TM12 / WN01-WN10. REFERENCE DE CALIBRATION, pas des looks de production (licence Adobe, cf docs/lightroom/3-cn11-cn17-mesures.md)
 |   |   |   |-- lut3d.js                # Moteur LUT 3D : buildLut3d evalue une fonction de preset sur une grille 33^3, applyLut3d l'applique par interpolation trilineaire en UNE passe. Cout de rendu constant : ajouter un preset ne coute rien
 |   |   |   |-- visionPresets.js         # Les presets Vision, ecrits comme des fonctions pures sRGB->sRGB dans l ordre Lightroom (courbe -> melangeur TSL -> desaturation hautes lumieres -> virage split). `powlisher`, reconstruit par mesure (cf docs/audit-preset-powlisher-2026-08-11.md), `powlisher-ciel` (le ciel CONVERGE vers la teinte ou atterrissent ses ciels, 190-199 deg, au lieu d etre tourne d un angle fixe) et `powlisher-showcase` (clair-obscur: creux de saturation qui vide le decor et laisse le sujet seul colore, plus des effets non-LUT via `spatialFilters`). La regle du ciel est partagee (`regleDuCiel`)
 |   |-- vibefx-shared/
@@ -511,7 +519,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- import-pixabay-ai-music.mjs     # Scraper/import local Playwright pour https://pixabay.com/music/search/ai-generated/, limite, sans contournement challenge, avec manifest droits
 |   |-- check-vision-corpus.mjs         # Verifie les 12 fixtures smartphone locales ignorees par Git
 |   |-- audit-vision-presets.mjs        # Audit chiffre des presets Vision : BANDES (plus gros saut dans un degrade lisse, le risque n1 d'une LUT), dominante sur l'axe des gris, derive teinte/sat/lum sur des couleurs temoins
-|   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : la mire neutre reexportee sans preset doit revenir a l'identite (<=2/255). Attrape le piege Adobe RVB au lieu de sRVB, qui fausserait chaque preset sans rien signaler
+|   |-- check-hald-control.mjs         # Controle a vide de la chaine Lightroom AVANT toute capture : accepte la mire historique 512 et la mire de production 2048 en blocs 4x4, dont il moyenne le coeur exactement comme l'importeur; la mire neutre doit revenir a l'identite (<=2/255)
 |   |-- make-hald-clut.mjs             # Genere la mire Hald. Depuis le lot J elle est en BLOCS de 4x4 pixels par couleur (2048x2048) avec profil sRGB explicite : une couleur par pixel faisait baver les couleurs entre voisines et virait les noirs au vert
 |   |-- mesure-grain-lightroom.mjs     # Combien vaut le grain de Lightroom, et combien vaut le notre, carre par carre sur la mire A. Lit le COEUR des aplats (marge de 30 px: tout effet spatial bave sur les bords) et extrait le grain EN QUADRATURE (sqrt(total^2 - base^2), jamais la difference brute). C'est lui qui a montre que le « x8 » etait faux (x2,66) et, surtout, que l'ecart n'etait pas un facteur mais une FORME: plat chez lui, cloche chez nous. `--planche` sort les trois versions cote a cote a l'echelle 1:1
 |   |-- make-mire-largeur.mjs          # La mire A DESSINEE a n'importe quelle largeur. Dessinee, jamais redimensionnee: agrandir au plus proche voisin marche (les aplats restent unis), mais REDUIRE melange les bords des carres et fabrique des pixels qui n'existent dans aucun aplat. C'est elle qui a permis de mesurer le grain a 810 et 1080 px, la ou sortent les images sociales
@@ -569,6 +577,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-vibeos-layout-b1.spec.cjs # Smoke Playwright Layout VibeOS : import, canvas, formats, modeles, template thematique, export
 |   |-- smoke-vibeos-layout-b3.spec.cjs # Smoke Playwright Layout VibeOS : textures, zones custom, stickers, comparaison, apercu Insta, reprise du projet
 |   |-- smoke-vibeos-vision.spec.cjs   # Smoke Playwright Vision VibeOS : analyse, « Ameliorer ma photo », intensite, 12 looks surs sur 5 photos types
+|   |-- vision-preview-performance.spec.cjs # Banc Playwright reproductible : première/dernière carte visible, scroll, petite collection, photo/intensité/cache, doublons, thread principal et fidélité CN01/CN14/BW01
 |   |-- smoke-reglages-avances.spec.cjs # LE MEME AUDIT, MAIS PAR L'INTERFACE: saisit les vrais curseurs de /creer/vision et /creer/studio et relit le canvas de la page. Ce que le banc d'essai ne peut pas voir: une borne d'interface plus large que celle du moteur, un onChange qui ecrit la mauvaise cle, un rendu qui ne se redeclenche pas. C'est lui qui a trouve que la moitie de la course des curseurs de Studio ne faisait rien. Designe les curseurs par LEUR LABEL, jamais par leur rang: le panneau Vision remonte en tete ce qui n'est plus au repos, donc bouger un curseur DEPLACE les suivants
 |   |-- smoke-vibeos-studio.spec.cjs   # Smoke Playwright Studio VibeOS : ambiances rendues sur la vraie image, intensite, « Surprends-moi », variantes, avances, 10 ambiances distinctes
 |   |-- smoke-vibeos-soundtrack.spec.cjs # Smoke Playwright Soundtrack VibeOS : import, lecture qui survit au changement de page, recherche, mobile
@@ -617,6 +626,277 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 
 - `/legal/confidentialite`
 - `/legal/conditions`
+
+## Journal — 2026-08-31 (performance des miniatures Vision)
+
+- Diagnostic avant patch sur `/creer/vision` : première carte calculée en
+  1,7–1,9 s mais 0/10 cartes du viewport après 20 s ; 30–31/261 terminées,
+  47–48 rendus lancés, environ 30 s de tâches longues et un pic de 774 ms.
+- Deux causes : file globale dans l'ordre des 261 presets via
+  `requestIdleCallback`, sans notion du viewport ; chaque publication React de
+  miniature recréait les options du renderer et relançait la grande image haute
+  qualité. Les data URLs ne représentaient que ~40 ms sur 20 s.
+- `VisionScreen` observe chaque carte dans le vrai panneau scrollable. Le
+  viewport est urgent, une marge de 500 px est préchargée au repos, et quitter
+  une collection retire les travaux non démarrés. Aucun rendu des 261 sans
+  consultation réelle.
+- `useVisionEditor` porte une file à concurrence 1, annule les générations
+  obsolètes et met en cache les Promises/Blob URLs par photo, preset, intensité
+  conseillée et version moteur. Le cache de Promise neutralise aussi le double
+  montage React Strict Mode.
+- `presetPreview` réduit une seule fois à 192×116, conserve `applyFiltersPro`
+  complet (LUT, réduction du bruit, clarté, texture, netteté, vignette, grain,
+  etc.) et remplace les data URLs par `toBlob`/object URL. L'aperçu principal
+  est plafonné à 1,25 Mpx, sans toucher à l'export.
+- Après patch, commande `npm run test:vision-preview-performance` : première
+  miniature 454 ms depuis l'import (23 ms après disponibilité photo), 10/10
+  visibles à 852 ms (421 ms après photo), scroll 284 ms, 14 rendus avant scroll,
+  4,7 ms de pipeline moyen, LUT 1,07 ms en moyenne et 0 doublon. La collection
+  Cinéma lance exactement 10 rendus. Parité visuelle automatisée sur CN01,
+  CN14 avec grain et BW01 : écart moyen par canal inférieur à 1 niveau.
+- Gates : performance 3/3, navigateur Vision 3/3, moteur 426/426, lint 0 erreur
+  et 5 avertissements préexistants. Build compilé puis bloqué comme avant par
+  l'ABI locale `better-sqlite3` (127, Node courant 26/module 147). Le seul bruit
+  console est le 403 App Check debug attendu avec la configuration locale.
+  Aucun déploiement.
+
+## Journal — 2026-08-31 (retrait de la détection intelligente Vision)
+
+- Suppression ciblée de VibeMask : moteur DeepLab/TensorFlow.js, Worker,
+  modèle de masque ciel/eau, pinceau, overlay, presets ciel locaux, aperçus,
+  persistance projet et test dédié.
+- Les presets classiques, l'amélioration automatique, les réglages Vision,
+  l'historique, le rendu commun et l'export restent en place. Les anciennes
+  données `smart*` éventuellement présentes dans IndexedDB sont simplement
+  ignorées par le modèle normalisé.
+- Les dépendances TensorFlow.js propres à cette expérimentation et sa
+  documentation d'architecture ont été retirées. Aucun déploiement.
+- Gates : pipeline 2/2, lint 0 erreur avec 5 avertissements préexistants et
+  build Node 22 vert. Restent hors lot l'échec moteur déjà présent sur 12
+  presets hors garde-fous et le délai de génération des 261 miniatures Vision
+  (173 disponibles dans la fenêtre de 20 s du smoke navigateur).
+
+## Journal — 2026-08-30 duodecies (Lightroom : quatre saisons)
+
+- Ajout des 45 presets Premium Printemps SP01–SP12, Été SM01–SM11, Automne
+  TM01–TM12 et Hiver WN01–WN10. Vision expose 181 presets avec quatre nouveaux
+  filtres de collection ; aucun preset saisonnier ne contient de grain.
+- Le contrôle Lightroom sur une photo téléphone 2252×4000 et une reflex
+  4000×6000 a corrigé le sens clair du vignettage positif, l'ordre du détail
+  avant LUT, le dosage JPEG de la clarté et la protection des arêtes de la
+  texture. Ces chemins sont opt-in pour les imports et préservent les anciens
+  presets VibeFX.
+- Audit et chiffres : `docs/lightroom/audit-saisons-2026-08-30.md`. Gates
+  ciblés : 408/408 preset, audit réglages vert, smoke réglages 1/1. Aucun
+  déploiement.
+
+## Journal — 2026-08-30 decies (Studio : Gradient et Lumen en grand)
+
+- `/creer/studio` ne monte plus l'ancien editeur photo ni ses dix ambiances :
+  les presets de qualite vivent dans Vision. La surface montre deux modules,
+  Gradient et Lumen, dans une coque Apple-dark responsive. Mesh n'y apparait
+  plus ; son usage Layout reste intact.
+- `useStudioGenerators.js` remplace le lourd `useStudioEditor` sur cette route.
+  Il conserve le contrat existant : la mini-app renvoie une image par
+  `postMessage`, convertie en Blob puis ecrite dans le fond du projet commun.
+- Le mode `immersive` de `Sheet` garde le bandeau VibeOS visible et donne aux
+  iframes tout le rectangle restant : zero padding, zero bord, zero rayon,
+  jusqu'aux deux cotes et au bas. Un bouton de fermeture discret vit dans le
+  bandeau ; Echap fonctionne aussi. La tab bar mobile est couverte.
+- `smoke-vibeos-studio.spec.cjs` verrouille exactement cette geometrie sur
+  desktop et mobile, les deux iframes, l'application/retrait d'un Gradient et
+  l'absence de Mesh/ambiances. Resultat : 2/2 vert.
+
+## Journal — 2026-08-30 nonies (Gradient Builder : le reste)
+
+Cloture du chantier : **les 28 types ont leur moteur**, et les trois manques du
+lot precedent sont combles.
+
+- **Glassy** : grille de tuiles de verre. Le fond est peint a part puis floute ;
+  chaque tuile le redecoupe avec un decalage — c'est ce decalage qui fait la
+  refraction. Dix formes de tuile (carre, cercle, hexagone, trefle, fleur,
+  feston, coeur, etoile, feuille, goutte), voile, reflet, ombre au pied,
+  liseré, et une deformation en boule sur toute la grille.
+- **Glint** : le soleil sur l'eau. Des rangees de vagues en perspective, une
+  nappe de lumiere sous l'horizon, des trainees, puis jusqu'a 4 200 reflets
+  semes selon une densite qui suit la colonne du soleil. Une toile en
+  « soft-light » casse le lisse.
+- **Mist** : des cretes de montagne en bruit de valeur, de plus en plus hautes
+  et nettes a mesure qu'elles se rapprochent, separees par des nappes de brume
+  elliptiques ; les cretes du fond sont floues et tirent vers la couleur du
+  ciel.
+- **Skyline** : cinq villes (San Francisco, New York, Paris, Londres, Sydney),
+  tracés SVG extraits du bundle, empilees par plans du plus clair au plus
+  sombre, calees en bas du cadre avec un halo de sol.
+- **Panneau Forms** au complet, comme sur le site : grille des 35 silhouettes,
+  12 gammes de couleur, 13 fonds + fond libre et un bouton « Match set »,
+  transformation sur le canvas (cadre deplacable, coins qui redimensionnent,
+  poignee de rotation, Fit / Fill / Reset), et le bloc « Form treatment »
+  (Edge fade, Width, Height, Distort, Bloom).
+- **Onglet Image** : import de logo ou de photo, place a la main sur le canvas,
+  avec taille, rotation, opacite et mode de fusion. Les images partent aussi a
+  l'export.
+- **Exports** dans une feuille dediee : **PNG** (4 formats, avec apercu),
+  **SVG** (vrais chemins pour Linear, Radial, Conic, Forms et Skyline ; rendu
+  embarque en image pour les types calcules pixel par pixel, et le panneau le
+  dit), **CSS** et **JSON** avec apercu du code et copie en un clic, et
+  **video** par `MediaRecorder` sur le flux du canvas — MP4 quand le navigateur
+  sait l'encoder, WebM sinon, l'etiquette suit.
+- **L'animation** ne se limite plus au GPU : les types calcules pixel par pixel
+  tournent aussi, en resolution reduite et a 24 images/s, quand leur curseur
+  Speed est au-dessus de zero. Un trait sans `sway` ne declenche rien : son
+  dessin ne depend pas du temps.
+
+## Journal — 2026-08-30 octies (Gradient Builder : les moteurs de type)
+
+L'UI etait juste, les types ne l'etaient pas : tout ce qui n'avait pas son
+moteur retombait sur une rampe lineaire. Cette tranche ecrit les moteurs
+manquants. **24 des 28 types rendent maintenant leur vrai dessin**, les quatre
+familles du dock comprises.
+
+- **Sky** et **Aurora** passent par le GPU (`js/render/gl.js` : socle WebGL,
+  bruit de Perlin et fbm partages). Sky est un fbm a domaine deforme empile en
+  trois couches d'altitude, fondu en « color burn » sur quatre tons — de vrais
+  nuages. Aurora est une nuit noire ou deux brins paralleles sont modelises par
+  une gaussienne asymetrique autour d'une colonne sinusoidale, avec stries de
+  champ et etoiles sur grille. Les deux **s'animent** : le curseur Speed pilote
+  une horloge qui ne tourne que pour ces types (le GPU encaisse, un champ par
+  pixel non) et s'arrete quand l'onglet passe en arriere-plan.
+- **Lines** : les 13 formes de trait (serpent, boucle, spirale, gribouillis,
+  zigzag, gelule, anneau, arc…), spline Catmull-Rom centripete, re-echantil-
+  lonnage a arc constant, tracé segment par segment avec un degrade local — la
+  couleur court le long du trait. Les 8 arrangements du site (Snake, Drops,
+  Loops, Ribbon, Doodle, Wander, Waves, Echo) sont extraits et leurs vignettes
+  rendues par le meme moteur. La premiere couleur est le papier.
+- **Forms** : les 35 silhouettes SVG de la bibliotheque, degrade et fondu
+  calcules **dans le repere du dessin** et non dans celui de l'ecran — c'etait
+  l'erreur qui coupait la forme en deux et la delavait.
+- Ajoutes aussi : **Still** (champ fige, melange RGB a exposant reglable),
+  **Retro** (taches gaussiennes sur fond domine, plan bouscule par du bruit),
+  **Noise**, **Prism** (colonnes a largeur bruitee, coeur incandescent, reflets
+  qui derivent), **Rings**, **Beehive**, **Blocks**, **Balls**, **Pixel**,
+  **Arch**.
+- **Texte** : plusieurs boites par composition, chacune deplacable au doigt sur
+  le canvas, avec police, taille, interlettrage, rotation, alignement et encre.
+  Les presets apportent leurs propres textes — le titre en serif et les
+  mentions d'angle des affiches Forms arrivent avec eux.
+- Chaque type a desormais son groupe de reglages (Weather pour Sky, Field pour
+  les autres, Direction en quart de tour) et **son propre libelle de bandes**.
+- Restent sans moteur : **Glassy, Glint, Mist, Skyline** (4 sur 28) ; ils
+  retombent sur la rampe lineaire, et la liste vivante est `READY` dans
+  `js/render/index.js`.
+
+## Journal — 2026-08-30 septies (Gradient Builder : premiere tranche)
+
+Nouveau generateur de fonds, reconstruit d'apres l'ecran Studio de
+`feralui.dev/gradients`. L'app vit dans `public/vendor/gradient-builder/`
+(HTML + ES modules, zero dependance), sur le meme principe que `vendor/lumen` :
+elle s'ouvre dans une iframe et rend son image au parent par `postMessage`.
+
+- **Coquille fidele** : entete + modes Studio/Gallery/Palette/Saved, bascule
+  clair/sombre, panneau vitre a onglets Design/Text/Image, dock de types a cinq
+  familles, barre de bandes, barre du bas. Les mesures (tokens `--jg-*`, rayons,
+  ombres, typo Inter 13.5px) sont relevees sur le site ; le CSS est reecrit.
+- **Donnees** : les 28 types et leurs 4 familles, 208 presets de panneau,
+  69 degrades de galerie, 12 gammes de palette et le nuancier de 102 couleurs
+  traditionnelles (avec repli par famille de teinte) sont extraits du bundle
+  public par un parseur de litteral maison (`scripts` de travail hors depot).
+- **Moteurs ecrits** : `FLOW` (champ de couleur en OKLab, ponderation en
+  inverse de distance, double pli sinusoidal + rotation vers les bords),
+  `AIR/Mesh`, `LINEAR`, `IOS`, `CIRCLE`, `ANGULAR`, `WAVE`, `STRIPE`,
+  `BARS`/`COLS`. Les 18 autres types s'affichent dans le dock et retombent sur
+  la rampe lineaire tant que leur moteur n'est pas ecrit.
+- **Rendu en deux temps** : passe brouillon a 260 px pendant qu'on manipule un
+  reglage, pleine resolution (plafond 1600 px) des que la main se leve.
+- **Cote VibeOS** : bouton `Gradient` a cote de Mesh et Lumen dans « Fond
+  genere » (Studio), `Sheet` gagne une variante `full` (min(1600px, 100vw)),
+  et `useStudioEditor` retient desormais quel generateur a produit le fond
+  (`lumenMode`) pour eclairer le bon bouton.
+- **Deux defauts corriges en route** : `requestAnimationFrame` ne se declenche
+  pas dans un onglet masque (le rendu ne repartait jamais — repli sur timer), et
+  l'attribut `hidden` ne cachait pas les sections a `display` explicite.
+
+## Journal — 2026-08-30 sexies (miniatures et vignettage Lightroom)
+
+- `vision/presetPreview.js` appelle maintenant `applyFiltersPro`, exporté par
+  `studioRenderer.js` : une carte rend la LUT et tous les effets spatiaux du
+  preset, avec la vraie taille source transmise au moteur de grain.
+- `useVisionEditor.js` calcule ces cartes par lots de quatre via le temps
+  d'inactivité du navigateur. Le catalogue peut dépasser 100 entrées sans
+  bloquer l'import, le scroll ou le premier affichage de la photo.
+- Le moteur/import XMP porte le voile négatif et les réglages Milieu, Arrondi,
+  Contour progressif et Hautes lumières du vignetage. Le nouveau profil radial
+  Lightroom est opt-in pour les imports ; le chemin des presets validés reste
+  inchangé. `scripts/mesure-vignette-lightroom.mjs` rejoue les mesures.
+- Gates : 384 vérifications moteur, smoke Vision principal, smoke des réglages
+  avancés Vision + Studio et lint verts. Le smoke global conserve son échec
+  connu PowV3 (contraste 1,426 < 1,5) ; le build compile puis bute sur l'ABI
+  locale préexistante de `better-sqlite3`. Aucun déploiement.
+
+## Journal — 2026-08-30 quinquies (Lightroom Cloud : famille Cinéma complète)
+
+- Audit direct de `Style : cinéma` : la famille va de CN01 à CN10. CN01 est
+  reclassé dans `Cinéma` sans modifier sa table LUT validée ; ajout des modules
+  générés `cn02.js` à `cn10.js` et régénération de l'index.
+- Les neuf nouvelles mires Hald ont une rugosité de 0,60 à 0,80/255 : aucun
+  grain n'est figé dans les tables. Les panneaux Lightroom confirment Grain 0,
+  Texture/Clarté/Voile/Vignette 0, aucun Auto/masque/noir et blanc. Le rendu
+  JPEG porte Netteté 40 et réduction du bruit Luminance 20 / Couleur 50.
+- Contrôle réel CN02/CN10 sur `37131.jpg` (téléphone) et `IMG_0349.JPG`
+  (reflex Maroc) : 1,23 à 1,98/255 d'écart moyen, P99 de 6 à 11/255, quatre
+  verdicts identiques à l'œil après inspection des planches et crops 1:1.
+- Vision contient désormais `Cinéma 10`, `Cinéma II 8`, `VibeFX 26` ; la
+  collection vide `Imports` disparaît. Le smoke navigateur vérifie le filtre
+  Cinéma et la recherche CN01. Aucun déploiement.
+- Audit : `docs/lightroom/audit-cinema-2026-08-30.md`.
+
+## Journal — 2026-08-30 quater (Vision : collections de presets)
+
+- La grille plate devient une bibliothèque structurée : recherche, filtres en
+  pilules `Tous`, `Cinéma`, `Cinéma II`, `VibeFX`, `Imports`, compteurs, groupes
+  visibles et état vide. Le châssis reste celui de VibeOS, sombre et calme façon
+  Apple OS ; focus clavier et reduced-motion sont couverts.
+- `presetCollections.js` porte la logique pure. Les prochains imports peuvent déclarer
+  `--collection "Nom"`, ou reprendre automatiquement le groupe du XMP.
+- Le smoke navigateur vérifie Cinéma II = 8, recherche CN17 = 1 et retour à la
+  bibliothèque complète. Contrôle visuel desktop/mobile effectué sur le vrai
+  écran Vision. Aucun déploiement.
+
+## Journal — 2026-08-30 ter (Lightroom Cloud : famille Cinéma II complète)
+
+- Audit direct de Lightroom Cloud : « Style : cinéma II » va de **CN11 à
+  CN18**, pas à CN20. VibeFX possédait CN11, CN13, CN14, CN16, CN17 ; ajout de
+  `cn12.js`, `cn15.js` et `cn18.js`, puis régénération de `presets/index.js`.
+- Les trois mires sont les exports sRGB 2048×2048 en blocs 4×4. CN18 porte
+  Grain 20 / Taille 40 / Cassure 50 / Netteté 40 ; CN12 et CN15 portent
+  Netteté 40. Toute la famille porte la réduction de bruit Lightroom Luminance
+  20 / Couleur 50, maintenant reproduite avant la netteté par un lissage
+  luminance/chroma qui protège les arêtes.
+- `check-hald-control.mjs` rejetait à tort la mire de production 2048 en
+  attendant l'ancienne 512. Il détecte maintenant la taille des blocs et
+  moyenne leur cœur comme l'importeur. `import-lightroom-preset.mjs` ne prétend
+  plus que les effets relevés à l'écran sont perdus quand aucun XMP n'existe.
+- Le smoke verrouille CN11–CN18, leur réduction du bruit 20/50, le parseur XMP
+  (quantité, Taille et Cassure du grain, même à zéro) et l'ordre du pipeline
+  spatial.
+  Contrôle à l'œil sur quatre photos Unsplash : aucun défaut accidentel vu ; les
+  trois nouveaux restent hors `presets-valides.md` jusqu'au regard de Matthis.
+- Corpus réel ajouté : quatre photos téléphone jusqu'à 200 Mpx et trois reflex
+  Canon EOS 200D du dossier `~/Desktop/maroc`. Les exports avec/sans grain
+  isolent directement le champ Lightroom. CN14 est à environ 1 % de force et
+  +3,5 % de grosseur au pire ; CN17/CN18 restent à environ 2 % de force et 3 %
+  de grosseur jusque 200 Mpx. Sur reflex, la force varie de −6,8 à +4,2 % sans
+  biais systématique.
+- Contrôle final LUT + NR + netteté + grain : 1,68–1,97/255 d'écart moyen sur
+  téléphone, texture, portrait et paysage reflex. Les quatre planches et crops
+  1:1 ont été regardés à l'œil, sans différence gênante.
+- Audit complet : `docs/lightroom/audit-cinema-II-2026-08-30.md`. Aucun
+  déploiement.
+- Gates du lot : 373/373 vérifications preset après ajout de Cinéma, audit des réglages et smoke
+  navigateur Vision/Studio verts, lint sans erreur. Le smoke VibeOS global
+  conserve un échec hors lot sur `saturee / PowV3` (1,426 sous le seuil 1,5) ;
+  le build compile puis s'arrête sur l'ABI locale incompatible de
+  `better-sqlite3` dans `node_modules`.
 
 ## Journal — 2026-08-30 bis (`powV12` : le blanc du logo, et le poteau)
 
@@ -4633,9 +4913,9 @@ Trois reproches, tous fondés : **trop rapide**, **images pas en pleine qualité
 - Le module video Vibe_CUT, ses pistes `public/music/` et ses dependances audio/state ont ete portes ; la navigation React Router source a ete remplacee par l'etat d'onglet interne du studio, et les composants studio/video sont declares en client components pour eviter les bailouts SSR.
 - Le module video Vibe_CUT accepte les imports lourds en ajoutant les clips immediatement puis en extrayant les thumbnails en arriere-plan ; les filtres colorimetriques sont appliques au rendu canvas, les textes restent visibles en lecture/export, les pistes musique locales `public/music/` sont importables/lisibles, les clips video se reordonnent par drag/drop pointer dans la timeline, une timeline `Effets` separee entre video et texte permet de placer/deplacer/redimensionner des transitions librement sans les melanger aux clips video, et l'export navigateur utilise un canvas dedie a la resolution du preset avec mix audio vers WebM/MP4 si supporte via `MediaRecorder`.
 - ~~`npm run test:video-ui` lance le smoke Playwright de l'ancien front~~ **PHASE 7 (2026-08-01) : `smoke-video-ui.spec.cjs` est supprime avec l'ancien front.** `npm run test:video-ui` ne garde plus que les smokes de MODELE et de STORE (timeline, store, persistance, manifeste, jobs, rendu image), qui restent valables : ils ne testaient jamais l'interface. La couverture navigateur est desormais `npm run test:vibecut-ui-v2` (42 tests). Historique de ce que couvrait l'ancien smoke, conserve pour memoire : il demarrait un serveur Next local sur port libre ou reutilise le serveur dev Next deja actif, puis execute `scripts/smoke-video-ui.spec.cjs` contre `/studio` avec `SMOKE_BASE_URL` controle ; le smoke couvre import de deux videos courtes, reorder, trim par poignee, split/coupe, drag rapide du playhead violet pendant lecture, vitesse 2x, filtre Cyberpunk, transition Flash sur timeline `Effets` avec verification de luminance canvas, deplacement de l'item transition, synchronisation du panneau Transitions sur start/duration canonique, verrou de piste Effets bloquant input timecode, range du panneau Transitions et drag, verrou de piste Filtres bloquant presets/ranges du panneau Filtres, verrou de piste Musique bloquant le volume, modele pur avec transitions de coupe/libres presentes dans `items[]`, audio integre des clips expose comme items `audio-main`, filtres clips exposes comme items `effect-main`, overlap de transitions detecte, volumes bornes, couverture des frames export pour timestamps de transitions et rejet des transitions trop courtes pour le FPS, texte intro, bibliotheque musique locale avec source/licence White Bat Audio, volumes clip/musique, export WebM telecharge, echec MediaRecorder sans telechargement partiel, fallback MP4 indisponible vers format reel WebM visible, onglet musique ouvrant directement sur `Importer une nouvelle musique gratuite`, wizard `Sources -> Importer cette source` pre-rempli Pixabay, champ URL audio directe avec prechargement/ecoute, catalogue gratuit agrege visible/configurable, endpoint `/api/music/free-search` exposant Openverse/Pixabay et retire Archive/Wikimedia, rejet serveur d'un domaine non allowliste, et viewport mobile petite hauteur sans overflow avec lecture/export accessibles et panneau mobile compact basculable plein ecran.
-- `npm run test:vision-ui` lance `scripts/audit-vision-filters.mjs`, demarre un serveur Next local via `scripts/run-vision-ui-test.mjs`, puis execute `scripts/smoke-vision-ui.spec.cjs` ; l'audit verifie les cles de profils Vision, le branchement `safeSmartphone`, la normalisation du renderer, le garde-fou final `applySmartphoneOutputGuards`, le blend d'intensite perceptuel, le mode preview `low` fidele sur la passe couleur pixel avec saturation CSS neutralisee, le cap preview interactif 3 MP dans `useCanvasRenderer.js`, la sonde dev/test `__vibefxVisionQualityProbe`, les cles/defaults/masques pixel/controles UI de saturation selective peau/rouges-oranges/ciel/verts, le masque temperature safe pour neutres/hautes lumieres, le masque halation safe pour limiter les glows rouges sur blancs neutres, le tint global safe qui remplace l'overlay legacy en mode smartphone, le rail `Recommandes image`, les alertes `Profil actif vs image`, les recettes correctives diagnostic, le rail `Comparer favoris`, le signal UI performance du diagnostic, le score anti-voile gris, la detection peau ponderee, les metriques hue-zone ciel/vegetation/rouges-oranges, la mitigation de dosage depuis le diagnostic et le modele canonique `id/name/family/intent/bestFor/avoidFor/strength/parameters/recommendedIntensity/intensityRange/safetyRules/previewTags/technicalNotes/inspirationLabel` genere pour chaque profil, puis confirme que l'UI consomme ces `parameters` normalises et affiche le libelle d'inspiration sans promettre de reproduction constructeur. Il echoue si un profil brut a risque n'a pas de metadonnees explicites `strength`, `bestFor` et `avoidFor`. Le smoke navigateur importe l'asset demo, verifie les miniatures calculees sur l'image courante, le rail de recommandations image avec application/undo, mode simple/expert avec courbe master safe, saturation selective peau/rouges-oranges/ciel/verts, halation/noirs leves/teintes tonales, recherche, filtre famille, favoris persistants localStorage, rail de comparaison rapide Velvia/Astia, applique Velvia, verifie le profil actif, expose l'intention/l'inspiration/garde-fous/notes techniques/dosage conseille du profil, verifie que Velvia applique la saturation normalisee `120` dans les controles experts, verifie le bouton dosage conseille `70%`, verifie l'avertissement hors plage a `100%`, la mitigation diagnostic vers `80%`, la recette `Dose sure` vers `80%` et le retour manuel a `80%`, expose le diagnostic image avec temps/taille source, taille preview cappee, score de voile et zones hue, compare un rendu `low` et `high` hors ecran via la sonde runtime, mesure clipping/saturation/voile/peau/neutres proteges/ciel/verts/rouges-oranges via `visionMetrics.js`, verifie undo/redo sur le profil applique, sauvegarde un profil personnel local nomme, le retrouve par recherche, le supprime et nettoie ses favoris, verifie le split avant/apres reglable, verifie le bouton maintenu avant/apres, verifie une intensite 50 intermediaire, le retour source a intensite 0, teste une fixture synthetique smartphone-like sur Velvia/Ektar/Sepia avec alerte contenu/profil et recette corrective contextuelle, teste une fixture 4200x3200 pour verifier que la preview Vision reste sous 3,05 MP tout en gardant `fullWidth/fullHeight` dans la sonde, teste une fixture metrique delavee pour declencher `greyVeilRisk`, teste une fixture metrique peau claire/medium/foncee, mesure par regions que les saturations selectives ciblent peau/rouges-oranges/ciel/verts sans polluer les neutres ni la peau pour le controle chaud, verifie que la chaleur maximale affecte moins la bande neutre que la zone chaude coloree, verifie que la halation safe affecte moins un blanc speculaire neutre qu'une zone neon coloree, verifie par test moteur extrait que le tint global safe affecte moins un pixel neutre qu'un pixel colore, verifie le mobile sans overflow horizontal et le reset.
+- `npm run test:vision-ui` lance `scripts/audit-vision-filters.mjs`, demarre un serveur Next local via `scripts/run-vision-ui-test.mjs`, puis execute `scripts/smoke-vision-ui.spec.cjs` ; l'audit et le smoke historique couvrent le moteur et l'ancienne surface Vision. Le plafond d'aperçu partagé est désormais 1,25 Mpx dans `useCanvasRenderer.js` ; la couverture VibeOS actuelle vit dans `smoke-vibeos-vision.spec.cjs` et `vision-preview-performance.spec.cjs`.
 - `npm run check:vision-corpus` verifie la presence des 12 fixtures smartphone locales ignorees par Git dans `test-fixtures/vision-corpus`; il reste non bloquant par defaut, devient strict avec `VISION_CORPUS_REQUIRED=1`, et rappelle que Vision ne peut pas etre declaree stable finale tant que le corpus reel est absent/incomplet. `npm run test:vision-corpus` ajoute un smoke Playwright metrique sur les fixtures presentes et passe en skip si le corpus local est vide.
-- L'onglet Vision applique les profils via `normalizeVisionFilters` et `buildVisionProfileModel`, et les miniatures comme l'application profil consomment les `vision.parameters` normalises plutot que les anciens `filters` bruts. Il expose des miniatures de profils calculees sur l'image courante, un rail `Recommandes image` classe par metriques source (peau, ciel/verts, basse lumiere, saturation deja haute, image plate, neutres) avec badges de signaux detectes et application directe au dosage conseille, des alertes `Profil actif vs image` quand le profil actif est probablement risqué pour le contenu source, avec bouton `Essayer` vers la meilleure alternative recommandee au dosage conseille, un diagnostic image visible (clipping, saturation forte, zones hue ciel/verts/rouges-oranges, noirs, range tonal P95-P05, score de voile gris, peau via score pondere hue/RGB/YCbCr, neutres proteges, temps de diagnostic, taille source, taille preview cappee et echantillon) avec action de mitigation vers le dosage conseille ou le bord sur de la plage active et bloc `Recettes correctives` qui applique des patches limites pour intensite, chroma, voile gris, hautes lumieres, ombres, peau ou neutres, les badges d'usage/risque/famille, l'intention, le libelle d'inspiration, les garde-fous, les notes techniques, le dosage conseille et la plage de dosage de chaque profil, un bouton d'application du dosage conseille pour le profil actif, un avertissement si l'intensite active sort de la plage conseillee avec bouton de retour au bord sur, un mode simple/createur (chaleur, contraste, peau, grain), un mode expert (lumiere, hautes lumieres, ombres, courbe master 5 points safe, saturation, vibrance, saturation selective peau/rouges-oranges/ciel/verts, clarte, nettete, anti-brume, vignette, grain, noirs leves, halation, teintes et couleurs tonales), recherche de profils, filtre par famille, favoris locaux persistants, rail de comparaison rapide des favoris avec miniatures et dosage conseille, profils personnels locaux nommables/persistants et supprimables en section `Perso`, undo/redo local des reglages Vision, un reset Vision, le profil actif, une intensite globale visible, un split avant/apres reglable sur le canvas et un bouton maintenu `Avant` qui restaure temporairement l'image source sans perdre le dosage courant. Les profils camera-inspired bruts a risque declarent maintenant leur `strength` et leurs cas d'usage/evitement. Le moteur Vision protege les saturations smartphone avec ceiling adaptatif, temperature masquee sur neutres/blancs/ombres, halation masquee sur blancs neutres/speculaires, tint global legacy masque en pixels, saturation selective hue/luma, vibrance protegee, protection tons peau/neutres/hautes lumieres, split toning limite, clamp des courbes/teintes/sepia/blur/hueRotate, garde-fou final anti-crush des ombres couleur et blend linear-light ; la preview interactive studio/Vision est plafonnee a 3 MP sans toucher l'export/import publication pleine resolution, et la preview `low` pendant drag conserve ces protections colorimetriques et ne coupe plus que les effets spatiaux lourds.
+- Le moteur Vision conserve ses protections colorimétriques ; l'aperçu interactif Studio/Vision est plafonné à 1,25 Mpx sans toucher l'export ni l'import publication en pleine résolution.
 - Le playhead Vibe_CUT est saisissable sur toute sa ligne via pointer capture et met a jour immediatement le canvas/audio pendant le scrub, y compris pendant la lecture ; la preview texte utilise aussi pointer capture pour ne pas perdre le drag.
 - Le header studio passe les onglets sur une deuxieme rangee pleine largeur en mobile afin que l'onglet Video reste cliquable sans etre recouvert par les actions de droite ou le player musique.
 - La bibliotheque musique Vibe_CUT affiche les metadonnees de licence/source White Bat Audio, extrait son catalogue et ses fournisseurs cibles dans `src/features/vibefx-studio/video/data/musicCatalog.js`, documente la strategie premium/free/IA dans `docs/music-sourcing-and-import-plan.md`, garde l'import de nouvelles pistes en import fichier local verifie avec declaration de droits sans scraping externe, et son panneau a ete compacte pour que les boutons d'import restent cliquables sur les hauteurs studio courtes.
@@ -4765,3 +5045,8 @@ Trois reproches, tous fondés : **trop rapide**, **images pas en pleine qualité
 - Mise a jour 2026-08-11 (import de presets Lightroom, exact) : le porteur du projet demande d'integrer CN11/CN17 (pack Adobe « Cinema II »). Verification faite : leurs valeurs ne sont PAS publiees sur le web (les resultats ne sont que des packs tiers sans rapport) et Lightroom n'est pas installe sur la machine. Recopier des valeurs de curseurs serait de toute facon faux : Lightroom applique ses reglages a du RAW lineaire dans son espace de travail, l'app travaille sur du JPEG 8 bits deja developpe. Solution retenue, qui evite completement le probleme : la capture par **Hald CLUT**. On genere une mire contenant une fois chaque couleur d'une grille RVB, on la fait passer dans Lightroom avec le preset, et l'image qui ressort EST la table de conversion du preset. Aucune approximation sur la couleur. Nouveaux fichiers : `utils/haldClut.js`, `utils/xmpPreset.js`, `utils/presets/` (genere), `scripts/make-hald-clut.mjs`, `scripts/import-lightroom-preset.mjs`, `docs/lightroom/2-methode-et-pieges.md`. Le `.xmp` reste lu en complement, pour les seuls reglages qu'une Hald CLUT ne peut pas voir (clarte, texture, nettete, grain, vignetage — ils dependent des pixels voisins ou de la position). `visionPresets.js` accepte desormais deux formes de preset, indiscernables au rendu : une fonction pure (powlisher) ou une table importee (`getLut`). Aller-retour verifie de bout en bout : mire -> preset -> reimport -> comparaison, ecart moyen 0,24/255 et max 1,8/255 sur des couleurs reelles. Le smoke `test:vision-preset` passe de 20 a 40 verifications. Reserve produit notee dans la doc : embarquer une table de preset Adobe sous son nom dans un produit public est un risque de licence — l'usage sain est la calibration de presets maison.
 
 - Mise a jour 2026-08-11 (elagage de `todo.md`) : le porteur du projet signale que `todo.md` (372 lignes) fait relire a chaque agent, a chaque session, l'historique complet de phases livrees et closes — du contexte paye pour rien. Correction : `todo.md` retombe a ~160 lignes et ne porte plus QUE le chantier actif (les presets de Vision). Le detail des phases A-G du redesign part dans `docs/archive-vibeos-2026-08-11.md`, et le prompt de reprise part dans `docs/prompt-reprise-2026-08-11.md` (il ne sert qu'une fois, a quelqu'un qui l'a deja recu en entier). `AGENTS.md` est aligne sur cette pratique : nouvelle regle « todo.md doit rester court », seuil d'archivage a ~200 lignes, et le prompt de reprise se range desormais dans `docs/` avec un lien depuis `todo.md` au lieu d'etre colle a la fin.
+- Mise a jour 2026-08-30 (bibliotheque Vision a 136 presets) : ajout par capture Lightroom Cloud de 92 modules dans `src/features/vibefx-studio/utils/presets/` — FT01-FT12, 12 looks `film-*`, BW01-BW12, VN01-VN10, UA01-UA10, LN01-LN10, LF01-LF08 et TR01-TR18. `presets/index.js` les enregistre dans les collections Futuriste, Inspire d'un film, Noir et blanc, Vintage, Architecture urbaine, Paysage, Style de vie, Voyage et Voyage II ; l'UI `/creer/vision` expose les comptes exacts. `import-lightroom-preset.mjs` normalise le vignetage Adobe negatif vers la force positive du moteur ; LF03 conserve son voile −28 grace a la borne sure etendue a −30 ; `smoke-vision-preset.mjs` verrouille les 136 presets et chaque collection (394 verifications). Les quatre dernieres familles ont ete controlees a l'oeil sur une photo telephone et une photo reflex du dossier `~/Desktop/maroc` ; `test:vibeos-vision` passe 3/3 et `test:reglages-avances` passe 1/1.
+- Mise a jour 2026-08-31 (correction BW Lightroom) : `utils/presets/bw01.js` a `bw12.js` sont regeneres depuis douze nouvelles Hald 2048 réellement passées dans `Style : Noir et blanc`. L'ancienne capture était restée RVB et produisait des photos couleur. Les LUT corrigées portent le mélange N&B Adobe et les virages attendus (BW01 gris, BW02 sépia, BW03 rose, BW04 vert, BW11 brun, BW12 bleu) ; BW10–BW12 séparent leur grain 75 de la table par un lissage mesuré et le rejouent via le moteur spatial. `scripts/smoke-vision-preset.mjs` refuse désormais une chroma résiduelle et verrouille les six signatures (426/426). Contrôle navigateur sur `37134.jpg` conforme aux miniatures Lightroom. Lint : 0 erreur, 5 avertissements préexistants. Build compilé puis bloqué par l'ABI locale préexistante de `better-sqlite3` (module 127, Node courant 147).
+- Mise a jour 2026-08-31 (effets spatiaux BW alignes sur Lightroom) : audit direct de BW01 a BW12 dans l'application Adobe Lightroom. Les douze modules `utils/presets/bw*.js` portent maintenant la vignette commune -25 (force moteur 25, profil radial Lightroom V2, milieu 50, arrondi 0, contour 50, hautes lumieres 0). BW01-BW09 ont grain 0 ; BW10-BW12 conservent 75/10/60. Les familles de detail deviennent BW01-BW04 clarte/texture -10/-10, BW05-BW06 +10/0, BW07-BW09 0/+20, BW10-BW12 0/+30 ; le faux voile +14 et la texture -15 de BW08 disparaissent. `smoke-vision-preset.mjs` ajoute sept contrats de regression (433/433). Controle navigateur sur `~/Desktop/maroc/IMG_0216.JPG` : vignette visible dans la grande image et les miniatures, BW04 sans grain. Gates : Vision 3/3, reglages avances 1/1, lint 0 erreur (5 avertissements preexistants). Build compile puis reste bloque par l'ABI locale preexistante `better-sqlite3` 127/147. Aucun deploiement.
+- Mise a jour 2026-08-31 (audit qualite representatif Lightroom) : nouveau dossier `docs/lightroom/audit-qualite-presets-2026-08-31/` avec cinq sources figees, tirage SHA-256 reproductible, 50 exports Lightroom, 50 rendus du vrai pipeline Vision, 50 planches/heatmaps, journaux, metriques RVB/Lab/luminance/SSIM et rapport famille par famille. Les 235 imports Lightroom des 22 collections sont separes des 26 presets VibeFX internes. Douze familles sont conformes, neuf a surveiller et Vintage non conforme ; Cinéma II a ete blanchi apres correction d'un faux positif de selection, tandis que Noir et blanc garde son identite avec un ecart spatial a recalibrer. Aucun fichier moteur/preset ni source utilisateur n'a ete modifie, aucun deploiement.
+- Mise a jour 2026-08-31 (correction Vintage + Noir et blanc apres audit) : `presets-lightroom/recapture-vintage-corrected/` conserve les dix exports Hald obtenus apres une reinitialisation Lightroom explicite avant chaque VN01-VN10 ; l'ancien lot fautif est garde explicitement sous `presets-lightroom/recapture-vintage-contaminee/` pour ne pas etre reutilise par erreur. `utils/presets/vn01.js` a `vn10.js` sont regeneres depuis les captures corrigees et les XMP Premium Adobe, avec leur grain et les effets spatiaux de VN06. La capture precedente etait contaminee par l'etat noir et blanc reste sur la mire. `utils/presets/bw01.js` a `bw12.js` ne portent plus le vignettage 25 : aucun XMP Adobe BW ne declare `PostCropVignetteAmount`. `audit-qualite-presets-2026-08-31/corrections-vintage-bw/` garde huit comparaisons apres correction ; Vintage est a 2,04-4,32/255 sur la couleur seule, BW01/BW04/BW05 a 2,64-3,32/255 et BW10 a 3,87/255 hors grain aleatoire. Le runner accepte `AUDIT_OUTPUT_VARIANT` pour ne pas ecraser un lot precedent. `smoke-vision-preset.mjs` verrouille les valeurs XMP des deux familles (436/436). Lint : 0 erreur, 5 avertissements preexistants. Build Node 22 : passe, avec l'avertissement NFT preexistant. Les smokes navigateur echouent avant Vision parce que le bouton Dev ne ferme plus la modale d'authentification ; echec preexistant et hors lot. Aucun deploiement.

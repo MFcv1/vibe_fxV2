@@ -66,6 +66,7 @@
     "preset:import": "node scripts/import-lightroom-preset.mjs",
     "preset:controle": "node scripts/check-hald-control.mjs",
     "test:vibeos-vision": "node scripts/smoke-vision-preset.mjs && node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-vision.spec.cjs",
+    "test:vision-preview-performance": "node scripts/run-video-ui-test.mjs scripts/vision-preview-performance.spec.cjs",
     "test:vibeos-studio": "node scripts/run-video-ui-test.mjs scripts/smoke-vibeos-studio.spec.cjs",
     "test:reglages-avances": "node scripts/run-video-ui-test.mjs scripts/smoke-reglages-avances.spec.cjs",
     "audit:reglages-avances": "node scripts/audit-reglages-avances.mjs",

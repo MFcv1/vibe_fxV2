@@ -122,6 +122,8 @@ export default function useStudioEditor() {
        rendu photo du Studio. On le lit et on l'ecrit, on ne le simule pas. */
     const [meshColors, setMeshColors] = useState(null);
     const [lumenName, setLumenName] = useState(null);
+    /* Quel generateur a produit le fond actif : 'gradient' ou Lumen (null). */
+    const [lumenMode, setLumenMode] = useState(null);
 
     /* Recadrage — memes noms d'etat que l'ancien Studio, memes moteurs. */
     const [cropRatio, setCropRatio] = useState('original');
@@ -232,7 +234,10 @@ export default function useStudioEditor() {
                 if (Array.isArray(stored.variants)) setVariants(stored.variants.slice(0, VARIANT_LIMIT));
                 const background = project.background || {};
                 if (background.mesh?.enabled && background.mesh.colors?.length) setMeshColors(background.mesh.colors);
-                if (background.lumen) setLumenName(background.lumen.name || 'Fond Lumen');
+                if (background.lumen) {
+                    setLumenName(background.lumen.name || 'Fond Lumen');
+                    setLumenMode(background.lumen.mode || null);
+                }
             } finally {
                 hydrationRef.current = 'done';
                 setIsLoadingImage(false);
@@ -433,6 +438,7 @@ export default function useStudioEditor() {
         if (!colors?.length) return;
         setMeshColors(colors);
         setLumenName(null);
+        setLumenMode(null);
         updateProject({
             background: {
                 ...(project?.background || {}),
@@ -447,6 +453,7 @@ export default function useStudioEditor() {
     const clearGeneratedBackground = useCallback(() => {
         setMeshColors(null);
         setLumenName(null);
+        setLumenMode(null);
         updateProject({
             background: { ...(project?.background || {}), mesh: null, lumen: null },
         });
@@ -459,6 +466,7 @@ export default function useStudioEditor() {
         if (!blob) return;
         const name = payload.styleName || payload.mode || 'Fond Lumen';
         setLumenName(name);
+        setLumenMode(payload.mode || null);
         setMeshColors(null);
         updateProject({
             background: {
@@ -545,7 +553,7 @@ export default function useStudioEditor() {
         variants, applyVariant,
         customStyles, saveStyle, removeStyle,
         creativeMode, setCreativeMode,
-        meshColors, lumenName, applyMeshBackground, applyLumenBackground, clearGeneratedBackground,
+        meshColors, lumenName, lumenMode, applyMeshBackground, applyLumenBackground, clearGeneratedBackground,
         cropRatio, setCropRatio, cropScale, setCropScale, cropPos, setCropPos,
         isCropping, setIsCropping,
         canvasRef, canvasEvents,

@@ -56,6 +56,7 @@ import {
     GRAIN_ATTENUATION,
     GRAIN_SIGMA_PAR_UNITE,
     grainEchelle,
+    grainGrosseurCalibree,
     grainSigma,
     grainValeurEn,
 } from '../src/features/vibefx-studio/utils/grainField.js';
@@ -78,11 +79,12 @@ function notreMire(taille, largeur, valeurGrain) {
     const w = largeur;
     const h = Math.round((largeur * 2) / 3);
     const echelle = grainEchelle(taille, w);
+    const grosseur = grainGrosseurCalibree(taille, w, echelle);
     const sigma = grainSigma(valeurGrain, taille, w);
     const data = Buffer.alloc(w * h * 3);
     for (let y = 0; y < h; y += 1) {
         for (let x = 0; x < w; x += 1) {
-            const delta = grainValeurEn(x, y, echelle) * sigma * GRAIN_ATTENUATION[128];
+            const delta = grainValeurEn(x, y, echelle, undefined, grosseur) * sigma * GRAIN_ATTENUATION[128];
             const v = Math.max(0, Math.min(255, Math.round(128 + delta)));
             const i = (y * w + x) * 3;
             data[i] = v;

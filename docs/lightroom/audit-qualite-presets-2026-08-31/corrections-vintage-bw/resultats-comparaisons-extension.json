@@ -1,0 +1,98 @@
+[
+  {
+    "presetId": "bw01",
+    "source": "telephone-chat-37131.jpg",
+    "mean": 3.32,
+    "median": 3,
+    "p90": 6,
+    "p99": 8,
+    "maximum": 20,
+    "presetEffect": 11.81,
+    "reproducedPercent": 71.9,
+    "verdict": "meme rendu, ecart invisible en pratique."
+  },
+  {
+    "presetId": "bw10",
+    "source": "telephone-chat-37131.jpg",
+    "mean": 12.87,
+    "median": 11,
+    "p90": 28,
+    "p99": 44,
+    "maximum": 107,
+    "presetEffect": 28.47,
+    "reproducedPercent": 54.8,
+    "verdict": "CE N'EST PLUS LE MEME RENDU."
+  },
+  {
+    "presetId": "bw04",
+    "source": "telephone-chat-37131.jpg",
+    "mean": 3.15,
+    "median": 3,
+    "p90": 6,
+    "p99": 9,
+    "maximum": 28,
+    "presetEffect": 28.32,
+    "reproducedPercent": 88.9,
+    "verdict": "meme rendu, ecart invisible en pratique."
+  },
+  {
+    "presetId": "bw05",
+    "source": "telephone-chat-37131.jpg",
+    "mean": 2.64,
+    "median": 3,
+    "p90": 5,
+    "p99": 7,
+    "maximum": 18,
+    "presetEffect": 11.87,
+    "reproducedPercent": 77.8,
+    "verdict": "meme rendu, ecart invisible en pratique."
+  },
+  {
+    "presetId": "vn04",
+    "source": "unsplash-auto-tqR4EzIwtLM.jpg",
+    "mean": 6.4,
+    "median": 5,
+    "p90": 14,
+    "p99": 29,
+    "maximum": 64,
+    "presetEffect": 7.34,
+    "reproducedPercent": 12.9,
+    "verdict": "meme look, ecart visible en comparant cote a cote."
+  },
+  {
+    "presetId": "vn03",
+    "source": "unsplash-auto-tqR4EzIwtLM.jpg",
+    "mean": 6.92,
+    "median": 5,
+    "p90": 15,
+    "p99": 32,
+    "maximum": 65,
+    "presetEffect": 8.18,
+    "reproducedPercent": 15.5,
+    "verdict": "meme look, ecart visible en comparant cote a cote."
+  },
+  {
+    "presetId": "vn05",
+    "source": "unsplash-auto-tqR4EzIwtLM.jpg",
+    "mean": 5.3,
+    "median": 4,
+    "p90": 11,
+    "p99": 18,
+    "maximum": 48,
+    "presetEffect": 9.14,
+    "reproducedPercent": 42,
+    "verdict": "meme look, ecart visible en comparant cote a cote."
+  },
+  {
+    "presetId": "vn09",
+    "source": "unsplash-auto-tqR4EzIwtLM.jpg",
+    "mean": 7.24,
+    "median": 6,
+    "p90": 15,
+    "p99": 30,
+    "maximum": 71,
+    "presetEffect": 8.39,
+    "reproducedPercent": 13.7,
+    "verdict": "meme look, ecart visible en comparant cote a cote."
+  }
+]

@@ -14,7 +14,25 @@ export const VISION_SUPPORTED_FILTER_KEYS = [
     'grain',
     'grainSize',
     'grainRoughness',
+    'noiseReductionLuminance',
+    'noiseReductionColor',
     'vignette',
+    'vignetteMidpoint',
+    'vignetteRoundness',
+    'vignetteFeather',
+    'vignetteHighlights',
+    'vignetteLightroomV2',
+    'vignetteLighten',
+    'presetSpatialBeforeLut',
+    'presetClarityScale',
+    'presetTextureEdgeAware',
+    'presetAutoTone',
+    'lightroomExposure',
+    'lightroomContrast',
+    'lightroomHighlights',
+    'lightroomShadows',
+    'lightroomWhites',
+    'lightroomBlacks',
     'degradeBas',
     'tintColor',
     'tintIntensity',
@@ -95,9 +113,22 @@ export const VISION_SAFE_BOUNDS = {
      * s'ouvrir jusqu'a -30 (0,80 d'amplification, soit un adoucissement franc
      * mais sain) et devenir symetrique du plafond.
      */
-    clarity: { min: -30, max: 30, neutre: 0 },
+    /* TM09 monte a +35 dans la famille Automne. La valeur est conservee plutot
+       que tronquee en silence ; les smokes sur photos verrouillent ce nouveau
+       plafond, sans ouvrir toute la course libre de Lightroom. */
+    /* PB03 descend a -33 dans Portrait noir et blanc. Conserver le nombre
+       Adobe evite un ecretage silencieux des imports, sans ouvrir la course
+       creative complete a -100. */
+    clarity: { min: -33, max: 35, neutre: 0 },
+    noiseReductionLuminance: { min: 0, max: 50, neutre: 0 },
+    noiseReductionColor: { min: 0, max: 100, neutre: 0 },
     sharpness: { min: 0, max: 60, neutre: 0 },
-    dehaze: { min: 0, max: 35, neutre: 0 },
+    /* Lightroom accepte aussi les valeurs negatives: plusieurs looks Premium
+       ajoutent volontairement du voile. LF03 descend a -28 ; une borne a -20
+       le tronquait silencieusement. -30 conserve le preset tout en gardant une
+       marge nette avec la course creative libre de Lightroom (-100). */
+    /* PM11 atteint +39 dans Portrait peau intermediaire. */
+    dehaze: { min: -30, max: 39, neutre: 0 },
     /*
      * L'echelle du grain est celle de LIGHTROOM depuis le 2026-08-15 (mesure:
      * ecart-type = 0,367 x valeur, constant du noir au blanc).
@@ -125,7 +156,15 @@ export const VISION_SAFE_BOUNDS = {
      * la force. Mesuree le 2026-08-22; la loi est dans `grainField.js`.
      */
     grainRoughness: { min: 0, max: 100, neutre: 50 },
-    vignette: { min: 0, max: 30, neutre: 0 },
+    /* TM07 porte -32 chez Lightroom, transpose en force positive par
+       l'importeur. On ouvre seulement les deux points necessaires. */
+    vignette: { min: 0, max: 32, neutre: 0 },
+    /* Sous-reglages du vignetage apres recadrage Lightroom. Ils restent neutres
+       tant que `vignette` vaut 0, mais doivent etre conserves par l'import. */
+    vignetteMidpoint: { min: 0, max: 100, neutre: 50 },
+    vignetteRoundness: { min: -100, max: 100, neutre: 0 },
+    vignetteFeather: { min: 0, max: 100, neutre: 50 },
+    vignetteHighlights: { min: 0, max: 100, neutre: 0 },
     /*
      * LE DEGRADE DU BAS. Ajoute le 2026-08-29, mesure sur la paire de nuit de
      * `@powl_d`: apres avoir cale couleur et courbe, ce qui restait etait un
@@ -135,6 +174,12 @@ export const VISION_SAFE_BOUNDS = {
      * cadre n'a plus de matiere.
      */
     degradeBas: { min: 0, max: 80, neutre: 0 },
+    lightroomExposure: { min: -5, max: 5, neutre: 0 },
+    lightroomContrast: { min: -100, max: 100, neutre: 0 },
+    lightroomHighlights: { min: -100, max: 100, neutre: 0 },
+    lightroomShadows: { min: -100, max: 100, neutre: 0 },
+    lightroomWhites: { min: -100, max: 100, neutre: 0 },
+    lightroomBlacks: { min: -100, max: 100, neutre: 0 },
     /*
      * AJOUTES LE 2026-08-17. Ces huit bornes existaient deja, mais ECRITES EN
      * DUR dans `normalizeVisionFilters` juste en dessous — donc invisibles pour
@@ -173,12 +218,18 @@ export const VISION_FREE_BOUNDS = {
     shadows: { min: -50, max: 50, neutre: 0 },
     texture: { min: -100, max: 100, neutre: 0 },
     clarity: { min: -100, max: 100, neutre: 0 },
+    noiseReductionLuminance: { min: 0, max: 100, neutre: 0 },
+    noiseReductionColor: { min: 0, max: 100, neutre: 0 },
     sharpness: { min: 0, max: 150, neutre: 0 },
-    dehaze: { min: 0, max: 50, neutre: 0 },
+    dehaze: { min: -100, max: 100, neutre: 0 },
     grain: { min: 0, max: 100, neutre: 0 },
     grainSize: { min: 0, max: 100, neutre: 25 },
     grainRoughness: { min: 0, max: 100, neutre: 50 },
     vignette: { min: 0, max: 100, neutre: 0 },
+    vignetteMidpoint: { min: 0, max: 100, neutre: 50 },
+    vignetteRoundness: { min: -100, max: 100, neutre: 0 },
+    vignetteFeather: { min: 0, max: 100, neutre: 50 },
+    vignetteHighlights: { min: 0, max: 100, neutre: 0 },
     degradeBas: { min: 0, max: 100, neutre: 0 },
     /*
      * Hors garde-fous, `normalizeVisionFilters` ne borne RIEN (elle sort avant).
@@ -286,6 +337,12 @@ export function normalizeVisionFilters(filters = {}) {
     next.shadows = clampSafe(next.shadows || 0, 'shadows', 0);
     next.texture = clampSafe(next.texture || 0, 'texture', 0);
     next.clarity = clampSafe(next.clarity || 0, 'clarity', 0);
+    next.noiseReductionLuminance = clampSafe(
+        next.noiseReductionLuminance || 0,
+        'noiseReductionLuminance',
+        0,
+    );
+    next.noiseReductionColor = clampSafe(next.noiseReductionColor || 0, 'noiseReductionColor', 0);
     next.sharpness = clampSafe(next.sharpness || 0, 'sharpness', 0);
     next.dehaze = clampSafe(next.dehaze || 0, 'dehaze', 0);
     next.tintIntensity = clampSafe(next.tintIntensity || 0, 'tintIntensity', 0, isMono);
@@ -294,6 +351,18 @@ export function normalizeVisionFilters(filters = {}) {
     next.fadedBlacks = clampSafe(next.fadedBlacks || 0, 'fadedBlacks', 0, isMono);
     next.halation = clampSafe(next.halation || 0, 'halation', 0);
     next.vignette = clampSafe(next.vignette || 0, 'vignette', 0);
+    next.vignetteMidpoint = clampSafe(
+        next.vignetteMidpoint === undefined || next.vignetteMidpoint === null ? 50 : next.vignetteMidpoint,
+        'vignetteMidpoint',
+        50,
+    );
+    next.vignetteRoundness = clampSafe(next.vignetteRoundness || 0, 'vignetteRoundness', 0);
+    next.vignetteFeather = clampSafe(
+        next.vignetteFeather === undefined || next.vignetteFeather === null ? 50 : next.vignetteFeather,
+        'vignetteFeather',
+        50,
+    );
+    next.vignetteHighlights = clampSafe(next.vignetteHighlights || 0, 'vignetteHighlights', 0);
     next.degradeBas = clampSafe(next.degradeBas || 0, 'degradeBas', 0);
     next.grain = clampSafe(next.grain || 0, 'grain', 0, isMono);
     /* Au repos c'est 25, la valeur de Lightroom — pas 0, qui donnerait des

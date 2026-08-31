@@ -220,6 +220,246 @@
     pointer-events: none;
 }
 
+/* ---------- Bibliotheque de presets ----------
+   Une barre compacte facon macOS: recherche sur une surface en retrait,
+   collections en pilules et contenu groupe. L'accent ne sert qu'a la
+   selection, jamais a decorer la bibliotheque. */
+.srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.presetTools {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.presetSearch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    height: 36px;
+    padding: 0 var(--vo-space-3);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-3);
+    transition: border-color var(--vo-dur-1) var(--vo-ease),
+        background var(--vo-dur-1) var(--vo-ease),
+        box-shadow var(--vo-dur-1) var(--vo-ease);
+}
+
+.presetSearch:hover {
+    border-color: var(--vo-line-strong);
+    background: var(--vo-surface-3);
+}
+
+.presetSearch:focus-within {
+    border-color: var(--vo-accent-line);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+    color: var(--vo-text-2);
+}
+
+.presetSearch input {
+    min-width: 0;
+    flex: 1 1 auto;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--vo-text);
+    font-size: var(--vo-text-sm);
+}
+
+.presetSearch input::placeholder {
+    color: var(--vo-text-3);
+}
+
+.presetSearch input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.presetSearchClear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-right: -4px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-3);
+    color: var(--vo-text-2);
+    cursor: pointer;
+}
+
+.presetSearchClear:hover {
+    color: var(--vo-text);
+}
+
+.presetSearchClear:focus-visible,
+.presetCollectionChip:focus-visible,
+.presetResultMeta button:focus-visible,
+.presetEmpty button:focus-visible {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: 2px;
+}
+
+.presetCollectionRail {
+    display: flex;
+    gap: 6px;
+    margin: 0 calc(var(--vo-space-5) * -1);
+    padding: 2px var(--vo-space-5) 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+}
+
+.presetCollectionRail::-webkit-scrollbar {
+    display: none;
+}
+
+.presetCollectionChip {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 11px;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface);
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease),
+        background var(--vo-dur-1) var(--vo-ease),
+        border-color var(--vo-dur-1) var(--vo-ease),
+        transform var(--vo-dur-1) var(--vo-ease-out);
+}
+
+.presetCollectionChip > span {
+    color: var(--vo-text-3);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.presetCollectionChip:hover {
+    color: var(--vo-text);
+    border-color: var(--vo-line-strong);
+    transform: translateY(-1px);
+}
+
+.presetCollectionChipActive,
+.presetCollectionChipActive:hover {
+    border-color: var(--vo-accent-line);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-text);
+    transform: none;
+}
+
+.presetCollectionChipActive > span {
+    color: var(--vo-accent-hover);
+}
+
+.presetResultMeta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 20px;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+}
+
+.presetResultMeta button {
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    cursor: pointer;
+}
+
+.presetResultMeta button:hover {
+    color: var(--vo-text);
+}
+
+.presetGroups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-5);
+}
+
+.presetGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    animation: presetGroupIn var(--vo-dur-2) var(--vo-ease-out) both;
+}
+
+.presetGroupHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+    min-height: 22px;
+}
+
+.presetGroupHead h4 {
+    margin: 0;
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    font-weight: 600;
+}
+
+.presetGroupHead > span {
+    color: var(--vo-text-3);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.presetEmpty {
+    display: flex;
+    min-height: 150px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-5);
+    border: 1px dashed var(--vo-line-strong);
+    border-radius: var(--vo-radius-md);
+    color: var(--vo-text-3);
+    text-align: center;
+}
+
+.presetEmpty strong {
+    color: var(--vo-text);
+    font-size: var(--vo-text-sm);
+    font-weight: 600;
+}
+
+.presetEmpty span,
+.presetEmpty button {
+    font-size: var(--vo-text-xs);
+}
+
+.presetEmpty button {
+    margin-top: var(--vo-space-1);
+    color: var(--vo-accent-hover);
+    cursor: pointer;
+}
+
+@keyframes presetGroupIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* ---------- Looks ---------- */
 .lookGrid {
     display: grid;
@@ -250,6 +490,11 @@
 
 .lookCard:active {
     transform: translateY(0) scale(0.99);
+}
+
+.lookCard:focus-visible {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: 2px;
 }
 
 .lookCardActive {
@@ -476,5 +721,16 @@
 
     .brandRow {
         white-space: nowrap;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .presetGroup {
+        animation: none;
+    }
+
+    .presetCollectionChip,
+    .lookCard {
+        transition: none;
     }
 }

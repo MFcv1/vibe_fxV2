@@ -50,7 +50,11 @@ export function createEmptyProject(overrides = {}) {
            { blob (PNG pleine resolution), width, height, updatedAt }. C'est
            l'entree du pipeline pour Vision et Studio (plan §4.3). */
         composition: null,
-        vision: { presetId: null, intensity: 80, filters: null },
+        vision: {
+            presetId: null,
+            intensity: 80,
+            filters: null,
+        },
         studio: { presetRef: null, filters: null, variants: [] },
         soundtrackTrackId: null,
         /* Vignette 256px (dataURL) pour l'accueil - ecrite par les pages d'edition. */
@@ -74,7 +78,11 @@ export function normalizeProject(raw) {
         geometry: { ...base.geometry, ...(raw.geometry || {}) },
         background: { ...base.background, ...(raw.background || {}) },
         composition: raw.composition?.blob ? raw.composition : null,
-        vision: { ...base.vision, ...(raw.vision || {}) },
+        vision: {
+            presetId: raw.vision?.presetId ?? base.vision.presetId,
+            intensity: raw.vision?.intensity ?? base.vision.intensity,
+            filters: raw.vision?.filters ?? base.vision.filters,
+        },
         studio: { ...base.studio, ...(raw.studio || {}) },
         images: Array.isArray(raw.images) ? raw.images : [],
         slots: raw.slots && typeof raw.slots === 'object' ? raw.slots : {},

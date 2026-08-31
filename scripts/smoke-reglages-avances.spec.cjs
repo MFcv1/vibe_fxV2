@@ -145,7 +145,7 @@ async function reglerParLabel(page, advancedTestId, label, cible) {
   return page.evaluate(({ advancedTestId, label, cible }) => {
     const root = document.querySelector(`[data-testid="${advancedTestId}"]`);
     if (!root) return null;
-    const els = [...root.querySelectorAll('input[type="range"]')];
+    const els = [...root.querySelectorAll('input[type="range"]:not(:disabled)')];
     const nomDe = (el) => (el.closest("div")?.querySelector("label")?.textContent || "").trim().split(" · ")[0];
     const el = els.find((e) => nomDe(e) === label);
     if (!el) return null;
@@ -164,7 +164,7 @@ async function reglerParLabel(page, advancedTestId, label, cible) {
 async function listerCurseurs(page, advancedTestId) {
   return page.evaluate((id) => {
     const root = document.querySelector(`[data-testid="${id}"]`);
-    return [...root.querySelectorAll('input[type="range"]')].map((el) => ({
+    return [...root.querySelectorAll('input[type="range"]:not(:disabled)')].map((el) => ({
       label: (el.closest("div")?.querySelector("label")?.textContent || "").trim().split(" · ")[0],
       min: Number(el.min),
       max: Number(el.max),
@@ -262,10 +262,10 @@ async function auditerEcran(page, { route, inputTestId, advancedTestId, screenTe
   return { resultats, morts, temoin };
 }
 
-test.describe("Réglages avancés — chaque curseur change-t-il l'image ?", () => {
+test.describe("Réglages avancés Vision — chaque curseur change-t-il l'image ?", () => {
   test.setTimeout(300000);
 
-  test("Vision et Studio: aucun curseur mort", async ({ page }) => {
+  test("Vision: aucun curseur mort", async ({ page }) => {
     const fichier = fabriquerPhoto();
     test.skip(!fichier, "ffmpeg indisponible: impossible de fabriquer la mire.");
 
@@ -277,18 +277,7 @@ test.describe("Réglages avancés — chaque curseur change-t-il l'image ?", () 
       nom: "VISION",
     }, fichier);
 
-    const studio = await auditerEcran(page, {
-      route: "/creer/studio",
-      inputTestId: "vibeos-studio-input",
-      advancedTestId: "vibeos-studio-advanced",
-      screenTestId: "vibeos-studio-screen",
-      nom: "STUDIO",
-    }, fichier);
-
-    const morts = [
-      ...vision.morts.map((r) => `Vision · ${r.label}`),
-      ...studio.morts.map((r) => `Studio · ${r.label}`),
-    ];
+    const morts = vision.morts.map((r) => `Vision · ${r.label}`);
     expect(morts, `Curseurs sans effet visible: ${morts.join(", ")}`).toEqual([]);
   });
 });

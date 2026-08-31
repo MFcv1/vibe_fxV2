@@ -6,18 +6,24 @@
  *     --xmp   presets-lightroom/CN11.xmp \
  *     --id    cn11 \
  *     --label "CN11" \
- *     [--hint "Cinematique nuit"] [--level 8] [--force]
+ *     [--collection "Cinéma II"] [--hint "Cinematique nuit"] [--level 8] [--force]
  *
  * `--hald` : la mire passee dans Lightroom avec le preset (voir
  *            `make-hald-clut.mjs`). C'est elle qui porte la COULEUR, exactement.
  * `--xmp`  : le fichier du preset. Optionnel, mais c'est le seul moyen de
  *            recuperer clarte / texture / nettete / grain / vignetage, qu'une
  *            Hald CLUT ne peut pas capturer.
+ * `--collection` : groupe affiche dans Vision (ex. « Cinéma II »). Si le XMP
+ *                  porte deja un groupe Lightroom, il est repris par defaut.
  *
  * Les memes valeurs se passent a la main quand le preset n'a pas de `.xmp`
  * (c'est le cas des presets Premium d'Adobe), avec le nombre lu a l'ecran:
- * `--grain`, `--grainSize`, `--grainRoughness`, `--vignette`, `--clarity`, `--texture`,
- * `--sharpness`, `--dehaze`. `--grainSize` est le sous-reglage « Taille » du
+ * `--grain`, `--grainSize`, `--grainRoughness`, `--vignette`,
+ * `--vignetteLighten` (si le montant Lightroom est positif),
+ * `--vignetteMidpoint`, `--vignetteRoundness`, `--vignetteFeather`,
+ * `--vignetteHighlights`, `--clarity`, `--texture`,
+ * `--sharpness`, `--noiseReductionLuminance`, `--noiseReductionColor`, `--dehaze`.
+ * `--grainSize` est le sous-reglage « Taille » du
  * grain: il ne se passe que si le preset s'ecarte de son defaut, 25.
  *
  * Ecrit un module dans `src/features/vibefx-studio/utils/presets/<id>.js` et
@@ -189,6 +195,18 @@ if (args.xmp) {
 
 const label = args.label || xmp?.name || args.id;
 const hint = args.hint || (xmp?.group ? `Lightroom — ${xmp.group}` : 'Preset importé de Lightroom');
+const collectionLabel = String(args.collection || xmp?.group || '')
+    .replace(/^style\s*:\s*/i, '')
+    .trim();
+const collectionId = String(args.collectionId || collectionLabel)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+const collection = collectionLabel && collectionId
+    ? { id: collectionId, label: collectionLabel }
+    : null;
 const spatial = xmp?.spatialFilters || {};
 
 /*
@@ -214,13 +232,49 @@ const spatial = xmp?.spatialFilters || {};
  * grains, donc aussi leur force apparente — un grain deux fois plus gros bruite
  * deux fois moins chaque pixel (mesures dans `grainField.js`).
  */
-['grain', 'grainSize', 'grainRoughness', 'vignette', 'clarity', 'sharpness', 'dehaze', 'texture'].forEach((cle) => {
+[
+    'grain', 'grainSize', 'grainRoughness', 'vignette', 'vignetteMidpoint',
+    'vignetteRoundness', 'vignetteFeather', 'vignetteHighlights', 'clarity', 'sharpness',
+    'noiseReductionLuminance', 'noiseReductionColor', 'dehaze', 'texture',
+    'lightroomExposure', 'lightroomContrast', 'lightroomHighlights',
+    'lightroomShadows', 'lightroomWhites', 'lightroomBlacks',
+].forEach((cle) => {
     const brut = args[cle];
     if (brut === undefined || brut === true) return;
     const valeur = Number(brut);
     if (!Number.isFinite(valeur)) fail(`--${cle} attend un nombre, recu « ${brut} ».`);
-    spatial[cle] = valeur;
+    /* Lightroom affiche un vignetage sombre avec un nombre negatif, alors que
+       le moteur stocke son intensite positive (le sens clair n'est pas pris en
+       charge). Les imports XMP faisaient deja cette transposition ; les releves
+       Premium saisis a la main doivent suivre exactement la meme convention. */
+    spatial[cle] = cle === 'vignette' && valeur < 0 ? -valeur : valeur;
 });
+/* Les imports Lightroom recourent aux profils radiaux mesures aux valeurs
+   faibles (-10/-17/-25/-30). Les anciens looks VibeFX gardent volontairement
+   leur interpolation historique, deja validee a l'oeil. */
+if (Number(spatial.vignette) > 0) spatial.vignetteLightroomV2 = true;
+if (args.vignetteLighten === true && Number(spatial.vignette) > 0) {
+    spatial.vignetteLighten = true;
+}
+/* Sur photo reelle, les reglages de detail Adobe sont calcules avant la
+   conversion couleur finale. La clarte doit en outre etre attenuee dans notre
+   pipeline JPEG: les controles SP11/TM03/TM09/WN06/WN07 donnent 0,35 au
+   positif et 0,18 au negatif. Les valeurs Lightroom restent intactes dans le
+   preset; ce coefficient ne change que leur rendu interne. */
+if (['clarity', 'texture', 'sharpness', 'noiseReductionLuminance', 'noiseReductionColor']
+    .some((key) => Number.isFinite(Number(spatial[key])) && Number(spatial[key]) !== 0)) {
+    spatial.presetSpatialBeforeLut = true;
+}
+if (Number(spatial.clarity) > 0) spatial.presetClarityScale = 0.35;
+if (Number(spatial.clarity) < 0) spatial.presetClarityScale = 0.18;
+if (Number.isFinite(Number(spatial.texture)) && Number(spatial.texture) !== 0) {
+    spatial.presetTextureEdgeAware = true;
+}
+/* Les familles Auto+ de Lightroom ne portent pas une exposition fixe : leur
+   socle Auto est recalcule pour chaque photo. La mire est donc exportee apres
+   remise a zero des curseurs Auto, puis ce marqueur demande au moteur VibeFX
+   de rejouer son etage adaptatif avant la LUT. */
+if (args.autoTone === true) spatial.presetAutoTone = true;
 const presetDir = path.join('src', 'features', 'vibefx-studio', 'utils', 'presets');
 const modulePath = path.join(presetDir, `${args.id}.js`);
 
@@ -232,7 +286,10 @@ fs.mkdirSync(presetDir, { recursive: true });
 
 const summaryComment = xmp?.summary?.length
     ? xmp.summary.map((line) => ` *   - ${line}`).join('\n')
-    : ' *   (aucun .xmp fourni : reglages Lightroom inconnus)';
+    : ' *   (aucun .xmp fourni : preset Premium Adobe relève à l’écran)';
+const spatialSummary = Object.keys(spatial).length
+    ? Object.entries(spatial).map(([key, value]) => ` *   - ${key}: ${value}`).join('\n')
+    : ' *   - aucun effet spatial actif';
 
 const moduleSource = `/*
  * ${label} — preset importe de Lightroom.
@@ -244,8 +301,10 @@ const moduleSource = `/*
  * approximation des calculs d'Adobe, c'est leur resultat mesure sur toute la
  * grille RVB (ecart moyen a l'identite: ${deviation.mean.toFixed(1)}/255, max ${deviation.max}/255).
  *
- * Reglages lus dans le .xmp:
+ * Reglages lus dans le .xmp ou releves dans Lightroom:
 ${summaryComment}
+ * Reglages hors LUT effectivement importes:
+${spatialSummary}
  *
  * Source Hald : ${path.basename(args.hald)} (niveau ${level}, cube ${level * level})
  * Importe le  : ${new Date().toISOString().slice(0, 10)}
@@ -260,6 +319,7 @@ let cached = null;
 export const preset = {
     id: '${args.id}',
     label: ${JSON.stringify(label)},
+    collection: ${JSON.stringify(collection)},
     hint: ${JSON.stringify(hint)},
     description: ${JSON.stringify(
         `Capturé depuis Lightroom par table de conversion complète.${xmp?.summary?.length ? ` Réglages : ${xmp.summary.join(' · ')}.` : ''}`,
@@ -312,6 +372,7 @@ fs.writeFileSync(indexPath, indexSource, 'utf8');
 console.log(`\nPreset « ${label} » importe.\n`);
 console.log(`  module        : ${modulePath}`);
 console.log(`  identifiant   : ${args.id}`);
+console.log(`  collection    : ${collection?.label || 'Autres imports'}`);
 console.log(`  table         : ${LUT_SIZE}^3 depuis un cube Hald de ${level * level}^3`);
 console.log(`  ecart mesure  : moyen ${deviation.mean.toFixed(2)}/255, max ${deviation.max}/255`);
 console.log(
@@ -336,8 +397,13 @@ if (xmp) {
     const spatialKeys = Object.keys(spatial);
     console.log(`  spatial       : ${spatialKeys.length ? spatialKeys.map((k) => `${k}=${spatial[k]}`).join(', ') : 'aucun'}`);
 } else {
-    console.log('  .xmp          : non fourni — clarte, texture, nettete, grain et');
-    console.log('                  vignetage du preset ne seront PAS reproduits.');
+    console.log('  .xmp          : non fourni — preset Premium Adobe releve a l\'ecran');
+    const spatialKeys = Object.keys(spatial);
+    console.log(
+        spatialKeys.length
+        ? `  spatial       : ${spatialKeys.map((k) => `${k}=${spatial[k]}`).join(', ')}`
+        : '  spatial       : aucun',
+    );
 }
 /*
  * CE QUI NE SERA PAS REPRODUIT FIDELEMENT — ajoute le 2026-08-19.

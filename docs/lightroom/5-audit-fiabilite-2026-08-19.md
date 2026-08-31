@@ -13,6 +13,16 @@ l'effet du réglage et pas un décalage d'encodage. Contrôle : l'export « sans
 rien » de Lightroom est à **0,00/255** de la mire d'origine — l'instrument ne
 ment pas.
 
+> **Mise à jour 2026-08-30 — Cinéma II.** Les réserves historiques sur les
+> sous-réglages du grain, la résolution et l'absence de réduction du bruit ne
+> s'appliquent plus aux presets CN11–CN18. Taille et Cassure sont branchées ;
+> les Tailles 10 et 40 sont calibrées sur des photos de 6000, 8160 et 16 320 px.
+> À 200 Mpx, la force reste à environ 2 % de Lightroom et la grosseur à environ
+> 3,5 %. La réduction de bruit Luminance 20 / Couleur 50 est reproduite avant
+> Netteté 40. Les contrôles finaux téléphone/reflex donnent 1,68–1,97/255 et ont
+> été jugés à l'œil. Chiffres et limites exactes :
+> [audit Cinéma II du 2026-08-30](audit-cinema-II-2026-08-30.md).
+
 ---
 
 ## 1. Ce qui est fiable, et à quel point

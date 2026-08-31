@@ -19,6 +19,7 @@
  *
  *   node scripts/compare-preset-vs-lightroom.mjs <origine> <version-lightroom> <presetId>
  *   ... [--planche <sortie.png>] [--sans-effets]
+ *       [--effets-seuls '{"clarity":24,"dehaze":6}']
  *
  * ═══ IL PASSE PAR LE VRAI MOTEUR DEPUIS LE 2026-08-19 ═══
  *
@@ -128,12 +129,18 @@ const plancheIndex = argv.indexOf('--planche');
 const planche = plancheIndex === -1 ? null : argv[plancheIndex + 1];
 const sortieIndex = argv.indexOf('--sortie');
 const sortie = sortieIndex === -1 ? null : argv[sortieIndex + 1];
+const effetsSeulsIndex = argv.indexOf('--effets-seuls');
+const effetsSeulsBruts = effetsSeulsIndex === -1 ? null : argv[effetsSeulsIndex + 1];
 /*
  * Le `plancheIndex + 1` vaut 0 quand --planche est absent (index -1): sans le
  * garde ci-dessous, le filtre jetait le PREMIER argument, et le script ne
  * marchait qu'avec --planche. Corrige le 2026-08-17.
  */
-const valeursDOptions = new Set([plancheIndex + 1, sortieIndex + 1].filter((i) => i > 0));
+const valeursDOptions = new Set([
+    plancheIndex + 1,
+    sortieIndex + 1,
+    effetsSeulsIndex + 1,
+].filter((i) => i > 0));
 const [source, reference, presetId] = argv.filter((v, i) => (
     !v.startsWith('--') && !valeursDOptions.has(i)
 ));
@@ -141,7 +148,8 @@ const [source, reference, presetId] = argv.filter((v, i) => (
 if (!source || !reference || !presetId) {
     console.error(
         '\nUsage: node scripts/compare-preset-vs-lightroom.mjs <origine> <version-lightroom> <presetId>'
-        + ' [--planche <p.png>] [--sortie <notre-rendu.png>] [--sans-effets]\n',
+        + ' [--planche <p.png>] [--sortie <notre-rendu.png>] [--sans-effets]'
+        + ' [--effets-seuls \'{"clarity":24}\']\n',
     );
     process.exit(1);
 }
@@ -271,7 +279,15 @@ async function rendreAvecLeMoteur(pngSource, filtres) {
 }
 
 const preset = VISION_PRESET_BY_ID[presetId];
-const effetsDuPreset = { ...(preset.spatialFilters || {}) };
+let effetsDuPreset = { ...(preset.spatialFilters || {}) };
+if (effetsSeulsBruts !== null) {
+    try {
+        effetsDuPreset = JSON.parse(effetsSeulsBruts);
+    } catch (error) {
+        console.error(`\nJSON invalide pour --effets-seuls: ${error.message}\n`);
+        process.exit(1);
+    }
+}
 const grainDuPreset = effetsDuPreset.grain || 0;
 delete effetsDuPreset.grain;
 

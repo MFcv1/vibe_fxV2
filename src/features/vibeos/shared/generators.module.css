@@ -99,12 +99,36 @@
     background: var(--vo-bg-sunken);
 }
 
+/* Gradient Builder : l'app occupe toute la hauteur disponible du sheet. */
+.gradientFrame {
+    flex: 1 1 auto;
+    min-height: 0;
+    border-radius: var(--vo-radius-md);
+    overflow: hidden;
+    border: 1px solid var(--vo-line);
+    background: var(--vo-bg-sunken);
+}
+
+.gradientFrame iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    border: 0;
+    display: block;
+}
+
 .lumenFrame iframe {
     width: 100%;
     height: 100%;
-    min-height: 60dvh;
+    min-height: 100%;
     border: 0;
     display: block;
+}
+
+.immersiveFrame {
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
 }
 
 /* ---------- Flou pro ---------- */

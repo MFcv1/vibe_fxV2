@@ -4,6 +4,65 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Audit transverse Vision du 2026-08-31, correction close : les 235 imports
+> Lightroom des 22 familles ont fait l'objet d'un tirage reproductible de deux
+> presets par famille, étendu dans trois familles. Les dix Vintage ont été
+> recapturés après réinitialisation explicite de la mire et les douze Noir et
+> blanc ont perdu le faux vignettage absent des XMP Adobe. Les deux familles
+> sont désormais conformes sur leurs quatre contrôles respectifs ; le bilan
+> passe à quatorze familles conformes et huit à surveiller pour de petits
+> écarts. Le diagnostic, les corrections et les preuves sont dans
+> `docs/lightroom/audit-qualite-presets-2026-08-31/rapport.md`.
+
+> Lot transverse Vision du 2026-08-30 : les familles Lightroom Cloud
+> « Style : cinéma » (CN01–CN10) et « Style : cinéma II » (CN11–CN18) sont
+> complètes dans VibeFX. La première ne porte aucun grain ; la seconde inclut
+> la réduction du
+> bruit 20/50 comprise, et son grain est calibré sur téléphone/reflex jusqu'à
+> 16 320 px. Vision classe maintenant les presets en collections recherchables
+> (`Cinéma`, `Cinéma II`, `VibeFX`, `Imports`) dans une UI Apple-dark. Ce lot ne modifie
+> aucune phase ni surface VibeCut ; son audit moteur vit dans
+> `docs/lightroom/audit-cinema-2026-08-30.md` et
+> `docs/lightroom/audit-cinema-II-2026-08-30.md`.
+>
+> Complément du même lot : les miniatures de presets utilisent désormais le
+> pipeline complet de Vision, par lots progressifs, au lieu d'une LUT seule.
+> Les imports Lightroom peuvent porter le voile négatif et tous les
+> sous-réglages visibles du vignetage Adobe sans modifier le rendu historique
+> des presets VibeFX validés.
+> Le 2026-08-31, cette génération devient pilotée par le viewport : cartes
+> visibles urgentes, rangée suivante au repos, annulation hors collection et
+> cache de session par photo/preset/intensité/version. La source dédiée passe à
+> 192×116, l'encodage devient Blob URL et le pipeline complet reste inchangé.
+> Les références stables du renderer empêchent surtout chaque carte terminée
+> de relancer la grande image. Le contrat navigateur mesure désormais le temps
+> des cartes visibles et n'attend plus artificiellement les 261 hors écran.
+>
+> Extension du lot : 56 presets Premium supplémentaires sont importés depuis
+> Lightroom Cloud — Futuriste 12, Inspiré d’un film 12, Noir et blanc 12,
+> Vintage 10 et Architecture urbaine 10. La bibliothèque Vision expose donc
+> désormais aussi Paysage 10, Style de vie 8, Voyage 10 et Voyage II 8 :
+> 136 presets au total, chaque collection verrouillée par un compte exact.
+> Quatre familles saisonnières complètent ce lot : Printemps 12, Été 11,
+> Automne 12 et Hiver 10. La bibliothèque atteint 181 presets. Les comparaisons
+> téléphone/reflex ont aussi ajouté le sens clair du vignettage Adobe et un
+> profil de détail Lightroom opt-in, sans toucher aux anciens presets validés.
+> Les familles Portraits et Auto rétro portent ensuite la bibliothèque à 261
+> presets. Le 2026-08-31, BW01–BW12 ont été recapturés : les premières Hald
+> étaient restées en couleur faute d'un clic effectif dans Lightroom. Les LUT
+> portent maintenant directement le mélange N&B Adobe et leurs virages gris,
+> sépia, rose, vert, brun et bleu ; un smoke refuse toute chroma couleur résiduelle.
+> Un audit direct des panneaux Effets a ensuite corrigé la couche spatiale :
+> vignette -25 complète sur BW01–BW12, grain nul sur BW01–BW09 et 75/10/60
+> uniquement sur BW10–BW12, puis clarté/texture regroupées en -10/-10,
+> +10/0 et 0/+20. BW08 perd son faux voile +14 et sa texture -15.
+>
+> Lot transverse Studio du 2026-08-30 : `/creer/studio` n'est plus un second
+> catalogue de looks photo. Il devient le lanceur Apple-dark des deux outils de
+> fond complets, Gradient et Lumen. Chaque mini-app occupe tout l'espace sous le
+> bandeau VibeOS, sans marge externe ; Mesh reste disponible dans Layout mais
+> disparait du Studio. Ce lot ne modifie aucune phase VibeCut.
+
 ---
 
 ## 1. Objet et périmètre
