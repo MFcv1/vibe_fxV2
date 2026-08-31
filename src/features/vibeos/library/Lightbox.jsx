@@ -125,13 +125,25 @@ function slideSize(photo, stageW, stageH) {
  */
 function Slide({ photo, position, distance, width, height, onNeedPixels }) {
     const [fullState, setFullState] = useState('idle'); // idle | ready | failed
-    const [thumbState, setThumbState] = useState('preview'); // preview | original | failed
+    /* Safari garde parfois en cache un echec d'image survenu pendant que
+       l'objet venait d'etre publie. Les etats `*-retry` ajoutent une query
+       stable et forcent une vraie nouvelle requete avant de changer de source. */
+    const [thumbState, setThumbState] = useState('preview');
     const centre = distance < 0.5;
     const previewSrc = thumbUrl(photo);
     const originalSrc = fullUrl(photo);
-    const thumbSrc = thumbState === 'preview'
-        ? previewSrc
-        : (thumbState === 'original' ? originalSrc : null);
+    const retryUrl = (url, source) => {
+        if (!url || /^(blob:|data:)/.test(url)) return url;
+        const separator = url.includes('?') ? '&' : '?';
+        const version = photo.cloud?.syncedAt || photo.addedAt || 1;
+        return `${url}${separator}vo_retry=${encodeURIComponent(`${source}-${version}`)}`;
+    };
+    const thumbSrc = {
+        preview: previewSrc,
+        'preview-retry': retryUrl(previewSrc, 'preview'),
+        original: originalSrc,
+        'original-retry': retryUrl(originalSrc, 'original'),
+    }[thumbState] || null;
 
     /* L'apercu stocke peut dater d'avant le passage a 1600 px: on le refait
        demander ici aussi, sinon les voisines resteraient molles pour toujours. */
@@ -168,11 +180,19 @@ function Slide({ photo, position, distance, width, height, onNeedPixels }) {
                                    si l'apercu a eu un echec transitoire, puis on
                                    demonte l'element plutot que d'afficher cette
                                    icone par-dessus le carrousel. */
-                                setThumbState((current) => (
-                                    current === 'preview' && originalSrc && originalSrc !== previewSrc
-                                        ? 'original'
-                                        : 'failed'
-                                ));
+                                setThumbState((current) => {
+                                    if (current === 'preview' && retryUrl(previewSrc, 'preview') !== previewSrc) {
+                                        return 'preview-retry';
+                                    }
+                                    if ((current === 'preview' || current === 'preview-retry')
+                                        && originalSrc && originalSrc !== previewSrc) {
+                                        return 'original';
+                                    }
+                                    if (current === 'original' && retryUrl(originalSrc, 'original') !== originalSrc) {
+                                        return 'original-retry';
+                                    }
+                                    return 'failed';
+                                });
                             }}
                         />
                     ) : null}

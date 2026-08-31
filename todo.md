@@ -13,8 +13,8 @@
 > Hosting. Le CORS explicite est maintenant appliqué au bucket et vérifié sur
 > `IMG_0421.JPG`. Le code télécharge d'abord par le chemin Firebase Storage
 > owner-scoped, garde l'URL tokenisée en repli, et le carrousel remplace un
-> aperçu cassé par l'original puis démonte l'image si les deux échouent : plus
-> d'icône « ? ». Gates : bibliothèque 36/36 + navigateur 1/1 avec aperçu
+> aperçu cassé par une requête versionnée, puis l'original, avant de démonter
+> l'image si tout échoue : plus d'icône « ? » ni de cache négatif Safari. Gates : bibliothèque 36/36 + navigateur 1/1 avec aperçu
 > volontairement absent, lint sans erreur (5 avertissements préexistants),
 > build Node 22 vert. Déploiement front à faire dans ce lot.
 >

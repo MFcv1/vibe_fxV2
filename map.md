@@ -393,7 +393,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul écran : cartes de DOSSIERS et GRILLE masonry. « Retoucher » crée un projet photo puis pousse /creer/vision, avec état Ouverture, verrou anti-double-clic et erreur explicite
 |   |   |   |-- FolderCard.jsx          # Carte de dossier : dos + onglet, deux epaisseurs de tirages, couverture, rabat translucide portant le compteur ; renommage sur place, suppression, pastille de sauvegarde
 |   |   |   |-- ImportSheet.jsx         # Fenetre d'import : destination (nouveau dossier nomme ou dossier existant), sources adaptees a l'appareil, jauge de quota. Montee seulement quand elle est ouverte
-|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier. Un aperçu cassé retente l'original puis est démonté : Safari n'affiche jamais son icône « ? »
+|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier. Un aperçu cassé est relancé avec URL versionnée (cache Safari), puis retente l'original avant démontage : jamais d'icône « ? »
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
 |   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
@@ -664,7 +664,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
   Hosting reçoit désormais `access-control-allow-origin` exact.
 - `libraryCloud.fetchBlob` privilégie `getBlob(ref(storage, path))`, donc les
   règles et l'identité Firebase, avant l'ancienne URL tokenisée. `Lightbox`
-  essaie l'original si l'aperçu échoue et démonte l'élément après deux échecs.
+  force d'abord une nouvelle requête versionnée pour contourner le cache négatif
+  Safari, essaie l'original si l'aperçu échoue et démonte l'élément en dernier.
 - Le smoke navigateur force un aperçu 404 et exige le repli original avant le
   passage à Vision. Gates locales : 36/36 + 1/1, lint 0 erreur, build vert.
 
