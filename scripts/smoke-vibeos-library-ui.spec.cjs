@@ -10,7 +10,8 @@
  *  5. carrousel: ouverture, navigation clavier, fermeture;
  *  6. retour a la vue dossiers: une carte, son compte de photos, son renommage;
  *  7. la fenetre d'import propose les bonnes sources et un nom de dossier;
- *  8. dossiers et photos survivent a un rechargement de page.
+ *  8. dossiers et photos survivent a un rechargement de page;
+ *  9. Retoucher depuis le carrousel ouvre Vision avec la photo.
  */
 
 const { test, expect } = require("@playwright/test");
@@ -178,4 +179,46 @@ test("bibliotheque VibeOS: dossiers, import, masonry, densite, carrousel, persis
     .getByRole("button", { name: /^Ouvrir le dossier / }).click();
   await expect(page.getByTestId("vibeos-library-tile"))
     .toHaveCount(PHOTOS.length, { timeout: 30000 });
+
+  // 9. On simule une photo redescendue du compte (URL distante, aucun Blob
+  // local), puis le bouton du carrousel doit la rapatrier et ouvrir Vision.
+  const remotePhotoName = await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("vibeos-library", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const record = await new Promise((resolve, reject) => {
+      const request = db.transaction("photos", "readonly").objectStore("photos").getAll();
+      request.onsuccess = () => resolve(request.result[2]);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("photos", "readwrite");
+      tx.objectStore("photos").put({
+        ...record,
+        blob: null,
+        thumbBlob: null,
+        remote: true,
+        originalUrl: "/assets/vibefx/demo-astronaut.png",
+        previewUrl: "/assets/vibefx/demo-astronaut.png",
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    return record.name;
+  });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: /contourner.*authentification/i })
+    .click({ timeout: 15000 })
+    .catch(() => {});
+  await page.getByTestId("vibeos-library-folder").first()
+    .getByRole("button", { name: /^Ouvrir le dossier / }).click();
+  await page.getByRole("button", { name: `Ouvrir ${remotePhotoName}` }).click();
+  await expect(page.getByTestId("vibeos-library-lightbox")).toBeVisible({ timeout: 10000 });
+  await page.getByTestId("vibeos-library-lightbox-edit").click();
+  await expect(page).toHaveURL(/\/creer\/vision$/, { timeout: 30000 });
+  await expect(page.getByTestId("vibeos-vision-screen")).toBeVisible({ timeout: 30000 });
 });

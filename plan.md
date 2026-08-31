@@ -4,6 +4,14 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Correctif Bibliothèque du 2026-08-31 : « Retoucher » depuis le carrousel
+> ouvre Vision dès que le fichier distant est disponible. La régénération de
+> vignette et la persistance IndexedDB ne bloquent plus la navigation ; un état
+> « Ouverture… », un verrou anti-double-clic et un repli original -> aperçu
+> rendent le parcours explicite et robuste sur Safari. Le smoke navigateur
+> couvre maintenant une photo simulée sans Blob local. Correctif vérifié en
+> local, non déployé.
+
 > Correctif Auth du 2026-08-31 : le domaine App Hosting est ajouté aux domaines
 > autorisés de la clé reCAPTCHA App Check. `AuthContext` initialise aussi le
 > resolver Google avant le premier clic afin que Safari conserve le geste

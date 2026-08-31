@@ -724,6 +724,12 @@
     background: rgba(255, 255, 255, 0.06);
 }
 
+.lightboxButton:disabled,
+.tileTool:disabled {
+    cursor: wait;
+    opacity: 0.58;
+}
+
 .lightboxIcon {
     display: inline-flex;
     align-items: center;

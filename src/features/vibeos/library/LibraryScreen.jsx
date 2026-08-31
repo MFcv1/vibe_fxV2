@@ -124,6 +124,7 @@ function createRevealer() {
  */
 const Tile = React.memo(function Tile({
     photo, position, rect, selected, revealer, onOpen, onEdit, onDelete, onToggle, onNeedPixels,
+    opening,
 }) {
     const nodeRef = useRef(null);
     const [loaded, setLoaded] = useState(false);
@@ -205,6 +206,8 @@ const Tile = React.memo(function Tile({
                         type="button"
                         className={styles.tileTool}
                         onClick={() => onEdit(photo)}
+                        disabled={opening}
+                        aria-busy={opening ? 'true' : undefined}
                         aria-label="Retoucher dans Vision"
                         title="Retoucher dans Vision"
                     >
@@ -625,22 +628,35 @@ export default function LibraryScreen() {
     }, [removeFolder, sync, push]);
 
     /* ---------- Retouche ---------- */
+    const [openingPhotoId, setOpeningPhotoId] = useState(null);
+    const openingPhotoRef = useRef(null);
+
     const openInVision = useCallback(async (photo) => {
+        if (!photo || openingPhotoRef.current) return;
+        openingPhotoRef.current = photo.id;
+        setOpeningPhotoId(photo.id);
         /* Une photo encore uniquement dans le compte n'a pas de fichier ici: on
            le rapatrie avant d'ouvrir Vision, sinon l'editeur ouvrirait du vide. */
-        const ready = photo.blob ? photo : await sync.hydrate(photo);
-        if (!ready?.blob) {
-            push('Photo indisponible hors ligne.', { tone: 'danger' });
-            return;
+        try {
+            const ready = photo.blob ? photo : await sync.hydrate(photo);
+            if (!ready?.blob) {
+                push('Le fichier original est indisponible. Vérifie ta connexion puis réessaie.', { tone: 'danger' });
+                return;
+            }
+            /* Un nouvel espace par photo: retoucher une photo ne doit jamais ecraser
+               la composition en cours dans Layout. */
+            await createProject({
+                title: ready.name,
+                images: [{ id: ready.id, name: ready.name, slotId: null, blob: ready.blob }],
+                thumbnail: null,
+            });
+            router.push('/creer/vision');
+        } catch {
+            push('Impossible d’ouvrir cette photo dans Vision. Réessaie.', { tone: 'danger' });
+        } finally {
+            openingPhotoRef.current = null;
+            setOpeningPhotoId(null);
         }
-        /* Un nouvel espace par photo: retoucher une photo ne doit jamais ecraser
-           la composition en cours dans Layout. */
-        await createProject({
-            title: ready.name,
-            images: [{ id: ready.id, name: ready.name, slotId: null, blob: ready.blob }],
-            thumbnail: null,
-        });
-        router.push('/creer/vision');
     }, [createProject, router, sync, push]);
 
     const handleDelete = useCallback(async (photo) => {
@@ -851,6 +867,7 @@ export default function LibraryScreen() {
                                         onDelete={handleDelete}
                                         onToggle={toggleSelect}
                                         onNeedPixels={ensurePreview}
+                                        opening={openingPhotoId === photo.id}
                                     />
                                 );
                             })}
@@ -925,6 +942,7 @@ export default function LibraryScreen() {
                     onCloseStart={() => setZoomedOut(false)}
                     onClose={closeLightbox}
                     onEdit={openInVision}
+                    opening={openingPhotoId === visible[lightboxIndex]?.id}
                     onDelete={handleDelete}
                     getTileRect={getTileRect}
                     onNeedPixels={ensurePreview}

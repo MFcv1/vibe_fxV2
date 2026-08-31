@@ -206,18 +206,38 @@ export default function useLibrarySync(library) {
     const hydrate = useCallback(async (photo) => {
         if (!photo) return null;
         if (photo.blob) return photo;
-        const blob = await fetchBlob(photo.originalUrl || photo.previewUrl).catch(() => null);
+
+        /* L'URL de l'original peut avoir expire alors que l'apercu reste
+           disponible. On tente les deux, dans cet ordre, afin que Retoucher ne
+           reste jamais bloque sur une seule URL distante devenue invalide. */
+        const sources = [...new Set([photo.originalUrl, photo.previewUrl].filter(Boolean))];
+        let blob = null;
+        for (const source of sources) {
+            blob = await fetchBlob(source).catch(() => null);
+            if (blob) break;
+        }
         if (!blob) return photo;
-        const preview = await makePreview(blob);
+
         const next = {
             ...photo,
             blob,
-            thumbBlob: preview?.thumbBlob || blob,
-            thumbWidth: preview?.thumbWidth || photo.thumbWidth || 0,
-            thumbHeight: preview?.thumbHeight || photo.thumbHeight || 0,
             remote: false,
         };
-        await upsertPhoto(next);
+
+        /* Vision peut ouvrir le Blob des maintenant. La regeneration de la
+           vignette et la copie IndexedDB continuent en arriere-plan: sur
+           Safari, decoder puis reecrire un JPEG plein format avant le
+           changement de page pouvait prendre plusieurs secondes et donnait
+           l'impression que le bouton Retoucher ne fonctionnait pas. */
+        void (async () => {
+            const preview = photo.thumbBlob ? null : await makePreview(blob);
+            await upsertPhoto({
+                ...next,
+                thumbBlob: preview?.thumbBlob || photo.thumbBlob || blob,
+                thumbWidth: preview?.thumbWidth || photo.thumbWidth || 0,
+                thumbHeight: preview?.thumbHeight || photo.thumbHeight || 0,
+            });
+        })().catch(() => {});
         return next;
     }, [upsertPhoto]);
 

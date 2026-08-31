@@ -1,10 +1,22 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-31 — correction de la connexion Google Safari.**
+> **Point d'étape : 2026-08-31 — correction Retoucher depuis le carrousel.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
+>
+> **2026-08-31 — carrousel Bibliothèque vers Vision corrigé localement.** Pour
+> une photo présente seulement dans le compte, « Retoucher » attendait le
+> décodage, la nouvelle vignette et sa copie IndexedDB avant de naviguer ; sur
+> Safari le bouton semblait donc mort. Vision reçoit désormais le Blob dès son
+> téléchargement, tandis que le cache local se termine en arrière-plan. L'UI
+> affiche « Ouverture… », empêche le double clic, retente l'aperçu si l'original
+> distant est indisponible et montre une erreur utile si aucun fichier ne peut
+> être chargé. Le smoke simule maintenant une photo sans Blob local et vérifie
+> le passage réel du carrousel à `/creer/vision`. Gates : bibliothèque 36/36 +
+> navigateur 1/1, lint sans erreur (5 avertissements préexistants), build Node
+> 22 vert. **Pas encore déployé** : ce correctif attend une demande explicite.
 >
 > **2026-08-31 — connexion Google Safari corrigée, publication en cours.** Le
 > popup s'ouvrait sur le helper Firebase avec `fac={error: UNKNOWN_ERROR}` : la
@@ -125,6 +137,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
+[**après la correction Retoucher du carrousel** — 2026-08-31](docs/prompt-reprise-2026-08-31-carrousel-vers-vision.md),
 [**après la correction Google Safari** — 2026-08-31](docs/prompt-reprise-2026-08-31-auth-google-safari.md),
 [**après les favoris de presets Vision** — 2026-08-31](docs/prompt-reprise-2026-08-31-favoris-presets-vision.md),
 [**après les dossiers de la bibliothèque** — 2026-08-31](docs/prompt-reprise-2026-08-31-bibliotheque-dossiers.md),

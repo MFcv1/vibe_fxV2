@@ -387,13 +387,13 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- folderNaming.js         # Nommage a la mode OS : nom du dossier choisi (webkitRelativePath), sinon la date en toutes lettres, suffixe « (2) » si le nom est pris, nettoyage des separateurs. Module pur, teste hors navigateur
 |   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. Module pur, teste hors navigateur
 |   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. La fiche Firestore est ecrite EN DERNIER : un envoi coupe ne laisse jamais de fiche sans fichier
-|   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement de l'original a la retouche, arret apres 3 echecs. Ne fait rien sans compte reel (le contournement dev est ignore)
+|   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
 |   |   |   |-- useLibrary.js           # Etat : dossiers + photos, import sequentiel avec progression dans un dossier, renommage, suppression profonde, filtres appareil/look/recherche, tris, quota, cache des URLs d'objet
-|   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul ecran : cartes de DOSSIERS (recherche, quota, Importer) et GRILLE masonry d'un dossier (recherche, appareils EXIF, looks, tri, densite − ▦ +, selection multiple, depot de fichiers). Un import cree un dossier et y entre tout de suite
+|   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul écran : cartes de DOSSIERS et GRILLE masonry. « Retoucher » crée un projet photo puis pousse /creer/vision, avec état Ouverture, verrou anti-double-clic et erreur explicite
 |   |   |   |-- FolderCard.jsx          # Carte de dossier : dos + onglet, deux epaisseurs de tirages, couverture, rabat translucide portant le compteur ; renommage sur place, suppression, pastille de sauvegarde
 |   |   |   |-- ImportSheet.jsx         # Fenetre d'import : destination (nouveau dossier nomme ou dossier existant), sources adaptees a l'appareil, jauge de quota. Montee seulement quand elle est ouverte
-|   |   |   |-- Lightbox.jsx            # Carrousel plein ecran : zoom partage FLIP depuis la tuile, vignette affichee avant la pleine resolution, rail de 3 diapositives, glissement au doigt, frise, clavier
+|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP depuis la tuile, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier et état « Ouverture… » du passage à Vision
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
 |   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
@@ -629,6 +629,24 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-08-31 (Bibliothèque : carrousel vers Vision)
+
+- Cause : pour une photo redescendue de Firebase, le clic « Retoucher »
+  attendait le téléchargement, le décodage plein format, la création d'une
+  vignette WebP et l'écriture IndexedDB avant `router.push`. Sur Safari, cette
+  chaîne lourde donnait l'impression d'un bouton sans effet.
+- `useLibrarySync.hydrate` rend maintenant le Blob dès qu'il est téléchargé.
+  La vignette et le cache local terminent en arrière-plan. Si l'URL de
+  l'original échoue, l'aperçu est essayé avant d'abandonner.
+- `LibraryScreen` verrouille les doubles clics, expose une erreur utile et
+  transmet l'état d'ouverture. `Lightbox` affiche « Ouverture… » pendant le
+  rapatriement.
+- Le smoke navigateur transforme une vraie photo importée en fiche distante
+  sans Blob, clique « Retoucher » dans le carrousel et exige `/creer/vision` +
+  l'écran Vision. Gates : bibliothèque pure 36/36, navigateur 1/1, lint 0
+  erreur (5 avertissements préexistants), build Node 22 vert.
+- Correctif local uniquement, pas de déploiement sans demande explicite.
 
 ## Pages cible a creer plus tard
 

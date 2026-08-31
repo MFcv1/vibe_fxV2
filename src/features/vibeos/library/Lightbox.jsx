@@ -175,7 +175,7 @@ function Slide({ photo, position, distance, width, height, onNeedPixels }) {
 
 export default function Lightbox({
     photos, index, onIndexChange, onClose, onCloseStart, onEdit, onDelete,
-    getTileRect, onNeedPixels,
+    getTileRect, onNeedPixels, opening = false,
 }) {
     const photo = photos[index] || null;
     const trackRef = useRef(null);
@@ -560,10 +560,12 @@ export default function Lightbox({
                         type="button"
                         className={styles.lightboxButton}
                         onClick={() => onEdit(photo)}
+                        disabled={opening}
+                        aria-busy={opening ? 'true' : undefined}
                         data-testid="vibeos-library-lightbox-edit"
                     >
                         <Wand2 size={13} />
-                        Retoucher
+                        {opening ? 'Ouverture…' : 'Retoucher'}
                     </button>
                     <a
                         className={styles.lightboxIcon}
