@@ -4,6 +4,13 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Lot Vision du 2026-08-31 : les presets ont des favoris propres à chaque
+> compte Firebase. L'étoile de chaque carte ne déclenche jamais l'application
+> du preset ; le filtre Favoris se combine à la recherche et se met à jour en
+> direct. La source de vérité est la sous-collection Firestore
+> `users/{uid}/visionPresetFavorites`, protégée par des règles owner-scoped et
+> vérifiée avec deux identités distinctes sur les émulateurs.
+
 > Audit transverse Vision du 2026-08-31, correction close : les 235 imports
 > Lightroom des 22 familles ont fait l'objet d'un tirage reproductible de deux
 > presets par famille, étendu dans trois familles. Les dix Vintage ont été

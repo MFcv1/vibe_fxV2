@@ -1,10 +1,21 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-31 — la bibliothèque range en dossiers et se sauvegarde dans le compte.**
+> **Point d'étape : 2026-08-31 — les favoris de presets Vision sont liés au compte.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
+>
+> **2026-08-31 — favoris de presets Vision prêts à publier.** Chaque carte de
+> `/creer/vision` porte une étoile indépendante du bouton qui applique le
+> preset. Le filtre « Favoris » se combine avec la recherche et affiche le
+> compte exact. Les choix sont synchronisés en direct dans
+> `users/{uid}/visionPresetFavorites/{presetId}` ; aucun favori d'un compte ne
+> peut apparaître ou être écrit dans un autre. L'interface reste optimiste mais
+> annule proprement une étoile si Firebase refuse l'écriture. Vérifications :
+> moteur 438/438, smoke Vision 3/3, scénario ciblé 1/1 après refactor, règles
+> Firestore sur émulateur avec deux comptes, lint sans erreur (5 avertissements
+> préexistants), build Node 22 vert. Déploiement demandé, à consigner ci-dessous.
 >
 > **2026-08-31 — bibliothèque : dossiers, fenêtre d'import et sauvegarde compte.**
 > `/creer/bibliotheque` s'ouvre désormais sur des **dossiers**, pas sur un tas de
@@ -99,6 +110,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
+[**après les favoris de presets Vision** — 2026-08-31](docs/prompt-reprise-2026-08-31-favoris-presets-vision.md),
 [**après les dossiers de la bibliothèque** — 2026-08-31](docs/prompt-reprise-2026-08-31-bibliotheque-dossiers.md),
 [après le recentrage du Studio — 2026-08-30 decies](docs/prompt-reprise-2026-08-30-decies.md),
 [**après la clôture du Gradient Builder** — 2026-08-30 nonies](docs/prompt-reprise-2026-08-30-nonies.md),

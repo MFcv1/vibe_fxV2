@@ -3,6 +3,9 @@
    desktop, seul le panneau droit scrolle. */
 
 .screen {
+    --vo-favorite: #f6c85f;
+    --vo-favorite-line: rgba(246, 200, 95, 0.6);
+    --vo-favorite-surface: rgba(72, 55, 20, 0.9);
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
@@ -307,7 +310,9 @@
 .presetSearchClear:focus-visible,
 .presetCollectionChip:focus-visible,
 .presetResultMeta button:focus-visible,
-.presetEmpty button:focus-visible {
+.presetEmpty button:focus-visible,
+.lookCardApply:focus-visible,
+.presetFavorite:focus-visible {
     outline: 2px solid var(--vo-accent);
     outline-offset: 2px;
 }
@@ -371,6 +376,14 @@
     color: var(--vo-accent-hover);
 }
 
+.presetFavoriteChip {
+    color: var(--vo-text-2);
+}
+
+.presetFavoriteChip[aria-selected="true"] {
+    color: var(--vo-favorite);
+}
+
 .presetResultMeta {
     display: flex;
     align-items: center;
@@ -388,6 +401,12 @@
 
 .presetResultMeta button:hover {
     color: var(--vo-text);
+}
+
+.presetFavoriteError {
+    margin: 0;
+    color: var(--vo-danger, #ff7b93);
+    font-size: var(--vo-text-xs);
 }
 
 .presetGroups {
@@ -482,17 +501,29 @@
         box-shadow var(--vo-dur-2) var(--vo-ease-out);
 }
 
+.lookCardApply {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
 .lookCard:hover {
     border-color: var(--vo-line-strong);
     transform: translateY(-2px);
     box-shadow: var(--vo-shadow-2);
 }
 
-.lookCard:active {
+.lookCard:has(.lookCardApply:active) {
     transform: translateY(0) scale(0.99);
 }
 
-.lookCard:focus-visible {
+.lookCardApply:focus-visible,
+.presetFavorite:focus-visible {
     outline: 2px solid var(--vo-accent);
     outline-offset: 2px;
 }
@@ -500,6 +531,47 @@
 .lookCardActive {
     border-color: var(--vo-accent-line);
     background: var(--vo-accent-quiet);
+}
+
+.presetFavorite {
+    position: absolute;
+    z-index: 2;
+    top: calc(var(--vo-space-2) + 5px);
+    right: calc(var(--vo-space-2) + 5px);
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--vo-radius-pill);
+    background: rgba(10, 11, 15, 0.78);
+    color: var(--vo-text-2);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease),
+        background var(--vo-dur-1) var(--vo-ease),
+        border-color var(--vo-dur-1) var(--vo-ease),
+        transform var(--vo-dur-1) var(--vo-ease-out);
+}
+
+.presetFavorite:hover {
+    color: var(--vo-favorite);
+    border-color: var(--vo-favorite-line);
+    transform: scale(1.06);
+}
+
+.presetFavoriteActive,
+.presetFavoriteActive:hover {
+    border-color: var(--vo-favorite-line);
+    background: var(--vo-favorite-surface);
+    color: var(--vo-favorite);
+}
+
+.presetFavorite[aria-busy="true"] {
+    cursor: wait;
+    opacity: 0.65;
 }
 
 /* Look contre-indique pour CETTE photo: present, mais visiblement en retrait. */

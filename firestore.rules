@@ -84,6 +84,27 @@ service cloud.firestore {
         ]);
     }
 
+    function isVisionPresetFavoriteValid(userId, presetId) {
+      return ownsUserDoc(userId)
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.presetId == presetId
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'presetId',
+          'createdAt',
+          'updatedAt',
+        ])
+        && request.resource.data.keys().hasAll([
+          'ownerUid',
+          'presetId',
+          'createdAt',
+          'updatedAt',
+        ])
+        && request.resource.data.presetId is string
+        && request.resource.data.presetId.size() > 0
+        && request.resource.data.presetId.size() <= 120;
+    }
+
     function isSoundtrackTrackValid(userId) {
       return ownsUserDoc(userId)
         && request.resource.data.ownerUid == userId
@@ -221,6 +242,14 @@ service cloud.firestore {
       match /libraryPhotos/{photoId} {
         allow read: if ownsUserDoc(userId);
         allow create, update: if isLibraryPhotoValid(userId);
+        allow delete: if ownsUserDoc(userId);
+      }
+
+      // Favoris de presets Vision: chaque compte ne voit et ne modifie que
+      // ses propres etoiles. L'identifiant stocke doit correspondre au chemin.
+      match /visionPresetFavorites/{presetId} {
+        allow read: if ownsUserDoc(userId);
+        allow create, update: if isVisionPresetFavoriteValid(userId, presetId);
         allow delete: if ownsUserDoc(userId);
       }
     }

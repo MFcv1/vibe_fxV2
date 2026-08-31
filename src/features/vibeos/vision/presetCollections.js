@@ -59,13 +59,17 @@ export function buildPresetCollections(presets = []) {
 export function filterAndGroupPresets(presets = [], {
     collectionId = PRESET_COLLECTION_ALL,
     query = '',
+    favoriteIds = null,
+    favoritesOnly = false,
 } = {}) {
     const needle = normaliser(query);
+    const favoriteSet = favoriteIds instanceof Set ? favoriteIds : new Set(favoriteIds || []);
     const groups = new Map();
 
     for (const preset of presets) {
         const collection = resolvePresetCollection(preset);
         if (collectionId !== PRESET_COLLECTION_ALL && collection.id !== collectionId) continue;
+        if (favoritesOnly && !favoriteSet.has(preset.id)) continue;
 
         if (needle) {
             const haystack = normaliser([

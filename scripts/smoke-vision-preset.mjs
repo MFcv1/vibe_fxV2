@@ -297,6 +297,18 @@ check(
 );
 const searchedCinemaII = filterAndGroupPresets(VISION_PRESETS, { collectionId: 'cinema-ii', query: 'CN17' });
 check('bibliothèque : filtre collection + recherche', searchedCinemaII[0]?.presets.length ?? 0, 1, 1);
+const favoriteIds = new Set(['cn01', 'cn17']);
+const favoriteGroups = filterAndGroupPresets(VISION_PRESETS, { favoriteIds, favoritesOnly: true });
+check(
+    'bibliothèque : filtre favoris strict',
+    favoriteGroups.reduce((total, group) => total + group.presets.length, 0),
+    2,
+    2,
+);
+const favoriteSearch = filterAndGroupPresets(VISION_PRESETS, {
+    favoriteIds, favoritesOnly: true, query: 'CN17',
+});
+check('bibliothèque : recherche dans les favoris', favoriteSearch[0]?.presets.length ?? 0, 1, 1);
 
 /* Les presets Style : Noir et blanc doivent embarquer la conversion N&B dans
    leur Hald. Une capture faite sans appliquer réellement le preset laisse les

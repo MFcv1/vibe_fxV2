@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, Search,
-    ShieldCheck, Sparkles, Undo2, Upload, X, ZoomIn, ZoomOut,
+    ShieldCheck, Sparkles, Star, Undo2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -17,11 +17,15 @@ import { describeSignals } from './autoEnhance';
 import {
     buildPresetCollections, filterAndGroupPresets, PRESET_COLLECTION_ALL,
 } from './presetCollections';
+import usePresetFavorites from './usePresetFavorites';
 import styles from './vision.module.css';
 
 const cx = (...values) => values.filter(Boolean).join(' ');
 
-function PresetCard({ preset, preview, active, onApply, requestPreview, releasePreview }) {
+function PresetCard({
+    preset, preview, active, favorite, favoritePending,
+    onApply, onToggleFavorite, requestPreview, releasePreview,
+}) {
     const cardRef = useRef(null);
 
     useEffect(() => {
@@ -51,24 +55,43 @@ function PresetCard({ preset, preview, active, onApply, requestPreview, releaseP
     }, [preset.id, requestPreview, releasePreview]);
 
     return (
-        <button
+        <article
             ref={cardRef}
-            type="button"
             className={cx(styles.lookCard, active && styles.lookCardActive)}
-            onClick={() => onApply(preset)}
             title={preset.description}
-            aria-pressed={active}
             data-preset-id={preset.id}
             data-preview-ready={preview ? 'true' : 'false'}
         >
-            <span className={styles.lookThumb}>
-                {preview
-                    ? <img src={preview} alt="" />
-                    : <span className={styles.lookThumbEmpty} />}
-            </span>
-            <span className={styles.lookLabel}>{preset.label}</span>
-            <span className={styles.lookHint}>{preset.hint}</span>
-        </button>
+            <button
+                type="button"
+                className={styles.lookCardApply}
+                onClick={() => onApply(preset)}
+                aria-label={`${preset.label} — ${preset.hint}`}
+                aria-pressed={active}
+                data-preset-apply
+            >
+                <span className={styles.lookThumb}>
+                    {preview
+                        ? <img src={preview} alt="" />
+                        : <span className={styles.lookThumbEmpty} />}
+                </span>
+                <span className={styles.lookLabel}>{preset.label}</span>
+                <span className={styles.lookHint}>{preset.hint}</span>
+            </button>
+            <button
+                type="button"
+                className={cx(styles.presetFavorite, favorite && styles.presetFavoriteActive)}
+                onClick={() => onToggleFavorite(preset.id)}
+                aria-label={`${favorite ? 'Retirer' : 'Ajouter'} ${preset.label} ${favorite ? 'des' : 'aux'} favoris`}
+                aria-pressed={favorite}
+                aria-busy={favoritePending}
+                disabled={favoritePending}
+                title={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                data-preset-favorite
+            >
+                <Star size={14} fill={favorite ? 'currentColor' : 'none'} aria-hidden="true" />
+            </button>
+        </article>
     );
 }
 
@@ -128,6 +151,10 @@ const ADVANCED_GROUPS = [
 
 export default function VisionScreen() {
     const editor = useVisionEditor();
+    const {
+        favoriteIds, pendingIds: favoritePendingIds,
+        toggleFavorite, error: favoriteError,
+    } = usePresetFavorites();
     const {
         image, metrics, signals, sourceKind,
         filters, setFilters,
@@ -215,6 +242,7 @@ export default function VisionScreen() {
     const [compareMode, setCompareMode] = useState('slider');
     const [presetCollection, setPresetCollection] = useState(PRESET_COLLECTION_ALL);
     const [presetQuery, setPresetQuery] = useState('');
+    const [favoritesOnly, setFavoritesOnly] = useState(false);
     const importRef = useRef(null);
 
     const {
@@ -228,7 +256,13 @@ export default function VisionScreen() {
     const presetGroups = useMemo(() => filterAndGroupPresets(presets, {
         collectionId: presetCollection,
         query: presetQuery,
-    }), [presets, presetCollection, presetQuery]);
+        favoriteIds,
+        favoritesOnly,
+    }), [presets, presetCollection, presetQuery, favoriteIds, favoritesOnly]);
+    const favoriteCount = useMemo(
+        () => presets.reduce((total, preset) => total + (favoriteIds.has(preset.id) ? 1 : 0), 0),
+        [presets, favoriteIds],
+    );
     const visiblePresetCount = useMemo(
         () => presetGroups.reduce((total, group) => total + group.presets.length, 0),
         [presetGroups],
@@ -561,12 +595,33 @@ export default function VisionScreen() {
                             <button
                                 type="button"
                                 role="tab"
-                                aria-selected={presetCollection === PRESET_COLLECTION_ALL}
+                                aria-selected={favoritesOnly}
                                 className={cx(
                                     styles.presetCollectionChip,
-                                    presetCollection === PRESET_COLLECTION_ALL && styles.presetCollectionChipActive,
+                                    styles.presetFavoriteChip,
+                                    favoritesOnly && styles.presetCollectionChipActive,
                                 )}
-                                onClick={() => setPresetCollection(PRESET_COLLECTION_ALL)}
+                                onClick={() => {
+                                    setFavoritesOnly(true);
+                                    setPresetCollection(PRESET_COLLECTION_ALL);
+                                }}
+                            >
+                                <Star size={12} fill={favoritesOnly ? 'currentColor' : 'none'} aria-hidden="true" />
+                                Favoris <span>{favoriteCount}</span>
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={!favoritesOnly && presetCollection === PRESET_COLLECTION_ALL}
+                                className={cx(
+                                    styles.presetCollectionChip,
+                                    !favoritesOnly && presetCollection === PRESET_COLLECTION_ALL
+                                        && styles.presetCollectionChipActive,
+                                )}
+                                onClick={() => {
+                                    setFavoritesOnly(false);
+                                    setPresetCollection(PRESET_COLLECTION_ALL);
+                                }}
                             >
                                 Tous <span>{presets.length}</span>
                             </button>
@@ -575,12 +630,16 @@ export default function VisionScreen() {
                                     key={collection.id}
                                     type="button"
                                     role="tab"
-                                    aria-selected={presetCollection === collection.id}
+                                    aria-selected={!favoritesOnly && presetCollection === collection.id}
                                     className={cx(
                                         styles.presetCollectionChip,
-                                        presetCollection === collection.id && styles.presetCollectionChipActive,
+                                        !favoritesOnly && presetCollection === collection.id
+                                            && styles.presetCollectionChipActive,
                                     )}
-                                    onClick={() => setPresetCollection(collection.id)}
+                                    onClick={() => {
+                                        setFavoritesOnly(false);
+                                        setPresetCollection(collection.id);
+                                    }}
                                 >
                                     {collection.label} <span>{collection.count}</span>
                                 </button>
@@ -589,18 +648,22 @@ export default function VisionScreen() {
 
                         <div className={styles.presetResultMeta} aria-live="polite">
                             <span>{visiblePresetCount} preset{visiblePresetCount > 1 ? 's' : ''}</span>
-                            {(presetCollection !== PRESET_COLLECTION_ALL || presetQuery) ? (
+                            {(favoritesOnly || presetCollection !== PRESET_COLLECTION_ALL || presetQuery) ? (
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setPresetCollection(PRESET_COLLECTION_ALL);
                                         setPresetQuery('');
+                                        setFavoritesOnly(false);
                                     }}
                                 >
                                     Tout afficher
                                 </button>
                             ) : null}
                         </div>
+                        {favoriteError ? (
+                            <p className={styles.presetFavoriteError} role="alert">{favoriteError}</p>
+                        ) : null}
                     </div>
 
                     <div className={styles.presetGroups} data-testid="vibeos-vision-presets">
@@ -617,7 +680,10 @@ export default function VisionScreen() {
                                             preset={preset}
                                             preview={previews[preset.id]}
                                             active={preset.id === activePresetId}
+                                            favorite={favoriteIds.has(preset.id)}
+                                            favoritePending={favoritePendingIds.has(preset.id)}
                                             onApply={applyPreset}
+                                            onToggleFavorite={toggleFavorite}
                                             requestPreview={requestPresetPreview}
                                             releasePreview={releasePresetPreview}
                                         />
@@ -626,14 +692,21 @@ export default function VisionScreen() {
                             </section>
                         )) : (
                             <div className={styles.presetEmpty}>
-                                <Search size={17} aria-hidden="true" />
-                                <strong>Aucun preset trouvé</strong>
-                                <span>Essaie un autre nom ou affiche toutes les collections.</span>
+                                {favoritesOnly
+                                    ? <Star size={17} aria-hidden="true" />
+                                    : <Search size={17} aria-hidden="true" />}
+                                <strong>{favoritesOnly ? 'Aucun favori' : 'Aucun preset trouvé'}</strong>
+                                <span>
+                                    {favoritesOnly
+                                        ? 'Clique sur l’étoile d’un preset pour le retrouver ici.'
+                                        : 'Essaie un autre nom ou affiche toutes les collections.'}
+                                </span>
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setPresetCollection(PRESET_COLLECTION_ALL);
                                         setPresetQuery('');
+                                        setFavoritesOnly(false);
                                     }}
                                 >
                                     Réinitialiser

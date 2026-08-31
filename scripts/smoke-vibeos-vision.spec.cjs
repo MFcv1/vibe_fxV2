@@ -148,7 +148,7 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
   // Les presets sont rendus sur la VRAIE photo (vignettes en <img>).
   const presetGrid = page.getByTestId("vibeos-vision-presets");
   await presetGrid.scrollIntoViewIfNeeded();
-  const presetCount = await presetGrid.locator("button").count();
+  const presetCount = await presetGrid.locator("[data-preset-apply]").count();
   expect(presetCount).toBeGreaterThan(0);
   /* Contrat utile: les cartes sont la tout de suite, puis seul le viewport et
      sa zone de prechargement travaillent. Les 261 cartes hors ecran n'ont pas
@@ -166,29 +166,39 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
   const cinemaTab = collectionTabs.getByRole("tab", { name: /^Cinéma 10$/ });
   await expect(cinemaTab).toBeVisible();
   await cinemaTab.click();
-  await expect(presetGrid.locator("button")).toHaveCount(10);
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(10);
   await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 5000 }).toBe(10);
   const presetSearch = page.getByTestId("vibeos-vision-preset-search");
   await presetSearch.fill("CN01");
-  await expect(presetGrid.locator("button")).toHaveCount(1);
-  await expect(presetGrid.getByRole("button", { name: /CN01/ })).toBeVisible();
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(1);
+  await expect(presetGrid.locator('[data-preset-apply][aria-label^="CN01 "]')).toBeVisible();
   await presetSearch.fill("");
 
   const cinemaIITab = collectionTabs.getByRole("tab", { name: /Cinéma II/ });
   await expect(cinemaIITab).toBeVisible();
   await cinemaIITab.click();
-  await expect(presetGrid.locator("button")).toHaveCount(8);
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(8);
   await expect.poll(async () => presetGrid.locator("img").count(), { timeout: 5000 }).toBe(8);
   await presetSearch.fill("CN17");
-  await expect(presetGrid.locator("button")).toHaveCount(1);
-  await expect(presetGrid.getByRole("button", { name: /CN17/ })).toBeVisible();
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(1);
+  await expect(presetGrid.locator('[data-preset-apply][aria-label^="CN17 "]')).toBeVisible();
   await presetSearch.fill("");
+  const cn17Card = presetGrid.locator('[data-preset-id="cn17"]');
+  const cn17Favorite = cn17Card.getByRole("button", { name: /Ajouter CN17 aux favoris/ });
+  await cn17Favorite.click();
+  await expect(cn17Card.getByRole("button", { name: /Retirer CN17 des favoris/ })).toHaveAttribute("aria-pressed", "true");
+  const favoriteTab = collectionTabs.getByRole("tab", { name: /^Favoris 1$/ });
+  await favoriteTab.click();
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(1);
+  await expect(presetGrid.locator('[data-preset-apply][aria-label^="CN17 "]')).toBeVisible();
+  await expect(presetGrid.locator('[data-preset-apply][aria-label^="CN17 "]')).toHaveAttribute("aria-pressed", "false");
+  await collectionTabs.getByRole("tab", { name: /Tous/ }).click();
   await cinemaTab.click();
   /* Retour sur une collection deja visitee: les URLs du cache sont publiees
      sans repasser par le moteur. */
   await expect(presetGrid.locator("img")).toHaveCount(10, { timeout: 500 });
   await collectionTabs.getByRole("tab", { name: /Tous/ }).click();
-  await expect(presetGrid.locator("button")).toHaveCount(presetCount);
+  await expect(presetGrid.locator("[data-preset-apply]")).toHaveCount(presetCount);
   if (process.env.VIBEFX_PRESET_UI_SCREENSHOT) {
     await page.screenshot({ path: process.env.VIBEFX_PRESET_UI_SCREENSHOT });
   }
@@ -222,7 +232,7 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
 
   /* Application du preset: la carte devient active et l'image change encore.
      Un second clic le retire — c'est la comparaison la plus directe. */
-  const firstPreset = presetGrid.locator("button").first();
+  const firstPreset = presetGrid.locator("[data-preset-apply]").first();
   const presetName = (await firstPreset.innerText()).split("\n")[0];
   const beforePreset = await readCanvasStats(page);
   await firstPreset.click();
@@ -245,7 +255,7 @@ test("vision VibeOS: analyse, amelioration, preset, comparaison", async ({ page 
    *   - le preset le DIT, au lieu de faire bouger des reglages en silence;
    *   - les reglages concernes portent vraiment la valeur du preset.
    */
-  const showcase = presetGrid.locator("button").filter({ hasText: "Showcase" });
+  const showcase = presetGrid.locator("[data-preset-apply]").filter({ hasText: "Showcase" });
   if (await showcase.count()) {
     await showcase.first().click();
     await expect(message).toContainText("Il pose aussi");
@@ -339,12 +349,12 @@ test("vision VibeOS: presets surs sur 5 photos types", async ({ page }) => {
       async () => page.locator("canvas").first().evaluate((node) => node.width),
       { timeout: 20000 },
     ).toBeGreaterThan(0);
-    const count = await presetGrid.locator("button").count();
+    const count = await presetGrid.locator("[data-preset-apply]").count();
     expect(count).toBeGreaterThan(0);
 
     // Chaque preset est applique, puis mesure: ni gris plat, ni ecrase.
     for (let index = 0; index < count; index += 1) {
-      const card = presetGrid.locator("button").nth(index);
+      const card = presetGrid.locator("[data-preset-apply]").nth(index);
       if ((await card.getAttribute("aria-pressed")) !== "true") await card.click();
       const label = (await card.innerText()).split("\n")[0];
       /* Le rendu passe par requestAnimationFrame: on attend que le canvas se
@@ -391,7 +401,7 @@ test("vision VibeOS: le zoom montre le grain que « Adapter » moyenne", async (
     .toBeGreaterThan(0);
 
   /* CN14 porte un grain 25 de Taille 10: c'est le preset qui a revele le bug. */
-  await page.getByRole("button", { name: /^CN14/ }).click();
+  await page.locator('[data-preset-apply][aria-label^="CN14 "]').click();
   await page.waitForTimeout(1500);
 
   const etiquette = page.getByTestId("vibeos-vision-zoom-label");
