@@ -38,6 +38,9 @@ Fichiers principaux :
   second compte refusé en lecture/écriture.
 - `npm run lint` : 0 erreur, 5 avertissements préexistants.
 - `npm run build` sous Node 22 : vert, avertissement NFT préexistant.
+- règles Firestore publiées ; commit `4f8336f` sur `master`.
+- rollout App Hosting `build-2026-08-31-005` : `SUCCEEDED`.
+- smoke live : 261 étoiles, filtre Favoris fonctionnel, aucune erreur console.
 
 ## Invariants
 

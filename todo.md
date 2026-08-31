@@ -15,7 +15,10 @@
 > annule proprement une étoile si Firebase refuse l'écriture. Vérifications :
 > moteur 438/438, smoke Vision 3/3, scénario ciblé 1/1 après refactor, règles
 > Firestore sur émulateur avec deux comptes, lint sans erreur (5 avertissements
-> préexistants), build Node 22 vert. Déploiement demandé, à consigner ci-dessous.
+> préexistants), build Node 22 vert. Règles publiées, commit `4f8336f` poussé
+> sur `master`, puis rollout App Hosting `build-2026-08-31-005` réussi. Le smoke
+> live voit les 261 étoiles, sélectionne le filtre et ne relève aucune erreur
+> console ; aucune donnée factice n'a été laissée dans le compte réel.
 >
 > **2026-08-31 — bibliothèque : dossiers, fenêtre d'import et sauvegarde compte.**
 > `/creer/bibliotheque` s'ouvre désormais sur des **dossiers**, pas sur un tas de

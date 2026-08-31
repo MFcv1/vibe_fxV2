@@ -9,7 +9,10 @@
 > du preset ; le filtre Favoris se combine à la recherche et se met à jour en
 > direct. La source de vérité est la sous-collection Firestore
 > `users/{uid}/visionPresetFavorites`, protégée par des règles owner-scoped et
-> vérifiée avec deux identités distinctes sur les émulateurs.
+> vérifiée avec deux identités distinctes sur les émulateurs. Le lot est publié
+> par le commit `4f8336f` et le rollout App Hosting
+> `build-2026-08-31-005` ; le smoke live confirme les 261 étoiles, le filtre
+> sélectionné et l'absence d'erreur navigateur.
 
 > Audit transverse Vision du 2026-08-31, correction close : les 235 imports
 > Lightroom des 22 familles ont fait l'objet d'un tirage reproductible de deux
