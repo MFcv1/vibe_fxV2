@@ -47,7 +47,7 @@ export async function buildPublicationPayload(project, { caption = '' } = {}) {
     const format = resolveFormat(project);
     const template = resolveTemplate(project);
     const socialImages = await buildSocialImages(canvas, format);
-    const blob = await canvasToBlob(canvas, 'image/png');
+    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.95);
     const background = project.background || {};
     const geometry = project.geometry || {};
 
@@ -57,10 +57,10 @@ export async function buildPublicationPayload(project, { caption = '' } = {}) {
            smokes ("la publication vient bien de la composition + Vision"). */
         pipeline: stages,
         name: slugifyTitle(project.title),
-        mimeType: 'image/png',
+        mimeType: 'image/jpeg',
         width,
         height,
-        dataUrl: canvas.toDataURL('image/png'),
+        dataUrl: canvas.toDataURL('image/jpeg', 0.95),
         blob,
         socialImages,
         caption,

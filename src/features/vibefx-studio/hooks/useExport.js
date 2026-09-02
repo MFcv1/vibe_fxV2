@@ -18,6 +18,17 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
     const [estimatedSize, setEstimatedSize] = useState(null);
     const canRenderOutput = canExport ?? images.length > 0;
 
+    const renderExportCanvas = useCallback(() => {
+        if (!canRenderOutput || !canvasRef.current) return null;
+        const { width, height } = getCanvasDimensions();
+        if (!width || !height) return null;
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = width;
+        exportCanvas.height = height;
+        renderPipeline(exportCanvas, width, height, false, 'high');
+        return exportCanvas;
+    }, [canRenderOutput, canvasRef, getCanvasDimensions, renderPipeline]);
+
     // --- Utilitaires internes ---
     const getMimeType = (format) => {
         if (format === 'png') return 'image/png';
@@ -50,11 +61,8 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
     // --- Estimation du poids ---
     const estimateFileSize = useCallback((format, quality) => {
         if (!canRenderOutput || !canvasRef.current || !isExportModalOpen) return;
-        const { width, height } = getCanvasDimensions();
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = width;
-        tempCanvas.height = height;
-        renderPipeline(tempCanvas, width, height, false, 'high');
+        const tempCanvas = renderExportCanvas();
+        if (!tempCanvas) return;
 
         const mimeType = getMimeType(format);
         const q = getQuality(format, quality);
@@ -71,7 +79,7 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
                 setEstimatedSize('---');
             }
         }, mimeType, q);
-    }, [canRenderOutput, canvasRef, getCanvasDimensions, renderPipeline, isExportModalOpen]);
+    }, [canRenderOutput, canvasRef, isExportModalOpen, renderExportCanvas]);
 
     // Debounced recalculation when modal is open
     useEffect(() => {
@@ -93,17 +101,14 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
     // --- Export final ---
     const performExport = useCallback(() => {
         if (!canRenderOutput || !canvasRef.current) return;
-        const { width, height } = getCanvasDimensions();
+        const tempCanvas = renderExportCanvas();
+        if (!tempCanvas) return;
+        const { width, height } = tempCanvas;
         const mimeType = getMimeType(exportFormat);
         const q = getQuality(exportFormat, exportQuality);
 
         // PANORAMA SPLITTING LOGIC
         if (activeFormat.id === 'pano-2' || activeFormat.id === 'pano-3') {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            renderPipeline(tempCanvas, width, height, false, 'high');
-
             const slices = activeFormat.id === 'pano-2' ? 2 : 3;
             const sliceWidth = width / slices;
 
@@ -123,16 +128,11 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
         }
 
         // STANDARD EXPORT
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = width;
-        tempCanvas.height = height;
-        renderPipeline(tempCanvas, width, height, false, 'high');
-
         tempCanvas.toBlob((blob) => {
             downloadBlob(blob, `${exportName}.${exportFormat}`);
             setIsExportModalOpen(false);
         }, mimeType, q);
-    }, [canRenderOutput, canvasRef, getCanvasDimensions, renderPipeline, activeFormat, exportName, exportFormat, exportQuality]);
+    }, [canRenderOutput, canvasRef, renderExportCanvas, activeFormat, exportName, exportFormat, exportQuality]);
 
     return {
         exportName, setExportName,
@@ -142,5 +142,6 @@ export default function useExport({ images, canvasRef, getCanvasDimensions, rend
         estimatedSize,
         handleDownload,
         performExport,
+        renderExportCanvas,
     };
 }

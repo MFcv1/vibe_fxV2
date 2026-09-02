@@ -120,6 +120,27 @@ try {
     const platformModule = await importAppModule(
         p("src", "features", "vibeos", "library", "platform.js"), "platform",
     );
+    const heicModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "heicImport.js"), "heicImport",
+    );
+
+    /* ---------- 0. Reconnaissance HEIC ---------- */
+    console.log("HEIC");
+    check("HEIC est reconnu par extension, sans distinction de casse", () => {
+        assert.equal(heicModule.isHeicFile({ name: "IMG_6469.HEIC", type: "" }), true);
+        assert.equal(heicModule.isHeicFile({ name: "portrait.heifs", type: "" }), true);
+    });
+    check("HEIC est reconnu par MIME quand le nom est trompeur", () => {
+        assert.equal(heicModule.isHeicFile({ name: "photo", type: "image/heic" }), true);
+        assert.equal(heicModule.isHeicFile({ name: "photo.bin", type: "image/heif-sequence" }), true);
+    });
+    check("un format web ordinaire n'est pas converti", () => {
+        assert.equal(heicModule.isHeicFile({ name: "photo.jpeg", type: "image/jpeg" }), false);
+    });
+    check("le nom converti devient un vrai nom JPEG", () => {
+        assert.equal(heicModule.jpegNameFor("IMG_6469.HEIC"), "IMG_6469.jpg");
+        assert.equal(heicModule.jpegNameFor("portrait"), "portrait.jpg");
+    });
 
     /* ---------- 1. Lecture EXIF ---------- */
     console.log("EXIF");

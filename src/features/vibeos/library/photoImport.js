@@ -2,6 +2,7 @@
 
 import { createPhotoId } from './libraryDb';
 import { EMPTY_EXIF, readExif } from './exif';
+import { convertHeicToJpeg, isHeicFile } from './heicImport';
 
 /*
  * Entree de la bibliotheque: un fichier -> un enregistrement complet
@@ -24,7 +25,7 @@ import { EMPTY_EXIF, readExif } from './exif';
 export const PREVIEW_MAX = 1600;
 const THUMB_QUALITY = 0.86;
 
-export const ACCEPTED_TYPES = 'image/*,.heic,.heif';
+export const ACCEPTED_TYPES = 'image/*,.heic,.heif,.heics,.heifs';
 
 /* Decodage oriente: `from-image` applique la rotation EXIF, donc les photos
    prises a la verticale ne se retrouvent pas couchees dans la grille. */
@@ -107,9 +108,19 @@ export async function makePreview(blob, maxSide = PREVIEW_MAX) {
  * image decodable par ce navigateur (cas typique: HEIC hors Safari).
  */
 export async function buildPhotoRecord(file, { folderId = null } = {}) {
+    const sourceFile = file;
+    let portableFile = file;
+    if (isHeicFile(file)) {
+        try {
+            portableFile = await convertHeicToJpeg(file);
+        } catch {
+            return null;
+        }
+    }
+
     let bitmap = null;
     try {
-        bitmap = await decode(file);
+        bitmap = await decode(portableFile);
     } catch {
         return null;
     }
@@ -119,7 +130,9 @@ export async function buildPhotoRecord(file, { folderId = null } = {}) {
     if (!width || !height) return null;
 
     const [exif, thumbBlob] = await Promise.all([
-        readExif(file),
+        /* Le fichier source porte les metadonnees de prise de vue. Le JPEG
+           converti sert aux pixels, pas a remplacer cette source de verite. */
+        readExif(sourceFile),
         makeThumbnail(bitmap, width, height),
     ]);
     if (typeof bitmap.close === 'function') bitmap.close();
@@ -129,12 +142,12 @@ export async function buildPhotoRecord(file, { folderId = null } = {}) {
         id: createPhotoId(),
         /* Le selecteur de dossier renvoie un chemin relatif ("ete/img.jpg"):
            on garde le nom du fichier, le dossier est porte par `folderId`. */
-        name: (file.name || 'photo').split('/').pop(),
+        name: (portableFile.name || 'photo').split('/').pop(),
         folderId,
-        blob: file,
-        thumbBlob: thumbBlob || file,
-        bytes: file.size || 0,
-        type: file.type || '',
+        blob: portableFile,
+        thumbBlob: thumbBlob || portableFile,
+        bytes: portableFile.size || 0,
+        type: portableFile.type || '',
         width,
         height,
         ratio: width / height,
@@ -145,7 +158,7 @@ export async function buildPhotoRecord(file, { folderId = null } = {}) {
         addedAt: now,
         /* Date de prise de vue si l'EXIF la donne, sinon date du fichier: la
            frise chronologique reste juste meme sans metadonnees. */
-        takenAt: exif.takenAt || file.lastModified || now,
+        takenAt: exif.takenAt || sourceFile.lastModified || now,
         exif: exif || { ...EMPTY_EXIF },
         /* Rempli quand la photo revient de Vision avec un preset applique. */
         preset: null,
@@ -153,6 +166,13 @@ export async function buildPhotoRecord(file, { folderId = null } = {}) {
         /* Etat de sauvegarde dans le compte utilisateur. `local` tant que rien
            n'est parti; voir `libraryCloud.js`. */
         cloud: { state: 'local' },
+        /* Trace utile pour expliquer le nom .jpg sans conserver le HEIC, qui
+           serait inutilisable dans certains navigateurs. */
+        convertedFrom: isHeicFile(sourceFile) ? {
+            name: sourceFile.name || null,
+            type: sourceFile.type || 'image/heic',
+            bytes: sourceFile.size || 0,
+        } : null,
     };
 }
 

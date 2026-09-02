@@ -4,6 +4,31 @@
 > État d'avancement : voir [todo.md](todo.md).
 > Carte du projet : voir [map.md](map.md). Règles de travail : voir [AGENTS.md](AGENTS.md).
 
+> Lot Layout du 2026-09-01 : la preview Instagram reprend le composant iPhone
+> de `secondevienextjsSSR` sans nouvelle direction artistique. Le châssis et
+> l'écran conservent leurs mesures exactes ; le contenu vient du même rendu
+> pleine définition que l'export/publication. Portrait 4:5, carré 1:1, story
+> 9:16 et paysage 1,91:1 produisent un JPEG aux dimensions attendues. Pano x2
+> et x3 découpent le master en deux ou trois images 1080×1350 continues et le
+> carrousel se parcourt au clic, au swipe ou au trackpad. Travail local
+> uniquement, sans déploiement.
+
+> Correctif pipeline du 2026-09-01 : les réglages Vision sont maintenant des
+> réglages de la photo source et sont synchronisés sans délai avec le projet.
+> Layout affiche et compose les pixels traités, mais persiste toujours le Blob
+> brut. Sa composition mémorise la révision Vision déjà intégrée afin que
+> Studio et l'export ne posent pas le preset deux fois. Compatibilité conservée
+> pour les anciennes compositions sans marqueur. Travail local uniquement.
+
+> Correctif Bibliothèque du 2026-09-01 : les fichiers iPhone HEIC/HEIF sont
+> convertis localement en JPEG portable avant leur stockage IndexedDB et leur
+> sauvegarde Firebase. Le decodeur libheif est chargé uniquement au premier
+> HEIC ; les imports JPEG/PNG ne paient donc pas ce coût. Un vrai
+> `IMG_6469.HEIC` 5712×4284 a été importé dans Chromium, puis retrouvé comme
+> JPEG décodable avec son nom et sa taille source conservés. Déployé le
+> 2026-09-01 sur `vibefx-v2-web` par la révision
+> `vibefx-v2-web-build-2026-09-01-001`.
+
 > Correctif Storage/Safari du 2026-08-31 : le bucket Bibliothèque porte enfin
 > un CORS explicite pour App Hosting, les domaines Firebase et localhost. Le
 > rapatriement utilise le chemin Storage authentifié avant l'URL tokenisée. Si

@@ -72,7 +72,7 @@ export function importSources(platform) {
                 title: platform.gallery,
                 hint: 'Tes photos, telles que le téléphone les range',
                 icon: 'images',
-                input: { accept: 'image/*,.heic,.heif', multiple: true },
+                input: { accept: 'image/*,.heic,.heif,.heics,.heifs', multiple: true },
             },
             {
                 id: 'camera',
@@ -86,7 +86,7 @@ export function importSources(platform) {
                 title: platform.files,
                 hint: 'Téléchargements, iCloud, Drive…',
                 icon: 'folder',
-                input: { accept: 'image/*,.heic,.heif', multiple: true },
+                input: { accept: 'image/*,.heic,.heif,.heics,.heifs', multiple: true },
             },
         ];
     }
@@ -96,7 +96,7 @@ export function importSources(platform) {
             title: 'Choisir des photos',
             hint: `Depuis ${platform.files} : Téléchargements, Bureau, Images…`,
             icon: 'images',
-            input: { accept: 'image/*,.heic,.heif', multiple: true },
+            input: { accept: 'image/*,.heic,.heif,.heics,.heifs', multiple: true },
         },
         {
             id: 'directory',

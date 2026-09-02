@@ -4,7 +4,7 @@
  * Ce module ne contient RIEN de nouveau: c'est le code d'export vers la
  * publication qui vivait dans `VibeFxStudio.jsx`, sorti tel quel pour que
  * l'ancien studio et le nouveau bouton « Publier » de VibeOS produisent
- * exactement la meme charge utile (memes tranches panorama, meme PNG),
+ * exactement la meme charge utile (memes tranches panorama, meme JPEG),
  * sans duplication.
  */
 
@@ -18,8 +18,8 @@ export const buildSocialImages = async (exportCanvas, activeFormat) => {
     const slices = activeFormat?.id === 'pano-2' ? 2 : activeFormat?.id === 'pano-3' ? 3 : 1;
     if (slices <= 1) {
         return [{
-            url: exportCanvas.toDataURL('image/png'),
-            blob: await canvasToBlob(exportCanvas, 'image/png'),
+            url: exportCanvas.toDataURL('image/jpeg', 0.95),
+            blob: await canvasToBlob(exportCanvas, 'image/jpeg', 0.95),
             width: exportCanvas.width,
             height: exportCanvas.height,
             index: 0,
@@ -35,8 +35,8 @@ export const buildSocialImages = async (exportCanvas, activeFormat) => {
         const sliceCtx = sliceCanvas.getContext('2d');
         sliceCtx.drawImage(exportCanvas, index * sliceWidth, 0, sliceWidth, exportCanvas.height, 0, 0, sliceWidth, exportCanvas.height);
         slides.push({
-            url: sliceCanvas.toDataURL('image/png'),
-            blob: await canvasToBlob(sliceCanvas, 'image/png'),
+            url: sliceCanvas.toDataURL('image/jpeg', 0.95),
+            blob: await canvasToBlob(sliceCanvas, 'image/jpeg', 0.95),
             width: sliceCanvas.width,
             height: sliceCanvas.height,
             index,

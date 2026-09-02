@@ -539,7 +539,7 @@ export default function LibraryScreen() {
     /* ---------- Import ---------- */
     const handleFiles = useCallback(async (files, options = {}) => {
         const result = await importFiles(files, options);
-        const { added, skipped, message, folderId } = result;
+        const { added, skipped, skippedHeic, message, folderId } = result;
         if (result.blocked) {
             push(message, { tone: 'danger', duration: 6000 });
             return result;
@@ -550,11 +550,16 @@ export default function LibraryScreen() {
         if (message) {
             push(message, { tone: 'danger', duration: 6000 });
         } else if (added && skipped) {
-            push(`${added} photo(s) ajoutée(s), ${skipped} illisible(s) par ce navigateur.`, { tone: 'success' });
+            const detail = skippedHeic
+                ? `${skippedHeic} HEIC impossible${skippedHeic > 1 ? 's' : ''} à convertir`
+                : `${skipped} illisible${skipped > 1 ? 's' : ''}`;
+            push(`${added} photo(s) ajoutée(s), ${detail}.`, { tone: 'success' });
         } else if (added) {
             push(`${added} photo${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''}.`, { tone: 'success' });
         } else if (skipped) {
-            push(`${skipped} fichier(s) illisible(s) : essaie en JPEG ou PNG.`, { tone: 'danger' });
+            push(skippedHeic
+                ? `Impossible de convertir ${skippedHeic > 1 ? 'ces fichiers HEIC' : 'ce fichier HEIC'}. Vérifie que le fichier n’est pas endommagé.`
+                : `${skipped} fichier(s) illisible(s) : essaie en JPEG ou PNG.`, { tone: 'danger' });
         }
         return result;
     }, [importFiles, push, setActiveFolderId]);

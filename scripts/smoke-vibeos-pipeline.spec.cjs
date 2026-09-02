@@ -2,9 +2,10 @@
  * Smoke du PIPELINE VibeOS (phase F, plan §4.3).
  *
  * Ce que le test prouve, dans l'ordre du produit:
- *   1. la composition faite dans Mise en page circule jusqu'a Vision;
- *   2. le Studio recentre ouvre ses deux generateurs de fond;
- *   3. « Publier » rend le projet complet et ouvre le vrai composeur de
+ *   1. Vision modifie la photo source et Layout reprend ces pixels traites;
+ *   2. la composition marquee ne recoit pas le preset une seconde fois;
+ *   3. le Studio recentre ouvre ses deux generateurs de fond;
+ *   4. « Publier » rend le projet complet et ouvre le vrai composeur de
  *      publication avec le visuel dedans.
  *
  * Le meme parcours est rejoue en 390px de large: le pipeline n'a pas le droit
@@ -43,9 +44,10 @@ function getFixtures() {
 }
 
 async function bypassAuth(page) {
-  await page.getByRole("button", { name: /contourner.*authentification/i })
-    .click({ timeout: 30000 })
-    .catch(() => {});
+  const button = page.getByRole("button", { name: /contourner.*authentification/i });
+  if (await button.isVisible({ timeout: 30000 }).catch(() => false)) {
+    await button.click({ force: true });
+  }
 }
 
 /* Signature de ce qui est reellement affiche: moyenne par canal + contraste. */
@@ -99,43 +101,48 @@ async function composeInLayout(page, dir) {
   return canvas;
 }
 
-test("pipeline VibeOS: composition -> Vision -> generateurs Studio -> publication", async ({ page }) => {
+test("pipeline VibeOS: Vision -> Layout synchronise -> Studio -> publication", async ({ page }) => {
   test.setTimeout(240_000);
   const dir = getFixtures();
   test.skip(!dir, "ffmpeg-static indisponible: fixtures impossibles");
 
   await composeInLayout(page, dir);
+  const rawLayoutStats = await readCanvasStats(page);
 
-  /* ---------- Etage 2: Vision recoit la composition ---------- */
+  /* ---------- Vision travaille sur la photo source ---------- */
   await page.getByRole("link", { name: "Vision" }).first().click();
   await expect(page.getByTestId("vibeos-vision-screen")).toBeVisible({ timeout: 30000 });
   const visionSource = page.getByTestId("vibeos-vision-source");
-  await expect(visionSource).toHaveAttribute("data-source-kind", "composition", { timeout: 30000 });
-  await expect(visionSource).toContainText("composition");
+  await expect(visionSource).toHaveAttribute("data-source-kind", "photo", { timeout: 30000 });
+  await expect(visionSource).toContainText("photo");
 
   const visionCanvas = page.locator("canvas").first();
   await expect.poll(async () => visionCanvas.evaluate((node) => node.width), { timeout: 20000 })
     .toBeGreaterThan(0);
-  const compositionStats = await readCanvasStats(page);
+  const photoStats = await readCanvasStats(page);
 
-  /* La composition est bien un visuel compose (format social), pas la photo
-     source 640x800. */
-  expect(compositionStats.width / compositionStats.height).toBeCloseTo(1080 / 1350, 2);
-
-  // Un preset franc, pour que l'etage Vision soit mesurable plus loin.
+  // Un preset franc, pour que la synchronisation soit mesurable plus loin.
   const presets = page.getByTestId("vibeos-vision-presets");
   await presets.locator("button").first().click();
   await expect(page.getByTestId("vibeos-vision-message")).toBeVisible();
-  await expect.poll(async () => distance(await readCanvasStats(page), compositionStats), { timeout: 20000 })
+  await expect.poll(async () => distance(await readCanvasStats(page), photoStats), { timeout: 20000 })
     .toBeGreaterThan(2);
-  /* Laisse la sauvegarde debouncee ecrire les filtres Vision dans le projet. */
+
+  /* ---------- Layout reprend le rendu Vision, pas le Blob brut ---------- */
+  await page.getByRole("link", { name: "Layout" }).first().click();
+  await expect(page.getByTestId("vibeos-layout-screen")).toBeVisible({ timeout: 30000 });
+  await expect.poll(async () => distance(await readCanvasStats(page), rawLayoutStats), { timeout: 30000 })
+    .toBeGreaterThan(2);
+  const syncedLayoutStats = await readCanvasStats(page);
   await page.waitForTimeout(2500);
 
-  /* ---------- Etage 3: le Studio porte les generateurs de fond ---------- */
+  /* ---------- Studio recoit la composition deja traitee une seule fois ---------- */
   await page.getByRole("link", { name: "Studio" }).first().click();
   await expect(page.getByTestId("vibeos-studio-screen")).toBeVisible({ timeout: 30000 });
   await expect(page.getByTestId("vibeos-studio-module-gradient")).toBeVisible();
   await expect(page.getByTestId("vibeos-studio-module-lumen")).toBeVisible();
+  await expect.poll(async () => distance(await readCanvasStats(page), syncedLayoutStats), { timeout: 30000 })
+    .toBeLessThan(3);
 
   /* ---------- Etage 4: publication ---------- */
   await page.getByTestId("vibeos-publish").click();
@@ -156,14 +163,19 @@ test("pipeline VibeOS: la composition circule aussi sur mobile", async ({ page }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await composeInLayout(page, dir);
+  const rawLayoutStats = await readCanvasStats(page);
 
   /* Sur mobile la navigation passe par la tab bar basse. */
   await page.getByRole("link", { name: "Vision" }).last().click();
   await expect(page.getByTestId("vibeos-vision-screen")).toBeVisible({ timeout: 30000 });
   await expect(page.getByTestId("vibeos-vision-source"))
-    .toHaveAttribute("data-source-kind", "composition", { timeout: 30000 });
+    .toHaveAttribute("data-source-kind", "photo", { timeout: 30000 });
 
   await page.getByTestId("vibeos-vision-presets").locator("button").first().click();
+  await page.getByRole("link", { name: "Layout" }).last().click();
+  await expect(page.getByTestId("vibeos-layout-screen")).toBeVisible({ timeout: 30000 });
+  await expect.poll(async () => distance(await readCanvasStats(page), rawLayoutStats), { timeout: 30000 })
+    .toBeGreaterThan(2);
   await page.waitForTimeout(2500);
 
   await page.getByRole("link", { name: "Studio" }).last().click();

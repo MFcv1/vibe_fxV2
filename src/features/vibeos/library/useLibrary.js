@@ -5,6 +5,7 @@ import {
     createFolderId, deleteFolderDeep, deletePhoto, listFolders, listPhotos, putFolder, putPhoto,
 } from './libraryDb';
 import { buildPhotoRecord, deviceLabel, makePreview, PREVIEW_MAX } from './photoImport';
+import { isHeicFile } from './heicImport';
 import { sanitizeFolderName, suggestFolderName, uniqueFolderName } from './folderNaming';
 import { checkImport, quotaState } from './libraryQuota';
 
@@ -161,7 +162,7 @@ export default function useLibrary() {
      */
     const importFiles = useCallback(async (fileList, options = {}) => {
         const files = Array.from(fileList || []).filter((file) => (
-            file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name)
+            file.type.startsWith('image/') || isHeicFile(file)
         ));
         if (!files.length) return { added: 0, skipped: 0, folderId: null, message: '' };
 
@@ -185,6 +186,7 @@ export default function useLibrary() {
         setImportState({ done: 0, total: kept.length, folderName });
         let added = 0;
         let skipped = 0;
+        let skippedHeic = 0;
         let cover = null;
 
         for (let index = 0; index < kept.length; index += 1) {
@@ -198,6 +200,7 @@ export default function useLibrary() {
                 }
             } else {
                 skipped += 1;
+                if (isHeicFile(kept[index])) skippedHeic += 1;
             }
             if (mountedRef.current) {
                 setImportState({ done: index + 1, total: kept.length, folderName });
@@ -218,7 +221,9 @@ export default function useLibrary() {
             setImportState(null);
         }
 
-        return { added, skipped, folderId, message: gate.message, rejected: gate.rejected };
+        return {
+            added, skipped, skippedHeic, folderId, message: gate.message, rejected: gate.rejected,
+        };
     }, [photos.length, usedBytes, folders, takenNames, createFolder]);
 
     const removePhoto = useCallback(async (id) => {

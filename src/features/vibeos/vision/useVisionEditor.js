@@ -8,7 +8,7 @@ import { measureVisionImageData } from '../../vibefx-studio/utils/visionMetrics'
 import { getImageRecommendationSignals } from '../../vibefx-studio/utils/visionRecommendation';
 import { VISION_PRESETS } from '../../vibefx-studio/utils/visionPresets';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
-import { loadImageFromBlob, resolveProjectSource } from '../project/pipeline';
+import { loadImageFromBlob, resolveProjectPhotoSource } from '../project/pipeline';
 import { srcToBlob } from '../layout/layoutPersistence';
 import { getPhoto as getLibraryPhoto, putPhoto as putLibraryPhoto } from '../library/libraryDb';
 import {
@@ -151,6 +151,7 @@ export default function useVisionEditor() {
     const previewControllerRef = useRef(null);
     const pendingPreviewRequestsRef = useRef(new Map());
     const [isLoadingImage, setIsLoadingImage] = useState(false);
+    const [isProjectHydrated, setIsProjectHydrated] = useState(false);
     /*
      * Vrai pendant qu'un curseur est tenu. Le rendu passe alors en resolution
      * reduite et en qualite 'low' (voir `useCanvasRenderer`): c'est ce qui rend
@@ -232,9 +233,9 @@ export default function useVisionEditor() {
         Promise.resolve().then(async () => {
             setIsLoadingImage(true);
             try {
-                /* Entree du pipeline: la composition du Layout si elle existe,
-                   sinon la photo du projet (plan §4.3). */
-                const { image: loaded, kind } = await resolveProjectSource(project);
+                /* Vision modifie la photo source. La composition est le resultat
+                   de Layout et ne doit pas recevoir le preset sur ses textes. */
+                const { image: loaded, kind } = await resolveProjectPhotoSource(project);
                 if (loaded) {
                     setImage(loaded);
                     setSourceKind(kind);
@@ -245,6 +246,7 @@ export default function useVisionEditor() {
                 if (storedVision.presetId) setActivePresetId(storedVision.presetId);
             } finally {
                 hydrationRef.current = 'done';
+                setIsProjectHydrated(true);
                 setIsLoadingImage(false);
             }
         });
@@ -295,7 +297,18 @@ export default function useVisionEditor() {
         /* Sans ca, les vignettes resteraient celles de la photo qu'on vient de
            retirer. */
         setPreviews({});
-        updateProject({ composition: null, images: [], slots: {}, thumbnail: null });
+        updateProject({
+            composition: null,
+            images: [],
+            slots: {},
+            thumbnail: null,
+            vision: {
+                presetId: null,
+                intensity: 80,
+                filters: { ...DEFAULT_FILTERS },
+                updatedAt: Date.now(),
+            },
+        });
     }, [updateProject]);
 
     /*
@@ -634,6 +647,29 @@ export default function useVisionEditor() {
         [activePresetId],
     );
 
+    /* Synchronisation immediate entre les onglets. Le provider garde le projet
+       en memoire pendant la navigation; il ne faut donc pas attendre le second
+       debounce IndexedDB pour que Layout voie le dernier clic de Vision. */
+    useEffect(() => {
+        if (!project || !image || !isProjectHydrated) return;
+        const stored = project.vision || {};
+        const samePreset = (stored.presetId || null) === (activePresetId || null);
+        const sameIntensity = (stored.intensity ?? 80) === intensity;
+        const sameFilters = JSON.stringify(stored.filters || null) === JSON.stringify(filters || null);
+        if (samePreset && sameIntensity && sameFilters) return;
+        updateProject({
+            vision: {
+                presetId: activePresetId,
+                intensity,
+                filters,
+                updatedAt: Date.now(),
+            },
+        });
+        /* `project` et `updateProject` sont omis : l'effet repond aux reglages,
+           pas a l'ecriture du store qu'il vient lui-meme de provoquer. */
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters, intensity, activePresetId, image, isProjectHydrated]);
+
     /* ---- Sauvegarde dans le projet commun ---- */
     const persistTimer = useRef(null);
     const blobCacheRef = useRef(new Map());
@@ -643,13 +679,7 @@ export default function useVisionEditor() {
         persistTimer.current = setTimeout(async () => {
             persistTimer.current = null;
             try {
-                const patch = {
-                    vision: {
-                        presetId: activePresetId,
-                        intensity,
-                        filters,
-                    },
-                };
+                const patch = {};
                 /* Photo importee directement depuis Vision: elle rejoint le
                    projet (Blob), pour que Layout et l'accueil la retrouvent.
                    Une composition, elle, appartient au Layout: on ne la
@@ -660,7 +690,7 @@ export default function useVisionEditor() {
                         patch.images = [{ id: `vision-${Date.now()}`, name: image.name || '', slotId: null, blob }];
                     }
                 }
-                updateProject(patch);
+                if (Object.keys(patch).length) updateProject(patch);
 
                 /* La photo vient de la bibliotheque (identifiant `ph-...`): on y
                    reporte le preset applique, pour pouvoir ensuite filtrer la

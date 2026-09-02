@@ -28,6 +28,35 @@ assert.equal(draft.layoutDraft.source, "vibefx");
 assert.equal(draft.layoutDraft.textLayers[0].x, 50);
 assert.equal(draft.socialImages.length, 1);
 
+const landscapeDraft = normalizeVibeFxDraft({
+  dataUrl: "data:image/jpeg;base64,landscape",
+  blob: sampleBlob,
+  width: 1080,
+  height: 566,
+  format: { id: "insta-land", w: 1080, h: 566, ratio: 1.91 },
+  template: { id: "standard" },
+});
+assert.equal(landscapeDraft.format.id, "landscape");
+assert.equal(landscapeDraft.format.width, 1080);
+assert.equal(landscapeDraft.format.height, 566);
+assert.equal(landscapeDraft.format.publishKind, "feed");
+
+const panoDraft = normalizeVibeFxDraft({
+  dataUrl: "data:image/jpeg;base64,pano",
+  blob: sampleBlob,
+  width: 2160,
+  height: 1350,
+  format: { id: "pano-2", w: 2160, h: 1350, ratio: 8 / 5 },
+  template: { id: "standard" },
+  socialImages: [
+    { url: "data:image/jpeg;base64,left", blob: sampleBlob, width: 1080, height: 1350, index: 0 },
+    { url: "data:image/jpeg;base64,right", blob: sampleBlob, width: 1080, height: 1350, index: 1 },
+  ],
+});
+assert.equal(panoDraft.format.id, "pano2");
+assert.equal(panoDraft.format.slices, 2);
+assert.deepEqual(panoDraft.socialImages.map(({ width, height }) => [width, height]), [[1080, 1350], [1080, 1350]]);
+
 const checker = buildChecker({
   caption: "Nouvelle publication #social #instagram #facebook",
   format: draft.format,
@@ -38,6 +67,14 @@ const checker = buildChecker({
 assert.equal(checker.issues.length, 0);
 assert.equal(checker.hashtags, 3);
 assert.ok(checker.score > 0);
+
+const invalidStory = buildChecker({
+  caption: "#test #story #format",
+  format: { publishKind: "story", width: 1080, height: 1350, ratio: 4 / 5 },
+  exportSize: 100_000,
+  textLayers: [],
+});
+assert.match(invalidStory.issues.join(" "), /1080 x 1920/);
 
 const uploadedPaths = [];
 const fakeStorage = {};

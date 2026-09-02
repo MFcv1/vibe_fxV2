@@ -12,7 +12,9 @@ import {
     scoreProfileForImage,
 } from '../../vibefx-studio/utils/visionRecommendation';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
-import { applyVisionStage, canvasToImage, resolveProjectSource } from '../project/pipeline';
+import {
+    applyVisionStage, canvasToImage, compositionIncludesCurrentVision, resolveProjectSource,
+} from '../project/pipeline';
 import { srcToBlob } from '../layout/layoutPersistence';
 import { AMBIANCES, AMBIANCE_BY_ID, JITTERABLE_KEYS } from './ambianceCatalog';
 import { deleteCustomStyle, loadCustomStyles, saveCustomStyle } from './customStyles';
@@ -220,11 +222,12 @@ export default function useStudioEditor() {
                  */
                 const { image: loaded, kind } = await resolveProjectSource(project);
                 if (loaded) {
-                    const visionCanvas = applyVisionStage(loaded, project);
+                    const alreadyBaked = kind === 'composition' && compositionIncludesCurrentVision(project);
+                    const visionCanvas = alreadyBaked ? null : applyVisionStage(loaded, project);
                     const chained = visionCanvas ? await canvasToImage(visionCanvas, loaded.name) : null;
                     setImage(chained || loaded);
                     setSourceKind(kind);
-                    setVisionApplied(Boolean(chained));
+                    setVisionApplied(Boolean(chained) || alreadyBaked);
                 }
                 const stored = project.studio || {};
                 if (stored.filters) setFilters(stored.filters);

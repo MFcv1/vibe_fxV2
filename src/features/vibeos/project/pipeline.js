@@ -5,13 +5,16 @@
  *
  * ORDRE FIXE, une seule source de verite pour tout le produit :
  *
- *      composition Layout  ->  filtres Vision  ->  effets Studio  ->  export
+ *      photo  ->  filtres Vision  ->  composition Layout  ->  effets Studio  ->  export
  *
- * - La **composition** est produite par l'ecran Layout (moteurs
+ * - Vision garde la photo brute comme source et ne cuit jamais ses reglages
+ *   dans le Blob utilisateur.
+ * - La **composition** est produite par l'ecran Layout avec les pixels Vision
+ *   (moteurs
  *   `vibefx-studio/engine/layoutRenderer` via `useCanvasRenderer`), puis publiee
  *   dans le projet commun sous forme de Blob PNG pleine resolution
- *   (`project.composition`). C'est elle qui circule : Vision et Studio ne
- *   travaillent plus sur la photo brute quand une composition existe.
+ *   (`project.composition`). Studio la recoit sans reposer Vision une seconde
+ *   fois. Les anciennes compositions sans marqueur gardent l'ancien chainage.
  * - Les etages **Vision** et **Studio** appliquent leurs filtres avec le moteur
  *   existant `renderStudio` - exactement celui qu'utilisent les deux ecrans a
  *   l'aperçu. Aucun rendu n'est reecrit ici : ce module ne fait qu'enchainer.
@@ -134,6 +137,38 @@ export async function resolveProjectSource(project) {
     return { image: null, kind: null };
 }
 
+/* Vision est maintenant un reglage de PHOTO: cet acces ignore volontairement
+   la composition Layout. Il permet de revenir dans Vision sans retraiter le
+   texte, les stickers et les marges deja composes. */
+export async function resolveProjectPhotoSource(project) {
+    const record = (project?.images || [])[0];
+    if (!record?.blob) return { image: null, kind: null };
+    const image = await loadImageFromBlob(record.blob, record.name);
+    return { image, kind: image ? 'photo' : null };
+}
+
+/* Identite du rendu Vision. Les projets anciens n'ont pas `updatedAt` : leur
+   signature reste tout de meme deterministe a partir des reglages stockes. */
+export function visionRevision(vision = {}) {
+    if (vision.updatedAt) return `vision-${vision.updatedAt}`;
+    return JSON.stringify({
+        presetId: vision.presetId || null,
+        intensity: typeof vision.intensity === 'number' ? vision.intensity : 80,
+        filters: vision.filters || null,
+    });
+}
+
+export function compositionIncludesCurrentVision(project) {
+    return Boolean(
+        project?.composition?.visionRevision
+        && project.composition.visionRevision === visionRevision(project.vision),
+    );
+}
+
+export function shouldApplyVisionToSource(project, sourceKind) {
+    return sourceKind !== 'composition' || !compositionIncludesCurrentVision(project);
+}
+
 /* Etage Vision applique a une source deja resolue. Rend `null` si l'etage est
    neutre: l'appelant garde alors sa source telle quelle. */
 export function applyVisionStage(sourceImage, project) {
@@ -171,7 +206,8 @@ export function applyStudioStage(sourceImage, project) {
 }
 
 /*
- * Le rendu final du projet : composition -> Vision -> Studio.
+ * Le rendu final du projet : composition deja traitee -> Studio. Pour un ancien
+ * projet ou une photo sans composition, Vision est encore applique ici.
  * C'est ce que telecharge « Exporter » depuis l'accueil et ce que publie le
  * bouton « Publier » du bandeau.
  */
@@ -182,7 +218,9 @@ export async function renderProjectFinalCanvas(project) {
     const stages = [kind === 'composition' ? 'composition' : 'photo'];
 
     let current = image;
-    const visionCanvas = applyVisionStage(current, project);
+    const visionCanvas = shouldApplyVisionToSource(project, kind)
+        ? applyVisionStage(current, project)
+        : null;
     if (visionCanvas) {
         current = visionCanvas;
         stages.push('vision');

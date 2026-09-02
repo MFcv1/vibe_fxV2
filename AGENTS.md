@@ -5,12 +5,13 @@
 Tout agent IA doit lire ces fichiers dans cet ordre avant de modifier le projet :
 
 1. `AGENTS.md` - regles de travail, contraintes et liens vers les docs.
-2. `plan.md` - plan de la reconstruction VibeCut en cours : diagnostic, architecture, direction artistique detaillee, phases et rituel de fin de phase.
-3. `todo.md` - etat d'avancement de cette reconstruction, bugs connus et prompt de relance.
-4. `map.md` - carte vivante du projet, a tenir a jour.
-5. `seo.md` - strategie SEO Google, gates de validation et sources officielles.
-6. `MEGAPROMPT.md` - prompt maitre de conception pour lancer la vraie construction.
-7. Les skills utiles dans `.agents/skills/`, surtout `cyber-neon`, `dark-ui`, `technical-ui` et `motion`.
+2. `docs/developpement-local-et-couts.md` - boucle locale obligatoire, autorisation de deploiement, perimetres cloud et hygiene des ressources payantes.
+3. `plan.md` - plan de la reconstruction VibeCut en cours : diagnostic, architecture, direction artistique detaillee, phases et rituel de fin de phase.
+4. `todo.md` - etat d'avancement de cette reconstruction, bugs connus et prompt de relance.
+5. `map.md` - carte vivante du projet, a tenir a jour.
+6. `seo.md` - strategie SEO Google, gates de validation et sources officielles.
+7. `MEGAPROMPT.md` - prompt maitre de conception pour lancer la vraie construction.
+8. Les skills utiles dans `.agents/skills/`, surtout `cyber-neon`, `dark-ui`, `technical-ui` et `motion`.
 
 ## Intention produit
 
@@ -117,6 +118,13 @@ cout : chaque ligne inutile est relue a chaque session, par chaque agent.
 ## Discipline de deploiement et couts
 
 Les deploiements Firebase App Hosting, Cloud Run et Functions peuvent declencher Cloud Build, Artifact Registry et des couts de build/deploiement. Les agents doivent donc eviter les rollouts excessifs.
+
+Le protocole obligatoire et sa matrice de decision sont dans
+[`docs/developpement-local-et-couts.md`](docs/developpement-local-et-couts.md).
+Une demande comme « deploie regulierement en staging » autorise un deploiement
+par lot coherent termine, pas un rollout apres chaque correction. Tout nouveau
+deploiement dans le meme lot doit avoir une raison explicite que le local ne
+permet pas de verifier.
 
 - Developper et verifier en local d'abord : `npm run dev`, tests smoke, lint et build local.
 - Ne deployer que lorsqu'un lot coherent de changements est pret ou quand l'utilisateur demande explicitement une mise en hosting.

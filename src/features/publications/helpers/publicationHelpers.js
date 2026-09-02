@@ -4,6 +4,7 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 export const SOCIAL_FORMATS = [
   { id: "portrait", label: "Portrait", hint: "Post 4:5", width: 1080, height: 1350, ratio: 4 / 5, publishKind: "feed", icon: "Smartphone" },
   { id: "square", label: "Carre", hint: "Post 1:1", width: 1080, height: 1080, ratio: 1, publishKind: "feed", icon: "Square" },
+  { id: "landscape", label: "Paysage", hint: "Post 1,91:1", width: 1080, height: 566, ratio: 1.91, publishKind: "feed", icon: "RectangleHorizontal" },
   { id: "story-reel", label: "Story / Reel", hint: "9:16", width: 1080, height: 1920, ratio: 9 / 16, publishKind: "story", supportsReel: true, icon: "PanelTop" },
   { id: "pano2", label: "Pano x2", hint: "2 slides 4:5", width: 2160, height: 1350, ratio: 8 / 5, publishKind: "carousel", slices: 2, icon: "Columns2" },
   { id: "pano3", label: "Pano x3", hint: "3 slides 4:5", width: 3240, height: 1350, ratio: 12 / 5, publishKind: "carousel", slices: 3, icon: "Columns3" },
@@ -62,8 +63,8 @@ export function buildChecker({ caption, format, exportSize, textLayers }) {
   const issues = [];
   const warnings = [];
 
-  if (format.publishKind === "feed" && format.ratio < 4 / 5) issues.push("Le format feed doit rester entre 4:5 et 1.91:1.");
-  if (format.publishKind === "story" && format.width !== 1080 && format.height !== 1920) issues.push("La story doit etre en 1080 x 1920.");
+  if (format.publishKind === "feed" && (format.ratio < 4 / 5 || format.ratio > 1.91)) issues.push("Le format feed doit rester entre 4:5 et 1.91:1.");
+  if (format.publishKind === "story" && (format.width !== 1080 || format.height !== 1920)) issues.push("La story doit etre en 1080 x 1920.");
   if (format.publishKind === "reel") warnings.push("Le visuel est exporte en 9:16, mais l'API Reels demande une video. Pour l'instant, publie-le comme Story ou transforme-le en MP4.");
   if (caption.length > MAX_CAPTION_LENGTH) issues.push("La description depasse 2200 caracteres.");
   if (hashtags > MAX_HASHTAGS) issues.push("Instagram limite les hashtags a 30.");
@@ -187,6 +188,7 @@ export function normalizeVibeFxDraft(payload) {
   const formatMap = {
     "insta-port": "portrait",
     "insta-sq": "square",
+    "insta-land": "landscape",
     story: "story-reel",
     "pano-2": "pano2",
     "pano-3": "pano3",
