@@ -1,6 +1,6 @@
 # map.md - Carte vivante Vibe_fx V2
 
-Derniere mise a jour : 2026-08-31
+Derniere mise a jour : 2026-09-01
 
 ## Regle
 
@@ -42,6 +42,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |       |-- utilitarian/
 |       `-- vibrant-accents/
 |-- docs/
+|   |-- developpement-local-et-couts.md # Protocole obligatoire : boucle locale, autorisation et perimetre des deploys, branches live/staging, inventaire des ressources payantes
 |   |-- lightroom/                     # TOUT l'import de presets Lightroom. `README.md` = point d'entree ; `1-procedure.md` = la marche a suivre clic par clic plus une check-list ; `2-methode-et-pieges.md` = pourquoi la Hald CLUT marche et ses pieges mesures ; `3-cn11-cn17-mesures.md` = mesures de CN11/CN17/powlisher et licence Adobe ; `4-synchro-effets.md` = protocole des effets hors LUT ; `5-audit-fiabilite-2026-08-19.md` = fiabilite reglage par reglage ; `audit-cinema-2026-08-30.md` = CN01-CN10 ; `audit-cinema-II-2026-08-30.md` = CN11-CN18 et diagnostic du grain CN14/CN17 ; `audit-saisons-2026-08-30.md` = SP/SM/TM/WN et comparaisons telephone/reflex
 |   |-- prompt-reprise-2026-08-31-vision-sans-vibemask.md # Etat de reprise apres retrait de la segmentation intelligente, avec invariants Vision et gates
 |   |-- prompt-reprise-2026-08-19.md      # Prompt de reprise pour un chat neuf, apres l'audit de fiabilite du 2026-08-19 : etat du livre, gates, mission (clarte negative, avertissement a l'import, puis les nouveaux imports), interdits
@@ -396,11 +397,20 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier. Un aperçu cassé est relancé avec URL versionnée (cache Safari), puis retente l'original avant démontage : jamais d'icône « ? »
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
-|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
+|   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), grilles editoriales (applyGridPreset/transformGrid + recompilation au changement de format, sauf grille retouchee a la main), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
 |   |   |   |-- layoutPersistence.js    # Traduction etat editeur <-> projet VibeOS : images/textures/Lumen en **Blobs** (jamais des dataURL), zones custom, slots, textes, stickers, fond ; restauration en elements Image
-|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran, undo/redo, comparer, apercu Insta) + panneau 4 blocs (Format, Modele, Images, Habillage avec fond Couleur/Flou/Genere + Flou pro) + reglages avances (textes, stickers, zones custom, textures, zone selectionnee, geometrie) + sheet d'export
+|   |   |   |-- LayoutScreen.jsx        # Apercu canvas (drag & drop, plein ecran, undo/redo, comparer, apercu Insta construit depuis le rendu d'export pleine definition) + panneau 4 blocs (Format, Modele, Images, Habillage avec fond Couleur/Flou/Genere + Flou pro) + reglages avances (textes, stickers, zones custom, textures, zone selectionnee, geometrie) + sheet d'export
+|   |   |   |-- gridLibrary.js          # Bibliotheque de 24 grilles editoriales : grammaire rangees/colonnes compilee en zones normalisees, deux variantes par grille (portrait 4:5 / carre 1:1) de meme longueur, vides assumes (`void`), miroirs et rotation des photos
+|   |   |   |-- gridCatalog.js          # Liste unique partagee par le panneau et la bibliotheque : 24 grilles compilees + les 3 grilles historiques rangees en famille "Classiques", avec le compte par famille
+|   |   |   |-- GridCategoryMenu.jsx    # Selecteur de famille dans le panneau : le panneau affiche TOUTE la famille choisie, sans ouvrir la bibliotheque
+|   |   |   |-- SlotOverlay.jsx         # Couche posee sur l'apercu, une boite par case : « Importer » au survol d'une case vide ; sur une case pleine, poignee d'echange (haut gauche), corbeille rouge (haut droite) et barre de cadrage (bas) ; case selectionnee = deplacement de la photo a la souris + zoom a la molette. Les commandes s'adaptent a la taille de la case
+|   |   |   |-- SlotImportSheet.jsx     # « Ajouter des photos » : fichier de l'appareil ou photo de la bibliotheque VibeOS (lecture directe d'IndexedDB + rapatriement d'une photo qui n'existe que dans le compte). Deux modes : vers UNE case (elle se referme apres le choix) ou import general (elle reste ouverte pour en prendre plusieurs)
+|   |   |   |-- GridLibrarySheet.jsx    # Navigateur des grilles (6 familles + recherche) ; chaque carte montre la meme grille en 4:5 ET en 1:1, le format actif encadre. Les 3 grilles historiques y entrent comme grilles figees
 |   |   |   |-- ZoneOverlay.jsx         # Editeur de zones du modele personnalise pose sur l'apercu : deplacement, poignee de redimension, suppression (geometrie d'interface uniquement, le rendu reste au moteur)
-|   |   |   |-- InstaPreviewSheet.jsx   # Apercu Instagram du visuel exporte : post, story, carrousel panorama (maquette CSS Modules, aucune donnee reelle)
+|   |   |   |-- InstaPreviewSheet.jsx   # Relie les sorties JPEG exactes de Layout au téléphone Instagram (post, story, panorama)
+|   |   |   |-- PublicationPhoneShell.jsx # Copie adaptee du châssis iPhone Second Vie : scène 430×910, écran 402×874, mise à l'échelle sans fausser les proportions
+|   |   |   |-- InstagramPublicationPreview.jsx # Copie adaptee du feed Instagram Second Vie, alimentée par les rendus Layout ; carrousel clic/swipe/trackpad + story 9:16 ; hauteur du média calée sur le VRAI ratio du post (borné 4:5 ↔ 1,91:1 comme Instagram)
+|   |   |   |-- instagramPhone.module.css # Traduction CSS pixel pour pixel des classes Tailwind du téléphone source
 |   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
 |   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
 |   |   |   `-- layout.module.css
@@ -408,7 +418,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- index.jsx               # Button, IconButton, Segmented, Card, Badge, Spinner, Progress, EmptyState, Collapsible, Slider (double-clic reset), TileGrid/Tile, Sheet (lateral desktop / bottom sheet mobile), SearchField, ToastProvider/useToast
 |   |   |   `-- primitives.module.css
 |   |   |-- project/                    # Le projet commun ET le pipeline de rendu (plan §4.3)
-|   |   |   |-- pipeline.js             # PHASE F : l'ordre composition Layout -> filtres Vision -> effets Studio -> export, ecrit une fois pour tout le produit. Chaque etage passe par `renderStudio` (le moteur des ecrans), un etage neutre est saute, et `resolveProjectSource` donne l'entree (composition si le Layout en a publie une, sinon la photo)
+|   |   |   |-- pipeline.js             # Pipeline photo -> Vision -> Layout -> Studio -> export. Une composition marquee avec sa `visionRevision` saute la seconde application de Vision ; les anciens projets gardent le chainage historique
 |   |   |   |-- publishProject.js       # Projet -> charge utile de publication : rendu final + `buildSocialImages` (tranches panorama), au format exact qu'attend `normalizeVibeFxDraft`
 |   |   |   |-- publishHandoff.js       # Relais du bouton « Publier » vers /publier (singleton de module : des Blobs, donc pas de sessionStorage ; survit a une navigation client, pas a un rechargement)
 |   |   |   |-- PipelineSourceNote.jsx  # La ligne « sur quoi tu travailles » affichee par Vision et Studio (composition / photo du projet / import), + le rappel « ton reglage Vision est deja applique »
@@ -585,12 +595,16 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-vibecut-media-safety.spec.cjs # Smoke Playwright Phase 0 : les WebM a metadata instable ne crashent plus la timeline et les outils preview-only restent desactives
 |   |-- smoke-vibeos-layout-b1.spec.cjs # Smoke Playwright Layout VibeOS : import, canvas, formats, modeles, template thematique, export
 |   |-- smoke-vibeos-layout-b3.spec.cjs # Smoke Playwright Layout VibeOS : textures, zones custom, stickers, comparaison, apercu Insta, reprise du projet
+|   |-- smoke-vibeos-layout-instagram-preview.spec.cjs # Six formats Instagram : dimensions JPEG, vrai châssis iPhone et navigation des 2/3 tranches panorama
+|   |-- smoke-vibeos-layout-grids.mjs   # Geometrie des 24 grilles editoriales : pas de chevauchement, rien hors cadre, taille minimale du moteur, memes zones en 4:5 et en 1:1, miroirs et rotation
+|   |-- smoke-vibeos-layout-grids.spec.cjs # Parcours reel : bibliotheque de grilles, application, recomposition 4:5 -> 1:1, miroir, hauteur du media dans l'iPhone
+|   |-- smoke-vibeos-layout-slots.spec.cjs # Cases : une photo importee ne remplit qu'UNE case, import cible depuis une case vide, echange de deux cases au glisser-deposer, remplissage de la case restee vide
 |   |-- smoke-vibeos-vision.spec.cjs   # Smoke Playwright Vision VibeOS : analyse, « Ameliorer ma photo », intensite, 12 looks surs sur 5 photos types
 |   |-- vision-preview-performance.spec.cjs # Banc Playwright reproductible : première/dernière carte visible, scroll, petite collection, photo/intensité/cache, doublons, thread principal et fidélité CN01/CN14/BW01
 |   |-- smoke-reglages-avances.spec.cjs # LE MEME AUDIT, MAIS PAR L'INTERFACE: saisit les vrais curseurs de /creer/vision et /creer/studio et relit le canvas de la page. Ce que le banc d'essai ne peut pas voir: une borne d'interface plus large que celle du moteur, un onChange qui ecrit la mauvaise cle, un rendu qui ne se redeclenche pas. C'est lui qui a trouve que la moitie de la course des curseurs de Studio ne faisait rien. Designe les curseurs par LEUR LABEL, jamais par leur rang: le panneau Vision remonte en tete ce qui n'est plus au repos, donc bouger un curseur DEPLACE les suivants
 |   |-- smoke-vibeos-studio.spec.cjs   # Smoke Playwright Studio VibeOS : ambiances rendues sur la vraie image, intensite, « Surprends-moi », variantes, avances, 10 ambiances distinctes
 |   |-- smoke-vibeos-soundtrack.spec.cjs # Smoke Playwright Soundtrack VibeOS : import, lecture qui survit au changement de page, recherche, mobile
-|   |-- smoke-vibeos-pipeline.spec.cjs # PHASE F : le pipeline bout en bout, pixels mesures a chaque etage (composition -> Vision -> Studio) puis publication, desktop et mobile
+|   |-- smoke-vibeos-pipeline.spec.cjs # Pipeline bout en bout : Vision modifie la photo, Layout reprend les pixels traites, Studio ne les traite pas deux fois, puis publication ; desktop et mobile
 |   |-- smoke-vibecut-ui-v2.spec.cjs   # Smoke Playwright nouveau front : accueil, isolation CSS, regle typographique, cycle projet, noindex des six routes
 |   |-- smoke-vibecut-quick-v2.spec.cjs # Smoke Playwright montage rapide : import reel, storyboard, duree, mouvement, transition, texte, musique, export
 |   |-- smoke-vibecut-style-recipes.mjs # Smoke pur du moteur de recettes phase 3 : generation sur 5 jeux de scenes x 4 styles x 3 rythmes, et parite mouvements/transitions moteur <-> SERVER_RENDER_CAPABILITIES
@@ -630,6 +644,163 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-01 (la bibliotheque VibeOS entre dans Layout)
+
+- Layout n'offrait que l'import de fichiers, alors que Vision propose aussi la
+  bibliotheque. Deux entrees desormais, au meme rang: l'ecran vide propose
+  « Importer des images » et « Depuis ma bibliotheque », et le bouton
+  « Ajouter » du bloc Images ouvre le meme choix.
+- `SlotImportSheet` sert les deux cas: vers une case precise (elle se referme
+  apres le choix) ou en import general (elle reste ouverte pour en prendre
+  plusieurs d'affilee, et les photos remplissent les cases vides dans l'ordre).
+  En import general, le bouton « Depuis cet appareil » declenche le champ de
+  fichiers du panneau: un seul point d'entree, et il accepte plusieurs photos.
+
+## Journal — 2026-09-01 (la bande des images importees disparait)
+
+- La bande de vignettes sous la liste des cases empilait TOUTES les photos
+  importees, y compris celles retirees d'une case: elle faisait doublon avec la
+  liste des cases et montrait des photos qui n'etaient plus nulle part.
+  Supprimee.
+- Retirer la photo d'une case la retire desormais du projet quand aucune autre
+  case ne s'en sert (chaque image est enregistree en Blob: la garder alourdit
+  chaque sauvegarde). Avant de toucher au tableau, l'affectation de toutes les
+  cases est figee: une case sans reglage explicite lit `images[index]`, donc
+  retirer un element aurait fait glisser les photos d'une case a l'autre.
+- Changer de modele ne perd plus de photo: elles suivent dans les nouvelles
+  cases, dans l'ordre de lecture, et une grille plus large sert en plus les
+  photos restees en reserve. Le panneau annonce cette reserve
+  (« N en reserve ») au lieu de la cacher.
+- Le decalage des photos (variante « melanger ») deplace maintenant les photos
+  elles-memes: depuis que chaque case porte son image explicitement, changer
+  l'ordre des zones ne suffisait plus.
+
+## Journal — 2026-09-01 (selection d'une case : rouge, et qui ne colle plus)
+
+- Le liseret de selection passe du violet au ROUGE systeme (#FF453A) avec un
+  halo, en deux passes (halo puis trait net), et son epaisseur suit la
+  resolution du canvas: l'apercu est dessine en 1080 px puis reduit, un trait
+  fixe rendait un demi-pixel a l'ecran.
+- La selection ne colle plus: Echap la retire, un clic a cote de l'apercu aussi,
+  et le plein ecran s'ouvre toujours sans liseret. Elle n'a jamais atteint
+  l'export (`renderSlotSelection` est deja derriere `isPreview`), mais elle
+  restait affichee en plein ecran, ou l'on juge le visuel.
+
+## Journal — 2026-09-01 (cadrage photo par photo)
+
+- Chaque photo se recadre DANS sa case: zoom (boutons, molette sur la case
+  selectionnee), deplacement a la souris, double-clic ou bouton central pour
+  revenir au cadrage d'origine. Le zoom est borne a [1, 4]: en dessous de 1
+  l'image ne remplirait plus son cadre. Jusqu'ici, seuls les curseurs des
+  reglages avances permettaient de le faire.
+- Corbeille rouge en haut a droite de chaque case pleine (rouge systeme Apple
+  au survol), symetrique de la poignee d'echange en haut a gauche.
+- Les commandes sont en verre depoli sombre, invisibles tant que la souris
+  n'entre pas dans l'apercu, et s'adaptent a la taille de la case: une petite
+  case ne garde que la poignee et la corbeille, en plus petit.
+- Seule la case SELECTIONNEE capte la souris (deplacement, molette): les autres
+  restent transparentes, donc le canvas garde la selection, les textes et les
+  stickers.
+
+## Journal — 2026-09-01 (fond neutre et marges symetriques)
+
+- Fond par defaut neutre: `layoutBgBlur` demarrait a `true` et `layoutBgColor`
+  a `#000000`, donc la premiere photo importee etait recopiee floutee derriere
+  la grille sans que personne ne l'ait demande - la meme image apparaissait
+  deux fois. Defaut desormais: blanc uni, et le dos d'une case suit la couleur
+  de fond au lieu d'un noir en dur. Couleur / Flou / Genere restent au choix.
+- Marges symetriques par defaut: `padding`, `gap` et `customLayoutGap`
+  demarrent tous a 24. Nouveau mode « Marges egales » (actif par defaut) qui
+  pilote les trois ensemble; en mode « Libres », deux curseurs distincts,
+  « Marge exterieure » et « Ecart entre les images ». Les deux curseurs d'ecart
+  qui trainaient dans « Geometrie fine » sont supprimes (ils faisaient doublon).
+  Un habillage thematique qui impose des marges differentes sort du mode lie.
+- Apercu a angles droits (canvas et calque de comparaison): Instagram
+  n'arrondit pas le visuel publie.
+- Le smoke des cases verifie en plus le coin blanc du visuel et l'egalite
+  marge exterieure / gouttiere.
+
+## Journal — 2026-09-01 (cases de la mise en page : une photo par case)
+
+- Le moteur recopiait la meme photo dans toutes les cases
+  (`imgIndex % images.length` dans `renderSlot`): une seule photo importee
+  remplissait les cinq cases d'une grille. Une photo ne va plus que dans UNE
+  case; les autres restent vides avec leur cadre pointille. Une case videe a la
+  main porte `image: null` (et non plus une cle absente), sinon l'image
+  "naturelle" de sa position revenait; ce vide est aussi persiste
+  (`slots[].imageCleared`).
+- L'import global remplit les cases VIDES dans l'ordre de lecture, une par
+  case, au lieu d'empiler des images dans un tableau.
+- Nouvelle couche `SlotOverlay` sur l'apercu: survol d'une case vide -> bouton
+  « Importer » (feuille `SlotImportSheet`: fichier local OU photo de la
+  bibliotheque VibeOS); case pleine -> poignee qu'on glisse sur une autre case
+  pour echanger les deux photos. Un fichier lache directement sur une case y va.
+  La couche est transparente aux evenements sauf ses commandes: le canvas garde
+  le deplacement d'une photo dans son cadre, et la barre d'outils de l'apercu
+  reste cliquable (elle a ete masquee un temps par l'hote de la couche).
+- `useCanvasRenderer` publie desormais la geometrie des cases a React
+  (`{ rects, width, height }`, apercu seulement), filtree pour ne re-rendre que
+  si elle a vraiment change.
+- Le menu de familles du panneau est reduit a la liste des noms (le compte et la
+  phrase d'explication restaient dans la bibliotheque).
+- Gate: `scripts/smoke-vibeos-layout-slots.spec.cjs`.
+
+## Journal — 2026-09-01 (grilles editoriales du Layout)
+
+- Ajout de `gridLibrary.js` : les grilles ne sont plus des listes de
+  rectangles mais un ARBRE rangees/colonnes compile. 24 grilles editoriales en
+  6 familles (Editorial, Asymetrique, Galerie, Bandes & duos, Narratif, plus
+  les 3 grilles historiques en Classiques), avec vides assumes pour les marges
+  et bandeaux de titre.
+- Chaque grille existe en portrait 4:5 ET en carre 1:1, avec le meme nombre de
+  zones et le meme ordre de lecture : changer de format RECOMPILE la grille au
+  lieu de l'etirer, et les ids de zones stables gardent chaque photo en place.
+  Une grille deplacee a la main est marquee `dirty` et n'est plus recompilee.
+- Nouveau `GridLibrarySheet` (recherche + familles, apercu 4:5 et 1:1 cote a
+  cote). Dans le panneau, le titre de la grille est devenu un SELECTEUR DE
+  FAMILLE (`GridCategoryMenu`) : on choisit Editorial / Asymetrique / Galerie /
+  Bandes & duos / Narratif / Classiques et le panneau affiche toute la famille,
+  sans ouvrir la bibliotheque. La famille suit la grille appliquee, y compris
+  quand elle vient de la bibliotheque ; elle est derivee au rendu, jamais dans
+  un effet. Plus trois variantes : miroir horizontal, miroir vertical,
+  rotation des photos. Le miroir et la rotation
+  sont stockes dans `customLayout.transform` et survivent au changement de
+  format et a la reprise du projet.
+- Aperçu iPhone : la hauteur du media suit desormais le vrai ratio du post
+  (402 px en 1:1, 503 px en 4:5) au lieu d'une boite fixe de 536 px, comme
+  Instagram qui borne le feed entre 4:5 et 1,91:1.
+- Gates : `npm run lint`, `npm run build`, `scripts/smoke-vibeos-layout-grids.mjs`
+  (geometrie des 48 variantes) et le nouveau smoke Playwright
+  `smoke-vibeos-layout-grids.spec.cjs`, plus les trois smokes Layout existants.
+  Travail local uniquement, aucun deploiement.
+
+## Journal — 2026-09-01 (preview Instagram Layout)
+
+- Port du châssis `PublicationPhoneShell` et du feed
+  `InstagramPublicationPreview` depuis `secondevienextjsSSR`, avec les mesures
+  source 430×910 / 402×874 traduites en CSS Modules sans variation visuelle.
+- L'aperçu Layout est désormais construit depuis le canvas d'export pleine
+  définition et les mêmes JPEG que le flux Publication, plus depuis le petit
+  canvas affiché à l'écran.
+- Les formats feed sont audités et normalisés : portrait 4:5, carré 1:1,
+  paysage 1,91:1 ; story 9:16. Pano x2/x3 produit 2/3 tranches 1080×1350 et le
+  téléphone les parcourt au clic, au swipe et au trackpad.
+- Ajout d'un smoke Playwright couvrant les six formats, les dimensions JPEG et
+  la navigation panorama. Travail local uniquement, aucun déploiement.
+
+## Journal — 2026-09-01 (developpement local et couts cloud)
+
+- Ajout de `docs/developpement-local-et-couts.md` : le local devient la boucle
+  de developpement par defaut ; le cloud sert a valider un lot coherent ou une
+  release, avec un seul rollout attendu.
+- `AGENTS.md` impose la lecture du protocole et precise qu'une demande de
+  staging « reguliere » n'autorise pas les micro-deploiements successifs.
+- Le guide couvre les emulateurs, les gates cibles, le perimetre minimal des
+  deploys, les branches App Hosting, la declaration pre-deploiement et
+  l'inventaire mensuel des ressources payantes.
+- Aucun code applicatif, reglage Firebase ou ressource Google Cloud n'a ete
+  modifie ou deploye dans ce lot documentaire.
 
 ## Journal — 2026-08-31 (Bibliothèque : carrousel vers Vision)
 
@@ -5157,3 +5328,51 @@ Trois reproches, tous fondés : **trop rapide**, **images pas en pleine qualité
 - Mise a jour 2026-08-31 (release VibeFX live) : le commit `7401cd0` publie les 261 presets Vision, les performances de miniatures et le Studio Gradient/Lumen sur GitHub `MFcv1/vibe_fxV2`. Firestore, Storage et les 17 Functions sont redeployes sur `vibefx-v2`. App Hosting utilise une archive source locale de 49,1 Mio vers le backend existant `vibefx-v2-web`, car son ancien lien `ECFN15/vibe_fxV2` est en lecture seule ; l'URL live est `https://vibefx-v2-web--vibefx-v2.europe-west4.hosted.app`. Les six routes controlees repondent 200 et le module live du Gradient Builder expose Glassy, Glint, Mist et Skyline.
 - Mise a jour 2026-08-31 (favoris de presets Vision) : chaque carte de `/creer/vision` separe maintenant le bouton d'application du bouton etoile ; un clic sur l'etoile ne change donc jamais le rendu courant. Le filtre Favoris, son compte et la recherche composee sont portes par `presetCollections.js`. `usePresetFavorites.js` ecoute et ecrit la sous-collection `users/{uid}/visionPresetFavorites/{presetId}` en temps reel, avec etat separe par UID, mise a jour optimiste, verrou pendant l'ecriture et rollback lisible sur erreur. Les regles Firestore imposent le proprietaire, un identifiant de preset identique au document et un schema ferme ; l'emulateur confirme qu'un second compte ne peut ni lire ni ecrire les favoris du premier. Gates avant publication : 438/438 moteur, smoke navigateur Vision 3/3, test cible 1/1, lint sans erreur (5 avertissements preexistants), build Node 22 vert avec l'avertissement NFT preexistant. Les regles sont publiees avant le front ; commit `4f8336f` sur `master`, rollout App Hosting `build-2026-08-31-005` reussi. Sur l'URL live, les 261 etoiles et le filtre Favoris sont presents, l'etat vide fonctionne et la console reste sans erreur ; aucune donnee de test n'a ete ajoutee au compte reel.
 - Mise a jour 2026-08-31 (connexion Google Safari) : le popup Firebase a ete reproduit dans Safari. Son URL portait `fac={error: UNKNOWN_ERROR}` avant meme Google : la cle reCAPTCHA App Check `vibefx-v2-web` autorisait localhost, firebaseapp.com et web.app, mais pas le domaine App Hosting live. Ce domaine est ajoute dans Google Cloud sans ouvrir la cle a tous les domaines et sans desactiver App Check. Une fois cette erreur retiree, Safari montrait aussi son blocage du premier popup : le resolver Firebase etait initialise apres le clic. `src/context/AuthContext.jsx` appelle desormais `getRedirectResult(auth)` au montage, expose `googleAuthReady`, et `StudioAuthGate` n'active Google qu'apres cette preparation. Le gate traduit aussi `popup-blocked`, `cancelled-popup-request` et `unauthorized-domain`, et journalise le vrai code au lieu de tout masquer. Gates avant publication : smoke cible 1/1, lint sans erreur (5 avertissements preexistants), build Node 22 vert avec avertissement NFT preexistant.
+
+## Journal — 2026-09-01 (bibliothèque : import HEIC/HEIF iPhone)
+
+- Nouveau `src/features/vibeos/library/heicImport.js` : reconnaissance des
+  extensions et MIME HEIC/HEIF, conversion locale en JPEG qualité 0,94 avec
+  `heic-to/csp`, et renommage portable `.jpg`. Le moteur libheif est importé
+  dynamiquement au premier fichier concerné ; aucun serveur de conversion.
+- `photoImport.js` normalise systématiquement le HEIC avant vignette, IndexedDB,
+  Vision et Firebase. Le record conserve `convertedFrom` (nom, MIME et poids
+  source), tandis que `blob`, `name`, `type` et `bytes` décrivent le JPEG réel.
+- `useLibrary.js` et `LibraryScreen.jsx` distinguent maintenant un HEIC dont la
+  conversion a échoué d'une image ordinaire illisible. Les sélecteurs acceptent
+  aussi `.heics` et `.heifs`.
+- Vérification réelle dans Chromium avec
+  `/Users/matthis/Downloads/IMG_6469.HEIC` : `IMG_6469.jpg`, `image/jpeg`,
+  5712×4284, 6 873 373 octets, tuile affichée et Blob IndexedDB décodable.
+- Gates : 41 vérifications bibliothèque hors navigateur, smoke navigateur 1/1,
+  lint global 0 erreur et 5 avertissements préexistants, build Node 22 vert
+  avec l'avertissement NFT préexistant.
+- Déploiement App Hosting demandé ensuite : cible unique `vibefx-v2` /
+  `vibefx-v2-web` en `europe-west4`, Cloud Build
+  `1156c620-b9c0-4b66-85ca-22da1f73e3f4` réussi, révision
+  `vibefx-v2-web-build-2026-09-01-001` prête et à 100 % du trafic. La route
+  `/creer/bibliotheque` répond 200 et son chunk live contient les nouveaux
+  contrats `.heics/.heifs` et `convertedFrom`. Le smoke headless complet est
+  arrêté proprement au gate d'authentification ; aucune donnée du compte réel
+  n'a été créée pour le test.
+
+## Journal — 2026-09-01 (synchronisation Vision → Layout)
+
+- `useVisionEditor.js` ouvre désormais la première photo brute du projet et
+  synchronise le preset, son intensité et les réglages immédiatement dans le
+  provider partagé. Changer d'onglet juste après un clic ne dépend plus de la
+  sauvegarde IndexedDB différée.
+- `layoutPersistence.js` reconstruit pour Layout une image rendue par Vision,
+  mais attache et republie son Blob source. Une succession de sauvegardes ne
+  peut donc pas cuire le même preset plusieurs fois.
+- `projectModel.js` donne une révision aux réglages Vision ; Layout la copie
+  dans `composition.visionRevision`. `pipeline.js` et `useStudioEditor.js`
+  reconnaissent ce marqueur et sautent la seconde application du preset.
+  Les anciennes compositions sans marqueur restent compatibles.
+- Le smoke pipeline mesure maintenant le rendu brut, le changement Vision, la
+  reprise par Layout et l'absence de double traitement dans Studio, en desktop
+  et mobile.
+- Gates : build Node 22 vert avec l'avertissement NFT préexistant ; lint global
+  sans erreur et 5 avertissements préexistants. Le smoke navigateur reste
+  bloqué avant Layout par le contournement d'authentification Dev qui ne ferme
+  pas la modale, échec préexistant déjà documenté. Aucun déploiement.

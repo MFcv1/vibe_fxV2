@@ -120,15 +120,22 @@ export function renderLayoutImageTexture(ctx, w, h, { layoutTextures, activeText
  */
 export function renderSlot(ctx, slotId, imgIndex, x, y, sw, sh, overrideRadius, { images, slotConfigs, radius, layoutBgBlur, layoutBgColor, activeTemplate, slotRects, isPreview }) {
     const cfg = slotConfigs[slotId] || { zoom: 1, x: 0, y: 0, border: 0, blur: 0 };
+    /*
+     * UNE photo par case. L'ancien moteur bouclait sur `imgIndex % images.length`:
+     * importer une seule photo la recopiait dans les quatre cases d'une grille,
+     * ce qui n'a aucun sens pour une mise en page. Une case sans photo reste
+     * vide et affiche son cadre pointille - on y depose une image ensuite.
+     */
     let fallbackImg = null;
     if (images.length > 0) {
-        const safeImgIndex = imgIndex % images.length;
-        const candidateImg = images[safeImgIndex];
+        const candidateImg = images[imgIndex];
         if (candidateImg && (!candidateImg.isSlotSpecific || candidateImg.slotId === slotId)) {
             fallbackImg = candidateImg;
         }
     }
-    const img = cfg.image || fallbackImg;
+    /* `image: null` pose explicitement = case videe a la main (echange de
+       cases, retrait): elle ne doit pas retomber sur l'image "naturelle". */
+    const img = 'image' in cfg ? cfg.image : fallbackImg;
     const effRadius = overrideRadius !== undefined ? overrideRadius : radius;
 
     ctx.save(); // Main save
@@ -143,7 +150,9 @@ export function renderSlot(ctx, slotId, imgIndex, x, y, sw, sh, overrideRadius, 
         ctx.fillStyle = cfg.bgColor;
         ctx.fillRect(x, y, sw, sh);
     } else if (!layoutBgBlur && activeTemplate.id !== 'polaroid') {
-        ctx.fillStyle = "#000000";
+        /* Le dos d'une case suit le fond du visuel: du noir en dur posait des
+           rectangles noirs sur un fond clair. */
+        ctx.fillStyle = layoutBgColor || '#000000';
         ctx.fillRect(x, y, sw, sh);
     }
 
@@ -348,18 +357,34 @@ export function renderLayoutTexture(ctx, w, h, { layoutBgTexture, activeTemplate
 /**
  * renderSlotSelection — Dessine l'indicateur de sélection de slot.
  */
-export function renderSlotSelection(ctx, { selectedSlotIndex, slotRects }) {
+export function renderSlotSelection(ctx, { selectedSlotIndex, slotRects, canvasWidth = 1080 }) {
     const selectedRect = slotRects.find(s => s.id === selectedSlotIndex);
     if (!selectedRect) return;
 
     const { x, y, w: sw, h: sh, r } = selectedRect;
+    /* L'apercu est dessine a la resolution d'export (1080 px de large en 4:5)
+       puis reduit a l'ecran: une epaisseur fixe donnerait un trait d'un demi
+       pixel. On la met a l'echelle du canvas. */
+    const lineWidth = Math.max(2, canvasWidth / 260);
+    const inset = lineWidth / 2;
+
     ctx.save();
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(99, 102, 241, 0.5)';
-    ctx.shadowBlur = 8;
+    /* Rouge systeme (#FF453A) avec un halo: c'est la seule marque d'interface
+       posee sur l'image, elle doit se voir sur une photo claire comme sombre.
+       Deux passes: le halo, puis un trait net par-dessus. */
+    ctx.strokeStyle = 'rgba(255, 69, 58, 0.55)';
+    ctx.lineWidth = lineWidth * 1.6;
+    ctx.shadowColor = 'rgba(255, 69, 58, 0.75)';
+    ctx.shadowBlur = lineWidth * 5;
     ctx.beginPath();
-    ctx.roundRect(x + 1, y + 1, sw - 2, sh - 2, r);
+    ctx.roundRect(x + inset, y + inset, sw - lineWidth, sh - lineWidth, r);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ff453a';
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.roundRect(x + inset, y + inset, sw - lineWidth, sh - lineWidth, r);
     ctx.stroke();
     ctx.restore();
 }

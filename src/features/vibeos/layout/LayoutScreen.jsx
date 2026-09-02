@@ -2,12 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Bold, Columns2, Download, Eraser, ImagePlus, Italic, LayoutTemplate, Layers, Maximize2,
-    Plus, Redo2, Smartphone, Sparkles, Sticker, Trash2, Type, Undo2, Upload, Waves, X,
+    Bold, Columns2, Download, Eraser, FlipHorizontal2, FlipVertical2, ImagePlus, Images, Italic,
+    LayoutGrid, LayoutTemplate, Layers, Maximize2, Plus, Redo2, Shuffle, Smartphone, Sparkles,
+    Sticker, Trash2, Type, Undo2, Upload, Waves, X,
 } from 'lucide-react';
 import {
     CUSTOM_LAYOUT_PRESETS, CUSTOM_SHAPE_LIBRARY, FONT_OPTIONS, FORMATS, TEMPLATES,
 } from '../../vibefx-studio/data/constants';
+import { buildSocialImages } from '../../vibefx-studio/utils/socialExport';
 import {
     Button, Collapsible, IconButton, Progress, Segmented, Sheet, Slider, Tile, TileGrid,
 } from '../primitives';
@@ -17,6 +19,14 @@ import TemplatePreviewSvg from './TemplatePreviewSvg';
 import MeshSheet from '../shared/MeshSheet';
 import LumenSheet from '../shared/LumenSheet';
 import SmoothBlurSheet from '../shared/SmoothBlurSheet';
+import GridCategoryMenu from './GridCategoryMenu';
+import GridLibrarySheet from './GridLibrarySheet';
+import {
+    DEFAULT_GRID_ID, DEFAULT_GRID_TRANSFORM, gridPreviewZones, findGridPreset, pickGridVariant,
+} from './gridLibrary';
+import { GRID_CATEGORIES, GRID_COUNT, catalogGrid, gridsInCategory } from './gridCatalog';
+import SlotImportSheet from './SlotImportSheet';
+import SlotOverlay from './SlotOverlay';
 import ZoneOverlay from './ZoneOverlay';
 import InstaPreviewSheet from './InstaPreviewSheet';
 import styles from './layout.module.css';
@@ -75,29 +85,28 @@ function FormatShape({ ratio }) {
     return <span className={styles.formatShape} style={{ width: w, height: h }} />;
 }
 
-function makeFileEvent(files) {
-    return { target: { files, value: '' } };
-}
-
 export default function LayoutScreen() {
     const editor = useLayoutEditor();
     const {
         images, activeFormat, setActiveFormat,
         activeTemplate, setActiveTemplate, overlayMode, setOverlayMode,
         texts, activeTextId, setActiveTextId,
-        padding, setPadding, gap, setGap, radius, setRadius,
-        customLayoutGap, setCustomLayoutGap,
+        padding, setPadding, gap, radius, setRadius,
+        customLayoutGap,
+        linkedMargins, toggleLinkedMargins, setUniformMargin, setInnerGap,
         layoutBgColor, setLayoutBgColor,
         layoutBgBlur, setLayoutBgBlur,
         layoutBgTexture, setLayoutBgTexture,
         selectedSlotIndex, setSelectedSlotIndex,
-        slotModel, hasRenderableOutput, isProcessing, loadingProgress, isHydrating,
+        slotModel, reserveCount, hasRenderableOutput, isProcessing, loadingProgress, isHydrating,
         canvasRef, handlePointerDown, handlePointerMove, handlePointerUp,
-        handleImageUpload, handleSlotImageUpload, handleRemoveImage, handleRemoveSlotImage,
+        handleSlotImageUpload, handleRemoveSlotImage,
+        slotGeometry, swapSlotImages, importImageIntoSlot, importBlobIntoSlot, importImagesIntoSlots,
+        zoomSlot, panSlot, resetSlotFraming,
         addText, updateActiveText, deleteActiveText, currentText,
         assets, activeAssetId, setActiveAssetId,
         addAsset, updateActiveAsset, deleteActiveAsset, currentAsset,
-        applyCustomPreset, applyThemedTemplate,
+        applyGridPreset, applyThemedTemplate, applyTemplateWithPhotos, transformGrid,
         addCustomZone, updateCustomZone, deleteCustomZone, clearCustomZones,
         layoutTextures, activeTextureId, setActiveTextureId,
         layoutTextureOpacity, setLayoutTextureOpacity,
@@ -116,8 +125,12 @@ export default function LayoutScreen() {
     const [isSmoothBlurSheetOpen, setIsSmoothBlurSheetOpen] = useState(false);
     const [isDropTarget, setIsDropTarget] = useState(false);
     const [isComparing, setIsComparing] = useState(false);
-    const [instaPreviewUrl, setInstaPreviewUrl] = useState(null);
+    const [instaPreview, setInstaPreview] = useState(null);
     const [isZoneEditOpen, setIsZoneEditOpen] = useState(false);
+    const [isGridLibraryOpen, setIsGridLibraryOpen] = useState(false);
+    /* `null` = feuille fermee. `{ slotId }` = une case precise. `{ slotId: null }`
+       = import general, qui remplit les cases vides dans l'ordre. */
+    const [importTarget, setImportTarget] = useState(null);
     const globalImportRef = useRef(null);
     const textureImportRef = useRef(null);
     const canvasWrapRef = useRef(null);
@@ -125,7 +138,7 @@ export default function LayoutScreen() {
     const {
         exportName, setExportName, exportFormat, setExportFormat,
         exportQuality, setExportQuality, estimatedSize,
-        isExportModalOpen, setIsExportModalOpen, handleDownload, performExport,
+        isExportModalOpen, setIsExportModalOpen, handleDownload, performExport, renderExportCanvas,
     } = exportController;
 
     const isCustomTemplate = activeTemplate.id === 'custom';
@@ -134,14 +147,84 @@ export default function LayoutScreen() {
         [isCustomTemplate, activeTemplate],
     );
     const canvasBox = useCanvasBox(canvasRef, canvasWrapRef, `${activeFormat.id}-${hasRenderableOutput}`);
-    const originalImageSrc = images[0]?.src || null;
+    const originalImageSrc = images[0]?.vibeosOriginalSrc || images[0]?.src || null;
     const appliedThemedId = activeTemplate.customLayout?.presetId;
+
+    /* ---- Grilles editoriales (gridLibrary.js / gridCatalog.js) ---- */
+    const gridVariant = pickGridVariant(activeFormat);
+    const activeGridPreset = catalogGrid(appliedThemedId);
+    const gridTransform = { ...DEFAULT_GRID_TRANSFORM, ...(activeTemplate.customLayout?.transform || {}) };
+    const isGridEdited = Boolean(activeTemplate.customLayout?.dirty);
+    /*
+     * Le panneau montre TOUTE une famille, pas une selection figee: on choisit
+     * la famille au-dessus des vignettes et on reste dans le panneau. La
+     * bibliotheque garde son role de vue de decouverte (recherche + apercus
+     * 4:5 et 1:1 cote a cote).
+     */
+    const [browsedCategory, setBrowsedCategory] = useState(null);
+    /*
+     * Famille affichee: celle de la grille active, sauf si on est en train d'en
+     * parcourir une autre. Le choix manuel est attache a la grille active: des
+     * qu'on applique une autre grille (panneau OU bibliotheque), la famille
+     * suit cette grille. Rien n'est calcule dans un effet: tout se derive du
+     * rendu, donc le panneau ne peut pas afficher une famille perimee.
+     */
+    const appliedGridCategory = activeGridPreset?.category || GRID_CATEGORIES[0].id;
+    /* `browsedCategory` et `appliedThemedId` peuvent valoir undefined tous les
+       deux (modele integre): comparer sans verifier l'objet lisait alors une
+       propriete sur null. */
+    const gridCategoryId = browsedCategory && browsedCategory.presetId === appliedThemedId
+        ? browsedCategory.categoryId
+        : appliedGridCategory;
+    const browseGridCategory = useCallback((categoryId) => {
+        setBrowsedCategory({ presetId: appliedThemedId, categoryId });
+    }, [appliedThemedId]);
+    const categoryGrids = useMemo(() => gridsInCategory(gridCategoryId), [gridCategoryId]);
+    /*
+     * Cases de l'apercu: le moteur publie leurs rectangles (pixels du canvas
+     * d'apercu) a chaque rendu; on y accroche le libelle de la zone et la
+     * vignette pour le glisser-deposer.
+     */
+    const overlaySlots = useMemo(() => {
+        const labels = new Map(slotModel.map((slot) => [String(slot.id), slot]));
+        return (slotGeometry.rects || []).map((rect, index) => {
+            const known = labels.get(String(rect.id));
+            return {
+                id: rect.id,
+                label: known?.label || `Image ${index + 1}`,
+                src: known?.imageSrc || null,
+                hasImage: Boolean(known?.imageSrc),
+                zoom: slotConfigs[rect.id]?.zoom ?? 1,
+                x: rect.x, y: rect.y, w: rect.w, h: rect.h,
+            };
+        });
+    }, [slotGeometry, slotModel, slotConfigs]);
+    const importSlotLabel = overlaySlots.find((slot) => slot.id === importTarget?.slotId)?.label || '';
+
+    /* Quelle case se trouve sous ce point de l'ecran? (depot de fichiers) */
+    const slotIdAtPoint = useCallback((clientX, clientY) => {
+        if (!canvasBox || !slotGeometry.width || !slotGeometry.height) return null;
+        const wrapRect = canvasWrapRef.current?.getBoundingClientRect();
+        if (!wrapRect) return null;
+        const x = ((clientX - wrapRect.left - canvasBox.left) / canvasBox.width) * slotGeometry.width;
+        const y = ((clientY - wrapRect.top - canvasBox.top) / canvasBox.height) * slotGeometry.height;
+        const hit = (slotGeometry.rects || []).find((rect) => (
+            x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
+        ));
+        return hit ? hit.id : null;
+    }, [canvasBox, slotGeometry]);
+
     const hasGeneratedBackground = layoutBgGradient || Boolean(layoutLumenBackground);
     const backgroundMode = hasGeneratedBackground ? 'generated' : (layoutBgBlur ? 'blur' : 'color');
     const smoothBlurOn = Boolean(layoutSmoothBlur?.enabled);
     const selectedSlotConfig = selectedSlotIndex !== null
         ? (slotConfigs[selectedSlotIndex] || { zoom: 1, x: 0, y: 0, border: 0, blur: 0 })
         : null;
+
+    const marginModes = useMemo(() => ([
+        { value: 'linked', label: 'Égales' },
+        { value: 'free', label: 'Libres' },
+    ]), []);
 
     const bgOptions = useMemo(() => ([
         { value: 'color', label: 'Couleur' },
@@ -160,6 +243,24 @@ export default function LayoutScreen() {
             /* « Généré » : on ouvre Mesh par défaut si rien n'est actif. */
             if (!hasGeneratedBackground) setIsMeshSheetOpen(true);
         }
+    };
+
+    /*
+     * La selection d'une case ne doit pas coller: Echap la retire, un clic a
+     * cote de l'apercu aussi, et le plein ecran s'ouvre toujours sans le
+     * liseret (c'est une marque d'interface, pas une partie du visuel).
+     */
+    useEffect(() => {
+        const clearOnEscape = (event) => {
+            if (event.key === 'Escape') setSelectedSlotIndex(null);
+        };
+        window.addEventListener('keydown', clearOnEscape);
+        return () => window.removeEventListener('keydown', clearOnEscape);
+    }, [setSelectedSlotIndex]);
+
+    const clearSelectionOutsideCanvas = (event) => {
+        if (event.target.closest?.('canvas, button, input, [role="slider"], [data-testid="vibeos-slot-layer"], [data-testid="vibeos-zone-layer"]')) return;
+        setSelectedSlotIndex(null);
     };
 
     /* Depot sur l'apercu: une forme de zone si on vient de la palette,
@@ -186,18 +287,38 @@ export default function LayoutScreen() {
             }
         }
         const files = Array.from(event.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
-        if (files.length) handleImageUpload(makeFileEvent(files));
+        if (!files.length) return;
+        /* Un fichier lache SUR une case va dans cette case; ailleurs, import
+           global qui remplit les cases dans l'ordre de lecture. */
+        const targetSlotId = files.length === 1 ? slotIdAtPoint(event.clientX, event.clientY) : null;
+        if (targetSlotId !== null && targetSlotId !== undefined) {
+            importImageIntoSlot(files[0], targetSlotId);
+            return;
+        }
+        importImagesIntoSlots(files);
     };
 
     const handleFullscreen = () => {
+        setSelectedSlotIndex(null);
         canvasRef.current?.requestFullscreen?.();
     };
 
-    const openInstaPreview = () => {
+    const openInstaPreview = async () => {
+        const format = activeFormat;
+        setInstaPreview({ format, slides: [], loading: true, error: '' });
         try {
-            setInstaPreviewUrl(canvasRef.current?.toDataURL('image/jpeg', 0.92) || null);
-        } catch {
-            setInstaPreviewUrl(null);
+            const exportCanvas = renderExportCanvas();
+            if (!exportCanvas) throw new Error('Le rendu pleine définition n’est pas disponible.');
+            const slides = await buildSocialImages(exportCanvas, format);
+            if (!slides.length) throw new Error('Aucune image n’a pu être préparée.');
+            setInstaPreview({ format, slides, loading: false, error: '' });
+        } catch (error) {
+            setInstaPreview({
+                format,
+                slides: [],
+                loading: false,
+                error: error?.message || 'Impossible de préparer l’aperçu Instagram.',
+            });
         }
     };
 
@@ -218,6 +339,7 @@ export default function LayoutScreen() {
                 onDragOver={(event) => { event.preventDefault(); setIsDropTarget(true); }}
                 onDragLeave={() => setIsDropTarget(false)}
                 onDrop={handleDrop}
+                onPointerDown={clearSelectionOutsideCanvas}
             >
                 {hasRenderableOutput ? (
                     <>
@@ -266,6 +388,26 @@ export default function LayoutScreen() {
                                     <span className={styles.compareTag}>Original</span>
                                 </div>
                             ) : null}
+                            {/* Cases de la mise en page: import et échange de photos.
+                                Masquee pendant l'edition des zones, qui a sa
+                                propre couche de poignees. */}
+                            {!isZoneEditOpen && canvasBox && overlaySlots.length ? (
+                                <div className={styles.slotLayerHost} style={canvasBox}>
+                                    <SlotOverlay
+                                        slots={overlaySlots}
+                                        canvasWidth={slotGeometry.width}
+                                        canvasHeight={slotGeometry.height}
+                                        selectedSlotId={selectedSlotIndex}
+                                        onImport={(slotId) => setImportTarget({ slotId })}
+                                        onSwap={swapSlotImages}
+                                        onSelect={setSelectedSlotIndex}
+                                        onRemove={handleRemoveSlotImage}
+                                        onZoom={zoomSlot}
+                                        onPan={panSlot}
+                                        onResetFraming={resetSlotFraming}
+                                    />
+                                </div>
+                            ) : null}
                             {/* Édition des zones du modèle personnalisé. */}
                             {isZoneEditOpen && isCustomTemplate && canvasBox ? (
                                 <div className={styles.zoneLayerHost} style={canvasBox}>
@@ -290,9 +432,20 @@ export default function LayoutScreen() {
                             Importe une ou plusieurs photos, ou glisse-les ici. Tu choisiras ensuite
                             le format et l&apos;habillage.
                         </p>
-                        <Button variant="primary" size="lg" icon={<Upload size={15} />} onClick={() => globalImportRef.current?.click()}>
-                            Importer des images
-                        </Button>
+                        <div className={styles.emptyStageActions}>
+                            <Button variant="primary" size="lg" icon={<Upload size={15} />} onClick={() => globalImportRef.current?.click()}>
+                                Importer des images
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="lg"
+                                icon={<Images size={15} />}
+                                onClick={() => setImportTarget({ slotId: null })}
+                                data-testid="vibeos-open-library-picker"
+                            >
+                                Depuis ma bibliothèque
+                            </Button>
+                        </div>
                     </div>
                 )}
                 {isProcessing ? (
@@ -342,50 +495,124 @@ export default function LayoutScreen() {
                                 active={!isCustomTemplate && template.id === activeTemplate.id}
                                 visual={<TemplatePreviewSvg builtinId={template.id} ratio={1.2} width="44px" />}
                                 label={template.label}
-                                onClick={() => setActiveTemplate(template)}
+                                onClick={() => applyTemplateWithPhotos(template)}
                             />
                         ))}
                         <Tile
                             active={isCustomTemplate}
                             visual={<LayoutTemplate size={20} />}
                             label="Personnalisé"
-                            onClick={() => applyCustomPreset(CUSTOM_LAYOUT_PRESETS[0])}
+                            onClick={() => applyGridPreset(findGridPreset(DEFAULT_GRID_ID))}
                         />
                     </TileGrid>
                     {isCustomTemplate ? (
-                        <TileGrid aria-label="Préréglages personnalisés">
-                            {CUSTOM_LAYOUT_PRESETS.map((preset) => (
-                                <Tile
-                                    key={preset.id}
-                                    active={appliedThemedId === preset.id}
-                                    visual={<TemplatePreviewSvg zones={preset.zones} ratio={1.2} width="44px" />}
-                                    label={preset.label}
-                                    onClick={() => applyCustomPreset(preset)}
+                        <div className={styles.gridPicker}>
+                            <div className={styles.gridPickerHead}>
+                                <GridCategoryMenu
+                                    categories={GRID_CATEGORIES}
+                                    value={gridCategoryId}
+                                    onChange={browseGridCategory}
                                 />
-                            ))}
-                        </TileGrid>
+                                <button
+                                    type="button"
+                                    className={styles.gridLibraryLink}
+                                    onClick={() => setIsGridLibraryOpen(true)}
+                                    data-testid="vibeos-grid-library-open"
+                                >
+                                    <LayoutGrid size={13} />
+                                    {GRID_COUNT} grilles
+                                </button>
+                            </div>
+                            <TileGrid aria-label="Grilles éditoriales">
+                                {categoryGrids.map((preset) => (
+                                    <Tile
+                                        key={preset.id}
+                                        active={appliedThemedId === preset.id}
+                                        visual={(
+                                            <TemplatePreviewSvg
+                                                zones={gridPreviewZones(preset, gridVariant)}
+                                                ratio={activeFormat.ratio}
+                                                width="44px"
+                                            />
+                                        )}
+                                        label={preset.label}
+                                        hint={`${preset.slots} images`}
+                                        onClick={() => applyGridPreset(preset)}
+                                    />
+                                ))}
+                            </TileGrid>
+                            {/* Variantes d'une meme grille: on retourne la composition ou
+                                on fait tourner les photos, sans rien redessiner. */}
+                            <div className={styles.gridVariants}>
+                                <span className={styles.gridVariantsLabel}>Variantes</span>
+                                <IconButton
+                                    label="Miroir horizontal"
+                                    active={gridTransform.flipX}
+                                    onClick={() => transformGrid({ flipX: !gridTransform.flipX })}
+                                >
+                                    <FlipHorizontal2 size={14} />
+                                </IconButton>
+                                <IconButton
+                                    label="Miroir vertical"
+                                    active={gridTransform.flipY}
+                                    onClick={() => transformGrid({ flipY: !gridTransform.flipY })}
+                                >
+                                    <FlipVertical2 size={14} />
+                                </IconButton>
+                                <IconButton
+                                    label="Décaler les photos d'une zone"
+                                    onClick={() => transformGrid({ shift: gridTransform.shift + 1 })}
+                                >
+                                    <Shuffle size={14} />
+                                </IconButton>
+                            </div>
+                            <p className={styles.gridPickerHint}>
+                                <strong>{activeGridPreset?.label || activeTemplate.label}</strong>
+                                {isGridEdited ? ' · retouchée à la main' : ''}
+                                {' · '}
+                                {activeGridPreset && !activeGridPreset.fixed && !isGridEdited
+                                    ? 'se recompose en 4:5 et en 1:1.'
+                                    : 'garde ce découpage dans tous les formats.'}
+                            </p>
+                        </div>
                     ) : null}
                 </section>
 
                 {/* 3. Images */}
                 <section className={styles.block}>
                     <div className={styles.blockHead}>
-                        <h3 className={styles.blockTitle}><span className={styles.blockStep}>3</span>Images</h3>
-                        <label className={styles.slotImport}>
+                        <h3 className={styles.blockTitle}>
+                            <span className={styles.blockStep}>3</span>Images
+                            {reserveCount > 0 ? (
+                                <span className={styles.blockHint}>
+                                    &nbsp;· {reserveCount} en réserve
+                                </span>
+                            ) : null}
+                        </h3>
+                        <button
+                            type="button"
+                            className={styles.slotImport}
+                            onClick={() => setImportTarget({ slotId: null })}
+                        >
                             <Plus size={13} />
                             Ajouter
+                        </button>
+                        <label className={styles.hiddenInput}>
                             <input
                                 ref={globalImportRef}
                                 type="file"
                                 accept="image/*"
                                 multiple
                                 className={styles.hiddenInput}
-                                onChange={handleImageUpload}
+                                onChange={(event) => {
+                                    importImagesIntoSlots(event.target.files);
+                                    event.target.value = '';
+                                }}
                                 data-testid="vibeos-image-input"
                             />
                         </label>
                     </div>
-                    <div className={styles.slotList}>
+                    <div className={styles.slotList} data-testid="vibeos-slot-list">
                         {slotModel.map((slot) => (
                             <div
                                 key={slot.id}
@@ -418,23 +645,6 @@ export default function LayoutScreen() {
                             </div>
                         ))}
                     </div>
-                    {images.length > 0 ? (
-                        <div className={styles.importedStrip} aria-label="Images importées">
-                            {images.map((img, index) => (
-                                <span key={`${img.name || 'img'}-${index}`} className={styles.importedThumb}>
-                                    <img src={img.src} alt={img.name || `Image ${index + 1}`} />
-                                    <button
-                                        type="button"
-                                        className={styles.importedRemove}
-                                        aria-label={`Retirer ${img.name || `l'image ${index + 1}`}`}
-                                        onClick={() => handleRemoveImage(index)}
-                                    >
-                                        <X size={10} />
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
-                    ) : null}
                 </section>
 
                 {/* 4. Habillage */}
@@ -450,7 +660,44 @@ export default function LayoutScreen() {
                     >
                         Parcourir les templates
                     </Button>
-                    <Slider label="Marge" value={padding} onChange={setPadding} min={0} max={150} defaultValue={40} formatValue={(v) => `${v}px`} />
+                    {/* Marges: le mode « Égales » donne la meme respiration au bord
+                        du visuel et entre les images - c'est ce qui fait qu'une
+                        grille tombe juste sans reglage. */}
+                    <div className={styles.rowSplit}>
+                        <span className={styles.rowLabel}>Marges</span>
+                        <Segmented
+                            label="Réglage des marges"
+                            value={linkedMargins ? 'linked' : 'free'}
+                            onChange={(value) => toggleLinkedMargins(value === 'linked')}
+                            options={marginModes}
+                        />
+                    </div>
+                    {linkedMargins ? (
+                        <Slider
+                            label="Marge"
+                            value={padding}
+                            onChange={setUniformMargin}
+                            min={0} max={150} defaultValue={24}
+                            formatValue={(v) => `${v}px`}
+                        />
+                    ) : (
+                        <>
+                            <Slider
+                                label="Marge extérieure"
+                                value={padding}
+                                onChange={setPadding}
+                                min={0} max={150} defaultValue={24}
+                                formatValue={(v) => `${v}px`}
+                            />
+                            <Slider
+                                label="Écart entre les images"
+                                value={isCustomTemplate ? customLayoutGap : gap}
+                                onChange={setInnerGap}
+                                min={0} max={150} defaultValue={24}
+                                formatValue={(v) => `${v}px`}
+                            />
+                        </>
+                    )}
                     <Slider label="Arrondi" value={radius} onChange={setRadius} min={0} max={100} defaultValue={0} formatValue={(v) => `${v}px`} />
                     <div className={styles.rowSplit}>
                         <span className={styles.rowLabel}>Fond</span>
@@ -846,10 +1093,6 @@ export default function LayoutScreen() {
 
                     <section className={styles.block}>
                         <h3 className={styles.blockTitle}>Géométrie fine</h3>
-                        <Slider label="Écart entre zones" value={gap} onChange={setGap} min={0} max={100} defaultValue={20} formatValue={(v) => `${v}px`} />
-                        {isCustomTemplate ? (
-                            <Slider label="Écart (modèle personnalisé)" value={customLayoutGap} onChange={setCustomLayoutGap} min={0} max={80} defaultValue={12} formatValue={(v) => `${v}px`} />
-                        ) : null}
                         {activeTemplate.id === 'filmstrip' ? (
                             <div className={styles.rowSplit}>
                                 <span className={styles.rowLabel}>Orientation pellicule</span>
@@ -869,6 +1112,35 @@ export default function LayoutScreen() {
             </aside>
 
             {/* ---------- Sheets ---------- */}
+            <SlotImportSheet
+                open={importTarget !== null}
+                targetsSlot={importTarget?.slotId !== null && importTarget?.slotId !== undefined}
+                slotLabel={importSlotLabel}
+                onClose={() => setImportTarget(null)}
+                onPickDevice={importTarget && importTarget.slotId === null
+                    ? () => globalImportRef.current?.click()
+                    : undefined}
+                onPickFile={(file) => {
+                    if (importTarget?.slotId === null) importImagesIntoSlots([file]);
+                    else importImageIntoSlot(file, importTarget?.slotId);
+                }}
+                onPickBlob={(blob, name) => {
+                    if (importTarget?.slotId === null) {
+                        importImagesIntoSlots([new File([blob], name, { type: blob.type || 'image/jpeg' })]);
+                        return;
+                    }
+                    importBlobIntoSlot(blob, importTarget?.slotId, name);
+                }}
+            />
+
+            <GridLibrarySheet
+                open={isGridLibraryOpen}
+                onClose={() => setIsGridLibraryOpen(false)}
+                onApply={applyGridPreset}
+                activePresetId={appliedThemedId}
+                activeFormat={activeFormat}
+            />
+
             <TemplateSheet
                 open={isTemplateSheetOpen}
                 onClose={() => setIsTemplateSheetOpen(false)}
@@ -892,10 +1164,12 @@ export default function LayoutScreen() {
             />
 
             <InstaPreviewSheet
-                open={Boolean(instaPreviewUrl)}
-                onClose={() => setInstaPreviewUrl(null)}
-                previewUrl={instaPreviewUrl}
-                format={activeFormat}
+                open={Boolean(instaPreview)}
+                onClose={() => setInstaPreview(null)}
+                slides={instaPreview?.slides}
+                format={instaPreview?.format || activeFormat}
+                loading={instaPreview?.loading}
+                error={instaPreview?.error}
             />
 
             <SmoothBlurSheet

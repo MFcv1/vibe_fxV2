@@ -48,7 +48,9 @@
     height: auto;
     max-width: 100%;
     max-height: 100%;
-    border-radius: var(--vo-radius-sm);
+    /* Angles droits: Instagram n'arrondit pas le visuel publie, l'apercu ne
+       doit pas laisser croire le contraire. */
+    border-radius: 0;
     box-shadow: var(--vo-shadow-2);
     touch-action: none;
 }
@@ -71,7 +73,8 @@
     position: absolute;
     z-index: 4;
     overflow: hidden;
-    border-radius: var(--vo-radius-sm);
+    /* Meme cadre que le canvas: angles droits. */
+    border-radius: 0;
     pointer-events: none;
 }
 
@@ -100,6 +103,299 @@
 .zoneLayer {
     position: absolute;
     inset: 0;
+}
+
+/* ---------- Cases de la mise en page (import + echange) ---------- */
+/*
+ * La couche laisse passer les evenements: c'est le canvas qui, dessous, gere
+ * le deplacement d'une photo dans son cadre. Seules les cases VIDES et les
+ * poignees des cases pleines captent la souris.
+ */
+/*
+ * Hote de la couche: transparent aux evenements ET sous la barre d'outils de
+ * l'apercu (z-index 5). Sans ca, la boite du canvas avalait les clics sur
+ * « Aperçu Instagram » et « Exporter ».
+ */
+.slotLayerHost {
+    position: absolute;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.slotLayer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.slotBox {
+    position: absolute;
+    border-radius: var(--vo-radius-sm);
+    transition: box-shadow var(--vo-dur-1) var(--vo-ease);
+}
+
+.slotBoxEmpty {
+    pointer-events: auto;
+}
+
+.slotBoxTarget {
+    box-shadow: inset 0 0 0 2px var(--vo-accent);
+    background: var(--vo-accent-quiet);
+}
+
+.slotBoxSource {
+    box-shadow: inset 0 0 0 1px var(--vo-accent-line);
+    opacity: 0.6;
+}
+
+.slotEmptyButton {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: inherit;
+    color: var(--vo-text-2);
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.slotEmptyButton:hover,
+.slotEmptyButton:focus-visible {
+    background: rgba(10, 12, 20, 0.45);
+}
+
+.slotImportPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--vo-line-strong);
+    border-radius: 999px;
+    background: var(--vo-surface);
+    color: var(--vo-text);
+    font-size: var(--vo-text-xs);
+    font-weight: 550;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity var(--vo-dur-1) var(--vo-ease), transform var(--vo-dur-1) var(--vo-ease);
+}
+
+.slotEmptyLabel {
+    max-width: 90%;
+    overflow: hidden;
+    color: var(--vo-text-3);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--vo-dur-1) var(--vo-ease);
+}
+
+.slotEmptyButton:hover .slotImportPill,
+.slotEmptyButton:focus-visible .slotImportPill {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.slotEmptyButton:hover .slotEmptyLabel,
+.slotEmptyButton:focus-visible .slotEmptyLabel {
+    opacity: 1;
+}
+
+/*
+ * Commandes d'une case: verre depoli sombre, coins doux, aucune bordure dure.
+ * Elles restent invisibles tant que la souris n'entre pas dans l'apercu, pour
+ * qu'on juge la composition et pas l'interface. Chacune a SA place: poignee en
+ * haut a gauche, corbeille en haut a droite, cadrage en bas au centre.
+ */
+.slotGrip,
+.slotTrash,
+.slotZoomBar {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: rgba(12, 14, 20, 0.55);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 160ms var(--vo-ease), transform 160ms var(--vo-ease),
+        background 160ms var(--vo-ease);
+}
+
+.slotGrip,
+.slotTrash {
+    width: 26px;
+    height: 26px;
+    top: 8px;
+    border-radius: 8px;
+}
+
+.slotGrip { left: 8px; cursor: grab; }
+.slotTrash { right: 8px; }
+
+.slotBoxCompact .slotGrip,
+.slotBoxCompact .slotTrash {
+    width: 22px;
+    height: 22px;
+    top: 5px;
+    border-radius: 7px;
+}
+
+.slotBoxCompact .slotGrip { left: 5px; }
+.slotBoxCompact .slotTrash { right: 5px; }
+
+/* Barre de cadrage: un seul galet, trois zones separees par un filet. */
+.slotZoomBar {
+    left: 50%;
+    bottom: 8px;
+    height: 26px;
+    transform: translate(-50%, 2px);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.slotZoomBar button {
+    display: grid;
+    height: 100%;
+    min-width: 30px;
+    place-items: center;
+    padding: 0 6px;
+    color: inherit;
+    transition: background 140ms var(--vo-ease);
+}
+
+.slotZoomBar button + button {
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.14);
+}
+
+.slotZoomBar button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.slotZoomBar button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.slotZoomValue {
+    min-width: 46px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+/* Apparition: la poignee et la corbeille au survol de l'apercu (ou quand la
+   case est en cours de cadrage). La barre de cadrage, elle, n'est rendue que
+   pour la case selectionnee: elle est donc visible d'emblee. */
+.canvasWrap:hover .slotGrip,
+.canvasWrap:hover .slotTrash,
+.slotBoxSelected .slotGrip,
+.slotBoxSelected .slotTrash {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.slotZoomBar {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.slotGrip:hover,
+.slotTrash:hover,
+.slotGrip:focus-visible,
+.slotTrash:focus-visible {
+    background: rgba(12, 14, 20, 0.78);
+}
+
+/* Rouge systeme d'Apple: la corbeille est la seule commande destructrice. */
+.slotTrash:hover,
+.slotTrash:focus-visible {
+    background: rgba(255, 69, 58, 0.92);
+}
+
+.slotGrip:active { cursor: grabbing; }
+
+/* Case en cours de cadrage: on deplace la photo dedans. */
+.slotBoxSelected {
+    pointer-events: auto;
+    cursor: grab;
+}
+
+.slotBoxSelected:active { cursor: grabbing; }
+
+.slotDragGhost {
+    position: fixed;
+    z-index: 60;
+    width: 68px;
+    height: 68px;
+    margin: -34px 0 0 -34px;
+    overflow: hidden;
+    border: 1px solid var(--vo-accent-line);
+    border-radius: var(--vo-radius-sm);
+    box-shadow: var(--vo-shadow-2);
+    pointer-events: none;
+}
+
+.slotDragGhost img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ---------- Feuille « Ajouter une photo » ---------- */
+.slotImportActions {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-3);
+    flex-wrap: wrap;
+}
+
+.slotLibraryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--vo-space-2);
+    align-content: start;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.slotLibraryItem {
+    position: relative;
+    display: grid;
+    aspect-ratio: 1 / 1;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-bg-sunken);
+    transition: border-color var(--vo-dur-1) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.slotLibraryItem:hover {
+    border-color: var(--vo-accent-line);
+    transform: translateY(-2px);
+}
+
+.slotLibraryItem img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.slotLibraryBusy {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(10, 12, 20, 0.6);
 }
 
 .zoneBox {
@@ -187,6 +483,15 @@
 .emptyStageBody {
     font-size: var(--vo-text-sm);
     color: var(--vo-text-2);
+}
+
+/* Deux entrees de meme rang: l'appareil et la bibliotheque VibeOS. */
+.emptyStageActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vo-space-3);
 }
 
 .progressWrap {
@@ -349,29 +654,8 @@
     pointer-events: none;
 }
 
-.importedStrip {
-    display: flex;
-    gap: var(--vo-space-2);
-    overflow-x: auto;
-    padding-bottom: 2px;
-}
-
-.importedThumb {
-    position: relative;
-    flex: 0 0 auto;
-    width: 48px;
-    height: 48px;
-    border-radius: var(--vo-radius-sm);
-    border: 1px solid var(--vo-line);
-    overflow: hidden;
-}
-
-.importedThumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
+/* Retrait d'une vignette (textures du fond). La bande des images importees a
+   ete supprimee: une photo vit dans une case, la liste des cases fait foi. */
 .importedRemove {
     position: absolute;
     top: 2px;
@@ -571,6 +855,171 @@
     color: var(--vo-text-3);
 }
 
+/* ---------- Grilles editoriales (panneau + bibliotheque) ---------- */
+.gridPicker {
+    display: grid;
+    gap: var(--vo-space-2);
+    margin-top: var(--vo-space-2);
+    padding-top: var(--vo-space-2);
+    border-top: 1px solid var(--vo-line);
+}
+
+.gridPickerHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-2);
+}
+
+.gridCategoryMenu {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.gridCategoryButton {
+    display: flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 8px;
+    margin-left: -8px;
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-sm);
+    font-weight: 550;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.gridCategoryButton:hover {
+    background: var(--vo-surface-2);
+}
+
+.gridCategoryButton > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gridCategoryChevron {
+    flex: 0 0 auto;
+    color: var(--vo-text-3);
+    transition: transform var(--vo-dur-1) var(--vo-ease);
+}
+
+.gridCategoryChevronOpen {
+    transform: rotate(180deg);
+}
+
+.gridCategoryList {
+    position: absolute;
+    z-index: 20;
+    left: -8px;
+    top: calc(100% + 4px);
+    display: grid;
+    width: max(170px, 100%);
+    gap: 1px;
+    padding: var(--vo-space-2);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    box-shadow: var(--vo-shadow-3, var(--vo-shadow-2));
+}
+
+.gridCategoryOption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-2);
+    padding: 6px var(--vo-space-2);
+    border-radius: var(--vo-radius-sm);
+    font-size: var(--vo-text-sm);
+    text-align: left;
+    white-space: nowrap;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.gridCategoryOption:hover {
+    background: var(--vo-surface-2);
+}
+
+.gridCategoryOptionActive,
+.gridCategoryOptionActive:hover {
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+}
+
+.gridLibraryLink {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 4px var(--vo-space-2);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-sm);
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    transition: border-color var(--vo-dur-1) var(--vo-ease), color var(--vo-dur-1) var(--vo-ease);
+}
+
+.gridLibraryLink:hover {
+    border-color: var(--vo-accent-line);
+    color: var(--vo-accent);
+}
+
+.gridVariants {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+}
+
+.gridVariantsLabel {
+    margin-right: auto;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+}
+
+.gridPickerHint {
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    line-height: 1.4;
+}
+
+.gridPickerHint strong {
+    color: var(--vo-text-2);
+    font-weight: 550;
+}
+
+.gridCardStages {
+    display: grid;
+    grid-template-columns: 5fr 4fr;
+    gap: var(--vo-space-2);
+    align-items: start;
+}
+
+.gridCardStage {
+    display: grid;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-bg-sunken);
+}
+
+.gridCardStage small {
+    color: var(--vo-text-3);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.gridCardStageActive {
+    border-color: var(--vo-accent-line);
+}
+
+.gridCardStageActive small {
+    color: var(--vo-accent);
+}
+
 .generatedChoices {
     display: flex;
     gap: var(--vo-space-2);
@@ -651,169 +1100,24 @@
 }
 
 /* ---------- Apercu Instagram ---------- */
-.phone {
-    margin: 0 auto;
-    width: min(320px, 100%);
-    padding: 10px;
-    border-radius: 38px;
+.previewAuditHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-md);
     background: var(--vo-surface-2);
-    border: 1px solid var(--vo-line-strong);
-    box-shadow: var(--vo-shadow-2);
 }
 
-.phoneScreen {
-    border-radius: 30px;
-    overflow: hidden;
-    background: #000;
-    color: #fff;
-}
-
-.postView {
-    display: flex;
-    flex-direction: column;
-}
-
-.postHead {
-    display: flex;
-    align-items: center;
-    gap: var(--vo-space-2);
-    padding: var(--vo-space-3);
-    font-size: var(--vo-text-sm);
-}
-
-.postAvatar {
-    width: 26px;
-    height: 26px;
-    border-radius: var(--vo-radius-pill);
-    background: linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7);
-}
-
-.postAuthor {
-    flex: 1 1 auto;
-    font-weight: 600;
-}
-
-.postMore {
-    opacity: 0.6;
-}
-
-.postMedia {
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-    background: #0a0a0a;
-}
-
-.postMedia img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.postMediaPano {
-    height: 100%;
-    object-fit: cover;
-    transition: transform var(--vo-dur-3) var(--vo-ease-out);
-}
-
-.panoNav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--vo-radius-pill);
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-}
-
-.panoNavPrev {
-    left: var(--vo-space-2);
-}
-
-.panoNavNext {
-    right: var(--vo-space-2);
-}
-
-.panoDots {
-    display: inline-flex;
-    gap: 4px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.panoDots span {
-    width: 6px;
-    height: 6px;
-    border-radius: var(--vo-radius-pill);
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.panoDots span[data-active='true'] {
-    background: var(--vo-accent);
-}
-
-.postActions {
-    display: flex;
-    align-items: center;
-    gap: var(--vo-space-4);
-    padding: var(--vo-space-3);
-}
-
-.postSave {
-    margin-left: auto;
-}
-
-.postCaption {
-    padding: 0 var(--vo-space-3) var(--vo-space-4);
-    font-size: var(--vo-text-sm);
-    color: rgba(255, 255, 255, 0.85);
-}
-
-.storyView {
-    position: relative;
-    aspect-ratio: 9 / 16;
-    background: #000;
-}
-
-.storyView img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.storyBar {
-    position: absolute;
-    top: 10px;
-    left: 12px;
-    right: 12px;
-    height: 2px;
-    border-radius: var(--vo-radius-pill);
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.storyBar span {
-    display: block;
-    width: 34%;
-    height: 100%;
-    border-radius: var(--vo-radius-pill);
-    background: #fff;
-}
-
-.storyFoot {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 14px;
-    padding: var(--vo-space-2) var(--vo-space-4);
-    border-radius: var(--vo-radius-pill);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    font-size: var(--vo-text-sm);
-    color: rgba(255, 255, 255, 0.9);
-}
+.previewAuditHead div { display: grid; gap: 2px; }
+.previewAuditHead strong { font-size: var(--vo-text-sm); }
+.previewAuditHead div span { color: var(--vo-text-2); font-size: var(--vo-text-xs); font-variant-numeric: tabular-nums; }
+.previewReady { padding: 4px 9px; border-radius: var(--vo-radius-pill); background: var(--vo-success-quiet, rgba(34, 197, 94, 0.12)); color: var(--vo-success, #55c98a); font-size: var(--vo-text-xs); font-weight: 600; }
+.previewState { display: grid; min-height: 220px; place-items: center; color: var(--vo-text-2); }
+.previewStateError { color: var(--vo-danger); }
+.referencePhoneStage { width: 100%; height: min(72dvh, 760px); min-height: 440px; overflow: hidden; }
 
 /* ---------- Export ---------- */
 .exportRow {

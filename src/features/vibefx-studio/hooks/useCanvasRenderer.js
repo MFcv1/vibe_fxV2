@@ -149,8 +149,8 @@ export default function useCanvasRenderer({
             const hasTextsOrAssets = (texts && texts.length > 0) || (assets && assets.length > 0);
             if (images.length === 0 && !hasCustomSlots && !hasGeneratedLayoutBackground && !hasTextsOrAssets) {
                 slotRects.current = [];
-                if (setSlotRectsState) {
-                    setSlotRectsState([]);
+                if (setSlotRectsState && isPreview) {
+                    setSlotRectsState({ rects: [], width: w, height: h });
                 }
                 return;
             }
@@ -274,7 +274,7 @@ export default function useCanvasRenderer({
 
             // 4. Slot selection
             if (isPreview && selectedSlotIndex !== null) {
-                renderSlotSelection(ctx, { selectedSlotIndex, slotRects: slotRectsArray });
+                renderSlotSelection(ctx, { selectedSlotIndex, slotRects: slotRectsArray, canvasWidth: w });
             }
 
             // 5. Assets
@@ -300,15 +300,17 @@ export default function useCanvasRenderer({
 
             // Sync slotRects ref
             slotRects.current = slotRectsArray;
-            if (setSlotRectsState) {
-                setSlotRectsState(slotRectsArray);
+            /* Seul l'apercu est publie a React: le canvas d'export a d'autres
+               dimensions, et l'interface pose ses reperes sur l'apercu. */
+            if (setSlotRectsState && isPreview) {
+                setSlotRectsState({ rects: slotRectsArray, width: w, height: h });
             }
 
         } else {
             // Studio
             slotRects.current = [];
             if (setSlotRectsState) {
-                setSlotRectsState([]);
+                setSlotRectsState({ rects: [], width: 0, height: 0 });
             }
             renderStudio(ctx, targetCanvas, w, h, isPreview, quality, {
                 images, cropRatio, cropPos, cropScale, isCropping,
@@ -335,7 +337,7 @@ export default function useCanvasRenderer({
         if ((!images.length && !canRenderEmpty) || !canvasRef.current) {
             slotRects.current = [];
             if (setSlotRectsState) {
-                setSlotRectsState([]);
+                setSlotRectsState({ rects: [], width: 0, height: 0 });
             }
             return;
         }
@@ -344,7 +346,7 @@ export default function useCanvasRenderer({
         if (width === 0 || height === 0) {
             slotRects.current = [];
             if (setSlotRectsState) {
-                setSlotRectsState([]);
+                setSlotRectsState({ rects: [], width: 0, height: 0 });
             }
             return;
         }

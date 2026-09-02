@@ -1,0 +1,70 @@
+.scaledStage { margin: 0 auto; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; }
+.scaleBox { position: relative; }
+.scaleContent { position: absolute; left: 0; top: 0; transform-origin: left top; }
+.sideButton { position: absolute; width: 5px; background: #343330; }
+.silentButton { left: -4px; top: 171px; height: 35px; border-radius: 3px 0 0 3px; }
+.volumeUpButton { left: -4px; top: 224px; height: 69px; border-radius: 3px 0 0 3px; }
+.volumeDownButton { left: -4px; top: 310px; height: 69px; border-radius: 3px 0 0 3px; }
+.powerButton { right: -4px; top: 251px; height: 108px; border-radius: 0 3px 3px 0; }
+.phoneOuter { position: absolute; inset: 0; border-radius: 76px; background: #77736d; box-shadow: 0 34px 70px rgba(28,25,23,.28), 0 10px 24px rgba(28,25,23,.18); }
+.phoneMiddle { position: absolute; inset: 3px; border-radius: 73px; background: #1d1d1c; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+.phoneInner { position: absolute; inset: 8px; border-radius: 68px; background: #000; box-shadow: inset 0 0 0 1px #000; }
+.statusBar { position: relative; display: flex; height: 54px; align-items: center; justify-content: space-between; padding: 3px 29px 0; }
+.darkTone { color: #000; }
+.lightTone { color: #fff; }
+.statusTime { width: 80px; text-align: center; font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.dynamicIsland { position: absolute; left: 50%; top: 10px; width: 126px; height: 36px; transform: translateX(-50%); border-radius: 999px; background: #000; }
+.dynamicIsland span { position: absolute; right: 9px; top: 50%; width: 10px; height: 10px; transform: translateY(-50%); border-radius: 999px; background: #15181d; box-shadow: inset 0 0 0 1px #262a31; }
+.statusSignals { display: flex; width: 80px; align-items: center; justify-content: center; gap: 6px; }
+.cellular { width: 18px; height: 12px; }
+.wifi { width: 17px; height: 13px; }
+.battery { position: relative; width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; }
+.battery span { position: absolute; inset: 2px; border-radius: 1px; background: currentColor; }
+.battery i { position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; border-radius: 0 2px 2px 0; background: currentColor; opacity: .45; }
+.phoneScreen { position: absolute; left: 14px; top: 18px; overflow: hidden; border-radius: 58px; }
+.homeIndicator { position: absolute; bottom: 6px; left: 50%; width: 134px; height: 5px; transform: translateX(-50%); border-radius: 999px; }
+.homeDark { background: #000; }
+.homeLight { background: #fff; }
+.instagramHeader { display: flex; height: 48px; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid rgba(0,0,0,.08); }
+.instagramWordmark { transform: translateY(-1px); font-family: "Brush Script MT", "Segoe Script", cursive; font-size: 29px; line-height: 1; letter-spacing: -.045em; }
+.headerIcons { display: flex; align-items: center; gap: 18px; }
+.accountRow { display: flex; height: 56px; align-items: center; justify-content: space-between; padding: 0 13px; }
+.accountIdentity { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.accountIdentity > div:last-child { min-width: 0; line-height: 1.1; }
+.accountIdentity p { margin: 0; overflow: hidden; font-size: 13px; font-weight: 600; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+.accountIdentity small { display: block; margin-top: 3px; overflow: hidden; color: rgba(0,0,0,.62); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.avatar, .avatarSmall { display: grid; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,.1); border-radius: 999px; background: #f5efe8; color: #7c4d44; font-weight: 700; }
+.avatar { width: 36px; height: 36px; font-size: 11px; }
+.avatarSmall { width: 25px; height: 25px; border-color: rgba(0,0,0,.8); font-size: 8px; }
+.moreDots { padding-bottom: 8px; font-size: 22px; font-weight: 500; letter-spacing: 1.5px; }
+.feedScreen { display: flex; flex-direction: column; }
+.feedFiller { flex: 1 1 auto; min-height: 0; border-top: 1px solid rgba(0,0,0,.08); background: #fff; }
+.mediaViewport { position: relative; flex: 0 0 auto; height: 502px; overflow: hidden; background: #f3f2ef; touch-action: pan-y; user-select: none; }
+.mediaViewport > img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+.emptyMedia { display: grid; height: 100%; place-items: center; color: rgba(0,0,0,.4); font-size: 13px; }
+.mediaCounter { position: absolute; right: 12px; top: 12px; padding: 5px 9px; border-radius: 999px; background: rgba(0,0,0,.72); color: #fff; font-size: 11px; font-weight: 600; }
+.mediaHit { position: absolute; top: 0; bottom: 0; width: 56px; padding: 0; border: 0; background: transparent; }
+.mediaHitLeft { left: 0; cursor: w-resize; }
+.mediaHitRight { right: 0; cursor: e-resize; }
+.actionRow { position: relative; display: flex; height: 46px; align-items: center; justify-content: space-between; padding: 0 13px; }
+.actionRow > div:first-child { display: flex; align-items: center; gap: 17px; }
+.dotRow { position: absolute; left: 50%; display: flex; max-width: 96px; transform: translateX(-50%); align-items: center; justify-content: center; gap: 4px; overflow: hidden; }
+.dotRow span { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 999px; background: rgba(0,0,0,.2); }
+.dotRow span[data-active='true'] { background: #0095f6; }
+.captionBlock { height: 78px; overflow: hidden; padding: 0 13px 8px; font-size: 12.5px; line-height: 1.32; letter-spacing: -.005em; }
+.captionBlock p { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.captionBlock strong { margin-right: 5px; font-weight: 600; }
+.captionBlock b { font-weight: 600; }
+.captionMuted { color: rgba(0,0,0,.44); }
+.hashtags { color: #00376b; }
+.moreCaption { color: rgba(0,0,0,.48); }
+.bottomNav { position: relative; display: flex; height: 56px; align-items: flex-start; justify-content: space-between; padding: 9px 24px 0; border-top: 1px solid rgba(0,0,0,.08); }
+.storyScreen { position: relative; }
+.storyScreen > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.storyScreen > div:first-of-type { position: relative; z-index: 3; }
+.storyBar { position: absolute; z-index: 3; left: 13px; right: 13px; top: 58px; height: 3px; border-radius: 999px; background: rgba(255,255,255,.35); }
+.storyBar i { display: block; width: 38%; height: 100%; border-radius: inherit; background: #fff; }
+.storyHead { position: absolute; z-index: 3; left: 13px; right: 13px; top: 70px; display: grid; grid-template-columns: 36px auto 1fr auto; align-items: center; gap: 10px; text-shadow: 0 1px 5px rgba(0,0,0,.6); }
+.storyHead small { color: rgba(255,255,255,.72); }
+.storyBottom { position: absolute; z-index: 3; left: 18px; right: 18px; bottom: 28px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 17px; }
+.storyBottom > span { padding: 11px 16px; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; font-size: 13px; }

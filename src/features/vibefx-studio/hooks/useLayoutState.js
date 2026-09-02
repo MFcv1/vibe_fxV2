@@ -13,11 +13,21 @@ export const useLayoutState = () => {
     const [activeTextId, setActiveTextId] = useState(null);
     const [activeAssetId, setActiveAssetId] = useState(null);
 
-    const [padding, setPadding] = useState(40);
-    const [gap, setGap] = useState(20);
+    /*
+     * Marges egales par defaut: la marge exterieure vaut l'ecart entre les
+     * images, sinon la composition sort dissymetrique (bord large, gouttieres
+     * fines) sans que personne ne l'ait demande.
+     */
+    const [padding, setPadding] = useState(24);
+    const [gap, setGap] = useState(24);
     const [radius, setRadius] = useState(0);
-    const [layoutBgColor, setLayoutBgColor] = useState('#000000');
-    const [layoutBgBlur, setLayoutBgBlur] = useState(true);
+    /*
+     * Fond neutre par defaut. Avant, `layoutBgBlur` demarrait a `true`: la
+     * premiere photo importee etait recopiee, floutee, derriere la grille -
+     * un choix esthetique impose, et la meme image se retrouvait deux fois.
+     */
+    const [layoutBgColor, setLayoutBgColor] = useState('#ffffff');
+    const [layoutBgBlur, setLayoutBgBlur] = useState(false);
     const [layoutBgTexture, setLayoutBgTexture] = useState(15);
     const [selectedSlotIndex, setSelectedSlotIndex] = useState(null);
     const [slotConfigs, setSlotConfigs] = useState({});

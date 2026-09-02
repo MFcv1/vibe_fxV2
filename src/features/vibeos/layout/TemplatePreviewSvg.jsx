@@ -63,17 +63,19 @@ export default function TemplatePreviewSvg({
             aria-hidden="true"
         >
             <rect x="0" y="0" width={viewW} height={viewH} rx="4" fill={bgColor} />
+            {/* Vignettes de 44px dans le panneau: sous 20% d'opacite, le
+                decoupage de la grille ne se lit plus. */}
             {drawZones.map((zone, index) => (
                 <rect
                     key={zone.id || index}
-                    x={zone.x * viewW + 1}
-                    y={zone.y * viewH + 1}
-                    width={Math.max(2, zone.w * viewW - 2)}
-                    height={Math.max(2, zone.h * viewH - 2)}
+                    x={zone.x * viewW + 1.2}
+                    y={zone.y * viewH + 1.2}
+                    width={Math.max(2, zone.w * viewW - 2.4)}
+                    height={Math.max(2, zone.h * viewH - 2.4)}
                     rx="2"
-                    fill="rgba(255,255,255,0.14)"
-                    stroke="rgba(255,255,255,0.22)"
-                    strokeWidth="0.6"
+                    fill="rgba(255,255,255,0.2)"
+                    stroke="rgba(255,255,255,0.3)"
+                    strokeWidth="0.7"
                 />
             ))}
             {texts.slice(0, 4).map((text, index) => {

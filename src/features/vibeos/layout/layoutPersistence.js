@@ -11,6 +11,7 @@
  */
 
 import { DEFAULT_CUSTOM_TEMPLATE, FORMATS, TEMPLATES } from '../../vibefx-studio/data/constants';
+import { applyVisionStage, canvasToImage, visionRevision } from '../project/pipeline';
 
 let idCounter = 0;
 const nextId = (prefix) => {
@@ -95,7 +96,10 @@ export async function snapshotComposition(state, cache) {
     const serializedImages = [];
     for (const img of orderedImages) {
         const id = ensureImageId(img);
-        const blob = await srcToBlob(img.src, cache);
+        /* Une image affichee dans Layout peut etre le rendu Vision. On persiste
+           toujours son original, sinon chaque sauvegarde cuirait le preset une
+           fois de plus et rendrait tout retour en arriere impossible. */
+        const blob = img.vibeosSourceBlob || await srcToBlob(img.src, cache);
         if (!blob) continue;
         serializedImages.push({
             id,
@@ -110,6 +114,9 @@ export async function snapshotComposition(state, cache) {
         if (!config) return;
         slots[slotId] = {
             imageId: config.image?.vibeosId || null,
+            /* Case videe a la main: sans ce drapeau, la reprise la remplirait a
+               nouveau avec l'image "naturelle" de sa position. */
+            imageCleared: 'image' in config && !config.image,
             imageName: config.imageName || null,
             zoom: config.zoom ?? 1,
             x: config.x ?? 0,
@@ -150,6 +157,10 @@ export async function snapshotComposition(state, cache) {
                 id: 'custom',
                 label: activeTemplate.label,
                 presetId: activeTemplate.customLayout?.presetId || 'manual',
+                /* Miroirs / rotation des photos et retouches manuelles: sans
+                   eux la grille se recompile a plat a la reouverture. */
+                transform: activeTemplate.customLayout?.transform || null,
+                dirty: Boolean(activeTemplate.customLayout?.dirty),
                 zones: activeTemplate.customLayout?.zones || [],
             }
             : activeTemplate.id,
@@ -158,7 +169,7 @@ export async function snapshotComposition(state, cache) {
         slots,
         texts: (texts || []).map((text) => ({ ...text })),
         assets: (assets || []).map((asset) => ({ ...asset })),
-        geometry: { padding, gap, radius, customLayoutGap },
+        geometry: { padding, gap, radius, customLayoutGap, linkedMargins: state.linkedMargins !== false },
         background: {
             color: layoutBgColor,
             blur: layoutBgBlur,
@@ -177,14 +188,26 @@ export async function snapshotComposition(state, cache) {
  * Enregistrement projet -> etat de l'editeur. Les Blobs redeviennent des
  * elements Image (objectURL), exactement ce que consomment les moteurs.
  */
-export async function restoreComposition(project) {
+export async function restoreComposition(project, { applyVision = false } = {}) {
     if (!project) return null;
 
     const imagesById = new Map();
     const images = [];
     for (const record of project.images || []) {
-        const img = await loadImageFromBlob(record.blob, record.name);
-        if (!img) continue;
+        const original = await loadImageFromBlob(record.blob, record.name);
+        if (!original) continue;
+        let img = original;
+        if (applyVision) {
+            const visionCanvas = applyVisionStage(original, project);
+            const treated = visionCanvas ? await canvasToImage(visionCanvas, record.name) : null;
+            if (treated) {
+                treated.vibeosOriginalSrc = original.src;
+                img = treated;
+            }
+        }
+        /* Le rendu courant peut changer; le Blob source ne change jamais. */
+        img.vibeosSourceBlob = record.blob;
+        img.vibeosVisionRevision = visionRevision(project.vision);
         img.vibeosId = record.id;
         if (record.slotId !== null && record.slotId !== undefined) {
             img.isSlotSpecific = true;
@@ -205,6 +228,7 @@ export async function restoreComposition(project) {
             blur: stored.blur ?? 0,
             ...(stored.bgColor ? { bgColor: stored.bgColor } : {}),
             ...(img ? { image: img, imageSrc: img.src, imageName: stored.imageName || img.name } : {}),
+            ...(!img && stored.imageCleared ? { image: null, imageSrc: null } : {}),
         };
     });
 
@@ -248,6 +272,8 @@ export async function restoreComposition(project) {
             customLayout: {
                 version: 1,
                 presetId: project.template.presetId || 'manual',
+                transform: project.template.transform || null,
+                dirty: Boolean(project.template.dirty),
                 zones,
             },
         };

@@ -11,8 +11,11 @@ import { DEFAULT_CUSTOM_LAYOUT_GAP, DEFAULT_CUSTOM_TEMPLATE, FORMATS, TEMPLATES 
 import {
     createCustomZone, normalizeCustomZones, updateCustomTemplateZones,
 } from '../../vibefx-studio/utils/customLayout';
+import {
+    DEFAULT_GRID_TRANSFORM, buildGridZones, findGridPreset, mirrorZones, rotateZoneImages,
+} from './gridLibrary';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
-import { canvasToBlob } from '../project/pipeline';
+import { canvasToBlob, visionRevision } from '../project/pipeline';
 import { hasStoredComposition, restoreComposition, snapshotComposition } from './layoutPersistence';
 
 /*
@@ -42,6 +45,53 @@ const DEFAULT_SMOOTH_BLUR_STATE = {
     easeType: 'in',
     reverse: false,
 };
+
+const DEFAULT_SLOT_CONFIG = { zoom: 1, x: 0, y: 0, border: 0, blur: 0 };
+
+/*
+ * Le moteur republie la geometrie des cases a chaque rendu d'apercu (y compris
+ * pendant qu'on deplace une photo dans sa case). On ne remonte au React que
+ * quand elle a VRAIMENT change: sinon l'interface se re-rendrait a chaque
+ * image du glissement.
+ */
+const sameSlotGeometry = (a, b) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.width !== b.width || a.height !== b.height) return false;
+    if (a.rects.length !== b.rects.length) return false;
+    return a.rects.every((rect, index) => {
+        const other = b.rects[index];
+        return rect.id === other.id
+            && rect.x === other.x && rect.y === other.y
+            && rect.w === other.w && rect.h === other.h
+            && rect.hasImage === other.hasImage;
+    });
+};
+
+/* Meme lecture que `useImageUpload` (objectURL, repli FileReader). */
+const readImageFile = (file) => new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new window.Image();
+    image.onload = () => {
+        image.name = file.name;
+        resolve({ image, src: objectUrl, name: file.name });
+    };
+    image.onerror = () => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const fallback = new window.Image();
+            fallback.onload = () => {
+                fallback.name = file.name;
+                resolve({ image: fallback, src: fallback.src, name: file.name });
+            };
+            fallback.onerror = () => resolve(null);
+            fallback.src = event.target.result;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    };
+    image.src = objectUrl;
+});
 
 const mapTextsWithIds = (texts = []) => {
     const stamp = Date.now();
@@ -83,6 +133,13 @@ export default function useLayoutEditor() {
     /* ---- Etat complementaire (meme forme que VibeFxStudio.jsx) ---- */
     const [images, setImages] = useState([]);
     const [customLayoutGap, setCustomLayoutGap] = useState(DEFAULT_CUSTOM_LAYOUT_GAP);
+    /*
+     * « Marges égales »: la marge exterieure (autour du visuel) et l'ecart
+     * entre les images sont pilotes ensemble. C'est ce qui donne une
+     * composition symetrique - meme respiration au bord et entre les blocs -
+     * sans avoir a accorder trois curseurs a la main.
+     */
+    const [linkedMargins, setLinkedMargins] = useState(true);
     const [layoutBgGradient, setLayoutBgGradient] = useState(false);
     const [layoutBgMeshColors, setLayoutBgMeshColors] = useState(DEFAULT_LAYOUT_MESH_COLORS);
     const [layoutLumenBackground, setLayoutLumenBackground] = useState(null);
@@ -102,6 +159,10 @@ export default function useLayoutEditor() {
     const canvasRef = useRef(null);
     const bgCanvasRef = useRef(null);
     const slotRects = useRef([]);
+    const [slotGeometry, setSlotGeometry] = useState({ rects: [], width: 0, height: 0 });
+    const publishSlotGeometry = useCallback((next) => {
+        setSlotGeometry((previous) => (sameSlotGeometry(previous, next) ? previous : next));
+    }, []);
     const requestRef = useRef(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
     const dragOffset = useRef({ x: 0, y: 0 });
@@ -121,7 +182,7 @@ export default function useLayoutEditor() {
         cropRatio: 'original', cropPos: { x: 0, y: 0 }, cropScale: 1, isCropping: false,
         filters: {},
         isDragging, requestRef,
-        setSlotRectsState: null,
+        setSlotRectsState: publishSlotGeometry,
     });
 
     const { handlePointerDown, handlePointerMove, handlePointerUp } = useCanvasEvents({
@@ -198,18 +259,7 @@ export default function useLayoutEditor() {
         setImages((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
-    /* Retire l'image d'une zone sans toucher aux autres (miroir de
-       VibeFxStudio.handleRemoveSlotImage, version zone-only). */
-    const handleRemoveSlotImage = useCallback((slotId) => {
-        setSlotConfigs((prev) => {
-            if (!prev[slotId]) return prev;
-            const config = { ...prev[slotId] };
-            delete config.image;
-            delete config.imageSrc;
-            delete config.imageName;
-            return { ...prev, [slotId]: config };
-        });
-    }, [setSlotConfigs]);
+
 
     /* ---- Textures du fond (moteur renderLayoutImageTexture, inchange) ---- */
 
@@ -239,6 +289,244 @@ export default function useLayoutEditor() {
             return next;
         });
     }, []);
+
+    /* ---- Marges ---- */
+
+    /* Marge unique: bord du visuel ET gouttieres entre les images. */
+    const setUniformMargin = useCallback((value) => {
+        setPadding(value);
+        setGap(value);
+        setCustomLayoutGap(value);
+    }, [setPadding, setGap]);
+
+    /* Ecart entre les images seul (les deux moteurs de gouttiere: modeles
+       integres et grilles personnalisees). */
+    const setInnerGap = useCallback((value) => {
+        setGap(value);
+        setCustomLayoutGap(value);
+    }, [setGap]);
+
+    /* Passer en marges egales aligne tout de suite sur la marge exterieure. */
+    const toggleLinkedMargins = useCallback((linked) => {
+        setLinkedMargins(linked);
+        if (linked) setUniformMargin(padding);
+    }, [padding, setUniformMargin]);
+
+    /* ---- Une photo par case: resolution, affectation, echange ---- */
+
+    /*
+     * Index de l'image "naturelle" d'une case: pour une grille, celui que porte
+     * la zone; pour un modele integre, la position de la case.
+     */
+    const slotImageIndex = useCallback((slotId) => {
+        if (activeTemplate.id !== 'custom') return Number(slotId);
+        const zones = (activeTemplate.customLayout?.zones || []).filter((zone) => !zone.hidden);
+        const index = zones.findIndex((zone) => zone.id === slotId);
+        if (index < 0) return -1;
+        return zones[index].imageIndex ?? index;
+    }, [activeTemplate]);
+
+    /* La photo reellement affichee dans une case, ou null si la case est vide. */
+    const resolveSlotImage = useCallback((slotId) => {
+        const config = slotConfigs[slotId];
+        if (config && 'image' in config) {
+            return config.image
+                ? { image: config.image, src: config.imageSrc || config.image.src, name: config.imageName || config.image.name }
+                : null;
+        }
+        const index = slotImageIndex(slotId);
+        const image = index >= 0 ? images[index] : null;
+        if (!image) return null;
+        /* Une photo importee dans une case precise n'appartient qu'a elle. */
+        if (image.isSlotSpecific && image.slotId !== slotId) return null;
+        return { image, src: image.src, name: image.name };
+    }, [images, slotConfigs, slotImageIndex]);
+
+    /* Les cases d'un modele, dans l'ordre de lecture. */
+    const templateSlotIds = useCallback((template) => (
+        template.id === 'custom'
+            ? (template.customLayout?.zones || []).filter((zone) => !zone.hidden).map((zone) => zone.id)
+            : Array.from({ length: template.slots || 1 }, (_, index) => index)
+    ), []);
+
+    /*
+     * Changer de modele NE DOIT PAS perdre les photos: elles suivent dans les
+     * nouvelles cases, dans l'ordre de lecture. Une photo importee dans une
+     * case porte son identifiant (`isSlotSpecific`), donc sans ce report elle
+     * restait accrochee a une case qui n'existe plus.
+     */
+    const applyTemplateWithPhotos = useCallback((nextTemplate) => {
+        const currentIds = templateSlotIds(activeTemplate);
+        const visible = currentIds.map((id) => resolveSlotImage(id)).filter(Boolean);
+        /* Une grille plus large sert d'abord les photos affichees, puis celles
+           qui attendaient en reserve, dans leur ordre d'import. */
+        const shown = new Set(visible.map((photo) => photo.image));
+        const reserve = images
+            .filter((image) => !shown.has(image))
+            .map((image) => ({ image, src: image.src, name: image.name }));
+        const photos = [...visible, ...reserve];
+        const nextIds = templateSlotIds(nextTemplate);
+        setActiveTemplate(nextTemplate);
+        setSlotConfigs((previous) => {
+            const next = { ...previous };
+            nextIds.forEach((id, index) => {
+                const photo = photos[index] || null;
+                if (photo?.image) {
+                    photo.image.isSlotSpecific = true;
+                    photo.image.slotId = id;
+                }
+                next[id] = {
+                    ...(previous[id] || DEFAULT_SLOT_CONFIG),
+                    image: photo?.image || null,
+                    imageSrc: photo?.src || null,
+                    imageName: photo?.name || null,
+                };
+            });
+            /* Les photos sans case repartent en reserve: plus d'attache a une
+               case disparue, elles reviendront dans une grille plus large. */
+            photos.slice(nextIds.length).forEach((photo) => {
+                if (photo.image) photo.image.isSlotSpecific = false;
+            });
+            return next;
+        });
+        setSelectedSlotIndex(null);
+    }, [activeTemplate, images, resolveSlotImage, setActiveTemplate, setSlotConfigs, setSelectedSlotIndex, templateSlotIds]);
+
+    /*
+     * Retirer la photo d'une case la retire VRAIMENT du projet quand plus
+     * aucune autre case ne s'en sert: chaque image est enregistree en Blob, la
+     * garder en reserve alourdirait la sauvegarde pour rien.
+     *
+     * Avant de toucher au tableau, on fige l'affectation de toutes les cases:
+     * une case sans reglage explicite lit `images[index]`, donc retirer un
+     * element ferait glisser les photos d'une case a l'autre.
+     */
+    const handleRemoveSlotImage = useCallback((slotId) => {
+        const removed = resolveSlotImage(slotId)?.image || null;
+        const slotIds = templateSlotIds(activeTemplate);
+
+        setSlotConfigs((previous) => {
+            const next = { ...previous };
+            slotIds.forEach((id) => {
+                const current = id === slotId ? null : resolveSlotImage(id);
+                next[id] = {
+                    ...(previous[id] || DEFAULT_SLOT_CONFIG),
+                    image: current?.image || null,
+                    imageSrc: current?.src || null,
+                    imageName: current?.name || null,
+                };
+            });
+            return next;
+        });
+
+        if (removed) {
+            const stillUsed = slotIds.some((id) => id !== slotId && resolveSlotImage(id)?.image === removed);
+            if (!stillUsed) setImages((previous) => previous.filter((image) => image !== removed));
+        }
+        setSelectedSlotIndex((current) => (current === slotId ? null : current));
+    }, [activeTemplate, resolveSlotImage, setImages, setSlotConfigs, setSelectedSlotIndex, templateSlotIds]);
+
+    /* Pose une photo dans une case (import appareil, bibliotheque, echange).
+       `payload` a null vide la case explicitement. */
+    const assignSlotImage = useCallback((slotId, payload) => {
+        if (slotId === null || slotId === undefined) return;
+        setSlotConfigs((previous) => ({
+            ...previous,
+            [slotId]: {
+                ...(previous[slotId] || DEFAULT_SLOT_CONFIG),
+                image: payload?.image || null,
+                imageSrc: payload?.src || null,
+                imageName: payload?.name || null,
+                /* Une nouvelle photo repart d'un cadrage neutre. */
+                x: 0,
+                y: 0,
+                zoom: 1,
+            },
+        }));
+    }, [setSlotConfigs]);
+
+    /*
+     * Cadrage d'une photo DANS sa case: zoom, deplacement, remise a plat.
+     * Le moteur lit `zoom` (1 = l'image remplit la case) et `x`/`y` en pourcent
+     * de la case; on borne a 1 pour ne jamais laisser de vide dans le cadre.
+     */
+    const zoomSlot = useCallback((slotId, factor) => {
+        if (slotId === null || slotId === undefined) return;
+        setSlotConfigs((previous) => {
+            const config = previous[slotId] || DEFAULT_SLOT_CONFIG;
+            const zoom = Math.min(4, Math.max(1, (config.zoom ?? 1) * factor));
+            return { ...previous, [slotId]: { ...config, zoom } };
+        });
+    }, [setSlotConfigs]);
+
+    const panSlot = useCallback((slotId, deltaXPercent, deltaYPercent) => {
+        if (slotId === null || slotId === undefined) return;
+        setSlotConfigs((previous) => {
+            const config = previous[slotId] || DEFAULT_SLOT_CONFIG;
+            return {
+                ...previous,
+                [slotId]: {
+                    ...config,
+                    x: Math.min(100, Math.max(-100, (config.x ?? 0) + deltaXPercent)),
+                    y: Math.min(100, Math.max(-100, (config.y ?? 0) + deltaYPercent)),
+                },
+            };
+        });
+    }, [setSlotConfigs]);
+
+    const resetSlotFraming = useCallback((slotId) => {
+        if (slotId === null || slotId === undefined) return;
+        setSlotConfigs((previous) => ({
+            ...previous,
+            [slotId]: { ...(previous[slotId] || DEFAULT_SLOT_CONFIG), zoom: 1, x: 0, y: 0 },
+        }));
+    }, [setSlotConfigs]);
+
+    /* Echange le contenu de deux cases (glisser-deposer sur l'apercu). */
+    const swapSlotImages = useCallback((fromId, toId) => {
+        if (fromId === toId || fromId === null || toId === null) return;
+        const from = resolveSlotImage(fromId);
+        const to = resolveSlotImage(toId);
+        const put = (payload, slotId, previous) => ({
+            ...(previous || DEFAULT_SLOT_CONFIG),
+            image: payload?.image || null,
+            imageSrc: payload?.src || null,
+            imageName: payload?.name || null,
+        });
+        setSlotConfigs((previous) => ({
+            ...previous,
+            /* Le cadrage suit sa photo: zoom et recadrage restent coherents. */
+            [fromId]: { ...put(to, fromId, previous[toId]), bgColor: previous[fromId]?.bgColor },
+            [toId]: { ...put(from, toId, previous[fromId]), bgColor: previous[toId]?.bgColor },
+        }));
+        setSelectedSlotIndex(toId);
+    }, [resolveSlotImage, setSlotConfigs, setSelectedSlotIndex]);
+
+    /* Import d'un fichier local DANS une case precise. */
+    const importImageIntoSlot = useCallback((file, slotId) => {
+        if (!file || slotId === null || slotId === undefined) return;
+        setIsProcessing(true);
+        const image = new window.Image();
+        const objectUrl = URL.createObjectURL(file);
+        image.onload = () => {
+            image.name = file.name;
+            image.isSlotSpecific = true;
+            image.slotId = slotId;
+            setImages((previous) => [...previous, image]);
+            assignSlotImage(slotId, { image, src: objectUrl, name: file.name });
+            setSelectedSlotIndex(slotId);
+            setIsProcessing(false);
+        };
+        image.onerror = () => setIsProcessing(false);
+        image.src = objectUrl;
+    }, [assignSlotImage, setImages, setSelectedSlotIndex]);
+
+    /* Meme chose depuis un Blob de la bibliotheque VibeOS. */
+    const importBlobIntoSlot = useCallback(async (blob, slotId, name = 'photo') => {
+        if (!blob || slotId === null || slotId === undefined) return;
+        const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type || 'image/jpeg' });
+        importImageIntoSlot(file, slotId);
+    }, [importImageIntoSlot]);
 
     /* ---- Zones du modele personnalise (utils/customLayout.js, inchange) ---- */
 
@@ -297,7 +585,15 @@ export default function useLayoutEditor() {
             const zones = currentZones.map((zone) => (
                 zone.id === zoneId ? { ...zone, ...updatedZone, ...homePatch, hidden: false } : zone
             ));
-            return updateCustomTemplateZones(previousTemplate, normalizeCustomZones(zones, zoneId));
+            /* Grille retouchee a la main: un changement de format ne doit plus
+               la recompiler par-dessus (voir l'effet de re-compilation). */
+            return updateCustomTemplateZones(
+                {
+                    ...previousTemplate,
+                    customLayout: { ...previousTemplate.customLayout, dirty: true },
+                },
+                normalizeCustomZones(zones, zoneId),
+            );
         });
     }, [setActiveTemplate]);
 
@@ -306,7 +602,13 @@ export default function useLayoutEditor() {
         setActiveTemplate((previousTemplate) => {
             if (previousTemplate.id !== 'custom') return previousTemplate;
             const zones = (previousTemplate.customLayout?.zones || []).filter((zone) => zone.id !== zoneId);
-            return updateCustomTemplateZones(previousTemplate, zones);
+            return updateCustomTemplateZones(
+                {
+                    ...previousTemplate,
+                    customLayout: { ...previousTemplate.customLayout, dirty: true },
+                },
+                zones,
+            );
         });
         setSelectedSlotIndex((current) => (current === zoneId ? null : current));
         setSlotConfigs((previous) => {
@@ -523,15 +825,127 @@ export default function useLayoutEditor() {
     /* ---- Application de templates ---- */
 
     const applyCustomPreset = useCallback((preset) => {
-        setActiveTemplate({
+        applyTemplateWithPhotos({
             ...DEFAULT_CUSTOM_TEMPLATE,
             label: preset.label,
             slots: preset.zones.length,
             customLayout: { version: 1, presetId: preset.id, zones: preset.zones },
         });
-        setSelectedSlotIndex(null);
         setActiveTextId(null);
-    }, [setActiveTemplate, setSelectedSlotIndex, setActiveTextId]);
+    }, [applyTemplateWithPhotos, setActiveTextId]);
+
+    /*
+     * Grilles de la bibliotheque (gridLibrary.js): la geometrie est COMPILEE
+     * pour le format courant, pas recopiee. C'est ce qui permet a une meme
+     * grille d'exister en 4:5 et en 1:1 sans etre etiree.
+     */
+    const applyGridPreset = useCallback((preset) => {
+        if (!preset) return;
+        const transform = { ...DEFAULT_GRID_TRANSFORM };
+        const zones = buildGridZones(preset, activeFormat, transform);
+        applyTemplateWithPhotos({
+            ...DEFAULT_CUSTOM_TEMPLATE,
+            label: preset.label,
+            slots: zones.length,
+            customLayout: {
+                version: 1, presetId: preset.id, transform, dirty: false, zones,
+            },
+        });
+        setActiveTextId(null);
+    }, [activeFormat, applyTemplateWithPhotos, setActiveTextId]);
+
+    /*
+     * Variantes d'une meme grille: miroir horizontal / vertical, et rotation
+     * des photos d'une zone a l'autre. Quand la grille vient de la
+     * bibliotheque on la recompile depuis sa definition (exact, et le miroir
+     * survit a un changement de format); sinon on transforme les zones
+     * posees a la main, l'operation etant sa propre inverse.
+     */
+    const transformGrid = useCallback((patch) => {
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            const layout = previousTemplate.customLayout || {};
+            const current = { ...DEFAULT_GRID_TRANSFORM, ...(layout.transform || {}) };
+            const next = { ...current, ...patch };
+            const preset = layout.dirty ? null : findGridPreset(layout.presetId);
+            let zones;
+            if (preset) {
+                zones = buildGridZones(preset, activeFormat, next);
+            } else {
+                zones = layout.zones || [];
+                if (next.flipX !== current.flipX) zones = mirrorZones(zones, 'x');
+                if (next.flipY !== current.flipY) zones = mirrorZones(zones, 'y');
+                if (next.shift !== current.shift) zones = rotateZoneImages(zones, next.shift - current.shift);
+            }
+            return {
+                ...previousTemplate,
+                slots: zones.length,
+                customLayout: { ...layout, transform: next, zones },
+            };
+        });
+        /* Le decalage doit deplacer les PHOTOS: une case porte son image de
+           facon explicite, l'ordre des zones ne suffirait pas. */
+        if (patch.shift !== undefined) {
+            const slotIds = templateSlotIds(activeTemplate);
+            const photos = slotIds.map((id) => resolveSlotImage(id));
+            const count = slotIds.length || 1;
+            const step = patch.shift - (activeTemplate.customLayout?.transform?.shift ?? 0);
+            setSlotConfigs((previous) => {
+                const next = { ...previous };
+                slotIds.forEach((id, index) => {
+                    const source = photos[(((index - step) % count) + count) % count];
+                    if (source?.image) {
+                        source.image.isSlotSpecific = true;
+                        source.image.slotId = id;
+                    }
+                    next[id] = {
+                        ...(previous[id] || DEFAULT_SLOT_CONFIG),
+                        image: source?.image || null,
+                        imageSrc: source?.src || null,
+                        imageName: source?.name || null,
+                    };
+                });
+                return next;
+            });
+        }
+    }, [activeFormat, activeTemplate, resolveSlotImage, setActiveTemplate, setSlotConfigs, templateSlotIds]);
+
+    /*
+     * Changement de format: une grille de la bibliotheque est RECOMPILEE pour
+     * le nouveau format (4:5 -> 1:1 et retour) au lieu d'etre etiree. Les ids
+     * de zones sont stables, donc les photos deposees zone par zone restent en
+     * place. Une grille retouchee a la main (`dirty`) n'est jamais recompilee:
+     * le travail de l'utilisateur passe avant l'adaptation automatique.
+     */
+    const previousFormatId = useRef(activeFormat.id);
+    useEffect(() => {
+        if (previousFormatId.current === activeFormat.id) return;
+        previousFormatId.current = activeFormat.id;
+        setActiveTemplate((previousTemplate) => {
+            if (previousTemplate.id !== 'custom') return previousTemplate;
+            const layout = previousTemplate.customLayout || {};
+            if (layout.dirty) return previousTemplate;
+            const preset = findGridPreset(layout.presetId);
+            if (!preset) return previousTemplate;
+            const transform = { ...DEFAULT_GRID_TRANSFORM, ...(layout.transform || {}) };
+            const previousById = new Map((layout.zones || []).map((zone) => [zone.id, zone]));
+            const zones = buildGridZones(preset, activeFormat, transform).map((zone) => {
+                const previousZone = previousById.get(zone.id);
+                if (!previousZone) return zone;
+                /* Reglages par zone (gouttiere, arrondi) conserves. */
+                return {
+                    ...zone,
+                    ...(previousZone.gap !== undefined ? { gap: previousZone.gap } : null),
+                    ...(previousZone.radius !== undefined ? { radius: previousZone.radius } : null),
+                };
+            });
+            return {
+                ...previousTemplate,
+                slots: zones.length,
+                customLayout: { ...layout, transform, zones },
+            };
+        });
+    }, [activeFormat, setActiveTemplate]);
 
     /* Meme sequence que LayoutSidebar.applyThemedTemplate (orchestration UI). */
     const applyThemedTemplate = useCallback((themedTpl) => {
@@ -540,7 +954,7 @@ export default function useLayoutEditor() {
             if (fmt) setActiveFormat(fmt);
         }
         if (themedTpl.zones) {
-            setActiveTemplate({
+            applyTemplateWithPhotos({
                 ...DEFAULT_CUSTOM_TEMPLATE,
                 label: themedTpl.label,
                 slots: themedTpl.zones.length,
@@ -548,47 +962,115 @@ export default function useLayoutEditor() {
             });
         } else {
             const base = TEMPLATES.find((t) => t.id === (themedTpl.baseTemplateId || 'minimal'));
-            setActiveTemplate(base || TEMPLATES[0]);
+            applyTemplateWithPhotos(base || TEMPLATES[0]);
         }
         const layout = themedTpl.layout || {};
         if (layout.padding !== undefined) setPadding(layout.padding);
         if (layout.gap !== undefined) setGap(layout.gap);
         if (layout.radius !== undefined) setRadius(layout.radius);
         if (layout.customLayoutGap !== undefined) setCustomLayoutGap(layout.customLayoutGap);
+        /* Un habillage porte ses propres marges: on ne pretend pas qu'elles
+           sont egales si elles ne le sont pas. */
+        const templatePadding = layout.padding ?? padding;
+        const templateGap = layout.gap ?? gap;
+        const templateCustomGap = layout.customLayoutGap ?? customLayoutGap;
+        setLinkedMargins(templatePadding === templateGap && templateGap === templateCustomGap);
         if (layout.bgColor !== undefined) setLayoutBgColor(layout.bgColor);
         if (layout.bgBlur !== undefined) setLayoutBgBlur(layout.bgBlur);
         if (layout.bgTexture !== undefined) setLayoutBgTexture(layout.bgTexture);
         setTexts(mapTextsWithIds(themedTpl.texts));
         setSelectedSlotIndex(null);
         setActiveTextId(null);
-    }, [setActiveFormat, setActiveTemplate, setPadding, setGap, setRadius, setLayoutBgColor, setLayoutBgBlur, setLayoutBgTexture, setTexts, setSelectedSlotIndex, setActiveTextId]);
+    }, [padding, gap, customLayoutGap, applyTemplateWithPhotos, setActiveFormat, setPadding, setGap, setRadius, setLayoutBgColor, setLayoutBgBlur, setLayoutBgTexture, setTexts, setSelectedSlotIndex, setActiveTextId]);
 
     /* ---- Modele des slots pour le bloc Images ---- */
     const slotModel = useMemo(() => {
         if (activeTemplate.id === 'custom') {
             const zones = (activeTemplate.customLayout?.zones || []).filter((zone) => !zone.hidden);
             return zones.map((zone, index) => {
-                const config = slotConfigs[zone.id];
-                const imgIndex = zone.imageIndex !== undefined ? zone.imageIndex : index;
-                const fallback = images.length > 0 ? images[imgIndex % images.length] : null;
+                const resolved = resolveSlotImage(zone.id);
                 return {
                     id: zone.id,
                     label: zone.label || `Zone ${index + 1}`,
-                    imageSrc: config?.imageSrc || (config?.image || fallback)?.src || null,
+                    imageSrc: resolved?.src || null,
                 };
             });
         }
         const count = activeTemplate.slots || 1;
         return Array.from({ length: count }, (_, index) => {
-            const config = slotConfigs[index];
-            const fallback = images.length > 0 ? images[index % images.length] : null;
+            const resolved = resolveSlotImage(index);
             return {
                 id: index,
                 label: `Image ${index + 1}`,
-                imageSrc: config?.imageSrc || (config?.image || fallback)?.src || null,
+                imageSrc: resolved?.src || null,
             };
         });
-    }, [activeTemplate, slotConfigs, images]);
+    }, [activeTemplate, resolveSlotImage]);
+
+    /*
+     * Import global (bouton « Ajouter », fichiers laches sur l'apercu): les
+     * photos remplissent les cases VIDES dans l'ordre de lecture, une par case.
+     * Sans ca, une case videe a la main restait vide pour toujours et le bouton
+     * « Ajouter » semblait ne rien faire.
+     */
+    const importImagesIntoSlots = useCallback(async (files) => {
+        const list = Array.from(files || []).filter((file) => file.type?.startsWith('image/'));
+        if (!list.length) return;
+        setIsProcessing(true);
+        setLoadingProgress(0);
+        setExportName(`${list[0].name.split('.')[0]}_edit`);
+        const loaded = [];
+        for (let index = 0; index < list.length; index += 1) {
+            /* Decodage sequentiel: c'est ce qui fait avancer la progression. */
+            const entry = await readImageFile(list[index]);
+            if (entry) loaded.push(entry);
+            setLoadingProgress(Math.round(((index + 1) / list.length) * 100));
+        }
+        const emptySlotIds = slotModel.filter((slot) => !slot.imageSrc).map((slot) => slot.id);
+        const assigned = loaded.slice(0, emptySlotIds.length);
+        const leftover = loaded.slice(emptySlotIds.length);
+        assigned.forEach((entry, index) => {
+            const slotId = emptySlotIds[index];
+            entry.image.isSlotSpecific = true;
+            entry.image.slotId = slotId;
+        });
+        setImages((previous) => [...previous, ...loaded.map((entry) => entry.image)]);
+        if (assigned.length) {
+            setSlotConfigs((previous) => {
+                const next = { ...previous };
+                assigned.forEach((entry, index) => {
+                    const slotId = emptySlotIds[index];
+                    next[slotId] = {
+                        ...(previous[slotId] || DEFAULT_SLOT_CONFIG),
+                        image: entry.image,
+                        imageSrc: entry.src,
+                        imageName: entry.name,
+                        x: 0,
+                        y: 0,
+                        zoom: 1,
+                    };
+                });
+                return next;
+            });
+            setSelectedSlotIndex(emptySlotIds[0]);
+        }
+        /* Les photos en trop restent dans le projet: elles serviront des qu'une
+           grille offrira plus de cases. */
+        if (leftover.length) leftover.forEach((entry) => { entry.image.isSlotSpecific = false; });
+        setIsProcessing(false);
+    }, [slotModel, setImages, setSlotConfigs, setSelectedSlotIndex, setExportName]);
+
+    /* Photos importees qu'aucune case n'affiche: elles reapparaissent des qu'une
+       grille offre plus de cases. Le panneau l'annonce plutot que de les
+       cacher. */
+    const reserveCount = useMemo(() => {
+        const used = new Set();
+        slotModel.forEach((slot) => {
+            const resolved = resolveSlotImage(slot.id);
+            if (resolved?.image) used.add(resolved.image);
+        });
+        return images.filter((image) => !used.has(image)).length;
+    }, [images, slotModel, resolveSlotImage]);
 
     const hasRenderableOutput = images.length > 0
         || activeTemplate.id === 'custom'
@@ -625,7 +1107,9 @@ export default function useLayoutEditor() {
         Promise.resolve().then(async () => {
             setIsHydrating(true);
             try {
-                const restored = await restoreComposition(project);
+                /* Layout compose les pixels tels qu'ils sont visibles dans
+                   Vision, tout en gardant les Blobs bruts pour la sauvegarde. */
+                const restored = await restoreComposition(project, { applyVision: true });
                 if (!restored) return;
                 if (restored.format) setActiveFormat(restored.format);
                 if (restored.template) setActiveTemplate(restored.template);
@@ -635,10 +1119,11 @@ export default function useLayoutEditor() {
                 setTexts(restored.texts);
                 setAssets(restored.assets);
                 if (restored.geometry) {
-                    setPadding(restored.geometry.padding ?? 40);
-                    setGap(restored.geometry.gap ?? 20);
+                    setPadding(restored.geometry.padding ?? 24);
+                    setGap(restored.geometry.gap ?? 24);
                     setRadius(restored.geometry.radius ?? 0);
                     setCustomLayoutGap(restored.geometry.customLayoutGap ?? DEFAULT_CUSTOM_LAYOUT_GAP);
+                    setLinkedMargins(restored.geometry.linkedMargins !== false);
                 }
                 const background = restored.background || {};
                 if (background.color !== undefined) setLayoutBgColor(background.color);
@@ -676,7 +1161,7 @@ export default function useLayoutEditor() {
                 const patch = await snapshotComposition({
                     activeFormat, activeTemplate, overlayMode,
                     images, slotConfigs, texts, assets,
-                    padding, gap, radius, customLayoutGap,
+                    padding, gap, radius, customLayoutGap, linkedMargins,
                     layoutBgColor, layoutBgBlur, layoutBgTexture,
                     layoutBgGradient, layoutBgMeshColors,
                     layoutTextures, activeTextureId, layoutTextureOpacity,
@@ -709,6 +1194,9 @@ export default function useLayoutEditor() {
                             width,
                             height,
                             updatedAt: Date.now(),
+                            /* Studio et l'export ne doivent pas poser le meme
+                               preset une seconde fois sur cette composition. */
+                            visionRevision: visionRevision(project.vision),
                         };
                     }
                 }
@@ -723,7 +1211,7 @@ export default function useLayoutEditor() {
         /* project omis volontairement: la sauvegarde repond aux changements
            d'edition, pas aux reecritures du store qu'elle provoque elle-meme. */
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [images, activeFormat, activeTemplate, overlayMode, padding, gap, radius, customLayoutGap,
+    }, [images, activeFormat, activeTemplate, overlayMode, padding, gap, radius, customLayoutGap, linkedMargins,
         layoutBgColor, layoutBgBlur, layoutBgTexture, layoutBgGradient, layoutBgMeshColors,
         layoutTextures, activeTextureId, layoutTextureOpacity,
         layoutLumenBackground, layoutSmoothBlur, texts, assets, slotConfigs, hasRenderableOutput]);
@@ -733,8 +1221,9 @@ export default function useLayoutEditor() {
         ...layoutState,
         images, setImages,
         customLayoutGap, setCustomLayoutGap,
+        linkedMargins, toggleLinkedMargins, setUniformMargin, setInnerGap,
         isProcessing, loadingProgress, isHydrating,
-        slotModel, hasRenderableOutput,
+        slotModel, reserveCount, hasRenderableOutput,
         /* refs + events canvas */
         canvasRef,
         handlePointerDown, handlePointerMove, handlePointerUp,
@@ -743,8 +1232,12 @@ export default function useLayoutEditor() {
         /* imports */
         handleImageUpload, handleReplaceImageUpload, handleSlotImageUpload,
         handleRemoveImage, handleRemoveSlotImage,
+        /* une photo par case */
+        slotGeometry, resolveSlotImage, assignSlotImage, swapSlotImages,
+        importImageIntoSlot, importBlobIntoSlot, importImagesIntoSlots,
+        zoomSlot, panSlot, resetSlotFraming,
         /* templates */
-        applyCustomPreset, applyThemedTemplate,
+        applyCustomPreset, applyGridPreset, applyThemedTemplate, applyTemplateWithPhotos, transformGrid,
         /* zones du modele personnalise */
         addCustomZone, updateCustomZone, deleteCustomZone, clearCustomZones,
         /* textures du fond */

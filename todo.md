@@ -1,10 +1,141 @@
 # TODO — Vibe_fx V2
 
-> **Point d'étape : 2026-08-31 — correction Retoucher depuis le carrousel.**
+> **Point d'étape : 2026-09-01 — la bibliothèque entre dans Layout.**
+>
+> Layout ne proposait que l'import de fichiers ; la bibliothèque VibeOS est
+> maintenant accessible au même rang, sur l'écran vide (**« Depuis ma
+> bibliothèque »**) et depuis le bouton **« Ajouter »** du bloc Images — en plus
+> du bouton « Importer » d'une case vide, qui existait déjà. En import général,
+> la fenêtre reste ouverte pour choisir plusieurs photos d'affilée, et elles
+> remplissent les cases vides dans l'ordre de lecture. Gates : lint 0 erreur,
+> build Node 22 vert, 5 smokes navigateur verts.
+>
+> **Point d'étape : 2026-09-01 — plus de bande d'images importées.**
+>
+> La bande de vignettes en bas du bloc Images empilait toutes les photos
+> importées, même retirées d'une case : supprimée, la liste des cases fait foi.
+> **Retirer une photo d'une case la retire vraiment du projet** quand aucune
+> autre case ne s'en sert (chaque image pèse un Blob à chaque sauvegarde). Deux
+> défauts trouvés en route et corrigés : changer de modèle **perdait** une photo
+> (elle restait épinglée à une case disparue) — elles suivent maintenant dans
+> l'ordre de lecture, et une grille plus large sert en plus les photos en
+> réserve ; et le bouton « mélanger » ne déplaçait plus rien depuis que chaque
+> case porte son image explicitement. Gates : lint 0 erreur, build Node 22 vert,
+> 5 smokes navigateur verts.
+>
+> **Point d'étape : 2026-09-01 — sélection rouge et qui ne colle plus.**
+>
+> Le liseré de sélection est passé au **rouge système avec un halo**, plus
+> visible sur une photo claire comme sombre, et son épaisseur suit la
+> résolution de l'aperçu. Surtout, il ne reste plus collé : **Échap** le
+> retire, un **clic à côté de l'aperçu** aussi, et le **plein écran** s'ouvre
+> toujours sans lui. Gates : lint 0 erreur, build Node 22 vert, 5 smokes
+> navigateur verts (celui des cases couvre les deux façons de désélectionner).
+>
+> **Point d'étape : 2026-09-01 — cadrage photo par photo.**
+>
+> Chaque photo se recadre dans sa case : **zoom** (boutons ou molette),
+> **déplacement à la souris**, retour au cadrage d'origine (double-clic ou
+> bouton central). Une **corbeille rouge** en haut à droite vide la case, en
+> face de la poignée de déplacement en haut à gauche. Les commandes sont en
+> verre dépoli, invisibles tant que la souris n'entre pas dans l'aperçu, et
+> s'adaptent à la taille de la case. Gates : lint 0 erreur, build Node 22 vert,
+> 5 smokes navigateur verts — celui des cases couvre maintenant zoom,
+> déplacement, remise à zéro et corbeille. Aucun déploiement.
+>
+> **Point d'étape : 2026-09-01 — fond neutre et marges symétriques.**
+>
+> Le fond ne se remplit plus tout seul avec la première photo floutée : par
+> défaut c'est un **blanc uni**, et Couleur / Flou / Généré restent au choix.
+> Les marges partent **égales** — même respiration au bord du visuel et entre
+> les images (24 px partout) — avec un mode « Marges égales » activé par défaut ;
+> en « Libres », deux curseurs séparés : *Marge extérieure* et *Écart entre les
+> images*. L'aperçu est repassé en **angles droits** (Instagram n'arrondit pas).
+> Gates : lint 0 erreur, build Node 22 vert, smoke géométrie vert, 5 smokes
+> navigateur verts en `--workers=1` — celui des cases vérifie maintenant le coin
+> blanc du visuel et l'égalité marge extérieure / gouttière. Aucun déploiement.
+>
+> **Point d'étape : 2026-09-01 — une photo par case dans le Layout.**
+>
+> Importer une photo la posait dans **toutes** les cases de la grille : le
+> moteur bouclait sur la liste d'images. Corrigé — une photo va dans une case,
+> les autres restent vides. Sur l'aperçu, survoler une case vide affiche
+> **« Importer »** : fichier de l'appareil ou photo de la bibliothèque VibeOS.
+> Une case pleine porte une poignée qu'on **glisse sur une autre case** pour
+> échanger les deux photos, et un fichier lâché directement sur une case y va.
+> Le bouton « Ajouter » remplit les cases vides dans l'ordre de lecture. Le menu
+> de familles a été réduit aux seuls noms. Gates : lint 0 erreur, build Node 22
+> vert, smoke géométrie vert, 5 smokes navigateur Layout verts en `--workers=1`
+> (dont le nouveau `smoke-vibeos-layout-slots.spec.cjs`). Aucun déploiement.
+>
+> **Point d'étape : 2026-09-01 — grilles éditoriales du Layout.**
+>
+> Le modèle « Personnalisé » ne propose plus 3 découpes mais **27 grilles**
+> (24 nouvelles + les 3 historiques, rangées en « Classiques »), en 6 familles.
+> Dans le panneau, le nom de la grille est devenu un menu de familles : on
+> choisit la famille et le panneau affiche ses grilles directement, sans ouvrir
+> la bibliothèque — celle-ci reste la vue de découverte, avec recherche et
+> aperçu côte à côte en 4:5 et en 1:1. Une grille n'est plus une liste de
+> rectangles : c'est un arbre rangées/colonnes compilé (`gridLibrary.js`), avec
+> deux variantes par grille — même nombre de zones, même ordre de lecture — donc
+> passer du portrait au carré **recompose** la mise en page au lieu de l'étirer,
+> et chaque photo reste dans sa zone. Trois variantes par grille : miroir
+> horizontal, miroir vertical, rotation des photos ; elles survivent au
+> changement de format et à la reprise du projet. Une grille déplacée à la main
+> est marquée « retouchée » et n'est plus recompilée. L'aperçu iPhone affiche
+> enfin le vrai ratio Instagram (402 px en 1:1, 503 px en 4:5) au lieu d'une
+> boîte fixe. Gates : lint 0 erreur, build Node 22 vert, smoke géométrie des 48
+> variantes vert, 4 smokes Playwright Layout verts **contre un `npm run dev`
+> réel, en `--workers=1`** (en parallèle ils se marchent dessus : défaut déjà
+> connu). Le serveur du runner de smokes (`run-video-ui-test.mjs`) reste cassé —
+> cause identifiée : avec les variables Firebase vides qu'il injecte, la page
+> n'hydrate plus du tout, ce qui explique le « blocage Dev Auth » documenté
+> depuis plusieurs lots. Aucun déploiement. Reprise :
+> [docs/prompt-reprise-2026-09-01-grilles-layout.md](docs/prompt-reprise-2026-09-01-grilles-layout.md).
+>
+> **Point d'étape : 2026-09-01 — preview Instagram Layout fidèle à Second Vie.**
+>
+> L'iPhone du back-office `secondevienextjsSSR` est porté dans Layout avec ses
+> dimensions et son chrome exacts (430×910, écran 402×874). La preview utilise
+> désormais le rendu pleine définition destiné à la publication : JPEG pour
+> portrait, carré, paysage et story, vraies tranches 1080×1350 pour les pano x2
+> et x3, parcourables au clic, au swipe et au trackpad. Le paysage est normalisé
+> en 1,91:1 jusque dans Publication. Smoke ciblé 6 formats vert, flux
+> publication vert, lint sans erreur et build Node 22 vert. Un premier essai
+> sous Node 26 avait logiquement rejeté le binaire Node 22 de `better-sqlite3` ;
+> la relance avec la version déclarée par le projet est complète. La suite
+> Layout groupée garde son blocage Dev Auth préexistant en exécution
+> parallèle ; le nouveau smoke passe seul. Aucun déploiement. Reprise :
+> [docs/prompt-reprise-2026-09-01-preview-instagram-layout.md](docs/prompt-reprise-2026-09-01-preview-instagram-layout.md).
+>
+> **Point d'étape : 2026-09-01 — synchronisation Vision → Layout.**
 >
 > Ce fichier ne porte QUE le chantier **actif**. Il est court **exprès** : un
 > agent le relit à chaque session. Le détail de ce qui est clos vit dans les
 > archives et dans les journaux datés de `map.md`.
+>
+> **2026-09-01 — synchronisation Vision → Layout livrée localement.** Vision
+> travaille désormais sur la photo source et écrit immédiatement ses réglages
+> dans le projet partagé. Layout reconstruit ses images avec le preset actif,
+> tout en conservant les Blobs bruts pour éviter toute cuisson cumulative. La
+> composition porte une révision Vision : Studio et l'export ne réappliquent
+> donc jamais le même preset. Build Node 22 vert ; lint sans erreur (5
+> avertissements préexistants). Le smoke ciblé reste bloqué avant Layout par le
+> contournement d'authentification Dev qui ne ferme pas la modale, problème
+> préexistant déjà documenté.
+> Aucun déploiement. Reprise :
+> [docs/prompt-reprise-2026-09-01-sync-vision-layout.md](docs/prompt-reprise-2026-09-01-sync-vision-layout.md).
+>
+> **2026-09-01 — import HEIC/HEIF livré localement.** La bibliothèque convertit
+> désormais les photos iPhone haute efficacité en JPEG dans le navigateur,
+> avant IndexedDB, Vision et la sauvegarde Firebase. Le convertisseur n'est
+> chargé qu'au premier HEIC et les imports restent séquentiels. Essai réel avec
+> `/Users/matthis/Downloads/IMG_6469.HEIC` : JPEG 5712×4284 affiché et stocké,
+> provenance source conservée. Gates : bibliothèque 41/41 + navigateur 1/1,
+> lint sans erreur (5 avertissements préexistants), build Node 22 vert.
+> **Déployé** sur App Hosting : build Cloud Build `1156c620…`, révision
+> `vibefx-v2-web-build-2026-09-01-001`, 100 % du trafic, route live 200 et
+> bundle HEIC confirmé sur l'URL publique.
 >
 > **2026-08-31 — régression Safari Storage diagnostiquée et corrigée.** Le
 > bucket `vibefx-v2.firebasestorage.app` n'avait aucune configuration CORS :
@@ -154,6 +285,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
+[**après l'import HEIC/HEIF** — 2026-09-01](docs/prompt-reprise-2026-09-01-import-heic.md),
 [**après la correction Retoucher du carrousel** — 2026-08-31](docs/prompt-reprise-2026-08-31-carrousel-vers-vision.md),
 [**après la correction Google Safari** — 2026-08-31](docs/prompt-reprise-2026-08-31-auth-google-safari.md),
 [**après les favoris de presets Vision** — 2026-08-31](docs/prompt-reprise-2026-08-31-favoris-presets-vision.md),

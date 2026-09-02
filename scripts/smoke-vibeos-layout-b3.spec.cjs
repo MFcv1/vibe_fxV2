@@ -123,11 +123,16 @@ test("layout VibeOS B3: textures, zones, stickers, comparaison, apercu, reprise"
   await page.getByRole("button", { name: "Aperçu Instagram" }).click();
   const instaDialog = page.getByRole("dialog", { name: "Aperçu Instagram" });
   await expect(instaDialog).toBeVisible();
-  await expect(instaDialog.getByRole("img", { name: "Aperçu de la publication" })).toBeVisible();
+  await expect(instaDialog.getByRole("img", { name: "Visuel 1 de la publication Instagram" })).toBeVisible();
   await instaDialog.getByRole("button", { name: "Fermer" }).click();
   await expect(instaDialog).toBeHidden();
 
   // --- Reprise du projet: rechargement, les images reviennent d'IndexedDB ---
+  // On note ce qui est pose dans les cases: c'est ce qui doit revenir a
+  // l'identique (la bande des images importees a ete supprimee, une photo vit
+  // desormais dans une case).
+  const filledSlotsBefore = await page.getByTestId("vibeos-slot-list").locator("img").count();
+  expect(filledSlotsBefore).toBeGreaterThan(0);
   // Sauvegarde: 1,5 s de debounce d'ecriture + 0,8 s d'autosauvegarde du store.
   await page.waitForTimeout(3500);
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -144,11 +149,11 @@ test("layout VibeOS B3: textures, zones, stickers, comparaison, apercu, reprise"
   ).toBeGreaterThan(0);
   await expect(page.getByRole("button", { name: "Importer des images" })).toBeHidden();
 
-  // La bande des images importees compte bien les deux photos.
+  // Les photos sont revenues dans les memes cases.
   await expect.poll(
-    async () => page.locator('[aria-label="Images importées"] img').count(),
+    async () => page.getByTestId("vibeos-slot-list").locator("img").count(),
     { timeout: 15000 },
-  ).toBe(2);
+  ).toBe(filledSlotsBefore);
 
   // La texture et le sticker ont survecu au rechargement.
   await page.getByRole("button", { name: "Réglages avancés" }).click();

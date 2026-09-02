@@ -5,7 +5,7 @@ export const FORMATS = [
     { id: 'insta-port', label: 'Portrait (4:5)', w: 1080, h: 1350, ratio: 4 / 5, icon: <Smartphone size={16} /> },
     { id: 'insta-sq', label: 'Carré (1:1)', w: 1080, h: 1080, ratio: 1 / 1, icon: <Square size={16} /> },
     { id: 'story', label: 'Story / Réel (9:16)', w: 1080, h: 1920, ratio: 9 / 16, icon: <Smartphone size={16} className="h-5" /> },
-    { id: 'insta-land', label: 'Paysage (16:9)', w: 1080, h: 566, ratio: 1.91 / 1, icon: <Smartphone size={16} className="rotate-90" /> },
+    { id: 'insta-land', label: 'Paysage (1,91:1)', w: 1080, h: 566, ratio: 1.91 / 1, icon: <Smartphone size={16} className="rotate-90" /> },
     { id: 'pano-2', label: 'Pano x2', w: 2160, h: 1350, ratio: 8 / 5, icon: <Columns size={16} /> },
     { id: 'pano-3', label: 'Pano x3', w: 3240, h: 1350, ratio: 12 / 5, icon: <Columns size={16} /> },
 ];
