@@ -116,7 +116,14 @@ export default class Stage {
      * `t` est le temps normalise dans la boucle, entre 0 et 1. Le rendu ne doit
      * dependre de rien d'autre : c'est ce qui permet a l'export de rembobiner.
      */
-    render(template, state, t, size) {
+    /*
+     * `t` est le temps normalise dans la boucle, entre 0 et 1. Le rendu ne doit
+     * dependre de rien d'autre : c'est ce qui permet a l'export de rembobiner.
+     *
+     * `fps` sert au flou de mouvement, qui a besoin de savoir ce que dure une
+     * image pour etaler l'echantillonnage sur la bonne fraction de temps.
+     */
+    render(template, state, t, size, fps = 60) {
         const { renderer, media } = this;
         const [w, h] = size;
         renderer.resize(w, h);
@@ -130,8 +137,72 @@ export default class Stage {
             renderer.draw({ p: NDC_QUAD, tex: this.bgTex, radius: 0, aspect: 1, pxScale: w }, bgRgb);
         }
 
+        /*
+         * Flou de mouvement : on rend plusieurs sous-images reparties autour de
+         * l'instant demande et on les moyenne a l'ecran. C'est la meme chose
+         * qu'un obturateur ouvert un certain temps — et c'est ce qui separe une
+         * suite de positions nettes, qui saute a l'oeil, d'un mouvement continu.
+         *
+         * La moyenne se fait par accumulation progressive : la sous-image k est
+         * dessinee avec une opacite de 1/(k+1), ce qui donne au final un poids
+         * egal a chacune, sans avoir besoin d'une cible de rendu intermediaire.
+         */
+        const finish = state.finish || { motionBlur: 0, vignette: 0, grain: 0 };
+        const blur = clamp(finish.motionBlur || 0, 0, 100);
+        const passes = blur <= 0 ? 1 : blur > 66 ? 5 : blur > 33 ? 4 : 3;
+        const span = (blur / 100) / Math.max(1, state.loop * fps);
+
+        for (let pass = 0; pass < passes; pass += 1) {
+            const offset = passes === 1 ? 0 : ((pass / (passes - 1)) - 0.5) * span;
+            let sub = t + offset;
+            sub -= Math.floor(sub);
+            this.drawScene(template, state, sub, w, w / h, bgRgb, 1 / (pass + 1), pass === 0);
+        }
+
+        if (finish.vignette > 0) {
+            renderer.setCamera(IDENTITY);
+            renderer.draw({
+                p: NDC_QUAD,
+                finish: 1,
+                finishArg: [(finish.vignette / 100) * 0.85, 0],
+                aspect: w / h,
+                pxScale: w,
+            }, bgRgb);
+        }
+
+        this.syncOverlay(state.textLayers, state.logo, w, h);
+        if (this.overlayTex && (state.textLayers.length || state.logo)) {
+            renderer.setCamera(IDENTITY);
+            renderer.draw({
+                p: NDC_QUAD, tex: this.overlayTex, radius: 0, aspect: 1, pxScale: w,
+            }, bgRgb);
+        }
+
+        if (finish.grain > 0) {
+            // La graine oscille avec le temps de boucle : le grain change donc
+            // d'une image a l'autre, mais retrouve son motif de depart a la fin
+            // du tour et ne casse pas le raccord.
+            const seed = 900 + Math.sin(t * Math.PI * 2 * 7) * 260;
+            renderer.setCamera(IDENTITY);
+            renderer.draw({
+                p: NDC_QUAD,
+                finish: 2,
+                finishArg: [(finish.grain / 100) * 0.075, seed],
+                aspect: 1,
+                pxScale: w,
+            }, bgRgb);
+        }
+    }
+
+    /*
+     * Une sous-image : construction de la scene, tri en profondeur, dessin.
+     * `weight` est l'opacite de la passe pour la moyenne du flou de mouvement ;
+     * `withShadow` limite les ombres a une seule passe, parce qu'une ombre douce
+     * n'a pas besoin d'etre floutee et que ca doublerait le nombre de dessins.
+     */
+    drawScene(template, state, t, w, frameAspect, bgRgb, weight, withShadow) {
+        const { renderer, media } = this;
         const P = state.params;
-        const frameAspect = w / h;
         const ctx = {
             t: t - Math.floor(t),
             P,
@@ -159,8 +230,7 @@ export default class Stage {
         const proj = perspective(fov, frameAspect, 0.01, 400);
         const eye = cam.eye || [0, 0, cam.dist];
         const view = lookAt(eye, cam.target || [0, 0, 0], cam.up || [0, 1, 0]);
-        const vp = multiply(proj, view);
-        renderer.setCamera(vp);
+        renderer.setCamera(multiply(proj, view));
 
         /*
          * Tri arriere vers avant : il n'y a pas de tampon de profondeur, et la
@@ -193,18 +263,11 @@ export default class Stage {
         const shadow = state.shadow;
         for (let i = 0; i < quads.length; i += 1) {
             const q = quads[i];
-            if (shadow.enabled && q.castShadow !== false && !q.shadow) {
+            const base = q.alpha === undefined ? 1 : q.alpha;
+            if (withShadow && shadow.enabled && q.castShadow !== false && !q.shadow) {
                 renderer.draw(this.shadowQuad(q, shadow), bgRgb);
             }
-            renderer.draw(q, bgRgb);
-        }
-
-        this.syncOverlay(state.textLayers, state.logo, w, h);
-        if (this.overlayTex && (state.textLayers.length || state.logo)) {
-            renderer.setCamera(IDENTITY);
-            renderer.draw({
-                p: NDC_QUAD, tex: this.overlayTex, radius: 0, aspect: 1, pxScale: w,
-            }, bgRgb);
+            renderer.draw(weight === 1 ? q : { ...q, alpha: base * weight }, bgRgb);
         }
     }
 

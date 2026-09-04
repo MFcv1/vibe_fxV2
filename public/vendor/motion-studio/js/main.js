@@ -35,9 +35,18 @@ function initialState(template) {
         },
         textLayers: [],
         logo: null,
+        // L'ombre est active par defaut, et discrete : sans elle les cartes
+        // flottent sans poids et la scene se lit comme un collage a plat.
         shadow: {
-            enabled: false, x: 0, y: 5, spread: 6, opacity: 35,
+            enabled: true, x: 0, y: 4, spread: 5, opacity: 30,
         },
+        /*
+         * Finition. Les trois reglages qui font passer le rendu de la
+         * diapositive a la video : le flou de mouvement lisse le deplacement,
+         * le vignetage recentre le regard, le grain casse la proprete
+         * numerique. Actives par defaut, dosages sobres.
+         */
+        finish: { motionBlur: 45, vignette: 26, grain: 10 },
         // Pistes d'animation : une entree par reglage anime.
         tracks: {},
     };
@@ -66,6 +75,9 @@ class App {
         this.time = 0;
         this.lastTs = 0;
         this.previews = new Map();
+        // Cadence de reference du flou de mouvement : celle de l'ecran en
+        // apercu, celle demandee pendant un export.
+        this.renderFps = 60;
         this.history = [];
         this.future = [];
         this.exporting = false;
@@ -128,7 +140,7 @@ class App {
             // Les reglages animes sont resolus ici, donc l'apercu et l'export
             // passent tous les deux par le meme etat effectif.
             const state = resolveTracks(this.state, t - Math.floor(t));
-            this.stage.render(this.template, state, t, size || this.previewSize);
+            this.stage.render(this.template, state, t, size || this.previewSize, this.renderFps);
             $('status').textContent = '';
         } catch (err) {
             $('status').textContent = `Rendu impossible : ${err.message}`;
@@ -212,8 +224,10 @@ class App {
     }
 
     resetParams() {
+        const fresh = initialState(this.template);
         this.state.params = defaultParams(this.template);
-        this.state.shadow = initialState(this.template).shadow;
+        this.state.shadow = fresh.shadow;
+        this.state.finish = fresh.finish;
         this.state.tracks = {};
         this.inspector.render();
         this.commit();
@@ -342,6 +356,11 @@ class App {
 
     setShadow(patch, rerender = true) {
         Object.assign(this.state.shadow, patch);
+        if (rerender) { this.inspector.render(); this.commit(); }
+    }
+
+    setFinish(patch, rerender = true) {
+        Object.assign(this.state.finish, patch);
         if (rerender) { this.inspector.render(); this.commit(); }
     }
 
@@ -555,6 +574,7 @@ class App {
         $('export-go').disabled = true;
         $('export-progress').hidden = false;
 
+        this.renderFps = fps;
         const common = {
             canvas: this.canvas,
             duration: this.state.loop,
@@ -577,6 +597,7 @@ class App {
             $('status').textContent = `Export impossible : ${err.message}`;
         } finally {
             this.exporting = false;
+            this.renderFps = 60;
             $('export-go').disabled = false;
             $('export-progress').hidden = true;
             $('export-bar').style.width = '0';

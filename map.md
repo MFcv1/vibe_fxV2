@@ -652,6 +652,34 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 quater (Motion : finition video et famille Signature)
+
+- **Mesure avant de toucher a quoi que ce soit** : le rendu d'une image coute
+  0,08 ms en mediane et 2,2 ms au pire, pour un budget de 16,7 ms a 60 images par
+  seconde. Le probleme n'etait donc pas la cadence, mais le mouvement lui-meme.
+  Ce budget libre a servi a payer une vraie finition.
+- **Flou de mouvement** (`engine/stage.js`) : trois a cinq sous-images reparties
+  autour de l'instant demande, moyennees a l'ecran par accumulation progressive
+  — la sous-image k est dessinee a une opacite de 1/(k+1), ce qui donne au final
+  un poids egal a chacune sans cible de rendu intermediaire. C'est un obturateur
+  ouvert, et c'est ce qui separe une suite de positions nettes d'un mouvement
+  continu. Les ombres ne sont tracees que sur la premiere passe : une ombre douce
+  n'a pas besoin d'etre floutee et ca doublerait le nombre de dessins.
+- **Vignetage et grain** : deux passes plein cadre dans le shader (`u_finish`).
+  La graine du grain oscille avec le temps de boucle, donc il change d'une image
+  a l'autre mais retrouve son motif au bout du tour et ne casse pas le raccord.
+- Nouveau bloc **FINITION** dans l'inspecteur (flou, vignetage, grain). Actives
+  par defaut a des dosages sobres, comme l'ombre qui passe elle aussi a
+  « active » : sans elle les cartes flottaient sans poids.
+- **Famille Signature VibeOS**, six animations a nous
+  (`templates/signature.js`) : Beat Punch, Push Cut, Swipe Stack, Split Slide,
+  Kinetic Wave, Depth Pop. Elles sont dans leur propre famille pour que les neuf
+  familles reprises de la reference gardent leurs comptes exacts. Toutes tiennent
+  deux principes : un temps d'arret sur chaque image, et une entree qui depasse
+  legerement sa cible avant de se poser.
+- Verifie : 68 templates, 10 familles, tous rendent et bouclent ; pire image
+  4,9 ms avec flou, vignetage et grain actifs — soit un tiers du budget 60 i/s.
+
 ## Journal — 2026-09-05 ter (Motion : familles repliables, cartes de demonstration)
 
 - **Les familles du catalogue ne se repliaient pas.** Le clic marchait, l'element

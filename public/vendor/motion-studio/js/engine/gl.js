@@ -40,6 +40,8 @@ uniform vec4  u_clip;     // (nx, ny, offset, adoucissement) : demi-plan de coup
 uniform float u_glow;     // liseré clair le long de la coupe
 uniform vec4  u_frameBox; // (demi-largeur, demi-hauteur, centre x, centre y) du cadre
 uniform float u_frameR;   // rayon du cadre ; 0 = pas de masque de cadre
+uniform int   u_finish;   // 1 = vignetage, 2 = grain, 0 = carte normale
+uniform vec2  u_finishArg; // (intensite, graine)
 
 /*
  * Distance signee a un rectangle aux quatre coins independants.
@@ -56,6 +58,24 @@ float roundedBox(vec2 p, vec2 half_, vec4 r) {
 }
 
 void main() {
+  /*
+   * Passes de finition : un voile plein cadre qui assombrit les bords, puis un
+   * grain leger. Ce sont elles qui font basculer le rendu du cote "video" — un
+   * aplat parfaitement propre et uniformement eclaire lit toujours comme une
+   * diapositive.
+   */
+  if (u_finish == 1) {
+    vec2 q = (v_uv - 0.5) * vec2(u_aspect, 1.0);
+    float r = length(q) / 0.62;
+    outColor = vec4(0.0, 0.0, 0.0, smoothstep(0.45, 1.25, r) * u_finishArg.x);
+    return;
+  }
+  if (u_finish == 2) {
+    float n = fract(sin(dot(v_uv * u_finishArg.y, vec2(12.9898, 78.233))) * 43758.5453);
+    outColor = vec4(vec3(n), u_finishArg.x);
+    return;
+  }
+
   // On travaille dans un repere ou la largeur vaut u_aspect et la hauteur 1,
   // sinon le rayon de coin serait ovale sur les cartes non carrees.
   vec2 half_ = vec2(u_aspect, 1.0) * 0.5;
@@ -142,6 +162,7 @@ export default class QuadRenderer {
         [
             'u_vp', 'u_tex', 'u_hasTex', 'u_color', 'u_alpha', 'u_radius', 'u_aspect',
             'u_fade', 'u_fadeColor', 'u_pxScale', 'u_shadow', 'u_uvRect', 'u_clip', 'u_glow', 'u_frameBox', 'u_frameR',
+            'u_finish', 'u_finishArg',
         ].forEach((name) => { this.u[name] = gl.getUniformLocation(prog, name); });
 
         this.vao = gl.createVertexArray();
@@ -231,6 +252,9 @@ export default class QuadRenderer {
         const fm = quad.frameMask;
         gl.uniform4f(u.u_frameBox, fm ? fm[0] : 0, fm ? fm[1] : 0, fm ? fm[2] : 0, fm ? fm[3] : 0);
         gl.uniform1f(u.u_frameR, fm ? fm[4] : 0);
+        gl.uniform1i(u.u_finish, quad.finish || 0);
+        const fa = quad.finishArg || [0, 0];
+        gl.uniform2f(u.u_finishArg, fa[0], fa[1]);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 

@@ -27,6 +27,10 @@ const THUMB_STATE = {
     shadow: {
         enabled: false, x: 0, y: 0, spread: 0, opacity: 0,
     },
+    // Pas de finition sur les vignettes : a 168 pixels, le flou et le grain
+    // brouillent la lecture du mouvement, qui est tout ce qu'elles doivent dire.
+    finish: { motionBlur: 0, vignette: 0, grain: 0 },
+    loop: 12,
 };
 
 export default class Catalogue {

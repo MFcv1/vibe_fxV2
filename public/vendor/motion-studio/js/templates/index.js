@@ -41,6 +41,9 @@ import { isoCascade, isoFocus, isoOrbit } from './iso.js';
 import {
     tripleScene, collageReel, fanShuffle, gridZoomStrip, spreadRows, spreadColumns,
 } from './multiscene.js';
+import {
+    beatPunch, swipeStack, splitSlide, kineticWave, pushCut, depthPop,
+} from './signature.js';
 
 export const TEMPLATES = [
     // 3D & Perspective
@@ -66,6 +69,8 @@ export const TEMPLATES = [
     // Stack & Scatter
     stackSlide, cascadeDrop, cascadeDeck, imageTrail,
     posterBurst, cardToss, positionDance,
+    // Signature — les notres
+    beatPunch, pushCut, swipeStack, splitSlide, kineticWave, depthPop,
 ];
 
 export const CATEGORIES = [
@@ -78,6 +83,7 @@ export const CATEGORIES = [
     { id: 'spotlight', label: 'Spotlight & Focus' },
     { id: 'wipe', label: 'Reveal & Wipe' },
     { id: 'stack', label: 'Stack & Scatter' },
+    { id: 'signature', label: 'Signature VibeOS' },
 ];
 
 export const byId = (id) => TEMPLATES.find((t) => t.id === id) || TEMPLATES[0];

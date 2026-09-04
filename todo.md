@@ -1,6 +1,8 @@
 # TODO — Vibe_fx V2
 
-> **Motion Studio — 3e mini-app du Studio, livre le 2026-09-05.** Moteur WebGL2,
+> **Motion Studio — 3e mini-app du Studio, livre le 2026-09-05.** 68 animations
+> en 10 familles (les 9 de la reference a leurs comptes exacts + 6 signatures),
+> finition video (flou de mouvement, vignetage, grain) et export MP4. Moteur WebGL2,
 > editeur complet, **les 62 animations des 9 familles**, timeline de keyframes,
 > et un export MP4 image par image (720p a 8K, 1x a 4x boucles) plus rapide que
 > le temps reel. Les 62 bouclent sans raccord. L'export est verifie avec

@@ -186,6 +186,26 @@ STRUCTURE, pas de reglage — le genre d'ecart qu'aucun test automatique ne voit
 Ecart connu et assume : **Orbit Bloom** ouvre bien sa corolle mais ne reproduit
 pas exactement la forme en papillon de la reference.
 
+## Finition et famille Signature (2026-09-05)
+
+Trois reglages globaux, dans le bloc **FINITION** de l'inspecteur, actifs par
+defaut :
+
+- **Flou de mouvement** — plusieurs sous-images moyennees autour de l'instant
+  demande. C'est le reglage qui fait basculer le rendu de la diapositive a la
+  video ; sans lui, chaque image est nette et le deplacement saute a l'oeil.
+- **Vignetage** — assombrit les bords, recentre le regard.
+- **Grain** — casse la proprete numerique. Sa graine suit le temps de boucle,
+  donc il bouge d'une image a l'autre sans casser le raccord.
+
+L'ombre portee est elle aussi active par defaut, discrete.
+
+**Signature VibeOS**, six animations a nous, dans leur propre famille pour que
+les comptes des neuf familles de la reference restent exacts : Beat Punch,
+Push Cut, Swipe Stack, Split Slide, Kinetic Wave, Depth Pop. Elles visent la
+story et le reel : mouvements courts, temps de lecture sur chaque image, entrees
+qui depassent leur cible avant de se poser.
+
 ## Etat des ecarts avec la reference
 
 Ce qui est **aligne** : les 62 noms, leur ordre, leurs familles, le nombre

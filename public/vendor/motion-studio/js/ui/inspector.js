@@ -56,6 +56,7 @@ export default class Inspector {
             this.logoSection(s),
             this.templateSection(tpl, s),
             ...(tpl.params.some((p) => p.t === 'shadow') ? [this.shadowSection(s)] : []),
+            this.finishSection(s),
             el('div.section', {}, [
                 el('button.btn.wide', {
                     type: 'button',
@@ -323,6 +324,25 @@ export default class Inspector {
         return el('div.slider-row', {}, [
             el('div.slider-head', {}, [el('label', { text: p.label })]),
             segmented(options, params[p.k], (v) => app.setParam(p.k, v)),
+        ]);
+    }
+
+    /*
+     * Finition : les trois reglages qui donnent au rendu sa texture de video.
+     * Ils s'appliquent a toutes les animations, d'ou leur place hors du bloc du
+     * template.
+     */
+    finishSection(s) {
+        const { app } = this;
+        const f = s.finish;
+        return el('div.section', {}, [
+            el('p.section-title', { text: 'Finition' }),
+            this.miniSlider('Flou de mouvement', f.motionBlur, 0, 100, 1,
+                (e) => app.setFinish({ motionBlur: Number(e.target.value) }, false), '%'),
+            this.miniSlider('Vignetage', f.vignette, 0, 100, 1,
+                (e) => app.setFinish({ vignette: Number(e.target.value) }, false), '%'),
+            this.miniSlider('Grain', f.grain, 0, 100, 1,
+                (e) => app.setFinish({ grain: Number(e.target.value) }, false), '%'),
         ]);
     }
 
