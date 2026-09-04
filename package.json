@@ -84,7 +84,8 @@
     "test:vibecut-library-media": "node scripts/smoke-vibecut-library-media.mjs",
     "build:vibecut-demo-clips": "node scripts/build-vibecut-library-demo-clips.mjs",
     "test:vibecut-sequence-edges": "node scripts/smoke-vibecut-sequence-edges.mjs",
-    "test:vision-filters": "node scripts/audit-vision-filters.mjs"
+    "test:vision-filters": "node scripts/audit-vision-filters.mjs",
+    "verifier:mp4": "node scripts/verifier-mp4-motion.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",

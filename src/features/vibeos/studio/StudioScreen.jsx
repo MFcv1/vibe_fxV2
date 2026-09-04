@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import {
-    ArrowUpRight, Blend, CircleDotDashed, Sparkles, Trash2,
+    ArrowUpRight, Blend, CircleDotDashed, Clapperboard, Sparkles, Trash2,
 } from 'lucide-react';
 import { Button } from '../primitives';
 import GradientSheet from '../shared/GradientSheet';
 import LumenSheet from '../shared/LumenSheet';
+import MotionSheet from '../shared/MotionSheet';
 import useStudioGenerators from './useStudioGenerators';
 import styles from './studio.module.css';
 
@@ -26,6 +27,14 @@ const MODULES = [
         description: 'Sculpte la lumière, la matière et des shaders vivants en temps réel.',
         meta: 'Shader studio · Temps réel',
         icon: CircleDotDashed,
+    },
+    {
+        id: 'motion',
+        index: '03',
+        title: 'Motion',
+        description: 'Anime tes images dans des scenes 3D et exporte une boucle video.',
+        meta: '62 animations · Export vidéo',
+        icon: Clapperboard,
     },
 ];
 
@@ -49,8 +58,9 @@ export default function StudioScreen() {
                 </div>
                 <h1 className={styles.title}>Crée tes fonds, en grand.</h1>
                 <p className={styles.intro}>
-                    Deux outils complets, chacun dans son propre espace. Choisis une matière,
-                    ouvre l’éditeur et utilise le résultat dans ton projet VibeOS.
+                    Trois outils complets, chacun dans son propre espace. Compose une
+                    matière, sculpte la lumière ou mets tes images en mouvement, puis
+                    récupère le résultat dans ton projet VibeOS.
                 </p>
 
                 {activeGenerator ? (
@@ -87,7 +97,15 @@ export default function StudioScreen() {
                             onClick={() => setOpenModule(module.id)}
                         >
                             <span className={styles.moduleVisual} aria-hidden="true">
-                                {module.id === 'gradient' ? (
+                                {module.id === 'motion' ? (
+                                    <span className={styles.motionScene}>
+                                        <span className={styles.motionRing}>
+                                            <span /><span /><span />
+                                            <span /><span /><span />
+                                        </span>
+                                        <span className={styles.motionGrid} />
+                                    </span>
+                                ) : module.id === 'gradient' ? (
                                     <span className={styles.gradientScene}>
                                         <span className={styles.gradientGlowA} />
                                         <span className={styles.gradientGlowB} />
@@ -138,6 +156,11 @@ export default function StudioScreen() {
                 onClose={() => setOpenModule(null)}
                 onUseBackground={applyGeneratedBackground}
             />
+            <MotionSheet
+                open={openModule === 'motion'}
+                onClose={() => setOpenModule(null)}
+            />
+
             <LumenSheet
                 open={openModule === 'lumen'}
                 onClose={() => setOpenModule(null)}

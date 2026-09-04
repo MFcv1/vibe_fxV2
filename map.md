@@ -89,6 +89,10 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   `-- vibefx/
 |   |       `-- demo-astronaut.png      # Asset demo pour pages publiques et studio
 |   |-- vendor/
+|   |   |-- motion-studio/           # Motion : 3e mini-app du Studio, editeur d'animations en boucle (app autonome ES modules, aucune dependance), ouverte plein ecran depuis Studio, exporte un MP4 en telechargement
+|   |   |   |-- index.html            # Coquille : entete, catalogue, scene + transport, inspecteur, modale d'export
+|   |   |   |-- styles.css            # Direction Apple OS epure alignee sur VibeOS, tokens --ms-* (l'iframe ne peut pas importer vibeos.css)
+|   |   |   `-- js/                   # engine/ (demoCards.js 12 compositions editoriales pour les emplacements vides, gl.js renderer WebGL2 de quads textures avec plan de coupe et masque de cadre, stage.js rendu d'une image, media.js textures et vignettes de demo, keyframes.js pistes d'animation circulaires, math.js), templates/ (62 templates en 9 familles : rings, walls, globes, tunnel, spiral, depth, orbits, flow, grids, spotlight, wipes, stacks, iso, multiscene), ui/ (catalogue a vignettes animees, inspecteur avec losanges d'animation), export.js (WebCodecs H.264, repli MediaRecorder), mp4.js (muxer MP4 minimal), main.js
 |   |   |-- lumen/                    # Copie integree de Leonxlnx/lumenshaders pour generer des fonds shader dans Layout, mode safe desktop WebGL
 |   |   `-- gradient-builder/         # Gradient Builder : reconstruction de l'ecran Studio de feralui.dev/gradients (app autonome ES modules, aucune dependance), ouverte plein ecran depuis Studio et rendue au parent par postMessage
 |   |       |-- index.html            # Coquille : entete + modes, canvas, bandes, barre du bas, panneau
@@ -407,9 +411,11 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- SlotImportSheet.jsx     # « Ajouter des photos » : fichier de l'appareil ou photo de la bibliotheque VibeOS (lecture directe d'IndexedDB + rapatriement d'une photo qui n'existe que dans le compte). Deux modes : vers UNE case (elle se referme apres le choix) ou import general (elle reste ouverte pour en prendre plusieurs)
 |   |   |   |-- GridLibrarySheet.jsx    # Navigateur des grilles (6 familles + recherche) ; chaque carte montre la meme grille en 4:5 ET en 1:1, le format actif encadre. Les 3 grilles historiques y entrent comme grilles figees
 |   |   |   |-- ZoneOverlay.jsx         # Editeur de zones du modele personnalise pose sur l'apercu : deplacement, poignee de redimension, suppression (geometrie d'interface uniquement, le rendu reste au moteur)
-|   |   |   |-- InstaPreviewSheet.jsx   # Relie les sorties JPEG exactes de Layout au téléphone Instagram (post, story, panorama)
+|   |   |   |-- InstaPreviewSheet.jsx   # Apercu plein cadre (Sheet `immersive` : le bandeau VibeOS reste, pas d'en-tete de sheet) en 3 colonnes : images du post / iPhone / ambiance sonore. Porte l'index actif du carrousel
+|   |   |   |-- PostImagesRail.jsx      # Colonne gauche de l'apercu : une vignette par image du post, clic = l'iPhone saute a cette image. Masquer/reordonner viendra avec le modele multi-grilles
+|   |   |   |-- PreviewSoundPanel.jsx   # Colonne droite de l'apercu : recherche + themes + resultats, branches sur useVibeOsSoundtrack et le lecteur global. Aucun second lecteur
 |   |   |   |-- PublicationPhoneShell.jsx # Copie adaptee du châssis iPhone Second Vie : scène 430×910, écran 402×874, mise à l'échelle sans fausser les proportions
-|   |   |   |-- InstagramPublicationPreview.jsx # Copie adaptee du feed Instagram Second Vie, alimentée par les rendus Layout ; carrousel clic/swipe/trackpad + story 9:16 ; hauteur du média calée sur le VRAI ratio du post (borné 4:5 ↔ 1,91:1 comme Instagram)
+|   |   |   |-- InstagramPublicationPreview.jsx # Copie adaptee du feed Instagram Second Vie, alimentée par les rendus Layout ; carrousel clic/swipe/trackpad + story 9:16 ; hauteur du média calée sur le VRAI ratio du post (borné 4:5 ↔ 1,91:1 comme Instagram) ; index du carrousel controlable de l'exterieur (pellicule) ou interne par defaut
 |   |   |   |-- instagramPhone.module.css # Traduction CSS pixel pour pixel des classes Tailwind du téléphone source
 |   |   |   |-- TemplateSheet.jsx       # Bibliotheque des ~80 templates thematiques (17 categories), apercus dessines depuis les vraies zones/textes
 |   |   |   |-- TemplatePreviewSvg.jsx  # Apercu SVG d'un template : zones custom reelles ou silhouettes des 8 modeles integres
@@ -437,6 +443,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- MeshSheet.jsx           # Fond Mesh gradient : 4 couleurs editables, 6 palettes, melange, apercu CSS (meshPreviewStyle exporte) ; rendu final par renderLayoutMeshBackground (moteur existant)
 |   |   |   |-- LumenSheet.jsx          # Fond Lumen : meme app embarquee /vendor/lumen + protocole postMessage que l'ancien modal, habillage VibeOS
 |   |   |   |-- GradientSheet.jsx       # Fond Gradient Builder : iframe /vendor/gradient-builder en Sheet `full`, protocole postMessage (vibefx:capture-gradient -> gradient:use-background), reutilise l'emplacement background.lumen
+|   |   |   |-- MotionSheet.jsx         # Motion : iframe /vendor/motion-studio en Sheet immersif. Pas de postMessage ni d'emplacement projet — Motion produit une video, pas un fond, et la rend par telechargement (d'ou `allow-downloads` sur l'iframe)
 |   |   |   |-- SmoothBlurSheet.jsx     # Flou pro : pilote la config du moteur partage vibefx-shared/smoothBlur (looks rapides, aleatoire safe, direction/hauteur/intensite/finesse)
 |   |   |   `-- generators.module.css
 |   |   |-- soundtrack/                 # Ecran Soundtrack reel (phase E) - hooks, services et APIs musique existants importes, jamais reecrits
@@ -644,6 +651,157 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 ter (Motion : familles repliables, cartes de demonstration)
+
+- **Les familles du catalogue ne se repliaient pas.** Le clic marchait, l'element
+  ne se cachait pas : `.cat-grid { display: grid }` l'emporte sur le
+  `display: none` que le navigateur applique a l'attribut `hidden`. Il manquait
+  `.cat-grid[hidden] { display: none }`. Ajoute aussi le chevron qui pivote, un
+  filet entre familles, et la memoire de l'etat plie quand le catalogue est
+  reconstruit.
+- **Cartes de demonstration** (`js/engine/demoCards.js`) : douze compositions
+  editoriales tracees au canvas — millesime, chiffre-cle, trame de disques,
+  sommaire de villes, plaque de rue, filet et legende, lettre geante, horizon,
+  etiquette — sur huit palettes sourdes. Un emplacement vide ne montre plus un
+  aplat terne : on voit tout de suite ce que l'animation donnera. Rien a charger,
+  rien a embarquer dans le depot. Les vignettes du catalogue gardent leurs aplats
+  gris : a 168 pixels, une composition chargee empeche de lire le mouvement.
+- Deux retouches d'animation apres comparaison des vignettes avec la reference :
+  **Wheel Carousel** (rayon ramene a 1,55 — la carte de tete etait seule au
+  milieu, les voisines hors cadre) et **Orbit Globe** (facteur de tassement de la
+  sphere abaisse : elle se lisait comme une mosaique au lieu de cartes qu'on
+  distingue).
+
+## Journal — 2026-09-05 bis (Motion : audit visuel des 62, 14 corrigees)
+
+- Les 62 animations avaient ete livrees sur la foi d'un test automatique — rendu
+  non vide et boucle fermee — et d'un coup d'oeil sur une quinzaine d'entre
+  elles. **Ce test ne dit rien de la ressemblance** : les 62 le passaient alors
+  que 14 ne correspondaient pas a la reference.
+- Methode : planches contact de nos 62 (deux instants chacun), lues en pleine
+  resolution, puis capture ciblee de la reference pour les cas douteux.
+- **Trois etaient des erreurs de structure**, pas de reglage : Iso Cascade et
+  Iso Focus posaient leurs cartes a plat sur le sol alors que la reference les
+  garde debout et les cisaille ; Grid Zoom Strip etait rendu en bande lineaire
+  alors que c'est une grille qui plonge sur une de ses cases.
+- Onze autres etaient fausses de proportion ou de placement : Iso Orbit
+  (cotes des cartes alignes sur le sol au lieu des axes camera, d'ou des losanges
+  pointus), Focus Orbit (anneau decale d'un rayon), Spread Rows/Columns (pile
+  reduite a un point), Spiral Stream, Orbit Bloom, Image Trail, Card Toss,
+  Feed Scroll, Wheel Carousel, Collage Reel.
+- Apres correction : les 62 rendent, bouclent, et ont ete revues visuellement.
+  Ecart connu : Orbit Bloom ouvre sa corolle mais ne reproduit pas la forme en
+  papillon exacte de la reference.
+- Detail et marche a suivre pour refaire l'audit :
+  `docs/motion-studio-reference.md`.
+
+## Journal — 2026-09-05 (Motion : le MP4 refuse par QuickTime, et les keyframes)
+
+- **Bug d'export corrige, et il etait grave.** Les fichiers produits s'ouvraient
+  dans Chrome et dans ffmpeg, mais QuickTime et l'apercu du Finder les
+  refusaient (« Le fichier n'est pas compatible »). Cause : dans le muxer MP4,
+  les boites construites a partir de texte encode sortaient tronquees —
+  `Array.prototype.flat()` aplatit les tableaux ordinaires mais laisse un
+  `Uint8Array` intact, compte pour un seul element. Un `ftyp` faisait 17 octets
+  au lieu de 32. Les lecteurs permissifs devinaient ; AVFoundation, non.
+  Correction dans `js/mp4.js` : une fonction `bytes()` qui aplatit aussi les
+  tableaux typees.
+- **La lecon de methode compte autant que le correctif** : verifier un export en
+  l'ouvrant dans un `<video>` de navigateur ne prouve rien sur macOS. La
+  verification se fait desormais avec AVFoundation, le decodeur de QuickTime.
+- **Garde-fou ajoute** : `npm run verifier:mp4`
+  (`scripts/verifier-mp4-motion.mjs`) fabrique un MP4 a partir de faux
+  echantillons et compare la taille de chaque boite a la valeur prevue par la
+  norme. Il tombe en panne bruyante si le defaut revient. Verifie : avec le bug
+  reintroduit, il liste les 13 boites fausses.
+- **Timeline de keyframes livree** (`js/engine/keyframes.js`). Un losange a cote
+  de chaque curseur et de chaque couleur pose ou retire un point a l'instant
+  courant ; un tiroir sous la scene montre une piste par reglage anime, avec sa
+  regle temporelle et sa tete de lecture. Les pistes sont **circulaires** : apres
+  le dernier point on repart vers le premier, donc un reglage anime ne casse pas
+  le raccord de boucle (verifie : ecart nul a t = 0 contre t = 1 avec deux
+  pistes actives). Les valeurs animees sont resolues dans `App.draw`, donc
+  l'apercu et l'export passent par le meme etat effectif.
+- Verifie sur le vrai chemin : export 1080x1080, 6 s, 30 i/s depuis le bouton
+  Exporter de l'app dans VibeOS — AVFoundation le lit, en extrait une image, et
+  le fichier arrive dans le dossier Telechargements. Idem en 1080x1920 sur 2
+  boucles, en 4K 60 i/s et en 4:5 24 i/s.
+
+## Journal — 2026-09-04 bis (Motion : les 62 animations et la parite d'export)
+
+- Les huit familles restantes sont livrees, soit **50 templates de plus** :
+  Multiscene (6), Isometric (3), Orbit (8), Carousel & Flow (10), Grid (8),
+  Spotlight & Focus (4), Reveal & Wipe (4), Stack & Scatter (7). Nouveaux
+  fichiers dans `templates/` : `orbits.js`, `flow.js`, `grids.js`,
+  `spotlight.js`, `wipes.js`, `stacks.js`, `iso.js`, `multiscene.js`.
+- **Deux ajouts au moteur**, demandes par ces familles :
+  - un **plan de coupe** par carte (`clip`), avec liseré optionnel : c'est lui
+    qui fait les balayages et les revelations. Une carte est rognee, jamais
+    redimensionnee — sinon l'image glisserait avec son bord ;
+  - un **masque de cadre** (`frameMask`) : un morceau d'image revele en bandes ou
+    en tuiles est un quad separe et ne sait rien des coins arrondis de l'image
+    entiere. On lui passe le rectangle du cadre exprime dans son propre repere.
+  - le rayon de coin accepte desormais quatre valeurs, une par coin.
+- **Bug de moteur trouve et corrige** : le tri des cartes se faisait sur la
+  distance a l'oeil. Pour des cartes coplanaires, une carte de coin se retrouvait
+  rangee derriere une carte centrale, et une revelation en bandes voyait ses
+  bandes du haut et du bas passer sous l'image posee dessous. Le tri se fait
+  maintenant sur la profondeur le long de l'axe de visee. Ce defaut touchait en
+  silence plusieurs familles.
+- **Boucles** : les 62 templates rendent la meme image a t = 0 et t = 1 (ecart
+  mesure inferieur a 6 sur 255), verifie par un balayage automatique. Six ne
+  bouclaient pas et ont ete corriges : Grid Reveal et Cascade Deck ne
+  revenaient pas a leur etat de depart, Mosaic Marquee et Column Drift ne
+  parcouraient pas un nombre entier de motifs, Hero Reel et Zoom Parallax
+  faisaient un fondu entre deux plans de tailles differentes — le zoom passe
+  maintenant par la fenetre de texture et non par la geometrie, ce qui rend le
+  fondu exact.
+- **Export aligne sur la reference** : choix du format, definitions 720p a 8K
+  (toutes gratuites, celles que la machine ne sait pas encoder sont grisees),
+  24/30/60 images par seconde, **1x a 4x boucles enchainees**, recapitulatif
+  (definition, duree, debit, poids attendu) et avertissement quand des
+  emplacements sont vides. Verifie : 1080x1920 sur 2 boucles de 3 s sort un MP4
+  de 6,00 s exactement, encode en 1,5 s, ecrit dans le dossier Telechargements.
+
+## Journal — 2026-09-04 (Motion : troisieme mini-app du Studio)
+
+- Le Studio n'avait que deux modules, Gradient et Lumen, qui rendent tous deux
+  une **image de fond**. Motion est le troisieme, et il rend une **video** : une
+  boucle animee a partir des images de l'utilisateur. Il suit le meme chemin
+  d'integration que les deux autres — app autonome dans `public/vendor/`, iframe
+  plein ecran dans un `Sheet` — mais sans protocole postMessage, puisque rien ne
+  remonte dans le projet : le fichier part en telechargement.
+- Nouveau : `public/vendor/motion-studio/` (moteur, editeur, 12 templates),
+  `src/features/vibeos/shared/MotionSheet.jsx`. Modifie :
+  `studio/StudioScreen.jsx` (entree `03 / Motion` dans `MODULES`, visuel
+  `motionScene`), `studio/studio.module.css` (grille a 3 colonnes, palier a
+  1080 px, visuel de l'anneau).
+- **Le moteur.** Un seul renderer WebGL2 qui ne sait dessiner qu'une chose : un
+  quad texture dont on donne les 4 coins en 3D. La perspective vient donc de la
+  projection des coins, et l'interpolation perspective-correcte des UV est faite
+  par GL. Un template n'est qu'une fonction `build(ctx)` qui rend une liste de
+  quads pour un temps donne : le rendu est une fonction pure du temps, ce qui
+  fait servir le meme chemin a l'apercu, aux vignettes du catalogue et a
+  l'export image par image. Il n'y a donc aucune derive possible entre ce qu'on
+  voit et ce qu'on exporte.
+- **Les vignettes du catalogue** partagent un seul contexte WebGL, rafraichi a
+  tour de role et recopie dans le petit canvas 2D de chaque tuile. Un contexte
+  par vignette aurait epuise la limite du navigateur des la deuxieme famille.
+- **L'export** passe par WebCodecs et un muxer MP4 ecrit ici
+  (`js/mp4.js`, ~110 lignes) : il encode aussi vite que la machine le permet,
+  sans sauter d'image. Le niveau H.264 est choisi en sondant reellement le
+  navigateur (`VideoEncoder.isConfigSupported`), et les definitions qu'il ne
+  sait pas encoder sont grisees dans la modale — la 8K l'est sur cette machine.
+  Repli MediaRecorder/WebM la ou WebCodecs manque, avec l'avertissement qui va
+  avec.
+- **Boucles verifiees** : les 12 templates rendent la meme image a t = 0 et
+  t = 1 (ecart mesure < 2 sur 255). Deux ne bouclaient pas et ont ete corriges :
+  Parallax Totem, dont les colonnes ne parcouraient pas un nombre entier de
+  cartes par tour, et Depth Stack Scroll, dont une carte se teleportait du fond
+  au premier plan.
+- Reste 50 templates dans huit familles, plus la timeline de keyframes : voir
+  `todo.md` et `docs/motion-studio-reference.md`.
 
 ## Journal — 2026-09-01 (la bibliotheque VibeOS entre dans Layout)
 
@@ -5376,3 +5534,160 @@ Trois reproches, tous fondés : **trop rapide**, **images pas en pleine qualité
   sans erreur et 5 avertissements préexistants. Le smoke navigateur reste
   bloqué avant Layout par le contournement d'authentification Dev qui ne ferme
   pas la modale, échec préexistant déjà documenté. Aucun déploiement.
+
+## Journal — 2026-09-03 (l'apercu Instagram passe en plein cadre, avec la musique dedans)
+
+- `InstaPreviewSheet` quitte le panneau lateral `wide` pour le mode `immersive`
+  de `Sheet`, qui existait dans les primitives sans etre utilise nulle part :
+  le bandeau VibeOS reste visible, tout le dessous est donne a l'apercu, et le
+  titre « Apercu Instagram » et son filet de separation disparaissent avec
+  l'en-tete de sheet.
+- Trois colonnes : `PostImagesRail` (images du post) / iPhone / `PreviewSoundPanel`
+  (ambiance sonore). Sous 1024px la pellicule sort, sous 820px la musique
+  passe en bande basse.
+- La carte `Portrait (4:5)` et la phrase interne « Le rendu pleine definition
+  est replace dans la preview iPhone de Seconde Vie » sont remplacees par une
+  ligne de legende sous le telephone. `.previewAuditHead`, `.previewReady` et
+  `.referencePhoneStage` sont supprimes du CSS, plus aucun appel.
+- `InstagramPublicationPreview` accepte `activeIndex` / `onActiveIndexChange`.
+  Sans ces props il garde son etat interne : le comportement des autres appels
+  ne change pas. Avec, la pellicule et le telephone restent d'accord dans les
+  deux sens (clic sur une vignette, swipe dans le telephone).
+- `PreviewSoundPanel` ne reconstruit aucun moteur : meme `useVibeOsSoundtrack`
+  que `/creer/son`, meme lecteur global `VibeOsAudioProvider`. Une piste lancee
+  depuis l'apercu continue donc de jouer quand on referme, et se retrouve dans
+  le `MiniPlayer` du bandeau — verifie a l'ecran.
+- La ligne de resultat est propre a ce panneau plutot que `TrackRow` : dans
+  340px, le badge de licence et les actions de la page Soundtrack ecrasent le
+  titre.
+- Ce que la pellicule ne fait PAS encore : cocher/decocher une image et
+  reordonner. Tant qu'un post est un seul rendu decoupe en tranches (pano-2,
+  pano-3), masquer ou deplacer une tranche casserait le panorama. Ces deux
+  controles arrivent avec le modele multi-grilles (`useLayoutEditor` est
+  mono-grille aujourd'hui).
+- Verifie a l'ecran sur localhost:3000 en 1440x900 : format Portrait (1 image)
+  et Pano x3 (3 vignettes, clic sur la vignette 3 = 3/3 dans le telephone),
+  recherche « lofi piano » et lecture d'une piste.
+- Gates : `npm run lint` sans erreur (5 avertissements preexistants),
+  `npm run build` vert. Le build a d'abord echoue sur `better-sqlite3` compile
+  pour une autre version de Node (probleme d'environnement, sans rapport) :
+  `npm rebuild better-sqlite3` le remet d'aplomb. Aucun deploiement.
+
+## Journal — 2026-09-04 (catalogue musical maison sous licence CC BY 4.0)
+
+- Constat qui a decide de tout: **aucune API musique gratuite n'autorise
+  l'usage commercial**. Verifie source par source. Jamendo renvoie a un devis
+  (« The API may be used freely for non-commercial uses », clause 3.3 de leurs
+  conditions). Openverse se reserve le droit de facturer l'usage commercial, et
+  melange des bruitages Freesound a la musique sans aucun signal de qualite.
+  L'API du Free Music Archive est fermee, celle de ccMixter renvoie 404.
+  archive.org est massivement des livres audio LibriVox et des licences NC.
+  Pixabay n'a pas d'API musique, est derriere un challenge Cloudflare (donc
+  inaccessible depuis un serveur, ce qui casserait en production meme si ca
+  marchait en local), et sa licence interdit la distribution « standalone » -
+  donc interdit d'en faire la bibliotheque d'un produit.
+- Solution retenue: **une licence CC-BY est irrevocable et autorise
+  explicitement l'usage commercial ET la redistribution**. On constitue donc un
+  catalogue maison une fois, plutot que de dependre d'une API a l'execution.
+- `scripts/moisson-musique-cc.mjs` moissonne la bibliotheque de Scott Buckley
+  (262 morceaux, CC BY 4.0). Le HTML porte la taxonomie posee par l'artiste
+  lui-meme (`genre-*`, `mood-*`, `instrumentation-*`): aucune API n'aurait
+  donne ca. Le script s'identifie, espace ses requetes et respecte robots.txt.
+- `scripts/categoriser-musique-cc.mjs` range en 7 categories Insta
+  (Cinematique 57, Voyage 109, Reverie 40, Emotion 135, Nuit urbaine 65,
+  Energie 89, Saisonnier 13 - une piste peut appartenir a plusieurs).
+  260/262 classees. Il fabrique aussi `docs/ecoute-catalogue-musique.html`,
+  page d'ecoute locale pour trancher a l'oreille.
+- Le probleme de « qualite » disparait de lui-meme: c'est la discographie d'UN
+  compositeur professionnel, pas un depot d'uploads. Il n'y a rien a filtrer,
+  seulement a ranger.
+- `src/features/vibeos/soundtrack/data/catalogueCc.json` (159 Ko) est embarque
+  dans le build et servi par `src/app/api/music/catalogue/route.js`
+  (filtres `categorie` et `q`, recherche sans accent sur titre/genres/
+  ambiances/instruments). Aucun appel sortant a l'execution.
+- `PreviewSoundPanel` ne passe plus par `useVibeOsSoundtrack` ni par les
+  providers Openverse: il lit le catalogue et joue via le lecteur global. Les
+  pistes portent leur URL, le resolveur du provider se contente de la rendre.
+- Les visuels de l'artiste sont des bandeaux 700x329 avec le titre au centre:
+  les recadrer en carre tombait sur le cartouche pale et donnait une vignette
+  blanche. Vignette large 64x36 a la place.
+- **L'attribution n'est pas decorative**: c'est la contrepartie du droit
+  d'usage. Le bandeau bas de colonne (« Musique de Scott Buckley — CC BY 4.0 »)
+  et le champ `attribution` de chaque piste ne doivent pas etre retires. Le
+  lien de soutien de l'artiste (Patreon) est porte par les donnees des la
+  moisson, en vue d'un partenariat futur.
+- Verifie a l'ecran sur localhost:3001 : les 7 categories, la liste avec
+  pochettes, la lecture reelle (l'etat `isPlaying` vient de l'evenement `play`
+  de la balise audio), le MiniPlayer du bandeau et le bloc now playing.
+- Reste a faire: Kevin MacLeod (~800 morceaux CC BY, structure de site
+  differente), les durees (absentes de la moisson), et decider si on heberge
+  les fichiers dans Storage plutot que de taper sur le serveur de l'artiste.
+- Gates : `npm run lint` sans erreur (5 avertissements preexistants),
+  `npm run build` vert. Aucun deploiement.
+
+## Journal — 2026-09-04 (mode ecoute et barre de lecture dans l'apercu)
+
+- L'apercu immersif porte une bascule **Grand / Ecoute** en haut de la scene.
+  En « grand » la barre de lecture n'est pas MASQUEE, elle n'est pas rendue:
+  zero pixel pris. Mesure a l'ecran en 1440x900: telephone a **771 px** en
+  grand, **687 px** en ecoute, soit 84 px (11 %) rendus quand on ferme le mode.
+  La preference est retenue en `localStorage` (`vibeos.apercu.mode`), lue a
+  l'initialisation du state et non dans un effet.
+- Ordre de la colonne centrale, dans cet ordre exact: bascule, telephone,
+  **legende de format**, barre de lecture. La legende decrit l'image, elle reste
+  collee a l'image.
+- `PreviewPlayerBar.jsx` (72 px): identite a gauche (pochette 48), commandes
+  CENTREES avec l'avancement juste dessous, volume a droite. C'est la largeur
+  qui porte la barre d'avancement - la hauteur est le seul axe qui coute
+  quelque chose au telephone. Un seul objet plein: le disque de lecture.
+- Les deux rails (position, volume) sont des `role="slider"` au clavier, avec
+  une zone de clic de 20 px autour d'un trait de 4 px et une tete de lecture
+  qui apparait au survol.
+- `AudioProvider` gagne `repeat` / `toggleRepeat`. La repetition rembobine
+  l'element audio au lieu de relancer `playTrack`: pas de nouvelle resolution de
+  source, donc pas de re-telechargement ni de coupure.
+- `PreviewSoundPanel` remonte la piste complete (`onPisteJouee`) parce que le
+  lecteur global ne retient que titre/artiste/pochette, alors que la barre a
+  besoin de la fiche entiere.
+- Le coeur « garder ce morceau » de la maquette validee n'est PAS implemente:
+  il n'aurait rien ou ranger tant que la fiche du morceau choisi ne voyage pas
+  jusqu'a la page publication. Un bouton qui ne range rien est un faux bouton.
+  Idem pour la file d'attente.
+- Verifie a l'ecran: bascule, ordre des blocs, barre a 72 px exactement, lecture
+  reelle (0:04 puis 0:17 sur une duree de 7:02 lue depuis l'element audio),
+  six commandes presentes, et la musique qui continue quand on revient en grand.
+- Maquette de decision archivee: artefact « Ou poser le player » (quatre
+  emplacements compares, cout en hauteur mesure pour chacun).
+- Gates : `npm run lint` sans erreur (5 avertissements preexistants),
+  `npm run build` vert. Aucun deploiement.
+
+## Journal — 2026-09-04 (corrections de placement du mode ecoute)
+
+Deux defauts vus a l'ecran par l'utilisateur, tous deux de positionnement.
+
+- **La bascule Grand / Ecoute atterrissait sur la colonne musique.** Elle est
+  en `position: absolute`, mais `.previewStageMain` n'etait pas positionne:
+  elle s'ancrait donc au panneau immersif entier et se posait sur le champ de
+  recherche. `.previewStageMain` passe en `position: relative`, et la bascule
+  passe de `right` a `left` - dans le noir vide en haut a gauche de la scene,
+  ou elle ne recouvre ni le telephone ni la colonne musique. Mesure apres
+  correction: bascule a x=157, colonne musique a x=1166.
+- **Le telephone debordait par-dessus la barre de lecture.**
+  `.previewStagePhone` etait en `display: grid; place-items: center`: un item
+  centre est dimensionne par son contenu, donc le `height: 100%` de
+  `ScaledStage` ne se resolvait plus contre une hauteur definie. Passage en
+  `display: flex` (etirement par defaut) plus `overflow: hidden` comme
+  ceinture.
+- Il restait ensuite un ecart de mesure: `ScaledStage` ne mesure sa boite qu'au
+  montage puis via son ResizeObserver, et l'echelle gardait la valeur d'avant
+  l'apparition de la barre (boite calculee a 796 px pour un emplacement de
+  726). `mode` entre donc dans la `key` de `InstagramPublicationPreview`:
+  changer de mode remonte le composant, son `useLayoutEffect` mesure apres
+  layout avec la barre deja presente. Plus de course entre le rendu et
+  l'observateur.
+- Verifie par mesure du DOM en 1512x950 apres les deux corrections CSS:
+  chevauchement telephone/barre = 0, ordre bascule / telephone / legende /
+  barre respecte. La correction de `key` n'a PAS pu etre revue a l'ecran:
+  l'acces du navigateur d'inspection a localhost a ete refuse ensuite.
+- Gates : `npm run lint` sans erreur (5 avertissements preexistants),
+  `npm run build` vert. Aucun deploiement.

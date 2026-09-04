@@ -135,7 +135,7 @@
 .moduleGrid {
     display: grid;
     width: min(1120px, 100%);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
 }
 
@@ -413,6 +413,69 @@
 @keyframes barIn {
     from { opacity: 0; transform: translateY(8px) scale(0.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/*
+ * Motion : un anneau de cartes vu de trois quarts, le motif de la famille 3D.
+ * Les cartes restent couchees dans le plan de l'anneau — les redresser une par
+ * une donnait une dispersion illisible a cette taille.
+ */
+.motionScene {
+    background:
+        radial-gradient(circle at 50% 58%, rgba(91, 124, 250, 0.16), transparent 38%),
+        linear-gradient(160deg, #0b0d14, #0a0a10 60%, #07070b);
+    perspective: 420px;
+}
+
+.motionRing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    width: 54%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%) rotateX(66deg);
+    transform-style: preserve-3d;
+    transition: transform 900ms var(--ease-product);
+}
+
+.motionRing span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    width: 26%;
+    height: 32%;
+    margin: -16% 0 0 -13%;
+    border-radius: 5px;
+    background: linear-gradient(150deg, rgba(215, 222, 240, 0.95), rgba(126, 141, 178, 0.85));
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.motionRing span:nth-child(1) { transform: rotateZ(0deg) translateY(-142%); }
+.motionRing span:nth-child(2) { transform: rotateZ(60deg) translateY(-142%); }
+.motionRing span:nth-child(3) { transform: rotateZ(120deg) translateY(-142%); }
+.motionRing span:nth-child(4) { transform: rotateZ(180deg) translateY(-142%); }
+.motionRing span:nth-child(5) { transform: rotateZ(240deg) translateY(-142%); }
+.motionRing span:nth-child(6) { transform: rotateZ(300deg) translateY(-142%); }
+
+.motionGrid {
+    position: absolute;
+    inset: 0;
+    display: block;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, transparent, #000 42%, #000);
+}
+
+.moduleCard:hover .motionRing {
+    transform: translate(-50%, -50%) rotateX(66deg) rotateZ(38deg);
+}
+
+@media (max-width: 1080px) {
+    .moduleGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 780px) {
