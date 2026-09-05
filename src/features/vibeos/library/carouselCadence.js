@@ -27,17 +27,25 @@
 export const SLIDE_MS = 620;
 
 /*
- * Le plancher animé. En dessous, un glissement ne se lit plus comme un
- * mouvement mais comme un tremblement : autant basculer franchement.
+ * Le plancher. On ne descend jamais en dessous, et on ne tombe JAMAIS a zero :
+ * une bascule sans mouvement, au milieu d'un defilement rapide, se lit comme un
+ * blocage — c'est le reproche exact qui a ete fait a la premiere version. A
+ * 80 ms, l'oeil voit la photo se deplacer, et douze photos par seconde restent
+ * atteignables.
  */
-export const SLIDE_MIN = 130;
+export const SLIDE_MIN = 80;
 
 /* Au-dela de cet ecart entre deux appuis, on considere que la personne
    regarde, pas qu'elle parcourt. */
 export const CADENCE_CALME = 520;
 
-/* En deca, c'est une rafale (typiquement une touche maintenue, qui se repete
-   toutes les 30 a 40 ms) : plus d'animation du tout. */
+/*
+ * En deca, c'est une rafale : typiquement une touche maintenue, qui se repete
+ * toutes les 30 a 40 ms. On garde le plancher, et c'est l'INTERRUPTION qui fait
+ * le travail : chaque appui relance le glissement depuis la position ou le rail
+ * se trouve, jamais depuis un cran fige. Le rail chasse la cible en continu au
+ * lieu de s'arreter a chaque photo.
+ */
 export const CADENCE_RAFALE = 150;
 
 /*
@@ -59,8 +67,6 @@ const MARGE = 0.9;
  */
 export function slideDuration(gap) {
     if (!Number.isFinite(gap) || gap >= CADENCE_CALME) return SLIDE_MS;
-    if (gap <= CADENCE_RAFALE) return 0;
-    const taille = Math.round(Math.min(SLIDE_MS, gap * MARGE));
-    /* Trop court pour se lire comme un mouvement : on bascule franchement. */
-    return taille < SLIDE_MIN ? 0 : taille;
+    if (gap <= CADENCE_RAFALE) return SLIDE_MIN;
+    return Math.max(SLIDE_MIN, Math.round(Math.min(SLIDE_MS, gap * MARGE)));
 }

@@ -223,18 +223,30 @@ export default function Lightbox({
     const trackRef = useRef(null);
     const stageRef = useRef(null);
     const dragRef = useRef(null);
-    const slidingRef = useRef(false);
+    /* Photo VISEE: elle avance a chaque appui, meme si le rail n'y est pas
+       encore. C'est elle, et jamais `index`, qui sert de point de depart au cran
+       suivant. */
+    const aimRef = useRef(index);
+    /* Horodatage de l'appui precedent, pour en tirer la cadence. */
+    const cadenceRef = useRef(0);
+    /* Trajet a rejouer au prochain rendu: position reelle du rail, abscisse de
+       la photo visee dans le repere actuel, et duree. */
+    const flipRef = useRef(null);
     const timersRef = useRef([]);
 
     const [stage, setStage] = useState({ width: 0, height: 0 });
     const [state, setState] = useState('open'); // open | idle | closing
-    /* Photo visee pendant un glissement. Le fondu des voisines doit accompagner
-       le mouvement du rail, donc il bascule des le DEBUT du geste, alors que
-       `index` ne change qu'a la fin. Un simple etat derive suffit: pas besoin
-       de le resynchroniser, il retombe sur `index` quand le glissement se
-       termine. */
-    const [pending, setPending] = useState(null);
-    const visual = pending ?? index;
+    /*
+     * `index` est valide IMMEDIATEMENT a chaque changement de photo, et le
+     * mouvement est rejoue par-dessus (voir `flipRef`).
+     *
+     * L'ancienne version ne le validait qu'a la FIN du glissement. Tout le
+     * reste en decoulait : les fleches a l'ecran calculaient `index + 1`, qui
+     * pendant l'animation designait la photo ou l'on allait deja, donc le
+     * deuxieme clic ne faisait rien. Cliquer vite « restait bloque sur l'image
+     * precedente » — litteralement.
+     */
+    const visual = index;
     /* L'habillage suit le MOUVEMENT, pas l'etat pose: compteur, legende et
        bouton Garder parlent de la photo vers laquelle on va. Sans ca, appuyer
        sur F en plein glissement garderait celle qu'on vient de quitter. */
@@ -301,6 +313,23 @@ export default function Lightbox({
         node.style.transform = `translate3d(${x}px, -50%, 0)`;
     }, []);
 
+    /*
+     * Ou le rail se trouve VRAIMENT, animation en cours comprise.
+     *
+     * C'est la piece qui permet d'interrompre un glissement sans saut: on
+     * repart d'ou l'oeil voit le rail, pas du cran d'ou il etait parti.
+     */
+    const railX = useCallback(() => {
+        const node = trackRef.current;
+        if (!node) return null;
+        const brut = window.getComputedStyle(node).transform;
+        if (!brut || brut === 'none') return null;
+        const nombres = brut.slice(brut.indexOf('(') + 1, -1).split(',').map(Number);
+        /* matrix(a,b,c,d,tx,ty) ou matrix3d(...16), tx en 5e / 13e position. */
+        const tx = nombres.length === 6 ? nombres[4] : nombres[12];
+        return Number.isFinite(tx) ? tx : null;
+    }, []);
+
     const centreOf = (item) => item.x + item.width / 2;
 
     /*
@@ -344,19 +373,37 @@ export default function Lightbox({
     }, []);
 
     /*
-     * Recentrage instantane a chaque changement de photo ou de taille.
+     * Le rail est repositionne, puis le mouvement est REJOUE par-dessus.
      *
-     * Sauf pendant un glissement: `layout` se refabrique des que la liste de
-     * photos change d'identite - garder une photo au coeur suffit - et sans
-     * cette reserve, appuyer sur F pendant que le rail bouge le ferait sauter
-     * a sa position finale au milieu du mouvement.
+     * L'index etant valide immediatement, la mise en page se recentre sur la
+     * nouvelle photo avant meme que rien ne bouge. Sans precaution, l'oeil
+     * verrait un saut. On rejoue donc le trajet: on replace le rail la ou il
+     * etait VISUELLEMENT juste avant (`flipRef`, releve sur le DOM anime), puis
+     * on le relance vers sa nouvelle place.
+     *
+     * Le repere change en meme temps que la fenetre de diapositives: la photo
+     * la plus lointaine sort, toutes les abscisses glissent. On compense avec
+     * l'abscisse de la photo visee, qui existe dans les deux reperes.
      */
     useLayoutEffect(() => {
         if (!layout) return;
-        if (pending !== null) return;
-        setTrackX(offsetFor(index), false);
-        slidingRef.current = false;
-    }, [layout, index, pending, offsetFor, setTrackX]);
+        const vers = offsetFor(index);
+        const rejeu = flipRef.current;
+        flipRef.current = null;
+        const item = layout.items.find((entry) => entry.position === index);
+
+        if (rejeu && item && rejeu.ms > 0) {
+            const depuis = rejeu.x + rejeu.anchorX - item.x;
+            setTrackX(depuis, false);
+            /* Force la prise en compte de la position de depart: sans cette
+               lecture, le navigateur fusionne les deux ecritures et il n'y a
+               aucune animation. */
+            void trackRef.current?.offsetHeight;
+            setTrackX(vers, true, rejeu.ms);
+            return;
+        }
+        setTrackX(vers, false);
+    }, [layout, index, offsetFor, setTrackX]);
 
     /*
      * Ouverture: la photo est CUEILLIE sur sa tuile.
@@ -420,66 +467,45 @@ export default function Lightbox({
      * - en rafale, ou pour un saut de plusieurs crans, une bascule seche - un
      *   glissement sur dix photos n'aurait rien a montrer de toute facon.
      */
-    const aimRef = useRef(index);
-    const cadenceRef = useRef(0);
-    const commitRef = useRef(null);
-
-    /* La visee doit suivre un changement d'index venu d'ailleurs (frise,
-       ouverture, suppression), sinon le prochain appui repartirait d'un cran
-       fantome. */
-    useEffect(() => {
-        if (pending === null) aimRef.current = index;
-    }, [index, pending]);
+    /* La visee suit un changement d'index venu d'ailleurs: frise, ouverture,
+       suppression. Sinon le prochain appui repartirait d'un cran fantome. */
+    useEffect(() => { aimRef.current = index; }, [index]);
 
     const slideTo = useCallback((next) => {
         if (state === 'closing' || !photos.length) return;
         const target = Math.max(0, Math.min(photos.length - 1, next));
-        if (target === aimRef.current) return;
+        const depart = aimRef.current;
+        if (target === depart) return;
 
         const now = typeof performance === 'undefined' ? Date.now() : performance.now();
         const gap = now - cadenceRef.current;
         cadenceRef.current = now;
         setState((current) => (current === 'open' ? 'idle' : current));
-
-        /* Le rappel de la photo precedente n'a plus lieu d'etre: c'est lui qui,
-           en se declenchant en retard, faisait revenir le rail en arriere. */
-        if (commitRef.current !== null) {
-            window.clearTimeout(commitRef.current);
-            commitRef.current = null;
-        }
-
-        const pas = Math.abs(target - aimRef.current) === 1;
-        /*
-         * Le rail ne peut glisser que vers une diapositive REELLEMENT montee.
-         * La fenetre en tient `WINDOW` de chaque cote de l'index valide, et
-         * c'est bien `index` — pas la visee — qui la definit : pendant un
-         * glissement, l'index n'a pas encore bouge. La marge de WINDOW est ce
-         * qui permet d'INTERROMPRE un glissement lent par un glissement court
-         * au lieu de basculer sec, qui est le cas le plus courant quand on
-         * accelere en cours de route.
-         */
-        const montee = layout && Math.abs(target - index) <= WINDOW;
-        const ms = pas && montee ? slideDuration(gap) : 0;
-
         aimRef.current = target;
 
-        if (ms === 0) {
-            slidingRef.current = false;
-            setPending(null);
-            onIndexChange(target);
-            return;
-        }
+        /*
+         * Un saut lointain (frise, Debut/Fin) n'a rien a montrer en chemin: il
+         * bascule. Un pas, meme enchaine a toute vitesse, garde toujours du
+         * mouvement — un changement sec au milieu d'un defilement se lit comme
+         * un blocage.
+         */
+        const item = layout?.items.find((entry) => entry.position === target);
+        const x = railX();
+        const proche = Math.abs(target - depart) <= WINDOW;
+        const ms = item && x !== null && proche ? slideDuration(gap) : 0;
 
-        slidingRef.current = true;
-        setPending(target);
-        restDistances(target);
-        setTrackX(offsetFor(target), true, ms);
-        commitRef.current = later(() => {
-            commitRef.current = null;
-            setPending(null);
-            onIndexChange(target);
-        }, ms);
-    }, [state, photos.length, index, layout, offsetFor, setTrackX, onIndexChange, later, restDistances]);
+        if (ms > 0) {
+            flipRef.current = { x, anchorX: item.x, ms };
+            /* Les voisines doivent se redimensionner au meme rythme que le
+               rail, sinon la photo arrive avant son entourage. */
+            trackRef.current?.style.setProperty('--vo-slide-ms', `${ms}ms`);
+        }
+        onIndexChange(target);
+    }, [state, photos.length, layout, railX, onIndexChange]);
+
+    /* Avancer d'un cran depuis la photo VISEE, jamais depuis l'index affiche:
+       c'est ce que doivent appeler les fleches, le clavier et le glissement. */
+    const step = useCallback((delta) => slideTo(aimRef.current + delta), [slideTo]);
 
     /* ---------- Fermeture ---------- */
     /*
@@ -560,28 +586,27 @@ export default function Lightbox({
             const tag = cible?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || cible?.isContentEditable) return;
 
-            const aim = aimRef.current;
             const key = event.key;
 
             if (key === 'Escape') { event.preventDefault(); close(); return; }
             if (key === 'ArrowRight' || key === 'ArrowDown' || key === 'PageDown' || key === ' ' || key === 'Spacebar') {
-                event.preventDefault(); slideTo(aim + 1); return;
+                event.preventDefault(); step(1); return;
             }
             if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp') {
-                event.preventDefault(); slideTo(aim - 1); return;
+                event.preventDefault(); step(-1); return;
             }
             if (key === 'Home') { event.preventDefault(); slideTo(0); return; }
             if (key === 'End') { event.preventDefault(); slideTo(photos.length - 1); return; }
             /* Trier sans lacher le clavier: la main droite garde les fleches,
                le pouce fait F. C'est le geste repete sept cents fois. */
-            if ((key === 'f' || key === 'F') && photos[aim]?.scout) {
+            if ((key === 'f' || key === 'F') && photos[aimRef.current]?.scout) {
                 event.preventDefault();
-                onFavorite?.(photos[aim]);
+                onFavorite?.(photos[aimRef.current]);
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [close, slideTo, photos, onFavorite]);
+    }, [close, slideTo, step, photos, onFavorite]);
 
     /* Le fond de page ne doit pas defiler derriere le carrousel. */
     useEffect(() => {
@@ -592,8 +617,12 @@ export default function Lightbox({
 
     /* ---------- Glissement ---------- */
     const onPointerDown = (event) => {
-        if (slidingRef.current || state === 'closing') return;
+        if (state === 'closing') return;
         if (event.pointerType === 'mouse' && event.button !== 0) return;
+        /* Un rail encore en mouvement se laisse attraper: on le fige la ou
+           l'oeil le voit, plutot que de refuser le geste. */
+        const enVol = railX();
+        if (enVol !== null) setTrackX(enVol, false);
         dragRef.current = {
             startX: event.clientX, startY: event.clientY, dx: 0, dy: 0, axis: null,
         };
@@ -652,8 +681,8 @@ export default function Lightbox({
 
         const current = layout?.items.find((entry) => entry.position === index);
         const threshold = (current?.width || stage.width || window.innerWidth) * SWIPE_RATIO;
-        if (drag.dx <= -threshold && index < photos.length - 1) slideTo(index + 1);
-        else if (drag.dx >= threshold && index > 0) slideTo(index - 1);
+        if (drag.dx <= -threshold && index < photos.length - 1) step(1);
+        else if (drag.dx >= threshold && index > 0) step(-1);
         else {
             restDistances(index);
             setTrackX(offsetFor(index), true);
@@ -789,7 +818,7 @@ export default function Lightbox({
                 <button
                     type="button"
                     className={`${styles.lightboxNav} ${styles.lightboxNavPrev}`}
-                    onClick={() => slideTo(index - 1)}
+                    onClick={() => step(-1)}
                     aria-label="Photo précédente"
                 >
                     <ChevronLeft size={20} />
@@ -799,7 +828,7 @@ export default function Lightbox({
                 <button
                     type="button"
                     className={`${styles.lightboxNav} ${styles.lightboxNavNext}`}
-                    onClick={() => slideTo(index + 1)}
+                    onClick={() => step(1)}
                     aria-label="Photo suivante"
                 >
                     <ChevronRight size={20} />

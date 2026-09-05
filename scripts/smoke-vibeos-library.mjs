@@ -492,16 +492,27 @@ try {
         assert.equal(slideDuration(CADENCE_CALME + 200), SLIDE_MS);
     });
 
-    check("une touche maintenue ne glisse plus du tout", () => {
-        /* Une repetition clavier tombe vers 30-40 ms. */
-        assert.equal(slideDuration(33), 0);
-        assert.equal(slideDuration(CADENCE_RAFALE), 0);
+    check("une touche maintenue garde du mouvement, jamais un gel", () => {
+        /* Une repetition clavier tombe vers 30-40 ms. Une bascule sans
+           mouvement au milieu d'un defilement se lit comme un blocage: c'est
+           le reproche exact fait a la premiere version. */
+        assert.equal(slideDuration(33), SLIDE_MIN);
+        assert.equal(slideDuration(CADENCE_RAFALE), SLIDE_MIN);
+        assert.ok(SLIDE_MIN > 0);
     });
 
-    check("LA promesse : en regime rapide, le glissement finit avant l'appui suivant", () => {
-        /* Le regime calme (au-dela de CADENCE_CALME) en est exempt par choix :
-           voir le commentaire de `slideDuration`. */
-        for (let gap = CADENCE_RAFALE + 1; gap < CADENCE_CALME; gap += 1) {
+    check("aucun ecart ne produit d'animation nulle", () => {
+        for (let gap = 0; gap <= 2000; gap += 1) {
+            assert.ok(slideDuration(gap) >= SLIDE_MIN, `animation nulle a ${gap} ms`);
+        }
+        assert.equal(slideDuration(Number.NaN), SLIDE_MS);
+    });
+
+    check("en regime soutenu, le glissement finit avant l'appui suivant", () => {
+        /* En rafale, c'est l'INTERRUPTION qui prend le relais: chaque appui
+           relance le trajet depuis la position reelle du rail. Le regime calme
+           en est exempt par choix. */
+        for (let gap = SLIDE_MIN + 1; gap < CADENCE_CALME; gap += 1) {
             const duree = slideDuration(gap);
             assert.ok(
                 duree <= gap,
@@ -519,10 +530,10 @@ try {
         }
     });
 
-    check("une duree animee n'est jamais un tremblement", () => {
-        for (let gap = 0; gap <= 1000; gap += 1) {
+    check("la duree reste dans ses bornes", () => {
+        for (let gap = 0; gap <= 2000; gap += 1) {
             const duree = slideDuration(gap);
-            assert.ok(duree === 0 || duree >= SLIDE_MIN, `duree batarde ${duree} ms a ${gap} ms`);
+            assert.ok(duree >= SLIDE_MIN && duree <= SLIDE_MS, `duree hors bornes ${duree} ms a ${gap} ms`);
         }
     });
 

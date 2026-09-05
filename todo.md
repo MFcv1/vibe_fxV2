@@ -253,8 +253,10 @@ sur deux images très différentes), et un panneau **Masquage** non vide.
    décode nativement (chemin `decodedFrom: 'native'`) — ce chemin-là n'a pas été
    joué par un agent.
 4. **La sensation du carrousel à 60 images/seconde n'est pas mesurable ici.** La
-   cadence est vérifiée (durées, aucun appui perdu) ; la fluidité perçue sous
-   Safari reste un jugement d'œil.
+   cadence est vérifiée (durées relevées dans le DOM, aucun appui perdu au
+   clavier ni à la souris) ; la fluidité perçue sous Safari reste un jugement
+   d'œil. Les trois seuils sont isolés dans `carouselCadence.js` — `SLIDE_MS`
+   (calme), `SLIDE_MIN` (plancher), `CADENCE_CALME` — pour être recalés vite.
 
 **Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
 bibliothèque Midjourney (routes et ledger intacts, cf. `src/config/aiLaunch.js`) ;

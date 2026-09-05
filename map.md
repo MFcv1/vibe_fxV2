@@ -661,6 +661,49 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 nonies (carrousel : la vraie cause, l'index en retard)
+
+La premiere passe (octies) avait supprime le verrou du CLAVIER, pas la cause.
+Retour d'usage : « ca reste bloque a l'image precedente si on clique vite ».
+Exact, et l'explication tient en trois defauts qui s'empilaient :
+
+1. **Les fleches a l'ecran appelaient `slideTo(index + 1)`.** Or `index`
+   n'etait valide qu'a la FIN du glissement : pendant l'animation, `index + 1`
+   designait la photo ou l'on allait deja, donc `slideTo` retournait sans rien
+   faire. Cliquer vite ne faisait litteralement rien. Seul le clavier avait ete
+   corrige (il visait `aimRef`), d'ou un retour d'usage sur les fleches.
+2. **Les voisines se redimensionnaient en 620 ms, en dur dans le CSS.** Quand
+   le rail s'est mis a glisser en 90 ms, la photo arrivait avant son entourage :
+   l'ensemble donnait l'impression d'etre reste sur l'image precedente.
+3. **En rafale, il n'y avait plus d'animation du tout.** Une bascule seche au
+   milieu d'un defilement se lit comme un gel, pas comme de la vitesse.
+
+**Ce qui change.** L'index est desormais valide IMMEDIATEMENT, et le mouvement
+est rejoue par-dessus (FLIP) : on releve la position reelle du rail sur le DOM
+anime, la mise en page se recentre, on replace le rail la ou l'oeil le voyait,
+puis on le relance. Le repere changeant avec la fenetre de diapositives, on
+compense avec l'abscisse de la photo visee, qui existe dans les deux reperes.
+
+Consequences : plus aucun appui ne peut viser un cran fantome ; un glissement
+s'interrompt sans saut, depuis la position ou le rail se trouve ; `--vo-slide-ms`
+fait suivre les voisines a la meme vitesse ; le plancher d'animation passe de
+« zero » a 80 ms, donc il y a TOUJOURS du mouvement. Les fleches, le clavier et
+le geste au doigt passent tous par `step(delta)`, qui part de la photo visee.
+
+Un rail encore en mouvement se laisse attraper a la souris : on le fige la ou il
+est au lieu de refuser le geste.
+
+**Mesure dans le navigateur, sur 60 photos.** 20 vraies frappes enchainees font
+exactement 20 photos (3 -> 23) ; 8 clics rapides sur la fleche a l'ecran font
+exactement 8 photos (7 -> 15) — c'est le cas qui ne faisait rien avant. Duree
+relevee dans le DOM : 620 ms pour un appui isole, 80 ms pour chacun des huit
+appuis d'une rafale, jamais `none`. Non verifie : la sensation a 60 images par
+seconde sous Safari.
+
+Fichiers touches : `Lightbox.jsx`, `carouselCadence.js`, `library.module.css`,
+`scripts/smoke-vibeos-library.mjs`.
+Gate : `npm run test:vibeos-library`.
+
 ## Journal — 2026-09-05 octies (carrousel : il suit le rythme, il ne perd plus rien)
 
 **Le constat, sur de vraies photos.** Sur un dossier de tri de 264 photos, le
