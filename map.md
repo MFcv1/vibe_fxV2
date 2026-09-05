@@ -205,6 +205,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- layout-visuel/page.js   # Espace Layout — ecran reel depuis la phase B tranche 1 (LayoutScreen)
 |   |   |   |-- studio/page.js          # Espace Studio : monte `features/vibeos/studio/StudioScreen`
 |   |   |   |-- vision/page.js          # Espace Vision : monte `features/vibeos/vision/VisionScreen`
+|   |   |   |-- room/page.js            # Room : monte `features/vibeos/room/RoomScreen` (file d'attente du post, ordre du carrousel, apercu Instagram)
 |   |   |   `-- son/page.js             # Espace Soundtrack : monte `features/vibeos/soundtrack/SoundtrackScreen`
 |   |   |-- publier/                    # Surface publication (phase F) : elle a repris les feuilles Tailwind/publications que /studio chargeait, sans jamais charger vibeos.css
 |   |   |   |-- layout.js               # vibefx-tailwind.css + vibefx-layout.css + publications.css, scopees a /publier
@@ -430,10 +431,15 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- PipelineSourceNote.jsx  # La ligne « sur quoi tu travailles » affichee par Vision et Studio (composition / photo du projet / import), + le rappel « ton reglage Vision est deja applique »
 |   |   |   |-- pipelineSourceNote.module.css
 |   |   |   |-- projectModel.js         # Modele projet v1 (format, template, images, `composition` (Blob PNG publie par le Layout), vision, studio, soundtrackTrackId, thumbnail) + normalisation defensive
-|   |   |   |-- projectDb.js            # IndexedDB `vibeos` (stores projects + meta), degrade en no-op si indisponible, recents limites a 8
+|   |   |   |-- projectDb.js            # IndexedDB `vibeos` v2 (stores projects + meta + room), degrade en no-op si indisponible, recents limites a 8 ; expose `withStore`/`requestToPromise`/`readMeta`/`writeMeta` pour la Room
 |   |   |   `-- VibeOsProjectProvider.jsx # Contexte du projet qui circule : autosauvegarde debouncee 800ms, flush sur pagehide, create/open/duplicate/remove/ensureProject
+|   |   |-- room/                       # Room : la file d'attente d'un post Instagram (ajoutee le 2026-09-05)
+|   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
+|   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
+|   |   |   |-- RoomScreen.jsx          # L'ecran : file horizontale numerotee, glisser-deposer ET fleches, retrait, vidage a double clic de confirmation, « Valider l'ordre » -> InstaPreviewSheet
+|   |   |   `-- room.module.css
 |   |   |-- shell/
-|   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces + mini-lecteur + Publier) + tab bar basse mobile safe-area
+|   |   |   |-- VibeOsShell.jsx         # Bandeau superieur unique (nav espaces dont Room avec son compteur + mini-lecteur + Publier) + tab bar basse mobile safe-area. Monte VibeOsRoomProvider
 |   |   |   |-- MiniPlayer.jsx          # Mini-lecteur du header, visible seulement si une piste est chargee, clic titre -> /creer/son
 |   |   |   |-- PublishButton.jsx       # « Publier » (phase F) : rend le projet via le pipeline, depose le resultat dans publishHandoff, ouvre /publier ; desactive tant qu'il n'y a ni composition ni photo
 |   |   |   `-- shell.module.css
@@ -606,6 +612,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |-- smoke-vibeos-layout-grids.mjs   # Geometrie des 24 grilles editoriales : pas de chevauchement, rien hors cadre, taille minimale du moteur, memes zones en 4:5 et en 1:1, miroirs et rotation
 |   |-- smoke-vibeos-layout-grids.spec.cjs # Parcours reel : bibliotheque de grilles, application, recomposition 4:5 -> 1:1, miroir, hauteur du media dans l'iPhone
 |   |-- smoke-vibeos-layout-slots.spec.cjs # Cases : une photo importee ne remplit qu'UNE case, import cible depuis une case vide, echange de deux cases au glisser-deposer, remplissage de la case restee vide
+|   |-- smoke-vibeos-room.spec.cjs     # Smoke Playwright de la Room (`npm run test:vibeos-room`) : Layout -> Room, Vision -> Room, survie au rechargement, fleches, glisser-deposer, « Valider l'ordre », puis relecture des COULEURS des images dans le carrousel de l'iPhone — c'est ce qui prouve que l'ordre affiche est l'ordre publie
 |   |-- smoke-vibeos-vision.spec.cjs   # Smoke Playwright Vision VibeOS : analyse, « Ameliorer ma photo », intensite, 12 looks surs sur 5 photos types
 |   |-- vision-preview-performance.spec.cjs # Banc Playwright reproductible : première/dernière carte visible, scroll, petite collection, photo/intensité/cache, doublons, thread principal et fidélité CN01/CN14/BW01
 |   |-- smoke-reglages-avances.spec.cjs # LE MEME AUDIT, MAIS PAR L'INTERFACE: saisit les vrais curseurs de /creer/vision et /creer/studio et relit le canvas de la page. Ce que le banc d'essai ne peut pas voir: une borne d'interface plus large que celle du moteur, un onChange qui ecrit la mauvaise cle, un rendu qui ne se redeclenche pas. C'est lui qui a trouve que la moitie de la course des curseurs de Studio ne faisait rien. Designe les curseurs par LEUR LABEL, jamais par leur rang: le panneau Vision remonte en tete ce qui n'est plus au repos, donc bouger un curseur DEPLACE les suivants
@@ -651,6 +658,32 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 sexies (Room : la file d'attente d'un post)
+
+Layout et Vision savaient finir UNE image et l'exporter. Rien ne permettait de
+mettre un rendu de cote et d'en cumuler plusieurs pour un carrousel : l'apercu
+Instagram du Layout ne montrait jamais que le montage courant.
+
+- **Nouvel ecran `/creer/room`** (`features/vibeos/room/`), septieme entree de
+  la navigation, avec un compteur des images en attente.
+- **Bouton « Room » a cote d'« Exporter »**, dans Layout et dans Vision. Il
+  envoie le rendu PLEINE DEFINITION, pas l'apercu : c'est `renderExportCanvas()`
+  des deux ecrans, passe a `buildSocialImages` — donc un panorama entre dans la
+  file deja decoupe en 2 ou 3 tranches, exactement celles que l'export produit.
+- **Ce qui est stocke est un rendu fige**, pas des reglages : continuer a
+  retoucher ne modifie plus l'image envoyee. C'est ce qui permet de mettre deux
+  versions d'une meme photo dans un meme carrousel.
+- **Persistance** : store `room` d'IndexedDB `vibeos`, passee en v2. Blobs, pas
+  de dataURL. Rien ne part au serveur.
+- **Reordonner** : glisser-deposer ou fleches ; l'ordre est reecrit dans la base
+  a chaque changement, et toute modification annule le « ordre valide ».
+- **Valider puis regarder** : « Valider l'ordre » ouvre l'apercu Instagram
+  existant (`layout/InstaPreviewSheet`) alimente par la file — meme iPhone, meme
+  pellicule, meme panneau sonore.
+- Gate : `npm run test:vibeos-room` (nouveau smoke Playwright bout-en-bout :
+  Layout -> Room, Vision -> Room, rechargement, fleches, glisser-deposer,
+  validation, couleurs relues dans le carrousel de l'iPhone).
 
 ## Journal — 2026-09-05 quinquies (Motion : polissage, deux bugs de fond)
 

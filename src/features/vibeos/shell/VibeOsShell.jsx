@@ -3,9 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Clapperboard, Eye, Home, Images, LayoutGrid, Music, Sparkles } from 'lucide-react';
+import { Clapperboard, Eye, Home, Images, LayoutGrid, Layers, Music, Sparkles } from 'lucide-react';
 import { VibeOsAudioProvider } from '../audio/AudioProvider';
 import { VibeOsProjectProvider } from '../project/VibeOsProjectProvider';
+import { VibeOsRoomProvider, useRoom } from '../room/RoomProvider';
 import { ToastProvider } from '../primitives';
 import MiniPlayer from './MiniPlayer';
 import PublishButton from './PublishButton';
@@ -25,6 +26,7 @@ const SPACES = [
     { href: '/creer/layout-visuel', label: 'Layout', icon: LayoutGrid },
     { href: '/creer/studio', label: 'Studio', icon: Sparkles },
     { href: '/creer/vision', label: 'Vision', icon: Eye },
+    { href: '/creer/room', label: 'Room', icon: Layers, counter: true },
     { href: '/creer/son', label: 'Soundtrack', icon: Music },
     { href: '/video', label: 'VibeCut', icon: Clapperboard },
 ];
@@ -35,8 +37,18 @@ const MOBILE_TABS = [
     { href: '/creer/layout-visuel', label: 'Layout', icon: LayoutGrid },
     { href: '/creer/studio', label: 'Studio', icon: Sparkles },
     { href: '/creer/vision', label: 'Vision', icon: Eye },
+    { href: '/creer/room', label: 'Room', icon: Layers, counter: true },
     { href: '/creer/son', label: 'Son', icon: Music },
 ];
+
+/* Le nombre d'images en attente dans la Room, lu la ou il est utile: dans la
+   navigation. Un composant separe parce que `useRoom` a besoin d'etre SOUS le
+   provider que ce shell monte lui-meme. */
+function RoomCounter() {
+    const { count } = useRoom();
+    if (!count) return null;
+    return <span className={styles.navCount} data-testid="vibeos-room-counter">{count}</span>;
+}
 
 function isActivePath(pathname, href, exact = false) {
     if (exact) return pathname === href;
@@ -48,8 +60,9 @@ export default function VibeOsShell({ children }) {
 
     return (
         <VibeOsProjectProvider>
-            <VibeOsAudioProvider>
-                <div className={`vibeos ${styles.root}`} data-vibeos-shell="true" data-theme="dark">
+            <VibeOsRoomProvider>
+                <VibeOsAudioProvider>
+                    <div className={`vibeos ${styles.root}`} data-vibeos-shell="true" data-theme="dark">
                     <ToastProvider>
                         <header className={styles.topbar}>
                             <div className={styles.leading}>
@@ -75,6 +88,7 @@ export default function VibeOsShell({ children }) {
                                             >
                                                 <Icon size={13} />
                                                 {space.label}
+                                                {space.counter ? <RoomCounter /> : null}
                                             </Link>
                                         );
                                     })}
@@ -101,14 +115,18 @@ export default function VibeOsShell({ children }) {
                                         aria-current={active ? 'page' : undefined}
                                     >
                                         <Icon size={18} />
-                                        {tab.label}
+                                        <span className={styles.tabbarLabel}>
+                                            {tab.label}
+                                            {tab.counter ? <RoomCounter /> : null}
+                                        </span>
                                     </Link>
                                 );
                             })}
                         </nav>
                     </ToastProvider>
-                </div>
-            </VibeOsAudioProvider>
+                    </div>
+                </VibeOsAudioProvider>
+            </VibeOsRoomProvider>
         </VibeOsProjectProvider>
     );
 }

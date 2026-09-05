@@ -1,0 +1,236 @@
+/*
+ * Ecran Room VibeOS.
+ * Trois bandes fixes: en-tete, file d'images (seule zone qui defile, en
+ * horizontal), pied d'aide. La page elle-meme ne bouge jamais, comme partout
+ * dans VibeOS.
+ */
+
+.screen {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    background: var(--vo-bg);
+    overflow: hidden;
+}
+
+.loading {
+    margin: auto;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-sm);
+}
+
+/* ---------- En-tete ---------- */
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--vo-space-4);
+    padding: var(--vo-space-6) var(--vo-space-6) var(--vo-space-4);
+}
+
+.headText {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.title {
+    margin: 0;
+    font-size: var(--vo-text-xl);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--vo-text);
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-sm);
+}
+
+.headActions {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+}
+
+/* ---------- File horizontale ---------- */
+
+.railWrap {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-height: 0;
+    padding: 0 var(--vo-space-6);
+    overflow: hidden;
+}
+
+.rail {
+    display: flex;
+    align-items: stretch;
+    gap: var(--vo-space-4);
+    width: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: var(--vo-space-2) 0 var(--vo-space-4);
+    list-style: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+}
+
+.card {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    width: 232px;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-lg);
+    background: var(--vo-surface);
+    box-shadow: inset 0 0 0 1px var(--vo-line), var(--vo-shadow-1);
+    scroll-snap-align: center;
+    cursor: grab;
+    transition:
+        transform var(--vo-dur-2) var(--vo-ease-out),
+        box-shadow var(--vo-dur-2) var(--vo-ease),
+        opacity var(--vo-dur-2) var(--vo-ease);
+}
+
+.card:active { cursor: grabbing; }
+
+.cardDragging {
+    opacity: 0.45;
+}
+
+/* Cible de depot: un filet d'accent a gauche, comme un point d'insertion. */
+.card[data-drop='true'] {
+    transform: translateY(-4px);
+    box-shadow: inset 0 0 0 1px var(--vo-accent-line), var(--vo-shadow-2);
+}
+
+.cardTop {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--vo-space-2);
+    min-height: 26px;
+}
+
+.cardIndex {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.cardSource {
+    overflow: hidden;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* L'action destructive ne s'affiche qu'au survol de sa carte - au clavier elle
+   reste atteignable, le focus la fait reapparaitre. */
+.cardRemove {
+    opacity: 0;
+    transition: opacity var(--vo-dur-1) var(--vo-ease);
+}
+
+.card:hover .cardRemove,
+.cardRemove:focus-visible {
+    opacity: 1;
+}
+
+/* Hauteur commune a toutes les vignettes: les cartes s'alignent, et le ratio
+   reel de chaque image reste lisible a son cadrage dans la boite. */
+.cardThumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: min(44vh, 340px);
+    overflow: hidden;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-bg-sunken);
+    box-shadow: inset 0 0 0 1px var(--vo-line);
+}
+
+.cardThumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.cardBottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-2);
+}
+
+.cardDims {
+    color: var(--vo-text-3);
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+}
+
+/* ---------- Vide et pied ---------- */
+
+.emptyWrap {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: var(--vo-space-6);
+}
+
+.emptyActions {
+    display: flex;
+    gap: var(--vo-space-2);
+}
+
+.foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vo-space-4);
+    padding: 0 var(--vo-space-6) var(--vo-space-5);
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+}
+
+.footCount {
+    font-family: var(--vo-font-numeric);
+}
+
+@media (max-width: 860px) {
+    .head {
+        align-items: flex-start;
+        padding: var(--vo-space-4) var(--vo-space-4) var(--vo-space-3);
+    }
+
+    .railWrap { padding: 0 var(--vo-space-4); }
+    .foot { padding: 0 var(--vo-space-4) var(--vo-space-4); }
+    .card { width: 190px; }
+    .cardThumb { height: min(38vh, 260px); }
+}

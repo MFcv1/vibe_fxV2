@@ -227,3 +227,27 @@
         display: none;
     }
 }
+
+/* Compteur de la Room: le nombre d'images en attente, pose dans la navigation.
+   Discret par defaut, il ne s'affiche que quand la Room contient quelque chose. */
+.navCount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-accent);
+    font-family: var(--vo-font-numeric);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.tabbarLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}

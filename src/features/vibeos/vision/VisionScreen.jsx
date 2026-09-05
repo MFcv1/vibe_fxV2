@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Columns2, Download, ImageOff, ImagePlus, Images, Redo2, RotateCcw, Search,
+    Columns2, Download, ImageOff, ImagePlus, Images, Layers, Redo2, RotateCcw, Search,
     ShieldCheck, Sparkles, Star, Undo2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
-    Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider,
+    Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider, useToast,
 } from '../primitives';
+import { useRoom } from '../room/RoomProvider';
 import { visionBoundsFor } from '../../vibefx-studio/utils/visionColorScience';
 import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import PipelineSourceNote from '../project/PipelineSourceNote';
@@ -248,8 +249,46 @@ export default function VisionScreen() {
     const {
         exportName, setExportName, exportFormat, setExportFormat,
         exportQuality, setExportQuality, estimatedSize,
-        isExportModalOpen, setIsExportModalOpen, handleDownload, performExport,
+        isExportModalOpen, setIsExportModalOpen, handleDownload, performExport, renderExportCanvas,
     } = exportController;
+
+    const { addFromCanvas: addToRoom, isFull: isRoomFull } = useRoom();
+    const toast = useToast();
+    const [isSendingToRoom, setIsSendingToRoom] = useState(false);
+
+    /*
+     * « Room »: la photo telle qu'elle sortirait de l'export part dans la file
+     * du post. C'est un RENDU fige: continuer a retoucher ici ne changera plus
+     * l'image envoyee - c'est ce qui permet d'envoyer deux versions de la meme
+     * photo dans un meme carrousel.
+     */
+    const sendToRoom = async () => {
+        if (isSendingToRoom) return;
+        setIsSendingToRoom(true);
+        try {
+            const exportCanvas = renderExportCanvas();
+            if (!exportCanvas) throw new Error('Le rendu pleine définition n’est pas disponible.');
+            const result = await addToRoom(exportCanvas, {
+                source: 'vision',
+                sourceLabel: 'Vision',
+                formatLabel: activePresetLabel || 'Photo',
+            });
+            if (!result.added) {
+                toast.push(
+                    result.reason === 'full'
+                        ? 'La Room est pleine : un carrousel Instagram s’arrête à 10 images.'
+                        : 'Rien n’a pu être envoyé dans la Room.',
+                    { tone: 'danger' },
+                );
+                return;
+            }
+            toast.push(`Photo envoyée dans la Room · ${result.total} au total`, { tone: 'success' });
+        } catch (error) {
+            toast.push(error?.message || 'Envoi dans la Room impossible.', { tone: 'danger' });
+        } finally {
+            setIsSendingToRoom(false);
+        }
+    };
 
     const signalTags = useMemo(() => (signals ? describeSignals(signals) : []), [signals]);
     const presetCollections = useMemo(() => buildPresetCollections(presets), [presets]);
@@ -408,6 +447,18 @@ export default function VisionScreen() {
                             >
                                 <ImagePlus size={15} />
                             </IconButton>
+                            <Button
+                                size="sm"
+                                icon={<Layers size={13} />}
+                                onClick={sendToRoom}
+                                disabled={isSendingToRoom || isRoomFull}
+                                title={isRoomFull
+                                    ? 'La Room est pleine (10 images)'
+                                    : 'Envoyer cette photo dans la Room, la file du post'}
+                                data-testid="vibeos-vision-send-room"
+                            >
+                                Room
+                            </Button>
                             <Button variant="primary" size="sm" icon={<Download size={13} />} onClick={handleDownload}>
                                 Exporter
                             </Button>

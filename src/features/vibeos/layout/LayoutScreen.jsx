@@ -11,8 +11,9 @@ import {
 } from '../../vibefx-studio/data/constants';
 import { buildSocialImages } from '../../vibefx-studio/utils/socialExport';
 import {
-    Button, Collapsible, IconButton, Progress, Segmented, Sheet, Slider, Tile, TileGrid,
+    Button, Collapsible, IconButton, Progress, Segmented, Sheet, Slider, Tile, TileGrid, useToast,
 } from '../primitives';
+import { useRoom } from '../room/RoomProvider';
 import useLayoutEditor from './useLayoutEditor';
 import TemplateSheet from './TemplateSheet';
 import TemplatePreviewSvg from './TemplatePreviewSvg';
@@ -126,6 +127,7 @@ export default function LayoutScreen() {
     const [isDropTarget, setIsDropTarget] = useState(false);
     const [isComparing, setIsComparing] = useState(false);
     const [instaPreview, setInstaPreview] = useState(null);
+    const [isSendingToRoom, setIsSendingToRoom] = useState(false);
     const [isZoneEditOpen, setIsZoneEditOpen] = useState(false);
     const [isGridLibraryOpen, setIsGridLibraryOpen] = useState(false);
     /* `null` = feuille fermee. `{ slotId }` = une case precise. `{ slotId: null }`
@@ -140,6 +142,9 @@ export default function LayoutScreen() {
         exportQuality, setExportQuality, estimatedSize,
         isExportModalOpen, setIsExportModalOpen, handleDownload, performExport, renderExportCanvas,
     } = exportController;
+
+    const { addFromCanvas: addToRoom, isFull: isRoomFull } = useRoom();
+    const toast = useToast();
 
     const isCustomTemplate = activeTemplate.id === 'custom';
     const customZones = useMemo(
@@ -322,6 +327,42 @@ export default function LayoutScreen() {
         }
     };
 
+    /*
+     * « Room »: le rendu pleine definition part dans la file du post, a cote
+     * des autres images deja preparees. Un panorama y entre decoupe en
+     * tranches - exactement celles qu'Instagram recevra.
+     */
+    const sendToRoom = async () => {
+        if (isSendingToRoom) return;
+        setIsSendingToRoom(true);
+        try {
+            const exportCanvas = renderExportCanvas();
+            if (!exportCanvas) throw new Error('Le rendu pleine définition n’est pas disponible.');
+            const result = await addToRoom(exportCanvas, {
+                format: activeFormat,
+                source: 'layout',
+                sourceLabel: 'Layout',
+            });
+            if (!result.added) {
+                toast.push(
+                    result.reason === 'full'
+                        ? 'La Room est pleine : un carrousel Instagram s’arrête à 10 images.'
+                        : 'Rien n’a pu être envoyé dans la Room.',
+                    { tone: 'danger' },
+                );
+                return;
+            }
+            toast.push(
+                `${result.added} image${result.added > 1 ? 's' : ''} dans la Room · ${result.total} au total`,
+                { tone: 'success' },
+            );
+        } catch (error) {
+            toast.push(error?.message || 'Envoi dans la Room impossible.', { tone: 'danger' });
+        } finally {
+            setIsSendingToRoom(false);
+        }
+    };
+
     /* « Comparer » = maintien: on relache, on revoit son montage. */
     const compareHandlers = {
         onPointerDown: () => setIsComparing(true),
@@ -364,6 +405,18 @@ export default function LayoutScreen() {
                             <IconButton label="Plein écran" onClick={handleFullscreen}>
                                 <Maximize2 size={15} />
                             </IconButton>
+                            <Button
+                                size="sm"
+                                icon={<Layers size={13} />}
+                                onClick={sendToRoom}
+                                disabled={isSendingToRoom || isRoomFull}
+                                title={isRoomFull
+                                    ? 'La Room est pleine (10 images)'
+                                    : 'Envoyer ce rendu dans la Room, la file du post'}
+                                data-testid="vibeos-layout-send-room"
+                            >
+                                Room
+                            </Button>
                             <Button variant="primary" size="sm" icon={<Download size={13} />} onClick={handleDownload}>
                                 Exporter
                             </Button>

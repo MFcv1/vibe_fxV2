@@ -13,6 +13,14 @@
 > catalogue musical, barre de lecture — sont clos et archives :
 > [docs/archive-points-etape-2026-09-04.md](docs/archive-points-etape-2026-09-04.md).
 
+> **Room — livree le 2026-09-05.** Nouvel ecran `/creer/room` : la file d'attente
+> d'un post. Layout et Vision ont un bouton **Room** a cote d'« Exporter » qui y
+> envoie le rendu pleine definition (un panorama y entre deja decoupe en
+> tranches). On reordonne a la souris ou aux fleches, on valide l'ordre, et
+> l'apercu Instagram existant montre le carrousel dans l'iPhone. Stockage local
+> (IndexedDB `vibeos` v2, store `room`, Blobs), rien n'est envoye au serveur.
+> Gate : `npm run test:vibeos-room`.
+
 **À lire avant de coder, dans cet ordre :**
 
 1. [AGENTS.md](AGENTS.md) — règles de travail, rituel de fin de phase.
@@ -28,6 +36,7 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
+[**après la Room** — 2026-09-05](docs/prompt-reprise-2026-09-05-room.md),
 [**après le lot 1 de Motion Studio** — 2026-09-04](docs/prompt-reprise-2026-09-04-motion-studio.md),
 [**après l'import HEIC/HEIF** — 2026-09-01](docs/prompt-reprise-2026-09-01-import-heic.md),
 [**après la correction Retoucher du carrousel** — 2026-08-31](docs/prompt-reprise-2026-08-31-carrousel-vers-vision.md),
@@ -84,6 +93,17 @@ famille sont dans
 template ne touche pas au moteur : c'est un objet avec un schema `params` et une
 fonction `build(ctx)` qui rend des quads 3D, depose dans
 `public/vendor/motion-studio/js/templates/` et inscrit dans `templates/index.js`.
+
+### Room — ce qui reste
+
+- **La Room ne nourrit pas encore « Publier ».** Le bouton Publier du bandeau
+  envoie toujours le rendu du PROJET courant vers `/publier`, pas la file. Le
+  branchement naturel : `publishHandoff` accepte plusieurs images, et `/publier`
+  les reprend comme carrousel.
+- **Une seule file pour tout le monde**, pas une par projet : c'est voulu (on
+  cumule des images venues de projets differents), mais si un jour il faut
+  plusieurs posts en parallele, il faudra une cle de post dans `roomDb`.
+- **La legende et le titre** de l'apercu restent les textes de demonstration.
 
 ### D'ABORD — regarder les presets qui attendent un regard
 
@@ -259,6 +279,7 @@ npm run test:vision-preset     # 426 vérifications (Node)
 npm run test:vision-filters
 npm run test:vibeos-vision     # rejoue test:vision-preset, puis le navigateur
 npm run test:vibeos-pipeline   # composition -> Vision -> Studio -> publication
+npm run test:vibeos-room       # Layout/Vision -> Room -> ordre -> carrousel iPhone
 npm run test:vibeos-library / -layout / -studio / -soundtrack   # si tu y touches
 npm run audit:reglages-avances # chaque réglage fait-il quelque chose ? (moteur)
 npm run test:reglages-avances  # ...et en poussant les vrais curseurs (interface)
@@ -288,6 +309,11 @@ Tous verts au 2026-08-17, les deux audits de réglages compris.
 **Échecs préexistants, hors chantier** : `smoke-vibecut-media-safety.spec.cjs`
 (3) et `test:vibecut-export-local-mp4` — fixtures manquantes, chemins Windows
 d'origine, pointeurs Git LFS ([archive](docs/archive-vibecut-2026-08-04.md#commandes)).
+Constatés aussi le 2026-09-05, **sans rapport avec la Room** (vérifiés `git
+stash` à l'appui) : `npm run test:scope` échoue sur
+`src/features/vibefx-studio/utils/presets/lf08.js` qui contient encore « Chawi »,
+et `npm run test:vibeos-layout` échoue quand ses 5 specs tournent en parallèle
+sur un seul serveur de dev — les mêmes passent une par une (`--workers=1`).
 
 **Node 22 est requis.** Le build passe sous Node 22. Sous un Node plus récent,
 `better-sqlite3` peut encore échouer sur une incompatibilité ABI ; revenir à la
