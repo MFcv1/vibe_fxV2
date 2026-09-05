@@ -9,7 +9,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease, steppedProgress } from '../engine/math.js';
 
@@ -130,7 +130,7 @@ export const isoCascade = {
             quads.push(shearedCard(ctx, i, P.cardRatio,
                 along * sx * 0.95, along * sy * 0.62, halfH, shear,
                 {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     alpha: clamp(1.8 - (Math.abs(d) / (n / 2)) * 1.8, 0, 1),
                 }));
         }
@@ -178,7 +178,7 @@ export const isoFocus = {
             quads.push(shearedCard(ctx, i, P.cardRatio,
                 along * sx * 0.95, along * 0.62, halfH * sc, shear,
                 {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     alpha: clamp(1.8 - (Math.abs(d) / (n / 2)) * 1.8, 0, 1),
                 }));
         }
@@ -241,7 +241,7 @@ export const isoOrbit = {
             quads.push(card(ctx, i, P.cardRatio,
                 ground(u * c - w * s, bob, u * s + w * c),
                 [ca, 0, sa], [-sa, 0, -ca], half,
-                { radius: pct(P.cornerRadius) * 6 }));
+                { radius: cornerRadius(P) }));
         }
         return { camera: isoCamera(P.tilt), quads };
     },

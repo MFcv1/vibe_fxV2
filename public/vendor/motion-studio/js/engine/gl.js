@@ -40,6 +40,7 @@ uniform vec4  u_clip;     // (nx, ny, offset, adoucissement) : demi-plan de coup
 uniform float u_glow;     // liseré clair le long de la coupe
 uniform vec4  u_frameBox; // (demi-largeur, demi-hauteur, centre x, centre y) du cadre
 uniform float u_frameR;   // rayon du cadre ; 0 = pas de masque de cadre
+uniform float u_shadowSoft; // largeur du degrade de l'ombre, en hauteur de carte
 uniform int   u_finish;   // 1 = vignetage, 2 = grain, 0 = carte normale
 uniform vec2  u_finishArg; // (intensite, graine)
 
@@ -113,8 +114,12 @@ void main() {
   if (mask <= 0.0) discard;
 
   if (u_shadow == 1) {
-    // L'ombre est un aplat sombre adouci vers ses bords.
-    float soft = 1.0 - smoothstep(-0.16, 0.02, d);
+    /*
+     * L'ombre est un aplat sombre adouci vers ses bords. La largeur du degrade
+     * suit l'etalement demande : figee, elle donnait un halo large et mou qui
+     * fait bon marche, la ou une ombre courte pose la carte sur le fond.
+     */
+    float soft = 1.0 - smoothstep(-u_shadowSoft, u_shadowSoft * 0.15, d);
     outColor = vec4(0.0, 0.0, 0.0, soft * u_alpha);
     return;
   }
@@ -162,7 +167,7 @@ export default class QuadRenderer {
         [
             'u_vp', 'u_tex', 'u_hasTex', 'u_color', 'u_alpha', 'u_radius', 'u_aspect',
             'u_fade', 'u_fadeColor', 'u_pxScale', 'u_shadow', 'u_uvRect', 'u_clip', 'u_glow', 'u_frameBox', 'u_frameR',
-            'u_finish', 'u_finishArg',
+            'u_finish', 'u_finishArg', 'u_shadowSoft',
         ].forEach((name) => { this.u[name] = gl.getUniformLocation(prog, name); });
 
         this.vao = gl.createVertexArray();
@@ -195,9 +200,71 @@ export default class QuadRenderer {
         this.canvas.height = h;
     }
 
-    beginFrame(bg) {
+    /*
+     * Cible hors ecran, pour le flou de mouvement.
+     *
+     * Moyenner des sous-images ne peut pas se faire directement a l'ecran en
+     * baissant l'opacite de chaque carte : les cartes d'une meme sous-image se
+     * melangeraient alors ENTRE ELLES, et une carte de dos transparaitrait au
+     * travers de celle de devant. Chaque sous-image doit etre composee
+     * entierement, opaque, puis moyennee avec les autres. D'ou cette cible.
+     */
+    ensureTarget(w, h) {
         const { gl } = this;
+        if (this.target && this.target.w === w && this.target.h === h) return this.target;
+        if (this.target) {
+            gl.deleteFramebuffer(this.target.fb);
+            gl.deleteTexture(this.target.tex);
+        }
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.target = {
+            fb, tex, w, h, handleWrap: { handle: tex, width: w, height: h },
+        };
+        return this.target;
+    }
+
+    bindTarget() {
+        const { gl } = this;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.fb);
+        gl.viewport(0, 0, this.target.w, this.target.h);
+    }
+
+    bindScreen() {
+        const { gl } = this;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    /* Recopie la cible sur l'ecran avec l'opacite donnee. */
+    blitTarget(alpha) {
+        const { gl } = this;
+        gl.useProgram(this.prog);
+        gl.bindVertexArray(this.vao);
+        // La cible est rendue a l'envers par rapport a l'ecran : on retourne le
+        // quad plutot que de refaire une passe de copie.
+        this.draw({
+            p: [[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0]],
+            tex: this.target.handleWrap,
+            radius: 0,
+            aspect: 1,
+            alpha,
+            pxScale: this.canvas.width,
+        }, [0, 0, 0]);
+    }
+
+    beginFrame(bg, keepViewport = false) {
+        const { gl } = this;
+        if (!keepViewport) gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         gl.clearColor(bg[0], bg[1], bg[2], 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.useProgram(this.prog);
@@ -252,6 +319,7 @@ export default class QuadRenderer {
         const fm = quad.frameMask;
         gl.uniform4f(u.u_frameBox, fm ? fm[0] : 0, fm ? fm[1] : 0, fm ? fm[2] : 0, fm ? fm[3] : 0);
         gl.uniform1f(u.u_frameR, fm ? fm[4] : 0);
+        gl.uniform1f(u.u_shadowSoft, quad.shadowSoft || 0.05);
         gl.uniform1i(u.u_finish, quad.finish || 0);
         const fa = quad.finishArg || [0, 0];
         gl.uniform2f(u.u_finishArg, fa[0], fa[1]);

@@ -206,6 +206,22 @@ Push Cut, Swipe Stack, Split Slide, Kinetic Wave, Depth Pop. Elles visent la
 story et le reel : mouvements courts, temps de lecture sur chaque image, entrees
 qui depassent leur cible avant de se poser.
 
+## Deux pieges du moteur, appris a la dure
+
+- **Le rayon de coin est une fraction de la HAUTEUR de la carte.** Le shader ne
+  connait pas les pourcentages du reglage : `u_radius = 0.03` donne 3% du petit
+  cote. Passer autre chose qu'un `pct()` direct denature toutes les cartes d'un
+  coup. Le helper `cornerRadius(P)` est la pour ca.
+- **Une moyenne de sous-images ne se fait pas a l'ecran.** Baisser l'opacite
+  carte par carte melange les cartes d'une meme sous-image entre elles : le fond
+  transparait au travers du premier plan et tout se delave. Chaque sous-image
+  doit etre composee entierement, opaque, dans une cible hors ecran, avant d'etre
+  moyennee.
+
+Aucun des deux ne se voyait dans les tests « ca rend et ca boucle ». Les deux se
+mesurent en une ligne : lire la valeur d'un pixel au centre d'une carte, avec et
+sans le reglage.
+
 ## Etat des ecarts avec la reference
 
 Ce qui est **aligne** : les 62 noms, leur ordre, leurs familles, le nombre

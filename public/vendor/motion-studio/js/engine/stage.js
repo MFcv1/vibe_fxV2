@@ -130,33 +130,59 @@ export default class Stage {
 
         const bgRgb = hexToRgb(state.background.color);
         renderer.beginFrame(bgRgb);
-
         this.syncBackground(state.background, w, h);
-        if (this.bgTex) {
-            renderer.setCamera(IDENTITY);
-            renderer.draw({ p: NDC_QUAD, tex: this.bgTex, radius: 0, aspect: 1, pxScale: w }, bgRgb);
-        }
 
         /*
-         * Flou de mouvement : on rend plusieurs sous-images reparties autour de
-         * l'instant demande et on les moyenne a l'ecran. C'est la meme chose
-         * qu'un obturateur ouvert un certain temps — et c'est ce qui separe une
-         * suite de positions nettes, qui saute a l'oeil, d'un mouvement continu.
+         * Flou de mouvement : plusieurs sous-images reparties autour de
+         * l'instant demande, moyennees. C'est un obturateur ouvert un certain
+         * temps — ce qui separe une suite de positions nettes, qui saute a
+         * l'oeil, d'un mouvement continu.
          *
-         * La moyenne se fait par accumulation progressive : la sous-image k est
-         * dessinee avec une opacite de 1/(k+1), ce qui donne au final un poids
-         * egal a chacune, sans avoir besoin d'une cible de rendu intermediaire.
+         * Chaque sous-image est composee ENTIEREMENT dans une cible hors ecran,
+         * opaque, avant d'etre moyennee. Baisser l'opacite carte par carte
+         * directement a l'ecran serait plus court, mais melangerait les cartes
+         * d'une meme sous-image entre elles : les cartes du fond
+         * transparaissaient au travers de celles de devant et tout le rendu se
+         * delavait.
          */
         const finish = state.finish || { motionBlur: 0, vignette: 0, grain: 0 };
         const blur = clamp(finish.motionBlur || 0, 0, 100);
         const passes = blur <= 0 ? 1 : blur > 66 ? 5 : blur > 33 ? 4 : 3;
-        const span = (blur / 100) / Math.max(1, state.loop * fps);
+        /*
+         * Duree d'obturation, en fraction de boucle. A 100% elle vaut deux
+         * images et demie, pas une seule : le flou physiquement exact d'un
+         * obturateur a 180 degres est presque invisible a l'ecran, alors que
+         * l'ecriture recherchee ici — celle des videos sociales — assume une
+         * trainee franche.
+         */
+        const span = ((blur / 100) * 2.5) / Math.max(1, state.loop * fps);
 
-        for (let pass = 0; pass < passes; pass += 1) {
-            const offset = passes === 1 ? 0 : ((pass / (passes - 1)) - 0.5) * span;
-            let sub = t + offset;
-            sub -= Math.floor(sub);
-            this.drawScene(template, state, sub, w, w / h, bgRgb, 1 / (pass + 1), pass === 0);
+        const paintFrame = (sub) => {
+            if (this.bgTex) {
+                renderer.setCamera(IDENTITY);
+                renderer.draw({
+                    p: NDC_QUAD, tex: this.bgTex, radius: 0, aspect: 1, pxScale: w,
+                }, bgRgb);
+            }
+            this.drawScene(template, state, sub, w, w / h, bgRgb, true);
+        };
+
+        if (passes === 1) {
+            paintFrame(t - Math.floor(t));
+        } else {
+            renderer.ensureTarget(w, h);
+            for (let pass = 0; pass < passes; pass += 1) {
+                const offset = ((pass / (passes - 1)) - 0.5) * span;
+                let sub = t + offset;
+                sub -= Math.floor(sub);
+                renderer.bindTarget();
+                renderer.beginFrame(bgRgb, true);
+                paintFrame(sub);
+                renderer.bindScreen();
+                // Moyenne progressive : la sous-image k arrive a 1/(k+1), ce qui
+                // laisse a chacune le meme poids au bout du compte.
+                renderer.blitTarget(1 / (pass + 1));
+            }
         }
 
         if (finish.vignette > 0) {
@@ -200,7 +226,7 @@ export default class Stage {
      * `withShadow` limite les ombres a une seule passe, parce qu'une ombre douce
      * n'a pas besoin d'etre floutee et que ca doublerait le nombre de dessins.
      */
-    drawScene(template, state, t, w, frameAspect, bgRgb, weight, withShadow) {
+    drawScene(template, state, t, w, frameAspect, bgRgb, withShadow) {
         const { renderer, media } = this;
         const P = state.params;
         const ctx = {
@@ -263,11 +289,10 @@ export default class Stage {
         const shadow = state.shadow;
         for (let i = 0; i < quads.length; i += 1) {
             const q = quads[i];
-            const base = q.alpha === undefined ? 1 : q.alpha;
             if (withShadow && shadow.enabled && q.castShadow !== false && !q.shadow) {
                 renderer.draw(this.shadowQuad(q, shadow), bgRgb);
             }
-            renderer.draw(weight === 1 ? q : { ...q, alpha: base * weight }, bgRgb);
+            renderer.draw(q, bgRgb);
         }
     }
 
@@ -291,6 +316,7 @@ export default class Stage {
             radius: q.radius,
             aspect: q.aspect,
             alpha: (shadow.opacity / 100) * (q.alpha === undefined ? 1 : q.alpha),
+            shadowSoft: Math.max(0.015, (shadow.spread / 100) * 0.8),
             pxScale: q.pxScale,
         };
     }

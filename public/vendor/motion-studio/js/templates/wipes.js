@@ -5,7 +5,7 @@
  */
 
 import {
-    pct, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, pct, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease } from '../engine/math.js';
 
@@ -67,7 +67,7 @@ export const diagonalWipe = {
         const nx = Math.cos(a);
         const ny = Math.sin(a);
         const reach = (Math.abs(nx) + Math.abs(ny)) * 0.5 + 0.02;
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
 
         return {
             camera: cameraFor(8),
@@ -103,7 +103,7 @@ export const stripeReveal = {
         const raw = ctx.t * n;
         const index = Math.floor(raw);
         const local = raw - index;
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
 
         const quads = [plate(ctx, index, box, { radius })];
         const sh = box.h / strips;
@@ -174,7 +174,7 @@ export const splitReveal = {
         const raw = ctx.t * n;
         const index = Math.floor(raw);
         const local = raw - index;
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
 
         // Les deux volets ne partent pas ensemble : le gauche mene, le droit
         // suit d'un quart de temps. C'est ce decalage qui fait la lecture.
@@ -239,7 +239,7 @@ export const mosaicWipe = {
         const raw = ctx.t * n;
         const index = Math.floor(raw);
         const local = raw - index;
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
 
         const quads = [plate(ctx, index, box, { radius })];
         const cw = box.w / cols;

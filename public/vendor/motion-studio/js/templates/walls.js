@@ -8,7 +8,7 @@
  */
 
 import {
-    pct, card, cameraFor, paddingScale, clamp, hash, waypointProgress, VIEW_HEIGHT,
+    cornerRadius, pct, card, cameraFor, paddingScale, clamp, hash, waypointProgress, VIEW_HEIGHT,
 } from './_helpers.js';
 import { rotX } from '../engine/math.js';
 
@@ -160,7 +160,7 @@ function buildWall(ctx, opts) {
                 [r0[0] - c0[0], r0[1] - c0[1], r0[2] - c0[2]],
                 [u0[0] - c0[0], u0[1] - c0[1], u0[2] - c0[2]],
                 h,
-                { radius: pct(P.cornerRadius) * 6, fade: clamp(edge, 0, 1) }));
+                { radius: cornerRadius(P), fade: clamp(edge, 0, 1) }));
         }
     }
     return quads;

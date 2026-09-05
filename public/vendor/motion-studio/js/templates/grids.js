@@ -8,7 +8,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease } from '../engine/math.js';
 
@@ -107,7 +107,7 @@ export const gridReveal = {
         const { P } = ctx;
         const n = Math.max(1, ctx.slots);
         const list = cells(ctx, n, P.gap, P.padding);
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
         /*
          * La revelation se rejoue a chaque tour : l'image en place reste
          * visible, la suivante se decouvre par-dessus. A la fin du tour on
@@ -164,7 +164,7 @@ export const spotlightZoom = {
         const quads = list.map((cell) => {
             const isActive = cell.i === ((active % n) + n) % n;
             if (!isActive) {
-                return flat(ctx, cell, cell.i, pct(P.cornerRadius) * 6, {
+                return flat(ctx, cell, cell.i, cornerRadius(P), {
                     fade: pct(P.dim) * grow,
                 });
             }
@@ -177,7 +177,7 @@ export const spotlightZoom = {
                 halfW: cell.halfW + (full.halfW - cell.halfW) * grow,
                 halfH: cell.halfH + (full.halfH - cell.halfH) * grow,
             };
-            return flat(ctx, target, cell.i, pct(P.cornerRadius) * 6 * (1 - grow * 0.7), { z: 0.05 });
+            return flat(ctx, target, cell.i, cornerRadius(P) * (1 - grow * 0.7), { z: 0.05 });
         });
         return { camera: cameraFor(8), quads };
     },
@@ -212,7 +212,7 @@ export const flipGrid = {
             const cellFlipped = P.axis === 'v'
                 ? { ...cell, halfH: cell.halfH * s }
                 : { ...cell, halfW: cell.halfW * s };
-            quads.push(flat(ctx, cellFlipped, face, pct(P.cornerRadius) * 6));
+            quads.push(flat(ctx, cellFlipped, face, cornerRadius(P)));
         });
         return { camera: cameraFor(8), quads };
     },
@@ -247,7 +247,7 @@ export const popGrid = {
             // Un rebond court a l'entree, une sortie nette.
             const s = w < 0.18 ? ease('overshoot', w / 0.18)
                 : w > 0.86 ? 1 - ease('custom', (w - 0.86) / 0.14) : 1;
-            quads.push(flat(ctx, cell, cell.i, pct(P.cornerRadius) * 6, {
+            quads.push(flat(ctx, cell, cell.i, cornerRadius(P), {
                 scale: clamp(s, 0.02, 1.15),
             }));
         });
@@ -301,7 +301,7 @@ function ticker(ctx, o) {
             const up = [0, 1, 0];
             const texIndex = ((idx + r * 3) % slots + slots) % slots;
             quads.push(card(ctx, texIndex, P.cardRatio, centre, right, up, halfH, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
             }));
         }
     }
@@ -412,7 +412,7 @@ export const columnDrift = {
                     tex: media.tex,
                     uvRect: media.uvRect,
                     aspect: cw / chH,
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                 });
             }
         }
@@ -478,7 +478,7 @@ export const feedScroll = {
                 const slide = P.enter === 'slide' ? (1 - nearBottom) * halfH * 1.2 : 0;
                 const texIndex = ((idx * lanes + lane) % slots + slots) % slots;
                 quads.push(card(ctx, texIndex, P.cardRatio, [x, y - slide, 0], [1, 0, 0], [0, 1, 0], halfH, {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     alpha,
                 }));
             }

@@ -7,7 +7,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, applyTilt, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, applyTilt, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease, steppedProgress } from '../engine/math.js';
 
@@ -118,7 +118,7 @@ export const spiralStream = {
                 [u0[0] - c0[0], u0[1] - c0[1], u0[2] - c0[2]],
                 halfH * pulse,
                 {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     fade: pct(P.backFade) * clamp((R - z) / (2 * R || 1), 0, 1),
                 }));
         }

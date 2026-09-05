@@ -13,7 +13,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease } from '../engine/math.js';
 
@@ -72,10 +72,10 @@ export const beatPunch = {
         const punch = 1 + pct(P.punch) * 0.55 * (1 - move);
         const quads = [];
         quads.push(card(ctx, index, P.cardRatio, [0, 0, 0], [1, 0, 0], [0, 1, 0],
-            half * drift, { radius: pct(P.cornerRadius) * 6, alpha: 1 - clamp((move - 0.5) / 0.5, 0, 1) }));
+            half * drift, { radius: cornerRadius(P), alpha: 1 - clamp((move - 0.5) / 0.5, 0, 1) }));
         if (move > 0) {
             quads.push(card(ctx, index + 1, P.cardRatio, [0, 0, 0.02], [1, 0, 0], [0, 1, 0],
-                half * punch, { radius: pct(P.cornerRadius) * 6, alpha: clamp(move * 2.2, 0, 1) }));
+                half * punch, { radius: cornerRadius(P), alpha: clamp(move * 2.2, 0, 1) }));
         }
         return { camera: cameraFor(8), quads };
     },
@@ -117,7 +117,7 @@ export const swipeStack = {
             quads.push(card(ctx, index + k, P.cardRatio, [x, -depth * peek, -depth * 0.02],
                 right, up, half * (1 - depth * 0.045),
                 {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     fade: depth * 0.07,
                     // La carte de tete reste opaque presque jusqu'''au bout : la
                     // voir se diluer des le debut du geste laissait apparaitre
@@ -155,7 +155,7 @@ export const splitSlide = {
         const index = Math.floor(raw);
         const local = raw - index;
         const h = pct(P.hold);
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
         const vertical = P.axis === 'v';
 
         /*
@@ -232,7 +232,7 @@ export const kineticWave = {
         const ch = H / rows;
         const raw = ctx.t * 1;
         const a = (P.angle * Math.PI) / 180;
-        const radius = pct(P.cornerRadius) * 6;
+        const radius = cornerRadius(P);
 
         /*
          * Une onde traverse la grille en diagonale : chaque tuile se retourne a
@@ -318,11 +318,11 @@ export const pushCut = {
             card(ctx, index, P.cardRatio,
                 [dx * move * travel * 0.35, dy * move * travel * 0.35, 0],
                 [1, 0, 0], [0, 1, 0], half * out,
-                { radius: pct(P.cornerRadius) * 6, fade: move * 0.25 }),
+                { radius: cornerRadius(P), fade: move * 0.25 }),
             card(ctx, index + 1, P.cardRatio,
                 [-dx * (1 - move) * travel, -dy * (1 - move) * travel, 0.02],
                 [1, 0, 0], [0, 1, 0], half,
-                { radius: pct(P.cornerRadius) * 6 }),
+                { radius: cornerRadius(P) }),
         ];
         return { camera: cameraFor(8), quads };
     },
@@ -360,7 +360,7 @@ export const depthPop = {
         if (echo > 0.02) {
             quads.push(card(ctx, index, P.cardRatio, [-sway * 0.35, 0, -pop], [1, 0, 0], [0, 1, 0],
                 half * 1.24, {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     fade: 0.55,
                     alpha: echo,
                     castShadow: false,
@@ -368,13 +368,13 @@ export const depthPop = {
         }
         quads.push(card(ctx, index, P.cardRatio, [sway, 0, 0], [1, 0, 0], [0, 1, 0],
             half * (1 - move * 0.12), {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 alpha: 1 - clamp((move - 0.6) / 0.4, 0, 1),
             }));
         if (move > 0) {
             quads.push(card(ctx, index + 1, P.cardRatio, [sway, 0, 0.02], [1, 0, 0], [0, 1, 0],
                 half * (0.86 + 0.14 * move), {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     alpha: clamp(move * 2, 0, 1),
                 }));
         }

@@ -8,7 +8,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, tangentBasis, clamp, waypointProgress, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, tangentBasis, clamp, waypointProgress, VIEW_HEIGHT,
 } from './_helpers.js';
 import { rotX, rotY } from '../engine/math.js';
 
@@ -60,7 +60,7 @@ function buildGlobe(ctx, opts) {
         // Fondu selon la face : une carte de dos se dilue dans le fond.
         const facing = clamp((n[2] + 1) / 2, 0, 1);
         quads.push(card(ctx, i, P.cardRatio, center, right, up, halfH, {
-            radius: pct(P.cornerRadius) * 6,
+            radius: cornerRadius(P),
             fade: pct(P.backFade) * (1 - facing),
         }));
     }

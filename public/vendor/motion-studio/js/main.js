@@ -38,7 +38,7 @@ function initialState(template) {
         // L'ombre est active par defaut, et discrete : sans elle les cartes
         // flottent sans poids et la scene se lit comme un collage a plat.
         shadow: {
-            enabled: true, x: 0, y: 4, spread: 5, opacity: 30,
+            enabled: true, x: 0, y: 3, spread: 7, opacity: 26,
         },
         /*
          * Finition. Les trois reglages qui font passer le rendu de la

@@ -9,7 +9,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, zoomedUv, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, zoomedUv, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease, steppedProgress } from '../engine/math.js';
 
@@ -119,7 +119,7 @@ function coverFlowBuild(ctx, vertical) {
             : [0, 1, 0];
 
         return card(ctx, i, P.cardRatio, centre, right, up, halfH, {
-            radius: pct(P.cornerRadius) * 6,
+            radius: cornerRadius(P),
             fade: 0.35 * away,
         });
     });
@@ -145,7 +145,9 @@ export const carouselFlow = {
         const n = Math.max(1, ctx.slots);
         const scale = paddingScale(P.padding);
         const vertical = P.direction === 'v';
-        const halfH = (vertical ? 0.94 : 0.94) * scale;
+        // Plein cadre : c'est le padding, et lui seul, qui laisse une marge.
+        // Un facteur en plus ajoutait une marge invisible dans les reglages.
+        const halfH = scale;
         const sample = ctx.card(0, P.cardRatio);
         const stepSize = (vertical ? halfH * 2 : halfH * 2 * sample.aspect) * (1 + pct(P.gap));
         const phase = steppedProgress(ctx.t, n, P.easing) ;
@@ -159,7 +161,7 @@ export const carouselFlow = {
             const along = d * stepSize;
             const centre = vertical ? [0, -along, -away * 0.05] : [along, 0, -away * 0.05];
             return card(ctx, i, P.cardRatio, centre, [1, 0, 0], [0, 1, 0], halfH * s, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 fade: 0.25 * away,
             });
         });
@@ -190,7 +192,7 @@ function curvedStrip(ctx, vertical) {
         const right = vertical ? [1, 0, 0] : [Math.cos(lean), 0, Math.sin(lean)];
         const up = vertical ? [0, Math.cos(lean), Math.sin(lean)] : [0, 1, 0];
         return card(ctx, i, P.cardRatio, centre, right, up, halfH, {
-            radius: pct(P.cornerRadius) * 6,
+            radius: cornerRadius(P),
             fade: clamp(away * curve * 0.35, 0, 0.6),
         });
     });
@@ -278,7 +280,7 @@ export const wheelCarousel = {
             const x = Math.sin(a) * R;
             const y = Math.cos(a) * R - R;
             quads.push(card(ctx, i, P.cardRatio, [x, y, 0], [1, 0, 0], [0, 1, 0], halfH, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
             }));
         }
         return { camera: cameraFor(12), quads };
@@ -323,7 +325,7 @@ export const diagonalCarousel = {
             ctx, i, P.cardRatio,
             [d * step * sample.aspect * sx, d * step * sy, -Math.abs(d) * 0.02],
             [1, 0, 0], [0, 1, 0], halfH,
-            { radius: pct(P.cornerRadius) * 6, fade: clamp(Math.abs(d) * 0.18, 0, 0.5) },
+            { radius: cornerRadius(P), fade: clamp(Math.abs(d) * 0.18, 0, 0.5) },
         ));
         return { camera: cameraFor(14), quads };
     },
@@ -369,7 +371,7 @@ export const focusSlider = {
             const along = d * stepSize;
             const centre = vertical ? [cross, -along, 0] : [along, cross, 0];
             return card(ctx, i, P.cardRatio, centre, [1, 0, 0], [0, 1, 0], halfH * s, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 fade: 0.3 * away,
             });
         });
@@ -441,7 +443,7 @@ export const mosaicMarquee = {
                     tex: media.tex,
                     uvRect: media.uvRect,
                     aspect: halfW / halfH,
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                 });
             });
         }
@@ -528,7 +530,7 @@ export const heroReel = {
             const lift = (1 - away) * P.lift * halfH * 0.5;
             quads.push(card(ctx, i, 'auto', [d * stepSize, -0.62 + lift, 0.1],
                 [1, 0, 0], [0, 1, 0], halfH * s,
-                { radius: pct(P.cornerRadius) * 6, fade: 0.25 * away }));
+                { radius: cornerRadius(P), fade: 0.25 * away }));
         });
         return { camera: cameraFor(10), quads };
     },

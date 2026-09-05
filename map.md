@@ -652,6 +652,46 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 quinquies (Motion : polissage, deux bugs de fond)
+
+Comparaison cote a cote d'un meme template chez nous et dans la reference. Deux
+defauts expliquaient l'essentiel de l'ecart de qualite, et aucun des deux
+n'etait visible dans les tests automatiques.
+
+- **Le rayon de coin sortait six fois trop grand.** Le shader interprete
+  `u_radius` comme une FRACTION DE LA HAUTEUR de la carte ; on lui passait la
+  valeur du reglage multipliee par six. Un reglage annonce a 3% donnait 18% :
+  les cartes prenaient l'allure d'icones d'application, la reference montrait
+  des photos. Corrige par un helper `cornerRadius(P)` qui documente la
+  conversion, applique aux 62 endroits concernes.
+- **Le flou de mouvement delavait au lieu de flouter.** La moyenne des
+  sous-images se faisait directement a l'ecran en baissant l'opacite de chaque
+  carte — donc les cartes d'une meme sous-image se melangeaient ENTRE ELLES, et
+  celles du fond transparaissaient au travers de celles de devant. Mesure : le
+  centre d'une carte tombait de 229 a 126. Chaque sous-image est desormais
+  composee entierement, opaque, dans une cible hors ecran
+  (`QuadRenderer.ensureTarget`), puis moyennee. Le centre reste a 229.
+- Duree d'obturation portee a deux images et demie a 100% : le flou
+  physiquement exact d'un obturateur a 180 degres est presque invisible, alors
+  que l'ecriture visee assume une trainee franche. Nettete des bords mesuree :
+  5,19 sans flou, 4,33 a 45%.
+- Autres corrections de cadrage : les cartes plein cadre le sont vraiment (seul
+  le padding laisse une marge, un facteur 0,94 en ajoutait une invisible dans
+  les reglages) ; l'ombre a un degrade court pilote par son etalement, plus un
+  halo large et mou ; l'opacite bascule plus vite lors d'un changement de scene
+  (Triple Scene, Fan Shuffle, Spread Rows) — a mi-course toutes les cartes
+  etaient a demi transparentes et l'image devenait un magma ; Wheel Spin Bottom
+  trace un arc large au lieu d'un petit anneau ; la pile de Spread Rows/Columns
+  est lisible.
+- Cartes de demonstration retravaillees : voiles plus nombreux, plus petits et
+  moins opaques, plus un grain fin. Quelques grosses taches se lisaient comme un
+  degrade rate des qu'on affichait la carte en plein cadre.
+- Trame de points sous la scene et cadre au liseré discret, comme la reference :
+  une carte claire sur un noir uni flottait sans qu'on sache ou commence la
+  scene.
+- Verifie : 68 templates rendent et bouclent ; pire image 7,15 ms avec flou,
+  vignetage, grain et ombres, pour un budget de 16,7 ms a 60 images par seconde.
+
 ## Journal — 2026-09-05 quater (Motion : finition video et famille Signature)
 
 - **Mesure avant de toucher a quoi que ce soit** : le rendu d'une image coute

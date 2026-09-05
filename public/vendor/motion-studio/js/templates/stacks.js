@@ -5,7 +5,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease, steppedProgress } from '../engine/math.js';
 
@@ -56,7 +56,7 @@ export const stackSlide = {
             quads.push(card(ctx, index + k, P.cardRatio, [x, -d * inset, -d * 0.02],
                 [1, 0, 0], [0, 1, 0], halfH * s,
                 {
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     fade: d * 0.07,
                     alpha: k === 0 ? 1 - clamp((move - 0.75) / 0.25, 0, 1) : 1,
                 }));
@@ -99,7 +99,7 @@ export const cascadeDrop = {
             const { right, up } = spun(a);
             quads.push(card(ctx, index - k + 1, P.cardRatio, [0, y, -k * 0.02],
                 right, up, halfH,
-                { radius: pct(P.cornerRadius) * 6, fade: k * 0.06 }));
+                { radius: cornerRadius(P), fade: k * 0.06 }));
         }
         return { camera: cameraFor(10), quads };
     },
@@ -151,7 +151,7 @@ export const cascadeDeck = {
             const a = -d * 0.05;
             const { right, up } = spun(a);
             quads.push(card(ctx, i, P.cardRatio, [d * step, 0, -d * 0.01], right, up, halfH, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 alpha: 1 - out,
             }));
         }
@@ -198,7 +198,7 @@ export const imageTrail = {
             const grow = 1 - (1 - pct(P.popFrom)) * ease(P.easing, clamp(age * 3, 0, 1));
             quads.push(card(ctx, k, P.cardRatio, [x, y, -k * 0.004], [1, 0, 0], [0, 1, 0],
                 halfH * clamp(grow, 0.02, 2),
-                { radius: pct(P.cornerRadius) * 6, alpha: clamp(1 - age, 0, 1) }));
+                { radius: cornerRadius(P), alpha: clamp(1 - age, 0, 1) }));
         }
         return { camera: cameraFor(10), quads };
     },
@@ -233,7 +233,7 @@ export const posterBurst = {
         // legerement de cote.
         const entrants = P.flow === 'volley' ? 2 : 1;
         quads.push(card(ctx, index, P.cardRatio, [0, 0, 0], [1, 0, 0], [0, 1, 0], halfH, {
-            radius: pct(P.cornerRadius) * 6,
+            radius: cornerRadius(P),
         }));
         for (let k = 0; k < entrants; k += 1) {
             const t = ease('overshoot', clamp((move - k * 0.18) / (1 - k * 0.18 || 1), 0, 1));
@@ -242,7 +242,7 @@ export const posterBurst = {
             quads.push(card(ctx, index + 1 + k, P.cardRatio,
                 [side * (1 - t) * halfH, 0, 0.01 + k * 0.01], [1, 0, 0], [0, 1, 0],
                 halfH * t,
-                { radius: pct(P.cornerRadius) * 6, alpha: clamp(t * 2, 0, 1) }));
+                { radius: cornerRadius(P), alpha: clamp(t * 2, 0, 1) }));
         }
         return { camera: cameraFor(10), quads };
     },
@@ -289,7 +289,7 @@ export const cardToss = {
             const { right, up } = spun(a);
             const s = 1 + (hash(i, 6) - 0.5) * pct(P.sizeVariation);
             quads.push(card(ctx, i, P.cardRatio, [x, y, i * 0.004], right, up, halfH * s, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 alpha: clamp(Math.min(t, 1 - t) * 8, 0, 1),
             }));
         }
@@ -339,7 +339,7 @@ export const positionDance = {
             quads.push(card(ctx, i, P.cardRatio,
                 [Math.sin(a) * R * ctx.frameAspect * 0.75, Math.cos(a) * R, i * 0.003],
                 [1, 0, 0], [0, 1, 0], halfH,
-                { radius: pct(P.cornerRadius) * 6 }));
+                { radius: cornerRadius(P) }));
         }
         return { camera: cameraFor(10), quads };
     },

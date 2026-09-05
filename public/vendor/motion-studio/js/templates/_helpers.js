@@ -33,6 +33,17 @@ export function cameraFor(perspectivePct, framing = 1) {
 
 export const pct = (v) => v / 100;
 
+/*
+ * Rayon de coin d'une carte.
+ *
+ * Le shader interprete cette valeur comme une FRACTION DE LA HAUTEUR de la
+ * carte : 0.03 donne un arrondi de 3% du petit cote, ce qui correspond a ce
+ * qu'annonce le reglage. On passait ici la valeur multipliee par six, si bien
+ * qu'un reglage a 3% sortait a 18% — les cartes prenaient l'allure d'icones
+ * d'application au lieu de photos.
+ */
+export const cornerRadius = (P) => pct(P.cornerRadius ?? 0);
+
 // Facteur d'echelle du reglage Padding : il resserre toute la scene.
 export const paddingScale = (paddingPct) => clamp(1 - pct(paddingPct) * 2, 0.1, 1);
 

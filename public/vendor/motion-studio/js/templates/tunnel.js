@@ -8,7 +8,7 @@
  */
 
 import {
-    pct, card, cameraFor, clamp, VIEW_HEIGHT,
+    cornerRadius, pct, card, cameraFor, clamp, VIEW_HEIGHT,
 } from './_helpers.js';
 
 const SPAN = 16;      // profondeur du couloir, en unites monde
@@ -109,7 +109,7 @@ export const cardTunnel = {
                     tex: c2.tex,
                     uvRect: c2.uvRect,
                     aspect: halfW / halfH,
-                    radius: pct(P.cornerRadius) * 6,
+                    radius: cornerRadius(P),
                     fade: pct(P.depthFade) * depth,
                     castShadow: false,
                 });

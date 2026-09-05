@@ -9,7 +9,7 @@
  */
 
 import {
-    pct, card, cameraFor, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, pct, card, cameraFor, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 
 const SPAN = 9;      // profondeur parcourue
@@ -98,7 +98,7 @@ export const depthStackScroll = {
 
             const depthT = clamp((NEAR - z) / depthSpan, 0, 1);
             const base = {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 fade: pct(P.depthFade) * depthT,
                 alpha: clamp(edgeAlpha, 0, 1),
             };

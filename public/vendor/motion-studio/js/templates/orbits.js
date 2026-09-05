@@ -9,7 +9,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, applyTilt, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, applyTilt, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease, steppedProgress } from '../engine/math.js';
 
@@ -225,7 +225,7 @@ export const orbitCarousel = {
         const n = Math.max(1, ctx.slots);
         const scale = paddingScale(P.padding);
         const r = pct(P.spread) * 1.5 * scale;
-        const halfH = 0.94 * scale;
+        const halfH = scale;
         const quads = [];
         for (let i = 0; i < n; i += 1) {
             const a = (i / n - ctx.t) * TAU;
@@ -235,7 +235,7 @@ export const orbitCarousel = {
             const x = Math.sin(a) * r * 0.55;
             const depth = clamp(-z / (2 * r || 1), 0, 1);
             quads.push(card(ctx, i, P.cardRatio, [x, 0, z], [1, 0, 0], [0, 1, 0], halfH, {
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 fade: pct(P.depthFade) * depth,
             }));
         }
@@ -308,7 +308,7 @@ export const focusOrbit = {
             quads.push(card(ctx, i, P.cardRatio,
                 [x * zoom, y * zoom, 0],
                 right, up, halfH * clamp(pulse, 0.05, 4) * zoom,
-                { radius: pct(P.cornerRadius) * 6, fade: spot }));
+                { radius: cornerRadius(P), fade: spot }));
         }
         return {
             camera: cameraFor(P.perspective),
@@ -357,7 +357,7 @@ export const vortexSpin = {
                     P.cardStyle === 'curved' ? [-Math.sin(a), Math.cos(a), 0] : [0, 1, 0],
                     halfH,
                     {
-                        radius: pct(P.cornerRadius) * 6,
+                        radius: cornerRadius(P),
                         fade: pct(P.backFade) * (ring / Math.max(1, rings - 1 || 1)),
                     }));
             }
@@ -371,7 +371,7 @@ function wheel(ctx, o) {
     const n = Math.max(1, ctx.slots);
     // La roue doit tenir dans le cadre : a 1.2 fois la hauteur visible, les
     // cartes sortaient toutes par les bords.
-    const R = pct(P.wheelSize) * 0.8;
+    const R = pct(P.wheelSize) * (o.radiusScale || 0.8);
     const halfH = pct(P.cardSize) * VIEW_HEIGHT * 0.5;
     const dir = P.direction === 'ccw' ? -1 : 1;
     const turns = Math.max(0.25, P.rotations || 1);
@@ -401,7 +401,7 @@ function wheel(ctx, o) {
         const flip = P.spinStyle === 'flip' ? Math.abs(Math.cos(a * 2 + base * 2)) * 0.9 + 0.1 : 1;
         quads.push(card(ctx, i, P.cardRatio, [x, y, 0],
             [right[0] * flip, right[1] * flip, 0], up, halfH,
-            { radius: pct(P.cornerRadius) * 6 }));
+            { radius: cornerRadius(P) }));
     }
     return quads;
 }
@@ -452,10 +452,19 @@ export const wheelSpinBottom = {
     build(ctx) {
         // Le moyeu descend sous le cadre : on ne voit que l'arc du haut, les
         // cartes montent d'un cote et redescendent de l'autre.
-        const R = pct(ctx.P.wheelSize) * 1.2;
+        /*
+         * Le rayon est bien plus grand ici que pour la roue centree : le moyeu
+         * est hors cadre, et il faut que l'arc visible traverse largement le bas
+         * de l'image. Au rayon de la roue centree, on ne voyait qu'un petit
+         * anneau pose dans un coin.
+         */
+        const radiusScale = 1.9;
+        const R = pct(ctx.P.wheelSize) * radiusScale;
         return {
             camera: cameraFor(10),
-            quads: wheel(ctx, { centreY: -R - 0.15, stepped: ctx.P.movement === 'stepped' }),
+            quads: wheel(ctx, {
+                centreY: -R * 0.86, radiusScale, stepped: ctx.P.movement === 'stepped',
+            }),
         };
     },
 };

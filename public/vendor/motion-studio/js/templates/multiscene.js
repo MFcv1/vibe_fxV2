@@ -8,7 +8,7 @@
  */
 
 import {
-    TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
+    cornerRadius, TAU, pct, card, cameraFor, paddingScale, clamp, hash, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease } from '../engine/math.js';
 
@@ -43,8 +43,15 @@ const mixPose = (a, b, m) => ({
     z: (a.z || 0) + ((b.z || 0) - (a.z || 0)) * m,
     s: a.s + (b.s - a.s) * m,
     a: (a.a || 0) + ((b.a || 0) - (a.a || 0)) * m,
+    /*
+     * L'opacite bascule plus vite que la position : au milieu d'un changement
+     * de scene, une carte a mi-opacite laisse voir toutes celles de dessous et
+     * l'image devient un magma. On veut qu'elle soit franchement la, ou
+     * franchement partie.
+     */
     alpha: (a.alpha === undefined ? 1 : a.alpha)
-        + ((b.alpha === undefined ? 1 : b.alpha) - (a.alpha === undefined ? 1 : a.alpha)) * m,
+        + ((b.alpha === undefined ? 1 : b.alpha) - (a.alpha === undefined ? 1 : a.alpha))
+        * clamp(m * m * (3 - 2 * m) * 1.6 - 0.3, 0, 1),
 });
 
 function poseQuads(ctx, poses, halfH, radius, ratioKey) {
@@ -132,7 +139,7 @@ export const tripleScene = {
         for (let i = 0; i < n; i += 1) poses.push(mixPose(scenes[from](i), scenes[to](i), m));
         return {
             camera: cameraFor(8),
-            quads: poseQuads(ctx, poses, halfH, pct(P.cornerRadius) * 6, P.cardRatio),
+            quads: poseQuads(ctx, poses, halfH, cornerRadius(P), P.cardRatio),
         };
     },
 };
@@ -180,7 +187,7 @@ export const collageReel = {
         for (let i = 0; i < n; i += 1) poses.push(mixPose(scenes[from](i), scenes[to](i), m));
         return {
             camera: cameraFor(8),
-            quads: poseQuads(ctx, poses, halfH, pct(P.cornerRadius) * 6, P.cardRatio),
+            quads: poseQuads(ctx, poses, halfH, cornerRadius(P), P.cardRatio),
         };
     },
 };
@@ -247,7 +254,7 @@ export const fanShuffle = {
         for (let i = 0; i < n; i += 1) poses.push(mixPose(scenes[from](i), scenes[to](i), m));
         return {
             camera: cameraFor(8),
-            quads: poseQuads(ctx, poses, halfH, pct(P.cornerRadius) * 6, P.cardRatio),
+            quads: poseQuads(ctx, poses, halfH, cornerRadius(P), P.cardRatio),
         };
     },
 };
@@ -322,7 +329,7 @@ export const gridZoomStrip = {
                 tex: media.tex,
                 uvRect: media.uvRect,
                 aspect: halfW / halfH,
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 fade: pct(P.fade) * off * zoomT,
             });
         }
@@ -384,7 +391,9 @@ function spreadBuild(ctx, vertical) {
         const stacked = {
             x: anchor.x + fan,
             y: anchor.y - fan * 0.8,
-            s: (cellSize * 0.5 * stackSize) / halfH,
+            // La pile part d'une taille deja lisible : a la moitie d'une case,
+            // elle se reduisait a une vignette perdue dans un cadre vide.
+            s: (cellSize * 0.5 * (0.9 + stackSize * 1.1)) / halfH,
             a: fan * 0.5,
             alpha: 1,
             z: i * 0.004,
@@ -401,7 +410,7 @@ function spreadBuild(ctx, vertical) {
     void to;
     return {
         camera: cameraFor(8),
-        quads: poseQuads(ctx, poses, halfH, pct(P.cornerRadius) * 6, P.cardRatio),
+        quads: poseQuads(ctx, poses, halfH, cornerRadius(P), P.cardRatio),
     };
 }
 

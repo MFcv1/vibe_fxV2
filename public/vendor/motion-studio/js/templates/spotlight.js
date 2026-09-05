@@ -4,7 +4,7 @@
  */
 
 import {
-    pct, card, cameraFor, paddingScale, clamp, zoomedUv, VIEW_HEIGHT,
+    cornerRadius, pct, card, cameraFor, paddingScale, clamp, zoomedUv, VIEW_HEIGHT,
 } from './_helpers.js';
 import { ease } from '../engine/math.js';
 
@@ -52,12 +52,12 @@ export const centerStage = {
             if (back <= 0) continue;
             quads.push(card(ctx, index, P.cardRatio,
                 [-back * travel, 0, -0.01 * k], [1, 0, 0], [0, 1, 0], halfH,
-                { radius: pct(P.cornerRadius) * 6, alpha: ghost * (1 - k / (taps + 1)) * 0.5, castShadow: false }));
+                { radius: cornerRadius(P), alpha: ghost * (1 - k / (taps + 1)) * 0.5, castShadow: false }));
         }
         quads.push(card(ctx, index, P.cardRatio, [-move * travel, 0, 0], [1, 0, 0], [0, 1, 0], halfH,
-            { radius: pct(P.cornerRadius) * 6, alpha: 1 - clamp((move - 0.6) / 0.4, 0, 1) }));
+            { radius: cornerRadius(P), alpha: 1 - clamp((move - 0.6) / 0.4, 0, 1) }));
         quads.push(card(ctx, index + 1, P.cardRatio, [(1 - move) * travel, 0, 0.01], [1, 0, 0], [0, 1, 0], halfH,
-            { radius: pct(P.cornerRadius) * 6, alpha: clamp(move / 0.5, 0, 1) }));
+            { radius: cornerRadius(P), alpha: clamp(move / 0.5, 0, 1) }));
         return { camera: cameraFor(10), quads };
     },
 };
@@ -102,7 +102,7 @@ export const focusShift = {
                 tex: m.tex,
                 uvRect: m.uvRect,
                 aspect: mainW / H,
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 alpha,
             };
         };
@@ -132,7 +132,7 @@ export const focusShift = {
                 tex: m.tex,
                 uvRect: m.uvRect,
                 aspect: railW / rowH,
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
             });
         }
         return { camera: cameraFor(8), quads };
@@ -174,7 +174,7 @@ export const deckPeel = {
             const alpha = k === 0 ? 1 - clamp((move - 0.7) / 0.3, 0, 1) : 1;
             quads.push(card(ctx, index + k, P.cardRatio, [x, y, -d * 0.02],
                 [1, 0, 0], [0, 1, 0], halfH * s,
-                { radius: pct(P.cornerRadius) * 6, alpha, fade: d * 0.08 }));
+                { radius: cornerRadius(P), alpha, fade: d * 0.08 }));
         }
         return { camera: cameraFor(12), quads };
     },
@@ -221,7 +221,7 @@ export const zoomParallax = {
                 tex: m.tex,
                 uvRect: zoomedUv(m.uvRect, zoom, pan, 0),
                 aspect: halfW / halfH,
-                radius: pct(P.cornerRadius) * 6,
+                radius: cornerRadius(P),
                 alpha,
             };
         };

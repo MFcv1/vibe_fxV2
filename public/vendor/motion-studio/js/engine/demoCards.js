@@ -26,23 +26,49 @@ const PALETTES = [
     { bg: '#c3cfd6', soft: '#9aabb6', ink: '#22303a', accent: '#3d5a6c' },
 ];
 
-// Un fond "matiere" : des voiles flous, qui evoquent une photo sans en etre une.
+/*
+ * Fond "matiere" : des voiles flous qui evoquent une photo sans en etre une.
+ *
+ * Ils sont volontairement nombreux, petits et peu opaques. Quelques grosses
+ * taches bien visibles, c'est ce qu'on avait au depart, et ca se lit comme un
+ * degrade rate des qu'on affiche la carte en plein cadre.
+ */
 function haze(g, S, p, seed) {
     g.fillStyle = p.bg;
     g.fillRect(0, 0, S, S);
     g.save();
-    g.globalAlpha = 0.55;
-    g.filter = `blur(${Math.round(S * 0.09)}px)`;
-    for (let i = 0; i < 5; i += 1) {
-        const a = (seed * 1.7 + i * 2.4);
-        g.fillStyle = i % 2 ? p.soft : p.accent;
+    g.globalAlpha = 0.3;
+    g.filter = `blur(${Math.round(S * 0.055)}px)`;
+    for (let i = 0; i < 11; i += 1) {
+        const a = seed * 1.7 + i * 1.9;
+        g.fillStyle = i % 3 === 0 ? p.accent : p.soft;
         g.beginPath();
         g.ellipse(
-            S * (0.5 + Math.cos(a) * 0.36), S * (0.5 + Math.sin(a * 1.3) * 0.36),
-            S * (0.16 + (i % 3) * 0.09), S * (0.13 + (i % 2) * 0.11),
+            S * (0.5 + Math.cos(a) * 0.42), S * (0.5 + Math.sin(a * 1.27) * 0.42),
+            S * (0.07 + (i % 4) * 0.05), S * (0.06 + (i % 3) * 0.055),
             a, 0, Math.PI * 2,
         );
         g.fill();
+    }
+    g.restore();
+    grain(g, S, 0.045);
+}
+
+/*
+ * Un grain fin sur toute la carte. C'est lui qui empeche les aplats de sonner
+ * "aplat numerique" : une surface parfaitement lisse trahit tout de suite le
+ * degrade genere.
+ */
+function grain(g, S, amount) {
+    const step = Math.max(1, Math.round(S / 320));
+    g.save();
+    for (let y = 0; y < S; y += step) {
+        for (let x = 0; x < S; x += step) {
+            const n = Math.random();
+            g.globalAlpha = amount * n;
+            g.fillStyle = n > 0.5 ? '#ffffff' : '#000000';
+            g.fillRect(x, y, step, step);
+        }
     }
     g.restore();
 }
@@ -100,6 +126,7 @@ const LAYOUTS = [
     (g, S, p) => {
         g.fillStyle = p.bg; g.fillRect(0, 0, S, S);
         dots(g, S, p, 5, 0.9);
+        grain(g, S, 0.035);
     },
     // 04 — sommaire de villes, aligne a droite
     (g, S, p) => {
@@ -208,7 +235,7 @@ const LAYOUTS = [
  * avancent a des rythmes differents (8 et 12), donc les combinaisons ne se
  * repetent qu'au bout de 24 cartes.
  */
-export default function demoCard(index, size = 640) {
+export default function demoCard(index, size = 900) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const g = c.getContext('2d');
