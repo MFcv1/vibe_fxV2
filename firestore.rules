@@ -84,6 +84,29 @@ service cloud.firestore {
         ]);
     }
 
+    // La Room dans le compte: une image du carrousel en attente de post. Meme
+    // regle que la bibliotheque - proprietaire verifie et champs fermes - avec
+    // un jeu de cles plus court: la Room ne porte ni EXIF ni preset.
+    function isRoomItemValid(userId) {
+      return ownsUserDoc(userId)
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'order',
+          'bytes',
+          'width',
+          'height',
+          'source',
+          'sourceLabel',
+          'formatLabel',
+          'projectTitle',
+          'createdAt',
+          'path',
+          'url',
+          'updatedAt',
+        ]);
+    }
+
     function isVisionPresetFavoriteValid(userId, presetId) {
       return ownsUserDoc(userId)
         && request.resource.data.ownerUid == userId
@@ -242,6 +265,12 @@ service cloud.firestore {
       match /libraryPhotos/{photoId} {
         allow read: if ownsUserDoc(userId);
         allow create, update: if isLibraryPhotoValid(userId);
+        allow delete: if ownsUserDoc(userId);
+      }
+
+      match /roomItems/{itemId} {
+        allow read: if ownsUserDoc(userId);
+        allow create, update: if isRoomItemValid(userId);
         allow delete: if ownsUserDoc(userId);
       }
 

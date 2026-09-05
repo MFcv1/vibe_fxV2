@@ -437,6 +437,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   `-- VibeOsProjectProvider.jsx # Contexte du projet qui circule : autosauvegarde debouncee 800ms, flush sur pagehide, create/open/duplicate/remove/ensureProject
 |   |   |-- room/                       # Room : la file d'attente d'un post Instagram (ajoutee le 2026-09-05)
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
+|   |   |   |-- roomCloud.js           # Room dans le compte (2026-09-05) : Firestore `users/{uid}/roomItems` + Storage `users/{uid}/room/{id}/image.jpg`, plafond 40 Mo (un panorama 4592x8160 depasse les 25 Mo de la bibliotheque). Le fichier part AVANT la fiche
+|   |   |   |-- useRoomSync.js         # File d'envoi un par un + ecoute des fiches distantes + repercussion d'une suppression faite ailleurs. Le local fait autorite pour l'affichage
 |   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05) : chaque rendu devient une vraie photo dans un dossier neuf ou existant, donc il entre dans le circuit de sauvegarde du compte. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
 |   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
 |   |   |   |-- RoomScreen.jsx          # L'ecran : file horizontale numerotee, glisser-deposer ET fleches, retrait, vidage a double clic de confirmation, « Valider l'ordre » -> InstaPreviewSheet
@@ -661,6 +663,57 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 duodecies (la Room suit le compte, plus le navigateur)
+
+**Constate par l'utilisateur.** File preparee sur le portable, introuvable sur
+le fixe. C'etait le comportement : la Room vivait dans IndexedDB, donc dans UN
+navigateur, et n'a jamais connu le compte. Vider les donnees du site suffisait a
+la perdre.
+
+Elle recoit donc le meme traitement que la bibliotheque : l'image dans Storage
+(`users/{uid}/room/{id}/image.jpg`), la fiche dans Firestore
+(`users/{uid}/roomItems/{id}`), une file d'envoi un par un, une ecoute des
+fiches distantes, et la repercussion d'une suppression faite ailleurs — mais
+UNIQUEMENT pour ce qui etait deja parti : un rendu en attente d'envoi est absent
+du compte parce qu'il n'y est pas encore, pas parce qu'on l'a supprime.
+
+Trois choix a retenir :
+
+- **pas de vignette separee**, contrairement a la bibliotheque. La Room affiche
+  une dizaine d'images, pas plusieurs centaines, et c'est l'image finale qu'on
+  veut voir ;
+- **plafond a 40 Mo** au lieu des 25 Mo de la bibliotheque : un rendu social est
+  deja un export pleine definition, et un panorama 4592x8160 en JPEG 0.95
+  depasse regulierement 25 Mo. Le laisser de cote reviendrait a ne pas
+  sauvegarder precisement l'image qu'on veut retrouver ailleurs ;
+- **l'ordre voyage, les fichiers non.** Un glisser-deposer ne reecrit que les
+  fiches.
+
+**Un defaut trouve en testant, qui aurait rendu la fonction muette.**
+`listRoomItems` filtrait sur `row.blob` — un reste de l'epoque ou la Room ne
+vivait que dans ce navigateur. Une fiche arrivee du compte, qui n'a pas de
+fichier local, etait donc jetee a la lecture : rien ne se serait affiche sur le
+deuxieme appareil. Le filtre accepte maintenant « un fichier local OU une
+adresse dans le compte ».
+
+Regles ajoutees : `users/{userId}/roomItems/{itemId}` dans `firestore.rules`
+(champs fermes, proprietaire verifie, sur le modele de `libraryPhotos`) et
+`users/{userId}/room/{itemId}/{fileName}` dans `storage.rules` (40 Mo, images
+seulement).
+
+**Verifie en local, et ce qui ne l'est pas.** Verifie : une fiche sans fichier
+local mais avec une adresse distante s'affiche bien dans la Room, et
+« Enregistrer dans la bibliotheque » la rapatrie pour de vrai (photo 2048x2048
+ecrite avec son original) ; la Room reste intacte apres enregistrement ; aucune
+regression sans compte. NON verifie : l'aller-retour Firestore/Storage reel,
+qui demande le compte de l'utilisateur — c'est lui qui le constatera en ouvrant
+la Room sur ses deux machines.
+
+Fichiers ajoutes : `roomCloud.js`, `useRoomSync.js`.
+Fichiers touches : `RoomProvider.jsx`, `RoomScreen.jsx`, `roomDb.js`,
+`roomToLibrary.js`, `room.module.css`, `firestore.rules`, `storage.rules`.
+Gate : `npm run test:vibeos-room`.
 
 ## Journal — 2026-09-05 undecies (Room : plus de plafond, et une sortie vers la bibliotheque)
 

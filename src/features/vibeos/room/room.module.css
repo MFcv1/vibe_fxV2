@@ -320,3 +320,31 @@
     justify-content: flex-end;
     gap: var(--vo-space-2);
 }
+
+/* L'etat de la sauvegarde de la Room dans le compte. Discret, mais toujours
+   au meme endroit: c'est ce qui repond a « est-ce que je vais les retrouver
+   sur mon autre ordinateur ». */
+.syncBar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    margin: 0 var(--vo-space-5);
+    padding: var(--vo-space-2) var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.syncBar[data-tone="warn"] {
+    color: var(--vo-warning);
+    border-color: rgba(232, 179, 57, 0.32);
+}
+
+.syncBar[data-tone="danger"] {
+    color: var(--vo-danger);
+    background: var(--vo-danger-quiet);
+    border-color: rgba(255, 90, 95, 0.32);
+}

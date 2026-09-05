@@ -29,7 +29,8 @@ const cx = (...values) => values.filter(Boolean).join(' ');
 
 export default function RoomScreen() {
     const {
-        items, count, status, overCarousel, validatedAt, removeItem, moveItem, clear, validateOrder,
+        items, count, status, overCarousel, validatedAt, syncEnabled, syncBanner,
+        removeItem, moveItem, clear, validateOrder,
     } = useRoom();
     const toast = useToast();
     const router = useRouter();
@@ -207,6 +208,15 @@ export default function RoomScreen() {
                 </div>
             </header>
 
+            {/* L'etat de la sauvegarde se lit sans avoir a le chercher: c'est la
+                seule facon de savoir si la file existe ailleurs que dans ce
+                navigateur. */}
+            {syncBanner ? (
+                <div className={styles.syncBar} role="status" data-tone={syncBanner.tone}>
+                    {syncBanner.label}
+                </div>
+            ) : null}
+
             {count === 0 ? (
                 <div className={styles.emptyWrap}>
                     <EmptyState
@@ -321,11 +331,13 @@ export default function RoomScreen() {
             >
                 <div className={styles.saveBody}>
                     <p className={styles.saveIntro}>
-                        Ces {count} image{count > 1 ? 's' : ''} ne vivent aujourd’hui que dans ce
-                        navigateur. Les enregistrer les fait entrer dans ta bibliothèque, puis dans
-                        ton compte — tu les retrouveras ailleurs, et une retouche de preset ne les
-                        effacera pas. <strong>La Room n’est pas vidée</strong> : ton post en cours
-                        reste tel quel.
+                        {syncEnabled
+                            ? `Ces ${count} image${count > 1 ? 's' : ''} sont déjà sauvegardées dans ton compte, mais la Room est une file d’attente : elle se vide quand le post part.`
+                            : `Ces ${count} image${count > 1 ? 's' : ''} ne vivent aujourd’hui que dans ce navigateur.`}{' '}
+                        Les enregistrer les range dans ta bibliothèque, où elles deviennent des
+                        photos comme les autres — retrouvables partout, réutilisables, et qu’une
+                        retouche de preset n’effacera pas.{' '}
+                        <strong>La Room n’est pas vidée</strong> : ton post en cours reste tel quel.
                     </p>
 
                     <div className={styles.saveField} role="radiogroup" aria-label="Destination">

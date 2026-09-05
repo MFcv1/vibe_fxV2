@@ -27,7 +27,14 @@ export async function listRoomItems() {
     try {
         const rows = await withStore(ROOM_STORE, 'readonly', (store) => requestToPromise(store.getAll()));
         return (rows || [])
-            .filter((row) => row?.blob)
+            /*
+             * Une fiche vaut si elle a de quoi montrer une image: un fichier
+             * local, OU une adresse dans le compte. Le filtre ne gardait que le
+             * premier cas — il datait de l'epoque ou la Room ne vivait que dans
+             * ce navigateur — et il aurait rendu invisible tout ce qui arrive
+             * d'un autre appareil.
+             */
+            .filter((row) => row?.blob || row?.cloud?.url)
             .sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch {
         return [];

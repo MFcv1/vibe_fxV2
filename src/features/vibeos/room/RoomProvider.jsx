@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { buildSocialImages } from '../../vibefx-studio/utils/socialExport';
 import {
     clearRoomItems,
@@ -11,6 +12,8 @@ import {
     readRoomValidatedAt,
     writeRoomValidatedAt,
 } from './roomDb';
+import useRoomSync from './useRoomSync';
+import { pushRoomOrder, roomCloudUid } from './roomCloud';
 
 /*
  * La Room: la file d'attente d'un post.
@@ -44,6 +47,11 @@ const RoomContext = createContext(null);
 function itemFromRecord(record) {
     return {
         id: record.id,
+        /* Venue du compte et pas encore rapatriee: elle s'affiche depuis son
+           URL Storage. C'est ce qui permet de retrouver sa Room sur un autre
+           appareil sans rien retelecharger. */
+        remote: !record.blob,
+        cloud: record.cloud || null,
         width: record.width,
         height: record.height,
         source: record.source,
@@ -51,8 +59,14 @@ function itemFromRecord(record) {
         formatLabel: record.formatLabel,
         projectTitle: record.projectTitle,
         createdAt: record.createdAt,
-        url: URL.createObjectURL(record.blob),
+        url: record.blob ? URL.createObjectURL(record.blob) : (record.cloud?.url || null),
     };
+}
+
+/* Seules les URLs fabriquees ici se revoquent; celles de Storage sont des
+   adresses distantes, les revoquer n'aurait aucun sens. */
+function isObjectUrl(url) {
+    return typeof url === 'string' && url.startsWith('blob:');
 }
 
 export function VibeOsRoomProvider({ children }) {
@@ -72,14 +86,26 @@ export function VibeOsRoomProvider({ children }) {
         const seen = new Set();
         nextItems.forEach((item) => {
             seen.add(item.id);
+            const ancienne = urlsRef.current.get(item.id);
+            if (ancienne && ancienne !== item.url && isObjectUrl(ancienne)) URL.revokeObjectURL(ancienne);
             urlsRef.current.set(item.id, item.url);
         });
         urlsRef.current.forEach((url, id) => {
             if (seen.has(id)) return;
-            URL.revokeObjectURL(url);
+            if (isObjectUrl(url)) URL.revokeObjectURL(url);
             urlsRef.current.delete(id);
         });
     }, []);
+
+    /* Relit la file depuis IndexedDB. La synchronisation s'en sert quand le
+       compte a apporte quelque chose que cet appareil ne connaissait pas. */
+    const reload = useCallback(async () => {
+        const records = await listRoomItems();
+        const loaded = records.map(itemFromRecord);
+        trackUrls(loaded);
+        itemsRef.current = loaded;
+        setItems(loaded);
+    }, [trackUrls]);
 
     useEffect(() => {
         let cancelled = false;
@@ -100,9 +126,15 @@ export function VibeOsRoomProvider({ children }) {
         };
     }, [trackUrls]);
 
+    /* Sauvegarde de la file dans le compte: c'est elle qui fait qu'une Room
+       preparee sur un appareil se retrouve sur l'autre. */
+    const sync = useRoomSync({ status, reload });
+    const { user } = useAuth();
+    const uid = roomCloudUid(user);
+
     /* Les object URLs ne survivent pas au demontage du provider. */
     useEffect(() => () => {
-        urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        urlsRef.current.forEach((url) => { if (isObjectUrl(url)) URL.revokeObjectURL(url); });
         urlsRef.current.clear();
     }, []);
 
@@ -127,7 +159,14 @@ export function VibeOsRoomProvider({ children }) {
             })
             .filter(Boolean);
         await putRoomItems(rows);
-    }, []);
+        /* L'ordre est la seule chose que cet ecran modifie: il doit suivre le
+           compte, sinon un carrousel reordonne ici reviendrait melange
+           ailleurs. Les fichiers, eux, ne bougent pas. */
+        if (uid) {
+            const partis = rows.filter((row) => row.cloud?.state === 'synced');
+            if (partis.length) await pushRoomOrder(uid, partis).catch(() => null);
+        }
+    }, [uid]);
 
     /*
      * Envoie un rendu dans la Room. Un panorama arrive decoupe en 2 ou 3
@@ -168,18 +207,21 @@ export function VibeOsRoomProvider({ children }) {
     }, [invalidate]);
 
     const removeItem = useCallback(async (id) => {
+        const rows = await listRoomItems();
+        const cible = rows.find((row) => row.id === id);
+        if (cible) await sync.forgetRemote(cible);
         await deleteRoomItem(id);
         const next = itemsRef.current.filter((item) => item.id !== id);
         itemsRef.current = next;
         setItems(next);
         const url = urlsRef.current.get(id);
         if (url) {
-            URL.revokeObjectURL(url);
+            if (isObjectUrl(url)) URL.revokeObjectURL(url);
             urlsRef.current.delete(id);
         }
         await persistOrder(next);
         invalidate();
-    }, [invalidate, persistOrder]);
+    }, [invalidate, persistOrder, sync]);
 
     const moveItem = useCallback(async (fromIndex, toIndex) => {
         const current = itemsRef.current;
@@ -196,14 +238,16 @@ export function VibeOsRoomProvider({ children }) {
     }, [invalidate, persistOrder]);
 
     const clear = useCallback(async () => {
+        const rows = await listRoomItems();
+        for (const row of rows) await sync.forgetRemote(row);
         await clearRoomItems();
-        urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        urlsRef.current.forEach((url) => { if (isObjectUrl(url)) URL.revokeObjectURL(url); });
         urlsRef.current.clear();
         itemsRef.current = [];
         setItems([]);
         await writeRoomValidatedAt(null);
         setValidatedAt(null);
-    }, []);
+    }, [sync]);
 
     /* « Valider l'ordre »: l'utilisateur dit que la file est le post. Rien ne
        part nulle part - c'est un feu vert, pas une publication. */
@@ -221,12 +265,16 @@ export function VibeOsRoomProvider({ children }) {
         /* Au-dela du carrousel Instagram: on le DIT, on ne l'empeche pas. */
         overCarousel: items.length > ROOM_CAROUSEL_MAX,
         validatedAt,
+        /* Etat de la sauvegarde dans le compte, pour l'ecran Room. */
+        syncEnabled: sync.enabled,
+        syncBanner: sync.banner,
         addFromCanvas,
         removeItem,
         moveItem,
         clear,
         validateOrder,
-    }), [items, status, validatedAt, addFromCanvas, removeItem, moveItem, clear, validateOrder]);
+    }), [items, status, validatedAt, sync.enabled, sync.banner,
+        addFromCanvas, removeItem, moveItem, clear, validateOrder]);
 
     return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
 }

@@ -58,6 +58,17 @@ service firebase.storage {
       allow delete: if ownsPath(userId);
     }
 
+    // La Room: le rendu social pleine definition d'une image du carrousel.
+    // Plafond plus haut que la bibliotheque (25 Mo) parce qu'un panorama
+    // 4592x8160 en JPEG qualite 0.95 le depasse regulierement, et que c'est
+    // precisement l'image que l'utilisateur veut retrouver sur son autre poste.
+    match /users/{userId}/room/{itemId}/{fileName} {
+      allow get: if ownsPath(userId);
+      allow list: if false;
+      allow create, update: if ownsPath(userId) && isSafeImageUpload(40 * 1024 * 1024);
+      allow delete: if ownsPath(userId);
+    }
+
     match /users/{userId}/uploads/audio/{allPaths=**} {
       allow get: if ownsPath(userId);
       allow list: if false;

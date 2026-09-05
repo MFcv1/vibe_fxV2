@@ -1,6 +1,7 @@
 "use client";
 
 import { listRoomItems } from './roomDb';
+import { fetchRoomBlob } from './roomCloud';
 import {
     createFolderId, listFolders, listPhotos, putFolder, putPhoto,
 } from '../library/libraryDb';
@@ -28,12 +29,24 @@ import { checkImport } from '../library/libraryQuota';
  */
 
 /* Un rendu de Room est un PNG ou un JPEG deja fabrique par l'export social. */
-function fileFromItem(item, index) {
-    const type = item.blob?.type || 'image/png';
+function fileFromItem(item, index, blob) {
+    const type = blob?.type || 'image/jpeg';
     const ext = type.includes('png') ? 'png' : 'jpg';
     const base = sanitizeFolderName(item.projectTitle || item.sourceLabel || 'Room') || 'Room';
     const nom = `${base} ${String(index + 1).padStart(2, '0')}.${ext}`;
-    return new File([item.blob], nom, { type, lastModified: item.createdAt || Date.now() });
+    return new File([blob], nom, { type, lastModified: item.createdAt || Date.now() });
+}
+
+/*
+ * Le fichier d'une image de Room.
+ *
+ * Sur l'appareil qui l'a fabriquee, il est dans IndexedDB. Sur un autre, la
+ * Room est arrivee par le compte et ne porte qu'une URL Storage: on rapatrie
+ * alors l'image, sinon « enregistrer » ne marcherait que la ou on l'a creee.
+ */
+async function blobOf(item) {
+    if (item.blob) return item.blob;
+    return fetchRoomBlob(item.cloud?.url, item.cloud?.path);
 }
 
 /* Nom propose pour le dossier: le projet s'il est unique, la date sinon. */
@@ -64,7 +77,15 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
     const items = await listRoomItems();
     if (!items.length) return { added: 0, folderId: null, message: 'La Room est vide.' };
 
-    const files = items.map(fileFromItem);
+    const blobs = await Promise.all(items.map(blobOf));
+    const paires = items
+        .map((item, index) => ({ item, blob: blobs[index] }))
+        .filter((paire) => paire.blob);
+    if (!paires.length) {
+        return { added: 0, folderId: null, message: 'Aucune image de la Room n’a pu être lue.' };
+    }
+    const introuvables = items.length - paires.length;
+    const files = paires.map((paire, index) => fileFromItem(paire.item, index, paire.blob));
     const existing = await listPhotos();
     const gardees = existing.filter((photo) => !photo.scout);
     const gate = checkImport({
@@ -122,6 +143,7 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
         added,
         failed: retenus.length - added,
         rejected: files.length - retenus.length,
+        introuvables,
         folderId: cible,
         folderName: nom,
         message: gate.message,

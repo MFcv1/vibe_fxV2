@@ -37,6 +37,14 @@
 > montent dans le compte. La Room n'est pas videe au passage. Module
 > `roomToLibrary.js`.
 
+> **La Room suit le compte — 2026-09-05.** Elle ne vivait que dans un
+> navigateur ; elle est maintenant sauvegardee dans Storage
+> (`users/{uid}/room/{id}/image.jpg`, plafond 40 Mo) et Firestore
+> (`users/{uid}/roomItems`), avec file d'envoi, ecoute distante et
+> repercussion des suppressions. Regles Firestore et Storage ajoutees.
+> **Non verifie par un agent** : l'aller-retour reel entre deux machines, qui
+> demande le compte de l'utilisateur.
+
 **À lire avant de coder, dans cet ordre :**
 
 1. [AGENTS.md](AGENTS.md) — règles de travail, rituel de fin de phase.
