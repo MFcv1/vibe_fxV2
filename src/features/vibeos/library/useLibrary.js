@@ -724,6 +724,47 @@ export default function useLibrary() {
     const activeScout = isScoutFolder(activeFolder);
 
     /*
+     * Les doublons du dossier ouvert.
+     *
+     * Deux photos issues du MEME rendu ont exactement les memes dimensions et
+     * le meme poids a l'octet pres. Deux photos differentes qui tomberaient sur
+     * ces trois valeurs, ca n'arrive pas avec des JPEG: un pixel de difference
+     * change le poids compresse. C'est donc une identite fiable, et elle marche
+     * meme sur les photos rangees avant que `fromRoomId` existe.
+     *
+     * On garde UN exemplaire par groupe, et le meilleur: celui qui est deja
+     * sauvegarde dans le compte d'abord, celui qui a son fichier d'origine
+     * ensuite, le plus ancien enfin. On ne supprime jamais une photo unique.
+     */
+    const duplicates = useMemo(() => {
+        if (!activeFolderId || activeScout) return { ids: [], groupes: 0 };
+        const groupes = new Map();
+        folderPhotos.forEach((photo) => {
+            const cle = `${photo.width || 0}x${photo.height || 0}:${photo.bytes || 0}`;
+            if (!cle.endsWith(':0')) {
+                if (!groupes.has(cle)) groupes.set(cle, []);
+                groupes.get(cle).push(photo);
+            }
+        });
+        const score = (photo) => (
+            (photo.cloud?.state === 'synced' ? 4 : 0)
+            + (photo.blob ? 2 : 0)
+            + (photo.fromRoomId ? 1 : 0)
+        );
+        const ids = [];
+        let doubles = 0;
+        groupes.forEach((liste) => {
+            if (liste.length < 2) return;
+            doubles += 1;
+            const trie = [...liste].sort((a, b) => (
+                score(b) - score(a) || (a.addedAt || 0) - (b.addedAt || 0)
+            ));
+            trie.slice(1).forEach((photo) => ids.push(photo.id));
+        });
+        return { ids, groupes: doubles };
+    }, [activeFolderId, activeScout, folderPhotos]);
+
+    /*
      * Etat du tri ouvert: combien de favorites, et combien sont encore reliees
      * a leur fichier. C'est ce couple qui pilote le bandeau de fin de tri.
      */
@@ -751,7 +792,7 @@ export default function useLibrary() {
     return {
         photos, folders, folderCards, folderPhotos, visible, status, importState,
         devices, presets, quota, usedBytes, takenNames,
-        activeScout, scoutState,
+        activeScout, scoutState, duplicates,
         scoutFiles, cancelScout, promoteFavorites, toggleFavorite, reattachScout,
         activeFolderId, setActiveFolderId, activeFolder,
         search, setSearch,

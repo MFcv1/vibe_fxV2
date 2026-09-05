@@ -5,7 +5,7 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    Camera, Check, ChevronLeft, FolderPlus, Grid2x2, Heart, Images, Laptop, Minus, Plus,
+    Camera, Check, ChevronLeft, Copy, FolderPlus, Grid2x2, Heart, Images, Laptop, Minus, Plus,
     Trash2, Upload, Wand2, X,
 } from 'lucide-react';
 import { Button, SearchField, useToast } from '../primitives';
@@ -332,6 +332,7 @@ function FolderToolbar({ folderCount, photoCount, weight, quota, search, onSearc
 function Toolbar({
     folder, count, weight, density, onDensity, devices, deviceFilter, onDeviceFilter,
     presets, presetFilter, onPresetFilter, sort, onSort, search, onSearch, onImport, onBack,
+    duplicates, onCleanDuplicates, cleaning,
 }) {
     return (
         <header className={styles.toolbar}>
@@ -426,6 +427,22 @@ function Toolbar({
                 </div>
             </div>
 
+            {/* Le nettoyage n'apparait QUE s'il y a vraiment a nettoyer, et il
+                annonce ce qu'il va supprimer avant de le faire. */}
+            {duplicates > 0 ? (
+                <Button
+                    variant={cleaning ? 'danger' : 'ghost'}
+                    size="sm"
+                    icon={<Copy size={13} />}
+                    onClick={onCleanDuplicates}
+                    title="Ne garder qu'un exemplaire de chaque image en double"
+                    data-testid="vibeos-library-dedupe"
+                >
+                    {cleaning
+                        ? `Supprimer ${duplicates} doublon${duplicates > 1 ? 's' : ''} ?`
+                        : `${duplicates} doublon${duplicates > 1 ? 's' : ''}`}
+                </Button>
+            ) : null}
             <Button
                 variant="primary"
                 size="sm"
@@ -452,7 +469,7 @@ export default function LibraryScreen() {
         presetFilter, setPresetFilter, sort, setSort,
         importFiles, renameFolder, removeFolder,
         removePhoto, removeAll, ensurePreview,
-        activeScout, scoutState, scoutFiles, cancelScout, promoteFavorites, toggleFavorite,
+        activeScout, scoutState, duplicates, scoutFiles, cancelScout, promoteFavorites, toggleFavorite,
         reattachScout,
     } = library;
 
@@ -490,6 +507,8 @@ export default function LibraryScreen() {
     /* Un seul observateur pour toute la grille, cree au premier rendu client. */
     const [revealer] = useState(createRevealer);
     const reattachRef = useRef(null);
+    /* Deux temps avant une suppression: on annonce, puis on confirme. */
+    const [confirmDedupe, setConfirmDedupe] = useState(false);
     useEffect(() => () => revealer?.disconnect(), [revealer]);
 
     /*
@@ -645,6 +664,33 @@ export default function LibraryScreen() {
         }
         return result;
     }, [scoutFiles, push, setActiveFolderId]);
+
+    /*
+     * Ne garder qu'un exemplaire de chaque image.
+     *
+     * Deux temps: le premier clic annonce le nombre exact, le second supprime.
+     * C'est le seul geste destructeur de cette barre, et il n'apparait que
+     * lorsqu'il y a vraiment des doublons — donc jamais par surprise.
+     *
+     * La copie distante part avec la locale, sinon l'ecoute du compte les
+     * ferait revenir a la prochaine ouverture.
+     */
+    const handleDedupe = useCallback(async () => {
+        const ids = duplicates.ids;
+        if (!ids.length) { setConfirmDedupe(false); return; }
+        if (!confirmDedupe) {
+            setConfirmDedupe(true);
+            window.setTimeout(() => setConfirmDedupe(false), 5000);
+            return;
+        }
+        setConfirmDedupe(false);
+        await removeAll(ids);
+        await sync.forgetPhotos(ids);
+        push(
+            `${ids.length} doublon${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''} · un exemplaire gardé de chaque image.`,
+            { tone: 'success', duration: 5000 },
+        );
+    }, [duplicates, confirmDedupe, removeAll, sync, push]);
 
     const handleFavorite = useCallback((photo) => {
         if (photo?.id) toggleFavorite(photo.id);
@@ -890,6 +936,9 @@ export default function LibraryScreen() {
                     onSearch={setSearch}
                     onImport={() => setSheetMode('import')}
                     onBack={backToFolders}
+                    duplicates={duplicates.ids.length}
+                    cleaning={confirmDedupe}
+                    onCleanDuplicates={handleDedupe}
                 />
             ) : (
                 <FolderToolbar

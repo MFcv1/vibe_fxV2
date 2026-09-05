@@ -664,6 +664,36 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-06 quinquies (nettoyer les doublons d'un dossier)
+
+Suite directe du defaut precedent: la Room reimportait tout a chaque
+enregistrement, et un dossier est monte a 106 photos pour 37 images de file. Le
+mecanisme est repare, restaient les doublons deja crees.
+
+**Ce qui identifie un doublon.** Dimensions + poids a l'octet pres. Deux photos
+issues du meme rendu partagent exactement ces trois valeurs; deux photos
+differentes qui tomberaient dessus, ca n'arrive pas avec des JPEG — un pixel de
+difference change le poids compresse. L'identite marche donc aussi sur les
+photos rangees avant que `fromRoomId` existe, ce qui est precisement le cas a
+traiter.
+
+**Ce qu'on garde.** Un exemplaire par groupe, et le meilleur: deja sauvegarde
+dans le compte d'abord, avec son fichier d'origine ensuite, le plus ancien
+enfin. Une photo unique n'est jamais supprimee.
+
+**Le geste.** Un bouton qui n'apparait QUE s'il y a des doublons, et en deux
+temps: le premier clic annonce le nombre exact (« Supprimer 3 doublons ? »), le
+second supprime, ici et dans le compte — sans quoi l'ecoute Firestore les ferait
+revenir a la prochaine ouverture. L'annonce retombe seule au bout de cinq
+secondes.
+
+Verifie dans le navigateur: dossier de 5 photos, 3 copies ajoutees a la main, le
+bouton annonce « 3 doublons », le premier clic demande confirmation, le second
+ramene le dossier a 5 — les trois copies parties, les originaux gardes, et le
+bouton disparait.
+
+Fichiers touches : `useLibrary.js`, `LibraryScreen.jsx`.
+
 ## Journal — 2026-09-06 quater (le avant/apres arrete de mentir, et Room reconnait l'existant)
 
 **1. L'ecart au repos etait un ecart d'AFFICHAGE, pas de traitement.**
