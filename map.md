@@ -6005,3 +6005,49 @@ Deux defauts vus a l'ecran par l'utilisateur, tous deux de positionnement.
   l'acces du navigateur d'inspection a localhost a ete refuse ensuite.
 - Gates : `npm run lint` sans erreur (5 avertissements preexistants),
   `npm run build` vert. Aucun deploiement.
+
+---
+
+## Journal — 2026-09-05 (Vision : le rendu au repos, et des curseurs qui ne mordaient pas)
+
+Parti d'un signalement : « quand on modifie les paramètres avancés, il ne se
+passe rien », puis « sans que je modifie l'image, l'avant/après change la
+luminosité ».
+
+- **Les deux outils d'audit ne mesuraient pas les bons états.**
+  `scripts/audit-reglages-avances.mjs` accepte maintenant `--preset <id>` (il
+  pose l'identifiant LUT **et** les `spatialFilters`, comme `applyPreset`),
+  `--nuit` (une mire exposée trois diaphragmes plus bas, enseignes gardées
+  vives) et `--repos-seul`. Il commence par un **contrôle du repos**.
+  `scripts/smoke-reglages-avances.spec.cjs` rejoue son audit après avoir cliqué
+  une vignette de preset, sur quatre familles (`SMOKE_PRESET` pour en changer).
+- **Corrigé : le moteur modifiait une photo intacte.**
+  `applySmartphoneOutputGuards` tournait à chaque rendu et relevait les noirs ;
+  sur une photo sombre, 56,9 % des pixels bougeaient jusqu'à 6/255 sans qu'un
+  seul curseur soit sorti du repos, ce qui faisait mentir la comparaison
+  avant/après. `visionFiltersAreIdentity` (nouveau, exporté par
+  `utils/visionColorScience.js`) fait sortir `applyFiltersPro` avant tout
+  traitement quand aucun réglage n'est actif et qu'aucun preset ne l'est.
+  Vérifié : 0,00/255 et 0,0 % des pixels sur les trois sources.
+- **Corrigé : la course de Température ne couvrait que 5730 K..7270 K.**
+  Un cran vaut 35 K et l'écart est encore divisé par deux, soit ±6/255 sur un
+  gris moyen au poids maximum. Course élargie à ±45 (sûr) et ±120 (libre,
+  2300 K..10700 K) **sans toucher au rendement par cran**, pour que les profils
+  de `data/constants.jsx` validés à l'œil rendent la même image. Luminosité
+  libre passe de 60..140 à 40..200 (un diaphragme : c'est un multiplicateur,
+  +40 % sur un pixel à 25 ne montait que de 10/255). Mesuré sur la mire de
+  nuit : Température libre 0,7 → 10,71/255, Luminosité libre 20 → 50,73/255.
+- **Trouvé, non corrigé** : les quatre curseurs sélectifs sont morts sous 36
+  presets sur 261 (familles noir & blanc et sépia) — leur masque de teinte est
+  lu après la LUT. La halation meurt sous n'importe quel preset. Le garde-fou de
+  température tombe à 0 sous 14/255 de luminance, donc en mode « Actifs » la
+  température reste quasi inerte de nuit. Les trois sont dans `todo.md` et
+  `docs/pieges-connus.md`.
+- Gates : `npm run lint` sans erreur (5 avertissements préexistants), audit
+  moteur complet vert sur mire + mire de nuit + photo sombre, smoke interface
+  vert sans preset et sous `powlisher-chaud`.
+  `scripts/audit-vision-filters.mjs` échoue sur « spatial effects must stay
+  gated by quality » — **échec préexistant**, vérifié par `git stash` : son
+  motif attend `applyClarity(ctx, targetCanvas, w, h, safeFilters.clarity)`
+  alors que le code passe `clarityForRender` depuis l'arrivée de
+  `presetClarityScale`. Aucun déploiement.

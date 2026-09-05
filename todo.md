@@ -216,6 +216,27 @@ TSL, étalonnage, virage, N&B, et le **profil**.
 signale : un réglage **« Auto »** non nul (calculé depuis la photo — le tester
 sur deux images très différentes), et un panneau **Masquage** non vide.
 
+### Vision — curseurs sélectifs sous preset (ouvert)
+
+**Ciel / Eau, Végétation, Tons chauds et Teintes de peau ne font rien sous 36
+presets sur 261** : les familles noir & blanc et sépia (`bw*`, `pb*`,
+`film-noir-blanc-*`, `pl10/11`, `pm10/11`, `ft03`, `tr07`, `cn05/08`). Leur
+masque de teinte est calculé **après** la LUT, et ces presets ramènent toutes
+les teintes vers 20–39° : il n'y a plus de bleu à désaturer. Mesuré au moteur et
+en poussant les vrais curseurs. Détail et chiffres dans
+[docs/pieges-connus.md](docs/pieges-connus.md).
+
+Trois issues, à trancher : lire les masques **avant** la LUT (ce que fait
+Lightroom, coût = une copie de l'image), griser les quatre curseurs sous un
+preset qui unifie les teintes, ou l'écrire dans la doc et ne rien faire.
+
+**Aussi ouvert** : le garde-fou de température (`getSafeTemperatureWeight`)
+tombe à 0 sous 14/255 de luminance, donc en mode « Actifs » la température reste
+quasi inerte sur une photo de nuit (1,07/255 course à fond). L'adoucir change le
+rendu des profils de `data/constants.jsx` qui portent une température (Nostalgic
+Neg. +12, Eterna −8...) et ont été validés à l'œil : à décider, pas à faire en
+passant.
+
 ### Reste ouvert
 
 1. **Trancher la licence** : CN11 et CN17 sont dans le bundle sous leurs noms

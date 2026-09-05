@@ -193,3 +193,39 @@ chaque preset importé pèse ~144 ko : au-delà d'une dizaine, chargement paress
 
 ---
 
+
+## Le rendu au repos (2026-09-05)
+
+- **Au repos, le moteur doit rendre la photo TELLE QUELLE.** Il ne le faisait
+  pas : `applySmartphoneOutputGuards` tournait à chaque rendu et relevait les
+  noirs (`5,5 × (1 − smoothstep(18, 56, luminance))`), même sans qu'un seul
+  curseur soit sorti du repos. Sur une photo sombre, **56,9 % des pixels
+  bougeaient jusqu'à 6/255** sans rien avoir demandé — et la comparaison
+  avant/après affichait donc un écart de luminosité inventé. Corrigé par
+  `visionFiltersAreIdentity` (`visionColorScience.js`), qui fait sortir
+  `applyFiltersPro` avant tout traitement. Verrou :
+  `node scripts/audit-reglages-avances.mjs --repos-seul --nuit --photo <sombre>`.
+- **Un garde-fou ne protège que des dégâts qu'un RÉGLAGE cause.** S'il n'y a pas
+  de réglage, il n'y a rien à protéger : le faire tourner quand même, c'est
+  modifier une photo intacte.
+
+## Mesurer sur la bonne image (2026-09-05)
+
+- **Une mire en tons moyens ne prouve rien pour une photo de nuit.** Plusieurs
+  étages sont pondérés par la luminance du pixel — `getSafeTemperatureWeight`
+  tombe à **0 sous 14/255** et ne vaut que 0,08 à 20/255 — et la luminosité est
+  un **multiplicateur** : +15 % sur un pixel à 25 ne monte que de 3,7/255. Sur
+  la mire claire, « Température » passait le seuil « vivant » ; sur une photo
+  sombre elle rend **0,51/255 curseur à fond**, c'est-à-dire rien. D'où
+  `--nuit` dans l'audit : la même matière exposée trois diaphragmes plus bas.
+- **Regarder aussi la COURSE, pas seulement le rendement.** Un cran de
+  Température vaut 35 K et l'écart est encore divisé par deux
+  (`s = 0.5` dans `getTemperatureMultipliers`) : la course −22..22 ne couvrait
+  que 5730 K..7270 K. On a élargi la course (±45 sûr, ±120 libre) sans toucher
+  au rendement par cran, pour que les profils de `data/constants.jsx` déjà
+  validés à l'œil rendent exactement la même image.
+- **Les curseurs sélectifs (Ciel, Végétation, Tons chauds, Peau) sont morts sous
+  36 presets sur 261** — les familles noir & blanc et sépia (`bw*`, `pb*`,
+  `film-noir-blanc-*`, `pl10/11`, `pm10/11`, `ft03`, `tr07`, `cn05/08`). Leur
+  masque de teinte est calculé **après** la LUT : le preset ramène tout vers
+  20–39° de teinte, donc il n'y a plus ni bleu ni vert à trouver. Non corrigé.
