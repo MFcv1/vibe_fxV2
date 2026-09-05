@@ -88,7 +88,23 @@ export const VISION_SAFE_BOUNDS = {
     warmSaturation: { min: -35, max: 18, neutre: 0 },
     skySaturation: { min: -35, max: 25, neutre: 0 },
     foliageSaturation: { min: -35, max: 22, neutre: 0 },
-    temperature: { min: -22, max: 22, neutre: 0 },
+    /*
+     * LA COURSE, PAS LA PHYSIQUE — elargie le 2026-09-05, et voici pourquoi.
+     *
+     * Un cran de ce curseur vaut 35 K (`getTemperatureMultipliers`), et l'ecart
+     * aux multiplicateurs neutres est encore divise par deux. La course -22..22
+     * ne couvrait donc que 5730 K..7270 K, soit +-6/255 sur un gris moyen AU
+     * POIDS MAXIMUM — et le garde-fou tombe a zero sous 14/255 de luminance,
+     * donc sur une photo de nuit ca donnait 0,51/255 en moyenne, curseur a
+     * fond. Autrement dit: rien. Mesures dans
+     * `scripts/audit-reglages-avances.mjs --nuit`.
+     *
+     * On elargit la COURSE et pas le rendement par cran: « temperature: 12 »
+     * rend donc exactement la meme image qu'avant, ce qui laisse intacts les
+     * profils de `data/constants.jsx` (Nostalgic Neg. a +12, Eterna a -8...)
+     * qui ont ete regardes et valides sur cette echelle-la.
+     */
+    temperature: { min: -45, max: 45, neutre: 0 },
     highlights: { min: -45, max: 35, neutre: 0 },
     shadows: { min: -35, max: 45, neutre: 0 },
     /*
@@ -205,7 +221,11 @@ export const VISION_SAFE_BOUNDS = {
  * produit plus une photo, il produit un artefact.
  */
 export const VISION_FREE_BOUNDS = {
-    brightness: { min: 60, max: 140, neutre: 100 },
+    /* Hors garde-fous, la luminosite est un MULTIPLICATEUR: 140 % sur un pixel
+       a 25/255 ne monte que de 10/255. Une photo de nuit demande un diaphragme
+       entier, donc 200 %; le plafond de 140 % rendait le mode « Libres » aussi
+       impuissant que le mode sur. */
+    brightness: { min: 40, max: 200, neutre: 100 },
     contrast: { min: 60, max: 180, neutre: 100 },
     saturation: { min: 0, max: 180, neutre: 100 },
     vibrance: { min: -50, max: 50, neutre: 0 },
@@ -213,7 +233,11 @@ export const VISION_FREE_BOUNDS = {
     warmSaturation: { min: -40, max: 40, neutre: 0 },
     skySaturation: { min: -40, max: 40, neutre: 0 },
     foliageSaturation: { min: -40, max: 40, neutre: 0 },
-    temperature: { min: -30, max: 30, neutre: 0 },
+    /* 2300 K..10700 K: la vraie plage d'une balance des blancs. Hors garde-fous
+       le poids par luminance ne s'applique pas (`applyFusedPixelOps` prend la
+       branche directe), donc ce mode est celui qui deplace vraiment une photo
+       de nuit. */
+    temperature: { min: -120, max: 120, neutre: 0 },
     highlights: { min: -50, max: 50, neutre: 0 },
     shadows: { min: -50, max: 50, neutre: 0 },
     texture: { min: -100, max: 100, neutre: 0 },
@@ -300,6 +324,54 @@ const classifyProfileFamily = (profile) => {
     if ((filters.fadedBlacks || 0) > 8 || text.includes('matte') || text.includes('vintage')) return 'Editorial Matte';
     return 'Natural Clean';
 };
+
+/*
+ * LE REPOS: aucun reglage actif, donc rien a faire.
+ *
+ * Pourquoi cette fonction existe, et ce qu'elle repare. `applySmartphoneOutputGuards`
+ * tournait a CHAQUE rendu, y compris quand l'utilisateur n'avait touche a rien:
+ * il releve tout canal sous `5,5 x (1 - smoothstep(18, 56, luminance))`, donc il
+ * eclaircissait les noirs d'une photo intacte. Mesure du 2026-09-05 sur une photo
+ * sombre: 56,9 % des pixels deplaces, jusqu'a 6/255, sans qu'aucun curseur ne soit
+ * sorti du repos. Ca se voyait dans la comparaison avant/apres, ou l'« apres »
+ * n'etait PAS la photo — et c'est le genre d'ecart qui fait douter de tout le reste.
+ *
+ * Le garde-fou garde son sens: il protege des degats que les REGLAGES causent.
+ * Quand il n'y a pas de reglage, il n'y a rien a proteger.
+ *
+ * Ne sont PAS listees ici les cles qui ne peuvent rien faire seules: les
+ * sous-reglages du grain et du vignetage (leur parent vaut 0), les couleurs de
+ * teinte (leur dosage vaut 0), les marqueurs d'ordre poses par les presets, ainsi
+ * que `filterIntensity`, `safeSmartphone` et `profileStrength`, qui ne font que
+ * moduler les autres.
+ */
+const VISION_IDENTITY_AT_REST = {
+    brightness: 100, contrast: 100, saturation: 100,
+    sepia: 0, blur: 0, hueRotate: 0,
+    temperature: 0, highlights: 0, shadows: 0, vibrance: 0,
+    skinSaturation: 0, warmSaturation: 0, skySaturation: 0, foliageSaturation: 0,
+    dehaze: 0, fadedBlacks: 0,
+    tintIntensity: 0, shadowTintIntensity: 0, highlightTintIntensity: 0,
+    texture: 0, clarity: 0, sharpness: 0,
+    noiseReductionLuminance: 0, noiseReductionColor: 0, halation: 0,
+    vignette: 0, degradeBas: 0, grain: 0,
+    lightroomExposure: 0, lightroomContrast: 0, lightroomHighlights: 0,
+    lightroomShadows: 0, lightroomWhites: 0, lightroomBlacks: 0,
+};
+
+export function visionFiltersAreIdentity(filters = {}) {
+    if (filters.presetId) return false;
+    if (filters.presetAutoTone) return false;
+    for (const [cle, repos] of Object.entries(VISION_IDENTITY_AT_REST)) {
+        const valeur = filters[cle];
+        if (valeur === undefined || valeur === null) continue;
+        if (Number(valeur) !== repos) return false;
+    }
+    for (const cle of ['toneCurveMaster', 'toneCurveR', 'toneCurveG', 'toneCurveB']) {
+        if (!isIdentityCurve(filters[cle])) return false;
+    }
+    return true;
+}
 
 export function normalizeVisionFilters(filters = {}) {
     const next = { ...filters };

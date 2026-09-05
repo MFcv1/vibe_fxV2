@@ -14,7 +14,7 @@ import {
     applyLightroomAutoTone,
     applyLightroomBasicTone
 } from '../utils/canvasUtils';
-import { normalizeVisionFilters } from '../utils/visionColorScience';
+import { normalizeVisionFilters, visionFiltersAreIdentity } from '../utils/visionColorScience';
 import { applyLut3d, LUT_SIZE } from '../utils/lut3d';
 import { getPresetLut } from '../utils/visionPresets';
 
@@ -162,6 +162,19 @@ function renderCropGrid(ctx, w, h) {
 export function applyFiltersPro(ctx, targetCanvas, w, h, quality, filters,
     grandCoteImage = Math.max(w, h), grandCoteRendu = Math.max(w, h)) {
     const safeFilters = normalizeVisionFilters(filters);
+    /*
+     * AU REPOS, ON NE TOUCHE A RIEN — et ca a du etre repare le 2026-09-05.
+     *
+     * Le canvas porte deja la photo dessinee par `renderStudio`: si aucun
+     * reglage n'est sorti du repos et qu'aucun preset n'est actif, le pipeline
+     * n'a rien a faire et doit rendre cette photo telle quelle. Il ne le
+     * faisait pas: `applySmartphoneOutputGuards` (tout en bas) relevait les
+     * noirs a chaque rendu. Sur une photo sombre, 56,9 % des pixels bougeaient
+     * jusqu'a 6/255 sans qu'on ait touche a un seul curseur, et la comparaison
+     * avant/apres montrait un ecart que personne n'avait demande.
+     * `scripts/audit-reglages-avances.mjs --repos-seul --nuit` verrouille ca.
+     */
+    if (visionFiltersAreIdentity(safeFilters)) return;
     const intensity = safeFilters.filterIntensity !== undefined ? safeFilters.filterIntensity : 100;
     if (intensity === 0) return;
 
