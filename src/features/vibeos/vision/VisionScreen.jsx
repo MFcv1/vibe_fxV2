@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Columns2, Download, ImageOff, ImagePlus, Images, Layers, Redo2, RotateCcw, Search,
-    ShieldCheck, Sparkles, Star, Undo2, Upload, X, ZoomIn, ZoomOut,
+    ShieldCheck, Sparkles, Star, Trash2, Undo2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import {
     Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider, useToast,
@@ -501,6 +501,25 @@ export default function VisionScreen() {
                         </div>
 
                         <div className={styles.canvasWrap}>
+                            {/*
+                              * Retirer la photo depuis la photo elle-meme.
+                              * Le seul bouton pour ca vivait tout en bas du
+                              * panneau de reglages: apres avoir envoye une image
+                              * dans la Room, il fallait remonter toute la liste
+                              * des presets pour en changer. Meme geste et meme
+                              * dessin que la corbeille des cases de Layout.
+                              */}
+                            <button
+                                type="button"
+                                className={styles.canvasTrash}
+                                aria-label="Retirer cette photo"
+                                title="Retirer cette photo — elle reste dans ta bibliothèque"
+                                data-testid="vibeos-vision-canvas-clear"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => { event.stopPropagation(); clearImage(); }}
+                            >
+                                <Trash2 size={13} />
+                            </button>
                             <BeforeAfter
                                 beforeSrc={image.src}
                                 ratio={(image.naturalWidth || image.width) / (image.naturalHeight || image.height)}

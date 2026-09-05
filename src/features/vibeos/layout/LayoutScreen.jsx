@@ -27,6 +27,7 @@ import {
 } from './gridLibrary';
 import { GRID_CATEGORIES, GRID_COUNT, catalogGrid, gridsInCategory } from './gridCatalog';
 import SlotImportSheet from './SlotImportSheet';
+import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import SlotOverlay from './SlotOverlay';
 import ZoneOverlay from './ZoneOverlay';
 import InstaPreviewSheet from './InstaPreviewSheet';
@@ -360,13 +361,16 @@ export default function LayoutScreen() {
         }
     };
 
-    /* « Comparer » = maintien: on relache, on revoit son montage. */
-    const compareHandlers = {
-        onPointerDown: () => setIsComparing(true),
-        onPointerUp: () => setIsComparing(false),
-        onPointerLeave: () => setIsComparing(false),
-        onPointerCancel: () => setIsComparing(false),
-    };
+    /*
+     * Comparer, comme dans Vision.
+     *
+     * C'etait un appui maintenu sur un bouton: on ne pouvait comparer qu'en
+     * tout-ou-rien, sans jamais examiner une zone precise, et l'infobulle du
+     * bouton chevauchait la barre. Les trois modes de `BeforeAfter` (rideau,
+     * cote a cote, maintien) remplacent tout ca — le maintien reste disponible,
+     * mais comme un mode, pas comme la seule facon de faire.
+     */
+    const [compareMode, setCompareMode] = useState('slider');
 
     return (
         <div className={styles.screen} data-testid="vibeos-layout-screen">
@@ -382,6 +386,17 @@ export default function LayoutScreen() {
                 {hasRenderableOutput ? (
                     <>
                         <div className={styles.stageActions}>
+                            {/* Les modes vivent sur la meme ligne que les autres
+                                actions de l'apercu, a gauche des fleches. */}
+                            {isComparing ? (
+                                <Segmented
+                                    label="Mode de comparaison"
+                                    value={compareMode}
+                                    onChange={setCompareMode}
+                                    options={COMPARE_MODES}
+                                    className={styles.compareModes}
+                                />
+                            ) : null}
                             <IconButton label="Annuler (Cmd+Z)" disabled={!canUndo} onClick={undo}>
                                 <Undo2 size={15} />
                             </IconButton>
@@ -389,10 +404,11 @@ export default function LayoutScreen() {
                                 <Redo2 size={15} />
                             </IconButton>
                             <IconButton
-                                label="Comparer avec l'original (maintiens le clic)"
+                                label={isComparing ? 'Masquer la comparaison' : "Comparer avec l'original"}
                                 disabled={!originalImageSrc}
                                 active={isComparing}
-                                {...compareHandlers}
+                                onClick={() => setIsComparing((current) => !current)}
+                                data-testid="vibeos-layout-compare-toggle"
                             >
                                 <Columns2 size={15} />
                             </IconButton>
@@ -417,25 +433,30 @@ export default function LayoutScreen() {
                             </Button>
                         </div>
                         <div className={styles.canvasWrap} ref={canvasWrapRef}>
-                            <canvas
-                                ref={canvasRef}
-                                className={styles.canvas}
-                                onPointerDown={handlePointerDown}
-                                onPointerMove={handlePointerMove}
-                                onPointerUp={handlePointerUp}
-                                onPointerLeave={handlePointerUp}
-                            />
-                            {/* Comparaison: l'original brut, recadré dans le format. */}
-                            {isComparing && originalImageSrc && canvasBox ? (
-                                <div
-                                    className={styles.compareOverlay}
-                                    style={canvasBox}
-                                    data-testid="vibeos-compare-overlay"
-                                >
-                                    <img src={originalImageSrc} alt="Photo d'origine" />
-                                    <span className={styles.compareTag}>Original</span>
-                                </div>
-                            ) : null}
+                            {/*
+                              * Le canvas passe DANS le comparateur partage. Les
+                              * couches de cases restent en dehors: elles se
+                              * placent sur `canvasBox`, mesure du canvas dans
+                              * son cadre, et n'ont donc pas a etre clippees avec
+                              * le rendu.
+                              */}
+                            <BeforeAfter
+                                beforeSrc={originalImageSrc}
+                                ratio={activeFormat.w / activeFormat.h}
+                                mode={compareMode}
+                                active={isComparing}
+                                afterLabel="Montage"
+                                testId="vibeos-layout-compare"
+                            >
+                                <canvas
+                                    ref={canvasRef}
+                                    className={styles.canvas}
+                                    onPointerDown={handlePointerDown}
+                                    onPointerMove={handlePointerMove}
+                                    onPointerUp={handlePointerUp}
+                                    onPointerLeave={handlePointerUp}
+                                />
+                            </BeforeAfter>
                             {/* Cases de la mise en page: import et échange de photos.
                                 Masquee pendant l'edition des zones, qui a sa
                                 propre couche de poignees. */}

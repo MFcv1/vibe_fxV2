@@ -108,16 +108,26 @@ test("layout VibeOS B3: textures, zones, stickers, comparaison, apercu, reprise"
   // Retour a un modele standard pour la suite.
   await page.getByRole("option", { name: "Standard" }).click();
 
-  // --- Comparaison avant/apres: maintien = photo d'origine ---
-  const compareButton = page.getByRole("button", { name: /Comparer avec l'original/ });
-  const compareOverlay = page.getByTestId("vibeos-compare-overlay");
-  await expect(compareOverlay).toBeHidden();
-  const compareBox = await compareButton.boundingBox();
-  await page.mouse.move(compareBox.x + compareBox.width / 2, compareBox.y + compareBox.height / 2);
-  await page.mouse.down();
-  await expect(compareOverlay).toBeVisible();
-  await page.mouse.up();
-  await expect(compareOverlay).toBeHidden();
+  // --- Comparaison avant/apres ---
+  // Ce n'est plus un appui maintenu sur un bouton mais une bascule, puis trois
+  // modes (rideau, cote a cote, maintien), comme dans Vision.
+  const compareToggle = page.getByTestId("vibeos-layout-compare-toggle");
+  const original = page.getByTestId("vibeos-layout-compare-before");
+  const compareStack = page.getByTestId("vibeos-layout-compare");
+  await expect(original).toBeHidden();
+
+  await compareToggle.click();
+  await expect(original).toBeVisible();
+  await expect(compareStack).toHaveAttribute("data-mode", "slider");
+
+  // Les trois modes sont proposes, et changer de mode change le rendu.
+  const modes = page.getByRole("tablist", { name: "Mode de comparaison" });
+  await expect(modes).toBeVisible();
+  await modes.getByRole("tab", { name: "Côte à côte" }).click();
+  await expect(compareStack).toHaveAttribute("data-mode", "split");
+
+  await compareToggle.click();
+  await expect(original).toBeHidden();
 
   // --- Apercu Instagram ---
   await page.getByRole("button", { name: "Aperçu Instagram" }).click();

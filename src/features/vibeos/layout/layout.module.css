@@ -14,15 +14,25 @@
 }
 
 /* ---------- Zone d'apercu ---------- */
+/*
+ * La scene est une COLONNE, comme celle de Vision.
+ *
+ * Elle etait une simple boite centree, avec la barre d'actions posee en
+ * absolu par-dessus le visuel. Ca tenait tant qu'il n'y avait que quatre
+ * icones; des que les trois modes de comparaison s'y ajoutent, la barre
+ * recouvre le haut du montage et se cogne aux etiquettes Avant/Apres. Une
+ * ligne pour la barre, le reste pour le visuel: plus rien ne se chevauche, et
+ * les deux ateliers se pilotent de la meme facon.
+ */
 .stage {
     position: relative;
     display: flex;
     flex: 1 1 auto;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
-    align-items: center;
-    justify-content: center;
-    padding: var(--vo-space-6);
+    padding: var(--vo-space-4) var(--vo-space-6) var(--vo-space-6);
+    gap: var(--vo-space-3);
     background: var(--vo-bg-sunken);
     overflow: hidden;
 }
@@ -32,8 +42,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 1 1 auto;
     width: 100%;
-    height: 100%;
     min-width: 0;
     min-height: 0;
 }
@@ -56,44 +66,23 @@
 }
 
 .stageActions {
-    position: absolute;
-    top: var(--vo-space-4);
-    right: var(--vo-space-4);
+    position: relative;
     z-index: 5;
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
     gap: var(--vo-space-2);
 }
 
+/* Les trois modes de comparaison, a gauche des fleches — meme place que dans
+   Vision, pour que les deux ateliers se pilotent pareil. */
+.compareModes {
+    margin-right: var(--vo-space-1);
+}
+
 /* ---------- Couches posees sur le canvas ---------- */
-
-/* Comparaison avant/apres: l'original, cadre exactement sur le canvas. */
-.compareOverlay {
-    position: absolute;
-    z-index: 4;
-    overflow: hidden;
-    /* Meme cadre que le canvas: angles droits. */
-    border-radius: 0;
-    pointer-events: none;
-}
-
-.compareOverlay img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.compareTag {
-    position: absolute;
-    left: var(--vo-space-3);
-    top: var(--vo-space-3);
-    padding: 2px var(--vo-space-2);
-    border-radius: var(--vo-radius-pill);
-    background: rgba(0, 0, 0, 0.66);
-    color: #fff;
-    font-size: var(--vo-text-xs);
-}
 
 .zoneLayerHost {
     position: absolute;

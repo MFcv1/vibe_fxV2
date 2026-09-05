@@ -664,6 +664,44 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-06 (Vision: retirer sa photo depuis la photo; Layout: comparer comme Vision)
+
+**Vision — une corbeille sur l'apercu.** Le seul bouton pour retirer la photo
+vivait tout en bas du panneau de reglages: apres avoir envoye une image dans la
+Room, il fallait remonter les 261 presets pour en changer. Meme dessin et meme
+comportement que la corbeille des cases de Layout: invisible au repos, elle
+apparait au survol de l'apercu et vire au rouge systeme d'Apple quand on la
+vise. Elle appelle `clearImage` — la photo reste dans la bibliotheque.
+
+**Layout — la comparaison de Vision, et la fin du chevauchement.** Comparer
+etait un appui maintenu sur un bouton: tout-ou-rien, jamais une zone precise, et
+l'infobulle du bouton recouvrait la barre. Layout monte maintenant le
+`BeforeAfter` partage, avec ses trois modes (rideau, cote a cote, maintien). Le
+canvas passe DANS le comparateur; les couches de cases restent en dehors, elles
+se placent sur `canvasBox` et n'ont pas a etre clippees avec le rendu.
+
+La scene devient une COLONNE, comme celle de Vision. Elle etait une boite
+centree avec la barre d'actions posee en absolu par-dessus le visuel: ca tenait
+avec quatre icones, plus du tout des que les trois modes s'y ajoutent — la barre
+recouvrait le haut du montage et se cognait aux etiquettes Avant/Apres. Une
+ligne pour la barre, le reste pour le visuel.
+
+L'ancienne surcouche `compareOverlay` et son etiquette sont supprimees.
+
+**Test mis a jour, pas contourne.** `smoke-vibeos-layout-b3` verifiait l'appui
+maintenu et l'existence de `vibeos-compare-overlay`, qui n'existent plus. Il
+verifie desormais la bascule, l'apparition de l'original, et qu'un changement de
+mode change bien `data-mode`. Les cinq specs Layout passent une par une; le
+lancement groupe reste rouge pour la raison pre-existante deja notee.
+
+Verifie dans le navigateur: corbeille Vision (apparition au survol, rouge au
+pointage, retour a l'ecran vide), et Layout avec sa barre sur sa propre ligne,
+le rideau, les etiquettes, et les poignees de cases toujours alignees sur le
+canvas (573x716 pour un 4:5, soit le bon rapport).
+
+Fichiers touches : `VisionScreen.jsx`, `vision.module.css`, `LayoutScreen.jsx`,
+`layout.module.css`, `scripts/smoke-vibeos-layout-b3.spec.cjs`.
+
 ## Journal — 2026-09-05 quindecies (Vision choisit sa photo sans quitter l'ecran)
 
 **Demande de l'utilisateur, apres avoir vu les deux comportements cote a cote.**
