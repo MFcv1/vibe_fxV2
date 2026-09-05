@@ -2,12 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, ArrowRight, Check, Eye, Images, LayoutGrid, Smartphone, Trash2,
+    ArrowLeft, ArrowRight, Check, Eye, FolderPlus, Images, LayoutGrid, Save, Smartphone, Trash2,
 } from 'lucide-react';
-import { Badge, Button, EmptyState, IconButton, useToast } from '../primitives';
+import { Badge, Button, EmptyState, IconButton, Sheet, useToast } from '../primitives';
 import InstaPreviewSheet from '../layout/InstaPreviewSheet';
-import { ROOM_MAX_ITEMS, useRoom } from './RoomProvider';
+import { ROOM_CAROUSEL_MAX, useRoom } from './RoomProvider';
+import { listTargetFolders, saveRoomToLibrary, suggestRoomFolderName } from './roomToLibrary';
 import styles from './room.module.css';
 
 /*
@@ -26,8 +28,11 @@ import styles from './room.module.css';
 const cx = (...values) => values.filter(Boolean).join(' ');
 
 export default function RoomScreen() {
-    const { items, count, status, isFull, validatedAt, removeItem, moveItem, clear, validateOrder } = useRoom();
+    const {
+        items, count, status, overCarousel, validatedAt, removeItem, moveItem, clear, validateOrder,
+    } = useRoom();
     const toast = useToast();
+    const router = useRouter();
     const [previewOpen, setPreviewOpen] = useState(false);
     const [confirmClear, setConfirmClear] = useState(false);
     const [dragIndex, setDragIndex] = useState(null);
@@ -52,6 +57,56 @@ export default function RoomScreen() {
             h: first?.height || 0,
         };
     }, [count, items]);
+
+    /*
+     * Mettre la Room a l'abri.
+     *
+     * Tant qu'un rendu n'est qu'un element de Room, il vit dans CE navigateur
+     * et nulle part ailleurs. L'enregistrer dans la bibliotheque le fait entrer
+     * dans le circuit normal - donc dans le compte, donc dans Storage.
+     */
+    const [saveOpen, setSaveOpen] = useState(false);
+    const [folders, setFolders] = useState([]);
+    const [destination, setDestination] = useState('new');
+    const [folderName, setFolderName] = useState('');
+    const [folderId, setFolderId] = useState('');
+    const [saving, setSaving] = useState(null); // { done, total }
+
+    const openSave = useCallback(async () => {
+        const liste = await listTargetFolders();
+        setFolders(liste);
+        setFolderId(liste[0]?.id || '');
+        setDestination(liste.length ? 'new' : 'new');
+        setFolderName(suggestRoomFolderName(items, liste.map((folder) => folder.name)));
+        setSaveOpen(true);
+    }, [items]);
+
+    const handleSave = useCallback(async () => {
+        setSaving({ done: 0, total: count });
+        const result = await saveRoomToLibrary({
+            folderId: destination === 'existing' ? folderId : null,
+            folderName: destination === 'new' ? folderName : null,
+            onProgress: (done, total) => setSaving({ done, total }),
+        });
+        setSaving(null);
+        setSaveOpen(false);
+        if (result.blocked) {
+            toast.push(result.message, { tone: 'danger', duration: 6000 });
+            return;
+        }
+        if (!result.added) {
+            toast.push('Aucune image n’a pu être enregistrée.', { tone: 'danger' });
+            return;
+        }
+        toast.push(
+            `${result.added} image${result.added > 1 ? 's' : ''} enregistrée${result.added > 1 ? 's' : ''} dans « ${result.folderName} ». La sauvegarde dans ton compte démarre.`,
+            { tone: 'success', duration: 6000 },
+        );
+        /* On emmene l'utilisateur dans la bibliotheque: c'est cet ecran qui
+           porte la synchronisation, donc c'est en y arrivant que la montee
+           vers le compte commence vraiment. */
+        router.push('/creer/bibliotheque');
+    }, [count, destination, folderId, folderName, router, toast]);
 
     const openPreview = useCallback(async () => {
         if (!count) return;
@@ -119,6 +174,16 @@ export default function RoomScreen() {
                     {validatedAt && count ? (
                         <Badge tone="accent" icon={<Check size={12} />}>Ordre validé</Badge>
                     ) : null}
+                    <Button
+                        size="sm"
+                        icon={<Save size={13} />}
+                        onClick={openSave}
+                        disabled={!count || Boolean(saving)}
+                        title="Enregistrer ces images dans la bibliothèque, et donc dans ton compte"
+                        data-testid="vibeos-room-save"
+                    >
+                        {saving ? `Enregistrement ${saving.done}/${saving.total}` : 'Enregistrer'}
+                    </Button>
                     <Button
                         variant={confirmClear ? 'danger' : 'ghost'}
                         size="sm"
@@ -241,11 +306,96 @@ export default function RoomScreen() {
                 <footer className={styles.foot}>
                     <span>Glisse une vignette pour changer l’ordre, ou utilise les flèches.</span>
                     <span className={styles.footCount} data-numeric>
-                        {count}/{ROOM_MAX_ITEMS}
-                        {isFull ? ' · limite du carrousel atteinte' : ''}
+                        {count} image{count > 1 ? 's' : ''}
+                        {overCarousel
+                            ? ` · un carrousel Instagram en prend ${ROOM_CAROUSEL_MAX}, les ${count - ROOM_CAROUSEL_MAX} dernières attendront un autre post`
+                            : ''}
                     </span>
                 </footer>
             ) : null}
+
+            <Sheet
+                open={saveOpen}
+                onClose={() => (saving ? null : setSaveOpen(false))}
+                title="Enregistrer dans la bibliothèque"
+            >
+                <div className={styles.saveBody}>
+                    <p className={styles.saveIntro}>
+                        Ces {count} image{count > 1 ? 's' : ''} ne vivent aujourd’hui que dans ce
+                        navigateur. Les enregistrer les fait entrer dans ta bibliothèque, puis dans
+                        ton compte — tu les retrouveras ailleurs, et une retouche de preset ne les
+                        effacera pas. <strong>La Room n’est pas vidée</strong> : ton post en cours
+                        reste tel quel.
+                    </p>
+
+                    <div className={styles.saveField} role="radiogroup" aria-label="Destination">
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked={destination === 'new'}
+                            data-active={destination === 'new' ? 'true' : 'false'}
+                            className={styles.saveChoice}
+                            onClick={() => setDestination('new')}
+                        >
+                            <FolderPlus size={14} />
+                            Nouveau dossier
+                        </button>
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked={destination === 'existing'}
+                            data-active={destination === 'existing' ? 'true' : 'false'}
+                            className={styles.saveChoice}
+                            onClick={() => setDestination('existing')}
+                            disabled={!folders.length}
+                        >
+                            <Images size={14} />
+                            Dossier existant
+                        </button>
+                    </div>
+
+                    {destination === 'new' ? (
+                        <input
+                            className={styles.saveInput}
+                            value={folderName}
+                            maxLength={60}
+                            onChange={(event) => setFolderName(event.target.value)}
+                            aria-label="Nom du dossier"
+                            placeholder="Nom du dossier"
+                            data-testid="vibeos-room-folder-name"
+                        />
+                    ) : (
+                        <select
+                            className={styles.saveInput}
+                            value={folderId}
+                            onChange={(event) => setFolderId(event.target.value)}
+                            aria-label="Dossier existant"
+                        >
+                            {folders.map((folder) => (
+                                <option key={folder.id} value={folder.id}>{folder.name}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    <div className={styles.saveFoot}>
+                        <Button variant="ghost" size="sm" onClick={() => setSaveOpen(false)} disabled={Boolean(saving)}>
+                            Annuler
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<Save size={13} />}
+                            onClick={handleSave}
+                            disabled={Boolean(saving) || (destination === 'existing' && !folderId)}
+                            data-testid="vibeos-room-save-confirm"
+                        >
+                            {saving
+                                ? `Enregistrement ${saving.done}/${saving.total}`
+                                : `Enregistrer ${count} image${count > 1 ? 's' : ''}`}
+                        </Button>
+                    </div>
+                </div>
+            </Sheet>
 
             <InstaPreviewSheet
                 open={previewOpen}

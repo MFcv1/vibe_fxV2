@@ -30,6 +30,13 @@
 > (IndexedDB `vibeos` v2, store `room`, Blobs), rien n'est envoye au serveur.
 > Gate : `npm run test:vibeos-room`.
 
+> **Room sans plafond + sortie vers la bibliotheque — 2026-09-05.** La file
+> accepte autant d'images qu'on veut (`ROOM_CAROUSEL_MAX` n'est plus qu'un
+> repere Instagram affiche en pied de page), et un bouton **Enregistrer** fait
+> entrer ses rendus dans la bibliotheque — dossier neuf ou existant — d'ou ils
+> montent dans le compte. La Room n'est pas videe au passage. Module
+> `roomToLibrary.js`.
+
 **À lire avant de coder, dans cet ordre :**
 
 1. [AGENTS.md](AGENTS.md) — règles de travail, rituel de fin de phase.

@@ -217,7 +217,20 @@ async function mesurerTemoin(page, canvas) {
   return ecart(a, b).moyenne;
 }
 
-async function auditerEcran(page, { route, inputTestId, advancedTestId, screenTestId, nom }, fichier) {
+/*
+ * Appliquer un preset comme un utilisateur le fait: en cliquant sa vignette.
+ * On attend que la carte soit marquee active, sinon la mesure suivante se
+ * ferait encore sur la photo nue.
+ */
+async function appliquerPreset(page, presetId) {
+  const carte = page.locator(`[data-preset-id="${presetId}"]`);
+  await carte.scrollIntoViewIfNeeded();
+  await carte.locator("[data-preset-apply]").click();
+  await expect(carte.locator("[data-preset-apply]")).toHaveAttribute("aria-pressed", "true", { timeout: 10000 });
+  await attendreRendu(page);
+}
+
+async function auditerEcran(page, { route, inputTestId, advancedTestId, screenTestId, nom, presetId = null }, fichier) {
   await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
   /* Hors emulateurs, la page demande une identite: le smoke passe par la meme
      sortie de secours que les autres suites VibeOS. */
@@ -226,6 +239,14 @@ async function auditerEcran(page, { route, inputTestId, advancedTestId, screenTe
     .catch(() => {});
   await expect(page.getByTestId(screenTestId)).toBeVisible({ timeout: 30000 });
   await importerPhoto(page, inputTestId, fichier);
+
+  /*
+   * LE CAS QUI MANQUAIT. Jusqu'au 2026-09-05, cette suite ne mesurait que la
+   * photo nue: un curseur devenu inerte SOUS PRESET passait donc inapercu,
+   * alors que c'est l'etat dans lequel on travaille reellement (on choisit un
+   * look, puis on l'ajuste).
+   */
+  if (presetId) await appliquerPreset(page, presetId);
 
   const advanced = page.locator(`[data-testid="${advancedTestId}"]`);
   await advanced.getByRole("button", { name: /Réglages avancés/i }).click();
@@ -280,4 +301,38 @@ test.describe("Réglages avancés Vision — chaque curseur change-t-il l'image 
     const morts = vision.morts.map((r) => `Vision · ${r.label}`);
     expect(morts, `Curseurs sans effet visible: ${morts.join(", ")}`).toEqual([]);
   });
+
+  /*
+   * Le meme audit, PRESET APPLIQUE — le cas ou l'on travaille vraiment: on
+   * choisit un look, PUIS on l'ajuste. Trois familles, choisies pour ce
+   * qu'elles font au pipeline et pas pour leur allure:
+   *   - `powlisher-chaud`: LUT pure, aucun `spatialFilters`. Un curseur mort ici
+   *     est etouffe par la LUT ou par l'ordre du pipeline.
+   *   - `pm11`: pose `presetClarityScale` (le Relief est divise) et un voile a
+   *     39, donc les etages de matiere partent deja charges.
+   *   - `film-bleu-profond`: grain 25 et vignetage 30, donc un temoin non nul
+   *     (le grain est aleatoire) et une image deja bruitee.
+   *   - `ar01`: `presetAutoTone` (etage adaptatif) + `presetSpatialBeforeLut`
+   *     (les etages de matiere passent AVANT la LUT).
+   * `SMOKE_PRESET` remplace la liste pour tester un preset precis.
+   */
+  const PRESETS = (process.env.SMOKE_PRESET || "powlisher-chaud,pm11,film-bleu-profond,ar01").split(",");
+  for (const presetId of PRESETS) {
+    test(`Vision sous preset ${presetId}: aucun curseur mort`, async ({ page }) => {
+      const fichier = fabriquerPhoto();
+      test.skip(!fichier, "ffmpeg indisponible: impossible de fabriquer la mire.");
+
+      const vision = await auditerEcran(page, {
+        route: "/creer/vision",
+        inputTestId: "vibeos-vision-input",
+        advancedTestId: "vibeos-vision-advanced",
+        screenTestId: "vibeos-vision-screen",
+        nom: `VISION + PRESET ${presetId}`,
+        presetId,
+      }, fichier);
+
+      const morts = vision.morts.map((r) => `Vision sous ${presetId} · ${r.label}`);
+      expect(morts, `Curseurs sans effet visible sous preset ${presetId}: ${morts.join(", ")}`).toEqual([]);
+    });
+  }
 });

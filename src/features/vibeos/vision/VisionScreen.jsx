@@ -252,7 +252,7 @@ export default function VisionScreen() {
         isExportModalOpen, setIsExportModalOpen, handleDownload, performExport, renderExportCanvas,
     } = exportController;
 
-    const { addFromCanvas: addToRoom, isFull: isRoomFull } = useRoom();
+    const { addFromCanvas: addToRoom } = useRoom();
     const toast = useToast();
     const [isSendingToRoom, setIsSendingToRoom] = useState(false);
 
@@ -274,12 +274,9 @@ export default function VisionScreen() {
                 formatLabel: activePresetLabel || 'Photo',
             });
             if (!result.added) {
-                toast.push(
-                    result.reason === 'full'
-                        ? 'La Room est pleine : un carrousel Instagram s’arrête à 10 images.'
-                        : 'Rien n’a pu être envoyé dans la Room.',
-                    { tone: 'danger' },
-                );
+                /* La Room n'a plus de plafond: il ne reste que le cas ou le
+                   rendu lui-meme n'a pas pu etre fabrique. */
+                toast.push('Rien n’a pu être envoyé dans la Room.', { tone: 'danger' });
                 return;
             }
             toast.push(`Photo envoyée dans la Room · ${result.total} au total`, { tone: 'success' });
@@ -451,10 +448,8 @@ export default function VisionScreen() {
                                 size="sm"
                                 icon={<Layers size={13} />}
                                 onClick={sendToRoom}
-                                disabled={isSendingToRoom || isRoomFull}
-                                title={isRoomFull
-                                    ? 'La Room est pleine (10 images)'
-                                    : 'Envoyer cette photo dans la Room, la file du post'}
+                                disabled={isSendingToRoom}
+                                title="Envoyer cette photo dans la Room, la file du post"
                                 data-testid="vibeos-vision-send-room"
                             >
                                 Room

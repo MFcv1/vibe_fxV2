@@ -437,6 +437,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   `-- VibeOsProjectProvider.jsx # Contexte du projet qui circule : autosauvegarde debouncee 800ms, flush sur pagehide, create/open/duplicate/remove/ensureProject
 |   |   |-- room/                       # Room : la file d'attente d'un post Instagram (ajoutee le 2026-09-05)
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
+|   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05) : chaque rendu devient une vraie photo dans un dossier neuf ou existant, donc il entre dans le circuit de sauvegarde du compte. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
 |   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
 |   |   |   |-- RoomScreen.jsx          # L'ecran : file horizontale numerotee, glisser-deposer ET fleches, retrait, vidage a double clic de confirmation, « Valider l'ordre » -> InstaPreviewSheet
 |   |   |   `-- room.module.css
@@ -660,6 +661,42 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 undecies (Room : plus de plafond, et une sortie vers la bibliotheque)
+
+**Le plafond de dix saute.** `ROOM_MAX_ITEMS` bloquait l'envoi depuis Layout et
+Vision des la dixieme image — bouton grise, rendu refuse. Or la Room sert aussi
+de reserve : on y accumule des variantes d'une meme photo pour choisir ensuite.
+Bloquer avant le choix, c'est obliger a jeter a l'aveugle. La constante devient
+`ROOM_CAROUSEL_MAX`, un REPERE : la file accepte tout, et le pied de page dit
+combien d'images depassent ce qu'un carrousel Instagram peut porter.
+
+**La Room ne sauvegardait rien, et ne le disait pas.** Elle vit dans IndexedDB,
+donc dans UN navigateur : vider les donnees du site, changer de machine, et la
+file disparait. Elle n'a jamais ete liee au compte. Un bouton **Enregistrer**
+fait donc entrer ses rendus dans la bibliotheque — dossier neuf ou existant, au
+choix — d'ou la synchronisation existante les monte dans le compte et dans
+Storage. Les dossiers de tri sont exclus des destinations : ils ne stockent
+aucun original.
+
+Deux decisions dans ce geste :
+
+- **la Room n'est pas videe.** On met a l'abri, on ne deplace pas : le post en
+  cours reste intact, et l'utilisateur decide seul quand vider sa file ;
+- **on atterrit dans la bibliotheque.** C'est cet ecran qui porte la
+  synchronisation ; y arriver est ce qui declenche vraiment la montee vers le
+  compte, donc la promesse « c'est sauvegarde » devient vraie tout de suite.
+
+Verifie dans le navigateur : 19 images acceptees dans la Room (l'ancien code en
+refusait 9), enregistrement vers un dossier neuf puis vers un dossier existant,
+19 photos ecrites avec leur original, 19 en attente de montee vers le compte, et
+la Room toujours a 19 apres coup. Aucun schema IndexedDB n'a bouge — une file
+deja en place survit au deploiement.
+
+Fichiers ajoutes : `roomToLibrary.js`.
+Fichiers touches : `RoomProvider.jsx`, `RoomScreen.jsx`, `room.module.css`,
+`LayoutScreen.jsx`, `VisionScreen.jsx`.
+Gate : `npm run test:vibeos-room`.
 
 ## Journal — 2026-09-05 decies (bibliotheque : deux defauts d'affichage)
 

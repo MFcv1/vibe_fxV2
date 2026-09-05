@@ -28,8 +28,16 @@ import {
  * composant n'a a s'en occuper.
  */
 
-/* Un carrousel Instagram affiche 10 images; l'apercu iPhone s'arrete la aussi. */
-export const ROOM_MAX_ITEMS = 10;
+/*
+ * Un carrousel Instagram affiche 10 images, et l'apercu iPhone s'arrete la.
+ *
+ * C'est un REPERE, plus un plafond. La Room sert aussi de reserve : on y
+ * accumule des rendus, on compare des variantes d'une meme photo, on choisit
+ * ensuite ce qui part dans le post. Bloquer a dix obligeait a jeter avant
+ * d'avoir choisi. On garde donc le chiffre pour dire ce qui tient dans un
+ * carrousel, et on ne refuse plus rien.
+ */
+export const ROOM_CAROUSEL_MAX = 10;
 
 const RoomContext = createContext(null);
 
@@ -134,10 +142,7 @@ export function VibeOsRoomProvider({ children }) {
         if (!usable.length) return { added: 0, reason: 'no-render' };
 
         const existing = await listRoomItems();
-        const free = Math.max(0, ROOM_MAX_ITEMS - existing.length);
-        const kept = usable.slice(0, free);
-        const skipped = usable.length - kept.length;
-        if (!kept.length) return { added: 0, skipped, reason: 'full', total: existing.length };
+        const kept = usable;
 
         const now = Date.now();
         const records = kept.map((slide, index) => ({
@@ -159,7 +164,7 @@ export function VibeOsRoomProvider({ children }) {
         addedItems.forEach((item) => urlsRef.current.set(item.id, item.url));
         setItems((current) => [...current, ...addedItems]);
         invalidate();
-        return { added: addedItems.length, skipped, total: existing.length + addedItems.length };
+        return { added: addedItems.length, total: existing.length + addedItems.length };
     }, [invalidate]);
 
     const removeItem = useCallback(async (id) => {
@@ -213,7 +218,8 @@ export function VibeOsRoomProvider({ children }) {
         items,
         count: items.length,
         status,
-        isFull: items.length >= ROOM_MAX_ITEMS,
+        /* Au-dela du carrousel Instagram: on le DIT, on ne l'empeche pas. */
+        overCarousel: items.length > ROOM_CAROUSEL_MAX,
         validatedAt,
         addFromCanvas,
         removeItem,

@@ -51,6 +51,24 @@ const lire = (nom, defaut = null) => {
 };
 const photo = lire('photo');
 const planche = lire('planche');
+/*
+ * `--preset <id>` rejoue tout l'audit AVEC un preset actif, exactement comme
+ * l'ecran /creer/vision quand une vignette est selectionnee. C'est le cas qui
+ * manquait: l'audit ne mesurait que la photo nue, donc un curseur devenu inerte
+ * sous LUT passait inapercu.
+ */
+const preset = lire('preset');
+/*
+ * `--nuit` ajoute une MIRE DE NUIT: la meme matiere, exposee trois diaphragmes
+ * plus bas, enseignes gardees vives. Elle existe parce que plusieurs reglages
+ * sont ponderes PAR LA LUMINANCE du pixel (`getSafeTemperatureWeight` tombe a
+ * zero sous 14/255) et que la luminosite est un MULTIPLICATEUR: sur une scene
+ * de nuit ils rendent une fraction de ce qu'ils rendent sur la mire claire.
+ * Un audit qui ne regarde qu'une mire moyenne ne peut pas voir ca.
+ */
+const avecNuit = args.includes('--nuit');
+/* `--repos-seul` saute tous les essais: on ne veut que le controle du repos. */
+const reposSeul = args.includes('--repos-seul');
 const seulement = lire('seulement'); /* filtre sur le nom d'un reglage */
 
 if (photo && !existsSync(photo)) {
@@ -117,9 +135,11 @@ const REGLAGES = [
     { cle: 'toneCurveB', label: 'Courbe bleue', panneau: false, sur: [[0, 90, 128, 170, 255]], libre: [] },
 ];
 
-const aTester = seulement
-    ? REGLAGES.filter((r) => r.cle.toLowerCase().includes(seulement.toLowerCase()))
-    : REGLAGES;
+const aTester = reposSeul
+    ? []
+    : (seulement
+        ? REGLAGES.filter((r) => r.cle.toLowerCase().includes(seulement.toLowerCase()))
+        : REGLAGES);
 
 /* Les essais, mis a plat: un par (reglage, valeur, garde-fous). */
 const essais = [];
@@ -148,6 +168,25 @@ const DEFAUTS = (() => {
     }
     throw new Error('DEFAULT_FILTERS introuvable dans useStudioFilters.js');
 })();
+
+/*
+ * Le preset actif, tel que l'ecran le pose vraiment: son identifiant POUR LA LUT
+ * plus ses `spatialFilters` (grain, vignetage, relief, marqueurs d'ordre), que
+ * `applyPreset` fusionne dans les reglages. Sans eux on mesurerait un demi-etat
+ * qui n'existe dans aucune session.
+ */
+let presetSpatials = {};
+if (preset) {
+    const { VISION_PRESETS } = await import('../src/features/vibefx-studio/utils/visionPresets.js');
+    const trouve = VISION_PRESETS.find((p) => p.id === preset);
+    if (!trouve) {
+        console.error(`\nECHEC: preset inconnu: ${preset}\n`);
+        process.exit(1);
+    }
+    presetSpatials = { ...(trouve.spatialFilters || {}) };
+    console.log(`\nPRESET ACTIF: ${trouve.label} [${preset}]`);
+    console.log(`  spatialFilters: ${JSON.stringify(presetSpatials)}`);
+}
 
 /* ── Serveur statique: le moteur, la mire, la photo ─────────────────────── */
 const MIME = { '.js': 'application/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
@@ -178,7 +217,9 @@ page.on('console', (m) => { if (m.type() === 'error') console.error('  [page]', 
 page.on('pageerror', (e) => console.error('  [page]', e.message));
 await page.goto(`http://127.0.0.1:${serveur.address().port}/`);
 
-const resultats = await page.evaluate(async ({ essais, avecPhoto, veutPlanche, DEFAUTS }) => {
+const resultats = await page.evaluate(async ({
+    essais, avecPhoto, veutPlanche, DEFAUTS, preset, presetSpatials, avecNuit,
+}) => {
     const { renderStudio } = await import('/src/features/vibefx-studio/engine/studioRenderer.js');
     /* Recopie de `DEFAULT_FILTERS` (hooks/useStudioFilters.js). On ne l'importe
        pas: ce module importe React, que le navigateur ne sait pas resoudre ici.
@@ -278,6 +319,38 @@ const resultats = await page.evaluate(async ({ essais, avecPhoto, veutPlanche, D
     }
 
     const sources = [{ nom: 'mire', el: mire, w: L, h: H }];
+
+    /* La MIRE DE NUIT: trois diaphragmes en dessous, en lumiere LINEAIRE (pas en
+       sRVB, sinon on ecrase les ombres au lieu de les exposer moins), enseignes
+       laissees vives. On obtient une mediane vers 25/255 avec des speculaires:
+       la distribution d'une rue de nuit. */
+    if (avecNuit) {
+        const nuit = document.createElement('canvas');
+        nuit.width = L;
+        nuit.height = H;
+        const n = nuit.getContext('2d', { willReadFrequently: true });
+        n.drawImage(mire, 0, 0);
+        const img = n.getImageData(0, 0, L, H);
+        const d = img.data;
+        const versLin = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+        const versSrgb = (x) => {
+            const v = Math.max(0, Math.min(1, x));
+            return 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+        };
+        const gain = 2 ** -3;
+        for (let i = 0; i < d.length; i += 4) {
+            for (let c = 0; c < 3; c += 1) d[i + c] = versSrgb(versLin(d[i + c]) * gain);
+        }
+        n.putImageData(img, 0, 0);
+        /* Les deux enseignes restent vives: une rue de nuit n'est pas une image
+           uniformement sombre, elle est sombre AVEC des sources de lumiere. */
+        n.fillStyle = '#fff05a';
+        n.fillRect(L - 2 * largeurPastille, 100, largeurPastille + 1, 140);
+        n.fillStyle = '#a8f0ff';
+        n.fillRect(L - largeurPastille, 100, largeurPastille + 1, 140);
+        sources.push({ nom: 'mire-nuit', el: nuit, w: L, h: H });
+    }
+
     if (photoImg) {
         /* La photo est ramenee a la meme echelle que la mire: les effets de
            detail dependent de la taille des pixels, et on veut comparer des
@@ -325,6 +398,33 @@ const resultats = await page.evaluate(async ({ essais, avecPhoto, veutPlanche, D
     const sortie = [];
     const vignettes = [];
 
+    /*
+     * LE CONTROLE DU REPOS, et c'est le plus important de ce fichier.
+     *
+     * Au repos, aucun reglage n'est actif: le moteur doit rendre la photo TELLE
+     * QUELLE. Si ce n'est pas le cas, tout le reste devient faux — la
+     * comparaison avant/apres montre un ecart que personne n'a demande, et
+     * chaque curseur se mesure depuis une image deja modifiee.
+     *
+     * On compare donc la source BRUTE (dessinee sans moteur) au rendu au repos.
+     * Deux repos, parce que l'ecran et le moteur ne sont pas d'accord: le
+     * moteur pose `filterIntensity` a 100, mais l'ecran Vision envoie son etat
+     * `intensity`, qui vaut 80 au demarrage.
+     */
+    const repos = [];
+    for (const source of sources) {
+        const brut = document.createElement('canvas');
+        brut.width = source.w;
+        brut.height = source.h;
+        const bctx = brut.getContext('2d', { willReadFrequently: true });
+        bctx.drawImage(source.el, 0, 0, source.w, source.h);
+        const reference = bctx.getImageData(0, 0, source.w, source.h).data;
+        for (const [nom, dosage] of [['moteur (100)', 100], ['écran Vision (80)', 80]]) {
+            const rendu = rendre(source, { ...DEFAULT_FILTERS, filterIntensity: dosage });
+            repos.push({ source: source.nom, dosage: nom, ...comparer(reference, rendu.data) });
+        }
+    }
+
     for (const source of sources) {
         const bases = new Map();
         const baseDe = (extra) => {
@@ -336,12 +436,20 @@ const resultats = await page.evaluate(async ({ essais, avecPhoto, veutPlanche, D
         };
 
         for (const essai of essais) {
-            const commun = { ...DEFAULT_FILTERS, safeSmartphone: essai.safe, ...(essai.avec || {}) };
+            const commun = {
+                ...DEFAULT_FILTERS, safeSmartphone: essai.safe,
+                ...(preset ? { presetId: preset, ...presetSpatials } : {}),
+                ...(essai.avec || {}),
+            };
             const filters = { ...commun, [essai.cle]: essai.valeur };
             /* Le repos de reference porte les MEMES reglages d'accompagnement:
                sinon on mesurerait aussi l'effet de la couleur de teinte ou du
                look que `filterIntensity` est cense doser. */
-            const repos = { ...DEFAULT_FILTERS, safeSmartphone: essai.safe, ...(essai.base || essai.avec || {}) };
+            const repos = {
+                ...DEFAULT_FILTERS, safeSmartphone: essai.safe,
+                ...(preset ? { presetId: preset, ...presetSpatials } : {}),
+                ...(essai.base || essai.avec || {}),
+            };
             const reposCle = { ...repos };
             const b = (() => {
                 const cle = JSON.stringify(reposCle);
@@ -362,8 +470,11 @@ const resultats = await page.evaluate(async ({ essais, avecPhoto, veutPlanche, D
         }
     }
 
-    return { sortie, mireUrl: veutPlanche ? mire.toDataURL('image/png') : null };
-}, { essais, avecPhoto: Boolean(photo), veutPlanche: Boolean(planche), DEFAUTS });
+    return { sortie, repos, mireUrl: veutPlanche ? mire.toDataURL('image/png') : null };
+}, {
+    essais, avecPhoto: Boolean(photo), veutPlanche: Boolean(planche), DEFAUTS,
+    preset, presetSpatials, avecNuit,
+});
 
 await navigateur.close();
 serveur.close();
@@ -380,6 +491,16 @@ const verdictDe = (lignes) => {
     if (pire < MORT_SEUIL) return { texte: 'MORT', rang: 0 };
     return { texte: 'quasi nul', rang: 1 };
 };
+
+console.log('\n\n╔══ CONTRÔLE DU REPOS ═══════════════════════════════════════');
+console.log("║  Rien n'est réglé: le rendu doit être la photo telle quelle.");
+for (const l of resultats.repos) {
+    const ok = l.moyenne < MORT_SEUIL;
+    console.log(
+        `  ${ok ? '✓' : '✗'} ${l.source.padEnd(11)} dosage ${l.dosage.padEnd(18)} `
+        + `moy ${f2(l.moyenne)}   max ${String(l.max).padStart(3)}   ${pct(l.partTouchee)} des pixels`,
+    );
+}
 
 const sources = [...new Set(resultats.sortie.map((l) => l.source))];
 const morts = [];

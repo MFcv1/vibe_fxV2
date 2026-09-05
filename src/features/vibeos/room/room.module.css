@@ -234,3 +234,89 @@
     .card { width: 190px; }
     .cardThumb { height: min(38vh, 260px); }
 }
+
+/* ==========================================================================
+   Enregistrer la Room dans la bibliotheque
+   ========================================================================== */
+
+.saveBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-4);
+}
+
+/* La phrase qui explique POURQUOI ce bouton existe. Elle a sa place ici et
+   nulle part ailleurs: c'est le seul endroit ou l'on peut dire, au moment ou
+   ca compte, que la Room ne vit que dans ce navigateur. */
+.saveIntro {
+    margin: 0;
+    font-size: var(--vo-text-xs);
+    line-height: 1.6;
+    color: var(--vo-text-2);
+}
+
+.saveIntro strong {
+    color: var(--vo-text);
+    font-weight: 590;
+}
+
+.saveField {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--vo-space-2);
+}
+
+.saveChoice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-2);
+    font: inherit;
+    font-size: var(--vo-text-sm);
+    cursor: pointer;
+    transition: border-color var(--vo-dur-2) var(--vo-ease), background var(--vo-dur-2) var(--vo-ease);
+}
+
+.saveChoice:hover:not(:disabled) {
+    border-color: var(--vo-line-strong);
+    background: var(--vo-surface-3);
+}
+
+.saveChoice[data-active="true"] {
+    border-color: var(--vo-accent);
+    background: var(--vo-accent-quiet);
+    color: var(--vo-text);
+}
+
+.saveChoice:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.saveInput {
+    width: 100%;
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+    font: inherit;
+    font-size: var(--vo-text-sm);
+}
+
+.saveInput:focus {
+    outline: none;
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+}
+
+.saveFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--vo-space-2);
+}
