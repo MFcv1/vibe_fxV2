@@ -48,6 +48,7 @@ function remoteToLocal(remote) {
         exif: remote.exif || null,
         preset: remote.preset || null,
         favorite: Boolean(remote.favorite),
+        fromRoomId: remote.fromRoomId || null,
         previewUrl: remote.previewUrl || null,
         originalUrl: remote.originalUrl || null,
         /* Pas de fichier local: la photo vit dans le compte, on la rapatrie a

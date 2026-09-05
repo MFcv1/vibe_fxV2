@@ -75,6 +75,7 @@ service cloud.firestore {
           'exif',
           'preset',
           'favorite',
+          'fromRoomId',
           'previewPath',
           'previewUrl',
           'originalPath',

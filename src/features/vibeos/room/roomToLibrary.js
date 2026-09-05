@@ -65,6 +65,29 @@ export async function listTargetFolders() {
 }
 
 /*
+ * Ce qui reste vraiment a enregistrer dans un dossier.
+ *
+ * La photo creee garde l'identifiant de l'element de Room dont elle vient
+ * (`fromRoomId`). « Deja enregistree ici » se lit donc dans le dossier lui-meme,
+ * pas dans une marque posee sur la Room: c'est la seule version qui reste vraie
+ * si on enregistre depuis un autre appareil, puisque la bibliotheque, elle, se
+ * synchronise.
+ *
+ * Un dossier NEUF ne filtre rien: le choisir est un geste explicite, on veut y
+ * mettre toute la file.
+ */
+export async function roomItemsLeftFor(folderId) {
+    const items = await listRoomItems();
+    if (!folderId) return { total: items.length, restants: items.length, deja: 0 };
+    const photos = await listPhotos();
+    const deja = new Set(photos
+        .filter((photo) => photo.folderId === folderId && photo.fromRoomId)
+        .map((photo) => photo.fromRoomId));
+    const restants = items.filter((item) => !deja.has(item.id)).length;
+    return { total: items.length, restants, deja: items.length - restants };
+}
+
+/*
  * Enregistre la Room dans la bibliotheque.
  *
  * `onProgress(fait, total)` sert a l'ecran: une dizaine de rendus pleine
@@ -74,8 +97,28 @@ export async function listTargetFolders() {
 export async function saveRoomToLibrary({ folderId = null, folderName = null, onProgress = null } = {}) {
     /* Les blobs ne sont pas dans l'etat React - il n'y garde que des URLs -
        donc on relit la file depuis IndexedDB. */
-    const items = await listRoomItems();
-    if (!items.length) return { added: 0, folderId: null, message: 'La Room est vide.' };
+    const tous = await listRoomItems();
+    if (!tous.length) return { added: 0, folderId: null, message: 'La Room est vide.' };
+
+    /*
+     * On ne repasse pas ce qui est deja dans le dossier vise. Sans ca, ajouter
+     * quatre images a une file de trente-six proposait de reimporter les
+     * trente-six, et le dossier se remplissait de doublons.
+     */
+    let dejaLa = new Set();
+    if (folderId) {
+        const photos = await listPhotos();
+        dejaLa = new Set(photos
+            .filter((photo) => photo.folderId === folderId && photo.fromRoomId)
+            .map((photo) => photo.fromRoomId));
+    }
+    const items = tous.filter((item) => !dejaLa.has(item.id));
+    const ignorees = tous.length - items.length;
+    if (!items.length) {
+        return {
+            added: 0, ignorees, folderId, message: 'Tout est déjà dans ce dossier.',
+        };
+    }
 
     const blobs = await Promise.all(items.map(blobOf));
     const paires = items
@@ -127,6 +170,9 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
     for (let index = 0; index < retenus.length; index += 1) {
         const record = await buildPhotoRecord(retenus[index], { folderId: cible });
         if (record) {
+            /* Le lien avec l'element de Room: c'est lui qui evitera de
+               reimporter cette image la prochaine fois. */
+            record.fromRoomId = paires[index]?.item?.id || null;
             await putPhoto(record);
             if (!cover) cover = record.id;
             added += 1;
@@ -144,6 +190,7 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
         failed: retenus.length - added,
         rejected: files.length - retenus.length,
         introuvables,
+        ignorees,
         folderId: cible,
         folderName: nom,
         message: gate.message,

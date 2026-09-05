@@ -439,7 +439,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
 |   |   |   |-- roomCloud.js           # Room dans le compte (2026-09-05) : Firestore `users/{uid}/roomItems` + Storage `users/{uid}/room/{id}/image.jpg`, plafond 40 Mo (un panorama 4592x8160 depasse les 25 Mo de la bibliotheque). Le fichier part AVANT la fiche
 |   |   |   |-- useRoomSync.js         # File d'envoi un par un + ecoute des fiches distantes + repercussion d'une suppression faite ailleurs. Le local fait autorite pour l'affichage
-|   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05) : chaque rendu devient une vraie photo dans un dossier neuf ou existant, donc il entre dans le circuit de sauvegarde du compte. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
+|   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05 ; incrementiel le 2026-09-06) : chaque rendu devient une vraie photo dans un dossier neuf ou existant, donc il entre dans le circuit de sauvegarde du compte. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
 |   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
 |   |   |   |-- RoomScreen.jsx          # L'ecran : file horizontale numerotee, glisser-deposer ET fleches, retrait, vidage a double clic de confirmation, « Valider l'ordre » -> InstaPreviewSheet
 |   |   |   `-- room.module.css
@@ -663,6 +663,36 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-06 ter (Room : n'enregistrer que ce qui a ete ajoute depuis)
+
+**Constate en usage.** Une Room de 36 images deja enregistrees dans « Room 5 09 »
+proposait, apres quatre ajouts, de reimporter les 36 — et le dossier se
+remplissait de doublons.
+
+**Ce qui change.** Chaque photo creee depuis la Room garde l'identifiant de
+l'element dont elle vient (`fromRoomId`). « Deja enregistree ici » se lit donc
+DANS LE DOSSIER, pas dans une marque posee sur la Room : c'est la seule version
+qui reste vraie depuis un autre appareil, puisque la bibliotheque se synchronise
+et que le lien voyage avec la fiche (`libraryCloud`, `useLibrarySync`, plus la
+cle ajoutee a `isLibraryPhotoValid` dans `firestore.rules`).
+
+Un dossier NEUF ne filtre rien : le choisir est un geste explicite, on veut y
+mettre toute la file.
+
+L'ecran recompte a chaque changement de destination et le dit avant le clic :
+« 3 de ces images sont deja dans ce dossier : seules les 2 ajoutees depuis
+seront enregistrees », bouton « Enregistrer 2 images ». Quand il ne reste rien,
+le bouton passe a « Deja tout enregistre » et se desactive.
+
+**Verifie de bout en bout dans le navigateur** : 3 images enregistrees dans un
+dossier neuf, 2 ajoutees a la Room, puis re-enregistrement vers le meme dossier
+— le dossier passe de 3 a 5 photos, pas de 3 a 8, chaque photo porte son lien et
+les cinq liens sont distincts. Une troisieme tentative annonce « Deja tout
+enregistre ».
+
+Fichiers touches : `roomToLibrary.js`, `RoomScreen.jsx`, `libraryCloud.js`,
+`useLibrarySync.js`, `firestore.rules`.
 
 ## Journal — 2026-09-06 bis (bibliotheque : les vignettes en point d'interrogation)
 

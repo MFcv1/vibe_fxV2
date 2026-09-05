@@ -125,6 +125,10 @@ export async function pushPhoto(uid, photo) {
         exif: photo.exif || null,
         preset: photo.preset || null,
         favorite: Boolean(photo.favorite),
+        /* D'ou vient cette photo, quand elle vient de la Room. C'est ce lien qui
+           evite de reimporter la meme image dans le meme dossier — y compris
+           depuis un autre appareil, puisqu'il voyage avec la fiche. */
+        fromRoomId: photo.fromRoomId || null,
         previewPath,
         previewUrl,
         originalPath,

@@ -9,7 +9,9 @@ import {
 import { Badge, Button, EmptyState, IconButton, Sheet, useToast } from '../primitives';
 import InstaPreviewSheet from '../layout/InstaPreviewSheet';
 import { ROOM_CAROUSEL_MAX, useRoom } from './RoomProvider';
-import { listTargetFolders, saveRoomToLibrary, suggestRoomFolderName } from './roomToLibrary';
+import {
+    listTargetFolders, roomItemsLeftFor, saveRoomToLibrary, suggestRoomFolderName,
+} from './roomToLibrary';
 import styles from './room.module.css';
 
 /*
@@ -72,6 +74,8 @@ export default function RoomScreen() {
     const [folderName, setFolderName] = useState('');
     const [folderId, setFolderId] = useState('');
     const [saving, setSaving] = useState(null); // { done, total }
+    /* Ce qui reste vraiment a enregistrer dans la destination choisie. */
+    const [reste, setReste] = useState(null); // { total, restants, deja }
 
     const openSave = useCallback(async () => {
         const liste = await listTargetFolders();
@@ -79,11 +83,26 @@ export default function RoomScreen() {
         setFolderId(liste[0]?.id || '');
         setDestination(liste.length ? 'new' : 'new');
         setFolderName(suggestRoomFolderName(items, liste.map((folder) => folder.name)));
+        setReste(null);
         setSaveOpen(true);
     }, [items]);
 
+    /*
+     * Recompte a chaque changement de destination: un dossier deja servi ne
+     * reprend que les images ajoutees depuis, un dossier neuf prend tout.
+     */
+    useEffect(() => {
+        if (!saveOpen) return undefined;
+        let vivant = true;
+        const cible = destination === 'existing' ? folderId : null;
+        roomItemsLeftFor(cible).then((valeur) => { if (vivant) setReste(valeur); });
+        return () => { vivant = false; };
+    }, [saveOpen, destination, folderId, count]);
+
+    const aEnregistrer = reste ? reste.restants : count;
+
     const handleSave = useCallback(async () => {
-        setSaving({ done: 0, total: count });
+        setSaving({ done: 0, total: aEnregistrer });
         const result = await saveRoomToLibrary({
             folderId: destination === 'existing' ? folderId : null,
             folderName: destination === 'new' ? folderName : null,
@@ -107,7 +126,7 @@ export default function RoomScreen() {
            porte la synchronisation, donc c'est en y arrivant que la montee
            vers le compte commence vraiment. */
         router.push('/creer/bibliotheque');
-    }, [count, destination, folderId, folderName, router, toast]);
+    }, [aEnregistrer, destination, folderId, folderName, router, toast]);
 
     const openPreview = useCallback(async () => {
         if (!count) return;
@@ -357,6 +376,28 @@ export default function RoomScreen() {
                         <strong>La Room n’est pas vidée</strong> : ton post en cours reste tel quel.
                     </p>
 
+                    {/* Ce qui est deja dans le dossier vise n'y retourne pas: sans
+                        ca, ajouter quatre images a une file de trente-six
+                        proposait de reimporter les trente-six. */}
+                    {reste && reste.deja ? (
+                        <p className={styles.saveIntro}>
+                            {reste.restants ? (
+                                <>
+                                    <strong data-numeric>{reste.deja}</strong> de ces images sont
+                                    déjà dans ce dossier : seule{reste.restants > 1 ? 's' : ''} l
+                                    {reste.restants > 1 ? 'es ' : 'a '}
+                                    <strong data-numeric>{reste.restants}</strong> ajoutée
+                                    {reste.restants > 1 ? 's' : ''} depuis sera
+                                    {reste.restants > 1 ? 'ont' : ''} enregistrée
+                                    {reste.restants > 1 ? 's' : ''}.
+                                </>
+                            ) : (
+                                <>Toutes ces images sont déjà dans ce dossier. Choisis un autre
+                                dossier, ou ajoute d’abord des images à la Room.</>
+                            )}
+                        </p>
+                    ) : null}
+
                     <div className={styles.saveField} role="radiogroup" aria-label="Destination">
                         <button
                             type="button"
@@ -415,12 +456,14 @@ export default function RoomScreen() {
                             size="sm"
                             icon={<Save size={13} />}
                             onClick={handleSave}
-                            disabled={Boolean(saving) || (destination === 'existing' && !folderId)}
+                            disabled={Boolean(saving) || !aEnregistrer || (destination === 'existing' && !folderId)}
                             data-testid="vibeos-room-save-confirm"
                         >
                             {saving
                                 ? `Enregistrement ${saving.done}/${saving.total}`
-                                : `Enregistrer ${count} image${count > 1 ? 's' : ''}`}
+                                : aEnregistrer
+                                    ? `Enregistrer ${aEnregistrer} image${aEnregistrer > 1 ? 's' : ''}`
+                                    : 'Déjà tout enregistré'}
                         </Button>
                     </div>
                 </div>
