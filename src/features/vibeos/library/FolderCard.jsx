@@ -105,6 +105,12 @@ const FolderCard = React.memo(function FolderCard({
                     {/* La poche: c'est elle qui fait lire "dossier" et pas
                         "photo". Elle porte le compteur, comme une etiquette. */}
                     <span className={styles.folderPocket}>
+                        {folder.scout && folder.favoriteCount ? (
+                            <span className={styles.folderKept}>
+                                <Heart size={10} fill="currentColor" />
+                                <span data-numeric>{folder.favoriteCount}</span>
+                            </span>
+                        ) : null}
                         <span className={styles.folderPocketCount} data-numeric>{folder.count}</span>
                     </span>
                     <span className={styles.folderGloss} />
@@ -162,13 +168,6 @@ const FolderCard = React.memo(function FolderCard({
                 <span className={styles.folderCloud} data-state="local" title="Ces photos ne sont pas sauvegardées : elles sont juste affichées depuis ton appareil.">
                     <Laptop size={11} />
                     <span>Sur cet appareil</span>
-                </span>
-            ) : null}
-
-            {folder.scout && folder.favoriteCount ? (
-                <span className={styles.folderKept} title={`${folder.favoriteCount} photo(s) gardée(s)`}>
-                    <Heart size={10} fill="currentColor" />
-                    <span data-numeric>{folder.favoriteCount}</span>
                 </span>
             ) : null}
 

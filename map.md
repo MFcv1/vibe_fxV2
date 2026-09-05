@@ -661,6 +661,28 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 decies (bibliotheque : deux defauts d'affichage)
+
+Remontes en usage reel, sur un tri de 633 photos.
+
+**La barre d'information etait coupee en deux.** Sous le titre du dossier, la
+barre de progression ne montrait qu'une tranche de son texte. Cause : l'ecran
+est une colonne flex, et `.importBar` portait une hauteur fixe SANS
+`flex-shrink: 0`. Une hauteur fixe n'est pas un minimum en flex : des que la
+grille en dessous devient haute, la barre se fait comprimer. Corrige sur
+`.toolbar`, `.importBar` (plus un `min-height`) et `.syncBar`. Verifie en
+injectant une barre temoin dans la colonne, fenetre a 380 px et grille pleine :
+26 px exactement, contre une barre ecrasee avant.
+
+**Le compteur de gardees etait sous les boutons du dossier.** `.folderKept`
+etait en haut a droite de la pile — exactement l'emplacement de `.folderTools`
+(renommer, supprimer), qui apparaissent au survol. Les deux se chevauchaient :
+plus rien de lisible ni de cliquable. Le compteur rejoint la POCHE, a gauche du
+nombre total : c'est la qu'on lit deja « 633 », les deux chiffres se repondent
+(gardees a gauche, total a droite) et le coin des outils est libre.
+
+Fichiers touches : `library.module.css`, `FolderCard.jsx`.
+
 ## Journal — 2026-09-05 nonies (carrousel : la vraie cause, l'index en retard)
 
 La premiere passe (octies) avait supprime le verrou du CLAVIER, pas la cause.

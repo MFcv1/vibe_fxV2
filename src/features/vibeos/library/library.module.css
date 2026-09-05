@@ -42,6 +42,14 @@
     align-items: center;
     gap: var(--vo-space-4);
     flex-wrap: wrap;
+    /*
+     * L'ecran est une colonne flex. Sans ce `flex-shrink: 0`, une barre a
+     * hauteur fixe se fait COMPRIMER quand la grille en dessous devient haute :
+     * sur un dossier de six cents photos, la barre de progression tombait a
+     * quelques pixels et son texte etait coupe en deux. La hauteur d'une barre
+     * d'information ne se negocie pas avec le contenu qu'elle surplombe.
+     */
+    flex-shrink: 0;
     padding: var(--vo-space-3) var(--vo-space-4);
     border-bottom: 1px solid var(--vo-line);
     background: var(--vo-bg);
@@ -165,6 +173,10 @@
     position: relative;
     display: flex;
     align-items: center;
+    /* Voir `.toolbar` : hauteur fixe ET incompressible, sinon le texte se coupe
+       des que la grille grossit. */
+    flex-shrink: 0;
+    min-height: 26px;
     height: 26px;
     padding: 0 var(--vo-space-4);
     background: var(--vo-surface);
@@ -1314,6 +1326,7 @@
     right: 0;
     bottom: 0;
     height: 48%;
+    z-index: 1;
     border-radius: 2px 2px 11px 11px;
     background: linear-gradient(178deg, rgba(112, 142, 255, 0.34), rgba(74, 104, 224, 0.2));
     border: 1px solid rgba(91, 124, 250, 0.34);
@@ -1554,6 +1567,7 @@
     display: flex;
     align-items: center;
     gap: var(--vo-space-2);
+    flex-shrink: 0;
     padding: var(--vo-space-2) var(--vo-space-4);
     font-size: var(--vo-text-xs);
     color: var(--vo-text-2);
@@ -1946,21 +1960,28 @@
     opacity: 0.72;
 }
 
-/* Le compteur de photos gardees, en bas a droite de la pile: c'est le seul
-   chiffre qui bouge pendant un tri, donc le seul qui merite d'etre affiche. */
+/*
+ * Le compteur de photos gardees vit DANS la poche, a cote du nombre total.
+ *
+ * Il etait en haut a droite de la pile, c'est-a-dire exactement sous les
+ * boutons renommer et supprimer, qui apparaissent au survol: les deux se
+ * chevauchaient et on ne pouvait plus lire ni cliquer. La poche est l'endroit
+ * juste de toute facon - c'est la qu'on lit deja "633" - et les deux chiffres
+ * se repondent: total a droite, gardees a gauche.
+ */
 .folderKept {
-    position: absolute;
-    right: var(--vo-space-2);
-    top: var(--vo-space-2);
+    margin-right: auto;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 7px;
+    font-family: var(--vo-font-numeric);
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 7px;
     border-radius: var(--vo-radius-pill);
-    font-size: 10px;
-    color: var(--vo-accent);
-    background: rgba(10, 10, 12, 0.7);
-    border: 1px solid var(--vo-accent-line);
+    color: var(--vo-text-on-accent);
+    background: var(--vo-accent);
+    border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 /* Le bouton "Garder" du carrousel, une fois la photo gardee: il se remplit,
