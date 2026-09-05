@@ -153,23 +153,87 @@ Raison : le besoin de referencement maximal exclut un SPA pur pour les pages mar
 
 ## Design system cible
 
-Ne pas reprendre la pate graphique de Jardin de Chawi.
+Etat reel constate le 2026-09-03. L'application a ete entierement redessinee en
+direction **Apple OS epure** : sombre, sobre, typo systeme, cartes arrondies,
+accent indigo `#5b7cfa`, tres peu de bordures. Les skills `cyber-neon`,
+`dark-ui` et `technical-ui` ne decrivent plus l'app ; ne pas s'en servir comme
+reference pour une surface produit.
 
-- Direction principale : `cyber-neon` pour la marque et les pages publiques.
-- Direction produit : `dark-ui` pour les surfaces de travail longues.
-- Direction workflow : `technical-ui` pour les panneaux, statuts, logs, tables et controles.
-- Contrainte forte : ne pas casser la structure responsive existante de la page mise en page ; changer l'UI et les tokens, pas l'ergonomie deja validee.
+Toutes les surfaces de creation sont concernees : Bibliotheque, Layout, Studio,
+Vision, Soundtrack, VibeCut.
+
+Deux jeux de tokens font autorite, volontairement separes et jamais melanges :
+
+- **VibeOS** (`/creer/*` : Bibliotheque, Layout, Studio, Vision, Soundtrack).
+  Tokens `--vo-*` dans `src/features/vibeos/styles/vibeos.css`, charge une seule
+  fois par `src/app/creer/layout.js`. Primitives partagees dans
+  `src/features/vibeos/primitives/` (Button, IconButton, Segmented, Card, Sheet,
+  Slider, Tile, Badge, Toast...). Toute nouvelle UI VibeOS passe par ces
+  primitives et ces tokens, pas par du CSS ad hoc.
+- **VibeCut** (`/video/*`). Tokens `--vc-*` dans
+  `src/features/vibecut/styles/vibecut.css`, tout scope sous `.vibecut`, plus
+  `src/features/vibecut/primitives/`. Meme direction et meme accent que VibeOS,
+  mais jeu independant : cette surface est isolee et ne charge ni `vibeos.css`
+  ni le bundle Tailwind statique de `/studio`.
+
+Deux surfaces ne sont pas encore alignees, et c'est connu :
+
+- `/publier` utilise `src/features/publications/publications.css` plus les CSS
+  importes de `vibefx-layout`.
+- Les pages publiques et marketing utilisent `src/app/globals.css`, avec ses
+  tokens `--vf-*` (violet `#9b5cff`, cyan `#00e5ff`) herites de la direction
+  precedente.
+
+Contraintes qui restent :
+
+- Ne pas reprendre la pate graphique de Jardin de Chawi.
+- Ne pas casser la structure responsive deja validee ; changer les tokens et
+  l'UI, pas l'ergonomie.
+- Ne pas melanger les prefixes `--vo-`, `--vc-` et `--vf-` dans un meme fichier.
 
 ## Code importe a auditer avant construction
 
-Le projet contient deja des copies de reference issues du projet source :
+Etat reel constate le 2026-09-03, par grep des imports depuis `src/app/` et
+`src/features/vibeos/`. Lire cette section avant de partir chercher un ecran
+dans un dossier `vibefx-*`.
 
-- `src/features/vibefx-layout/` : moteur et UI de la page mise en page.
-- `src/features/publications/PublicationsManager.jsx` : studio publications + route import vers publication + boutons Meta.
+**L'app vivante est `src/features/vibeos/`.** Les ecrans montes par
+`src/app/creer/*` sont `vibeos/library/LibraryScreen.jsx`,
+`vibeos/layout/LayoutScreen.jsx` (avec `layout/useLayoutEditor.js`),
+`vibeos/studio/StudioScreen.jsx`, `vibeos/vision/VisionScreen.jsx`,
+`vibeos/soundtrack/SoundtrackScreen.jsx`, `vibeos/home/HomeScreen.jsx`. La
+video vit dans `src/features/vibecut/`, montee par `src/app/video/*`.
+
+Les dossiers `vibefx-*` sont du code importe du projet source. Ils ne sont plus
+des UI vivantes, mais ils ne sont pas morts pour autant :
+
+- `src/features/vibefx-layout/` : **n'est plus la page mise en page**. Il n'en
+  reste que deux usages reels : `data/themedTemplates` (importe par
+  `vibeos/layout/TemplateSheet.jsx`) et ses deux feuilles
+  `vibefx-tailwind.css` / `vibefx-layout.css`, chargees par
+  `src/app/publier/layout.js`. Tout le reste du dossier est de la reference non
+  branchee : ne pas y chercher le comportement de l'ecran Layout.
+- `src/features/vibefx-studio/` : pas d'UI vivante non plus, mais ses **moteurs
+  sont utilises tous les jours** par VibeOS et VibeCut. Ne pas le supprimer.
+  Reellement importes : `hooks/` (`useCanvasRenderer`, `useCanvasEvents`,
+  `useExport`, `useImageUpload`, `useLayoutState`, `useLayoutHelpers`,
+  `useStudioFilters`), `data/constants` (FORMATS, TEMPLATES, presets),
+  `engine/` (`layoutRenderer`, `studioRenderer`), `utils/` (`customLayout`,
+  `socialExport`, `visionMetrics`, `visionRecommendation`, `visionPresets`,
+  `visionColorScience`), `soundtrack/` (`data`, `hooks`, `services`, via
+  `vibeos/soundtrack/useVibeOsSoundtrack.js`) et `video/` (`data`, `engine`,
+  `export`, `model`, `store`, `utils`, consomme par les adapters VibeCut).
+- `src/features/vibefx-shared/` : un seul usage, `utils/smoothBlur`, pilote par
+  `vibeos/shared/SmoothBlurSheet.jsx`.
+- `src/features/publications/PublicationsManager.jsx` : vivant, monte par
+  `/publier` (studio publications + import depuis la mise en page + boutons
+  Meta).
 - `functions/` : base Functions copiee, a reduire au strict necessaire Vibe_fx V2 avant deploy.
 - `public/assets/vibefx/demo-astronaut.png` : image demo.
 
-Ces copies sont des materiaux de depart, pas une architecture finale validee.
+Regle pratique : une UI se modifie dans `vibeos/` ou `vibecut/` ; un moteur de
+rendu, d'export ou de son se modifie dans `vibefx-studio/`, en sachant que le
+changement touche plusieurs ecrans a la fois.
 
 Important : le moteur publication/Firebase du projet source est une base a conserver. Les prochains agents doivent porter et generaliser la logique deja faite dans Jardin de Chawi : publication manager, route mise en page vers publication, uploads Storage, callables Meta OAuth, locks anti-doublon, statuts plateforme et regles Firestore/Storage. Il ne faut pas reconstruire cette logique de zero sauf si une partie est explicitement invalide pour le modele multi-utilisateur Vibe_fx V2.
 
