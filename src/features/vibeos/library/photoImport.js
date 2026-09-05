@@ -3,6 +3,7 @@
 import { createPhotoId } from './libraryDb';
 import { EMPTY_EXIF, readExif } from './exif';
 import { convertHeicToJpeg, isHeicFile } from './heicImport';
+import { fileSignature } from './libraryScout';
 
 /*
  * Entree de la bibliotheque: un fichier -> un enregistrement complet
@@ -179,4 +180,86 @@ export async function buildPhotoRecord(file, { folderId = null } = {}) {
 /* Nom d'appareil affichable dans la grille, meme sans EXIF. */
 export function deviceLabel(photo) {
     return photo?.exif?.device || 'Appareil inconnu';
+}
+
+/*
+ * Enregistrement LEGER, pour le mode tri (voir `libraryScout.js`).
+ *
+ * Deux differences avec `buildPhotoRecord`, et elles font tout:
+ *
+ * 1. AUCUN original n'est conserve. La fiche ne porte que l'apercu et de quoi
+ *    retrouver le fichier sur le disque. C'est ce qui fait tenir sept cents
+ *    photos dans ~150 Mo au lieu de plusieurs Go.
+ * 2. LE HEIC N'EST PAS CONVERTI si le navigateur sait deja le decoder. Safari
+ *    sur Mac affiche le HEIC nativement: lui imposer libheif ajouterait une
+ *    seconde par photo - une vingtaine de minutes sur un dossier entier - pour
+ *    un JPEG qu'on jetterait aussitot. La conversion reste le filet de secours
+ *    des navigateurs qui ne savent pas (Chrome, Firefox), et elle a lieu pour
+ *    de bon au moment ou la photo est gardee.
+ */
+export async function buildScoutRecord(file, { folderId = null, addedAt = null } = {}) {
+    let bitmap = null;
+    let decodedFrom = 'native';
+    try {
+        bitmap = await decode(file);
+    } catch {
+        if (!isHeicFile(file)) return null;
+        try {
+            bitmap = await decode(await convertHeicToJpeg(file));
+            decodedFrom = 'converted';
+        } catch {
+            return null;
+        }
+    }
+
+    const width = bitmap.width || bitmap.naturalWidth;
+    const height = bitmap.height || bitmap.naturalHeight;
+    if (!width || !height) return null;
+
+    const [exif, thumbBlob] = await Promise.all([
+        readExif(file),
+        makeThumbnail(bitmap, width, height),
+    ]);
+    if (typeof bitmap.close === 'function') bitmap.close();
+    if (!thumbBlob) return null;
+
+    const now = addedAt || Date.now();
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(width, height));
+    return {
+        id: createPhotoId(),
+        name: (file.name || 'photo').split('/').pop(),
+        folderId,
+        /* Le coeur du mode tri: pas d'original en base. */
+        blob: null,
+        thumbBlob,
+        /* Le poids REELLEMENT occupe par la fiche, pas celui du fichier source:
+           c'est l'apercu qu'on stocke, c'est lui qu'on compte. Le poids du
+           fichier d'origine reste lisible dans `source.size`. */
+        bytes: thumbBlob.size || 0,
+        type: file.type || '',
+        width,
+        height,
+        ratio: width / height,
+        thumbWidth: Math.max(1, Math.round(width * scale)),
+        thumbHeight: Math.max(1, Math.round(height * scale)),
+        addedAt: now,
+        takenAt: exif.takenAt || file.lastModified || now,
+        exif: exif || { ...EMPTY_EXIF },
+        preset: null,
+        favorite: false,
+        /* Une photo de tri ne part jamais dans le compte: elle n'a pas
+           d'original a envoyer, et son dossier est marque local. */
+        cloud: { state: 'local' },
+        convertedFrom: null,
+        scout: true,
+        /* De quoi retrouver le fichier d'origine sur le disque apres un
+           rechargement (voir `reattachFiles`). */
+        source: {
+            signature: fileSignature(file),
+            name: (file.name || 'photo').split('/').pop(),
+            size: file.size || 0,
+            lastModified: file.lastModified || 0,
+            decodedFrom,
+        },
+    };
 }

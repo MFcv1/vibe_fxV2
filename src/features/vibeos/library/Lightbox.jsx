@@ -4,7 +4,7 @@ import React, {
     useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react';
 import {
-    Calendar, ChevronLeft, ChevronRight, Download, Smartphone, Trash2, Wand2, X,
+    Calendar, ChevronLeft, ChevronRight, Download, Heart, Smartphone, Trash2, Wand2, X,
 } from 'lucide-react';
 import { describeExif } from './exif';
 import { deviceLabel } from './photoImport';
@@ -216,7 +216,7 @@ function Slide({ photo, position, distance, width, height, onNeedPixels }) {
 }
 
 export default function Lightbox({
-    photos, index, onIndexChange, onClose, onCloseStart, onEdit, onDelete,
+    photos, index, onIndexChange, onClose, onCloseStart, onEdit, onDelete, onFavorite,
     getTileRect, onNeedPixels, opening = false,
 }) {
     const photo = photos[index] || null;
@@ -477,10 +477,16 @@ export default function Lightbox({
             if (event.key === 'Escape') { event.preventDefault(); close(); }
             else if (event.key === 'ArrowRight') slideTo(index + 1);
             else if (event.key === 'ArrowLeft') slideTo(index - 1);
+            /* Trier sans lacher le clavier: la main droite garde les fleches,
+               le pouce fait F. C'est le geste repete sept cents fois. */
+            else if ((event.key === 'f' || event.key === 'F') && photos[index]?.scout) {
+                event.preventDefault();
+                onFavorite?.(photos[index]);
+            }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [close, slideTo, index]);
+    }, [close, slideTo, index, photos, onFavorite]);
 
     /* Le fond de page ne doit pas defiler derriere le carrousel. */
     useEffect(() => {
@@ -598,26 +604,47 @@ export default function Lightbox({
                     {index + 1} / {photos.length}
                 </span>
                 <div className={styles.lightboxActions}>
-                    <button
-                        type="button"
-                        className={styles.lightboxButton}
-                        onClick={() => onEdit(photo)}
-                        disabled={opening}
-                        aria-busy={opening ? 'true' : undefined}
-                        data-testid="vibeos-library-lightbox-edit"
-                    >
-                        <Wand2 size={13} />
-                        {opening ? 'Ouverture…' : 'Retoucher'}
-                    </button>
-                    <a
-                        className={styles.lightboxIcon}
-                        href={fullUrl(photo)}
-                        download={photo.name}
-                        aria-label="Télécharger la photo"
-                        title="Télécharger"
-                    >
-                        <Download size={15} />
-                    </a>
+                    {/* Pendant un tri, il n'y a qu'un geste qui compte, et il
+                        prend la place du bouton principal: garder, ou pas.
+                        Retoucher et telecharger n'auraient de toute facon rien a
+                        se mettre sous la dent - l'original n'est pas en base. */}
+                    {photo.scout ? (
+                        <button
+                            type="button"
+                            className={styles.lightboxButton}
+                            data-active={photo.favorite ? 'true' : 'false'}
+                            onClick={() => onFavorite?.(photo)}
+                            aria-pressed={Boolean(photo.favorite)}
+                            title="Garder cette photo (F)"
+                            data-testid="vibeos-library-lightbox-favorite"
+                        >
+                            <Heart size={13} fill={photo.favorite ? 'currentColor' : 'none'} />
+                            {photo.favorite ? 'Gardée' : 'Garder'}
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                className={styles.lightboxButton}
+                                onClick={() => onEdit(photo)}
+                                disabled={opening}
+                                aria-busy={opening ? 'true' : undefined}
+                                data-testid="vibeos-library-lightbox-edit"
+                            >
+                                <Wand2 size={13} />
+                                {opening ? 'Ouverture…' : 'Retoucher'}
+                            </button>
+                            <a
+                                className={styles.lightboxIcon}
+                                href={fullUrl(photo)}
+                                download={photo.name}
+                                aria-label="Télécharger la photo"
+                                title="Télécharger"
+                            >
+                                <Download size={15} />
+                            </a>
+                        </>
+                    )}
                     <button
                         type="button"
                         className={styles.lightboxIcon}

@@ -4,10 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     createFolderId, deleteFolderDeep, deletePhoto, listFolders, listPhotos, putFolder, putPhoto,
 } from './libraryDb';
-import { buildPhotoRecord, deviceLabel, makePreview, PREVIEW_MAX } from './photoImport';
+import {
+    buildPhotoRecord, buildScoutRecord, deviceLabel, makePreview, PREVIEW_MAX,
+} from './photoImport';
 import { isHeicFile } from './heicImport';
 import { sanitizeFolderName, suggestFolderName, uniqueFolderName } from './folderNaming';
 import { checkImport, quotaState } from './libraryQuota';
+import {
+    countAttached, forgetFile, isScoutFolder, isScoutPhoto, reattachFiles, rememberFile,
+    SCOUT_FOLDER_KIND, SCOUT_QUOTA, sourceFileOf,
+} from './libraryScout';
 
 /*
  * Etat de la bibliotheque: dossiers, photos, import, filtres, tri, quota.
@@ -38,6 +44,10 @@ export function thumbUrl(photo) {
 
 export function fullUrl(photo) {
     if (!photo) return null;
+    /* Une photo en cours de tri n'a pas d'original en base - c'est justement ce
+       qui la rend legere. Le carrousel affiche donc son apercu 1600 px, qui est
+       fait pour ca. Sans ce recours, l'ecran plein serait vide. */
+    if (!photo.blob && photo.scout) return thumbUrl(photo);
     if (!photo.blob) return photo.originalUrl || photo.previewUrl || null;
     if (!fullUrls.has(photo.id)) {
         fullUrls.set(photo.id, URL.createObjectURL(photo.blob));
@@ -80,6 +90,17 @@ export default function useLibrary() {
     const [sort, setSort] = useState('added');
     const [activeFolderId, setActiveFolderId] = useState(null);
     const mountedRef = useRef(true);
+    /*
+     * Miroir de `photos` lisible hors rendu.
+     *
+     * Il existe pour une raison precise: React peut REJOUER un reducteur d'etat
+     * (StrictMode, rendu concurrent). Calculer dans le reducteur une valeur
+     * RELATIVE - "l'inverse du favori actuel" - puis l'ecrire dans IndexedDB
+     * donne alors deux resultats differents a l'ecran et en base, et c'est
+     * l'ecran qui a raison. Toute bascule lit donc l'etat ici, calcule une
+     * valeur ABSOLUE, et pousse la meme aux deux endroits.
+     */
+    const photosRef = useRef([]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -95,22 +116,38 @@ export default function useLibrary() {
         };
     }, []);
 
+    useEffect(() => { photosRef.current = photos; }, [photos]);
+
     /* ---------- Quota ---------- */
 
+    /*
+     * Le quota ne compte QUE la vraie bibliotheque.
+     *
+     * Une photo en cours de tri n'a pas d'original stocke et ne part pas dans
+     * le compte: la faire peser sur le plafond bloquerait l'utilisateur des le
+     * premier gros dossier, pour un espace qu'il n'occupe pas. Le tri a son
+     * propre plafond, qui protege l'onglet et pas la facture (`SCOUT_QUOTA`).
+     */
+    const kept = useMemo(() => photos.filter((photo) => !isScoutPhoto(photo)), [photos]);
+    const scoutPhotos = useMemo(() => photos.filter(isScoutPhoto), [photos]);
     const usedBytes = useMemo(
-        () => photos.reduce((sum, photo) => sum + (photo.bytes || 0), 0),
-        [photos],
+        () => kept.reduce((sum, photo) => sum + (photo.bytes || 0), 0),
+        [kept],
+    );
+    const scoutBytes = useMemo(
+        () => scoutPhotos.reduce((sum, photo) => sum + (photo.bytes || 0), 0),
+        [scoutPhotos],
     );
     const quota = useMemo(
-        () => quotaState({ photoCount: photos.length, bytes: usedBytes }),
-        [photos.length, usedBytes],
+        () => quotaState({ photoCount: kept.length, bytes: usedBytes }),
+        [kept.length, usedBytes],
     );
 
     /* ---------- Dossiers ---------- */
 
     const takenNames = useMemo(() => folders.map((folder) => folder.name), [folders]);
 
-    const createFolder = useCallback(async ({ name, source = 'manual' } = {}) => {
+    const createFolder = useCallback(async ({ name, source = 'manual', kind = 'library' } = {}) => {
         const finalName = uniqueFolderName(sanitizeFolderName(name) || suggestFolderName({ taken: takenNames }), takenNames);
         const folder = {
             id: createFolderId(),
@@ -118,6 +155,10 @@ export default function useLibrary() {
             createdAt: Date.now(),
             updatedAt: Date.now(),
             source,
+            kind,
+            /* Un dossier de tri ne monte jamais dans le compte: la
+               synchronisation le saute sur ce seul drapeau. */
+            localOnly: kind === SCOUT_FOLDER_KIND,
             coverId: null,
         };
         await putFolder(folder);
@@ -143,6 +184,7 @@ export default function useLibrary() {
     const removeFolder = useCallback(async (folderId) => {
         const removedIds = await deleteFolderDeep(folderId);
         removedIds.forEach(releaseUrls);
+        removedIds.forEach(forgetFile);
         if (!mountedRef.current) return removedIds;
         const removed = new Set(removedIds);
         setPhotos((current) => current.filter((photo) => !removed.has(photo.id)));
@@ -226,9 +268,240 @@ export default function useLibrary() {
         };
     }, [photos.length, usedBytes, folders, takenNames, createFolder]);
 
+    /* ---------- Tri ---------- */
+
+    /*
+     * Le tri avance par paquets a l'ecran.
+     *
+     * L'import normal pousse chaque photo dans l'etat des qu'elle est prete:
+     * c'est juste, on veut voir le dossier se remplir. Mais a sept cents
+     * photos, sept cents rendus d'une grille en maconnerie qui grossit a chaque
+     * fois font ramer l'onglet - au moment precis ou il decode des images. On
+     * ecrit donc chaque fiche dans IndexedDB tout de suite (rien n'est perdu si
+     * on ferme), et on ne previent l'ecran que par paquets.
+     */
+    const SCOUT_FLUSH = 12;
+    const scoutCancel = useRef(false);
+    /*
+     * Les poignees de fichiers vivent hors de React (voir `libraryScout.js`):
+     * les rattacher ne declenche donc aucun rendu. Ce compteur est le signal
+     * explicite qui dit a l'ecran de recompter ce qui est pret a importer.
+     */
+    const [scoutTick, setScoutTick] = useState(0);
+
+    const cancelScout = useCallback(() => { scoutCancel.current = true; }, []);
+
+    const scoutFiles = useCallback(async (fileList, options = {}) => {
+        const files = Array.from(fileList || []).filter((file) => (
+            file.type.startsWith('image/') || isHeicFile(file)
+        ));
+        if (!files.length) return { added: 0, skipped: 0, folderId: null, message: '' };
+
+        const gate = checkImport({
+            photoCount: scoutPhotos.length,
+            bytes: scoutBytes,
+            files,
+            quota: SCOUT_QUOTA,
+            scope: 'scout',
+        });
+        if (!gate.ok) {
+            return { added: 0, skipped: 0, folderId: null, blocked: true, message: gate.message };
+        }
+        const accepted = files.slice(0, gate.accepted);
+
+        /* Un depot dans un tri deja ouvert le complete; sinon on en ouvre un. */
+        const existing = options.folderId
+            ? folders.find((item) => item.id === options.folderId && isScoutFolder(item))
+            : null;
+        const folder = existing || await createFolder({
+            name: options.folderName || suggestFolderName({ files, taken: takenNames }),
+            source: options.source || 'files',
+            kind: SCOUT_FOLDER_KIND,
+        });
+
+        scoutCancel.current = false;
+        setImportState({ done: 0, total: accepted.length, folderName: folder.name, mode: 'scout' });
+
+        let added = 0;
+        let skipped = 0;
+        let cover = null;
+        let pending = [];
+
+        /*
+         * Horodatage decroissant, un cran par fichier.
+         *
+         * Sans lui, chaque fiche prend l'heure de la fin de son decodage, et la
+         * grille - triee du plus recent au plus ancien - presente le dossier a
+         * l'ENVERS: on commence son tri par la derniere photo. Un cran par
+         * fichier fait tenir l'ordre du dossier choisi, qui est celui que
+         * l'utilisateur a sous les yeux dans le Finder.
+         */
+        const stamp = Date.now();
+
+        const flush = () => {
+            if (!pending.length || !mountedRef.current) return;
+            const batch = pending;
+            pending = [];
+            setPhotos((current) => [...batch.reverse(), ...current]);
+        };
+
+        for (let index = 0; index < accepted.length; index += 1) {
+            if (scoutCancel.current) break;
+            const file = accepted[index];
+            const record = await buildScoutRecord(file, { folderId: folder.id, addedAt: stamp - index });
+            if (record) {
+                await putPhoto(record);
+                /* La poignee vers le fichier reste en memoire: c'est elle qui
+                   permettra de lire l'original si la photo est gardee. */
+                rememberFile(record.id, file);
+                added += 1;
+                if (!cover) cover = record.id;
+                pending.push(record);
+                if (pending.length >= SCOUT_FLUSH) flush();
+            } else {
+                skipped += 1;
+            }
+            if (mountedRef.current) {
+                setImportState({
+                    done: index + 1, total: accepted.length, folderName: folder.name, mode: 'scout',
+                });
+            }
+        }
+        flush();
+        setScoutTick((current) => current + 1);
+
+        const next = { ...folder, updatedAt: Date.now(), coverId: folder.coverId || cover };
+        await putFolder(next);
+        if (mountedRef.current) {
+            setFolders((current) => current.map((item) => (item.id === folder.id ? next : item)));
+            setImportState(null);
+        }
+        return {
+            added,
+            skipped,
+            folderId: folder.id,
+            folderName: folder.name,
+            stopped: scoutCancel.current,
+            message: gate.message,
+        };
+    }, [scoutPhotos.length, scoutBytes, takenNames, folders, createFolder]);
+
+    /*
+     * Fin du tri: les favorites entrent pour de vrai.
+     *
+     * C'est ici, et seulement ici, que le fichier d'origine est relu sur le
+     * disque, converti si besoin et stocke - donc envoye dans le compte par la
+     * synchronisation. Le dossier de tri n'est pas touche: on peut refaire une
+     * passe, ou le supprimer quand on est sur de soi.
+     *
+     * Les photos dont la poignee a ete perdue (onglet recharge) sont comptees a
+     * part plutot qu'ignorees: l'ecran doit pouvoir dire combien il en manque et
+     * demander le dossier source, pas importer un lot silencieusement incomplet.
+     */
+    const promoteFavorites = useCallback(async (folderId, options = {}) => {
+        /*
+         * Une photo deja importee ne repart pas.
+         *
+         * Sans cette marque, rouvrir un tri et reappuyer sur "Importer" - le
+         * geste le plus naturel du monde quand on hesite - creerait un second
+         * exemplaire de chaque photo, dans un second dossier. La marque est
+         * portee par la photo de tri, donc elle survit a la fermeture de
+         * l'onglet, comme le favori lui-meme.
+         */
+        const source = photos.filter((photo) => (
+            photo.folderId === folderId && isScoutPhoto(photo)
+            && photo.favorite && !photo.promotedTo
+        ));
+        if (!source.length) return { added: 0, missing: 0, folderId: null };
+
+        const ready = source.filter((photo) => sourceFileOf(photo));
+        const missing = source.length - ready.length;
+        if (!ready.length) return { added: 0, missing, folderId: null };
+
+        const gate = checkImport({
+            photoCount: kept.length,
+            bytes: usedBytes,
+            files: ready.map((photo) => ({ size: photo.source?.size || 0 })),
+        });
+        if (!gate.ok) return { added: 0, missing, folderId: null, blocked: true, message: gate.message };
+        const batch = ready.slice(0, gate.accepted);
+
+        const folder = await createFolder({
+            name: options.folderName || `${options.baseName || 'Favoris'}`,
+            source: 'favorites',
+            kind: 'library',
+        });
+
+        setImportState({ done: 0, total: batch.length, folderName: folder.name, mode: 'promote' });
+        let added = 0;
+        let failed = 0;
+        let cover = null;
+
+        for (let index = 0; index < batch.length; index += 1) {
+            const photo = batch[index];
+            const file = sourceFileOf(photo);
+            const record = file ? await buildPhotoRecord(file, { folderId: folder.id }) : null;
+            if (record) {
+                /* La photo entre deja aimee: le tri qu'on vient de faire ne doit
+                   pas etre a refaire dans la bibliotheque. */
+                const full = { ...record, favorite: true, takenAt: photo.takenAt || record.takenAt };
+                await putPhoto(full);
+                const marked = { ...photo, promotedTo: folder.id };
+                await putPhoto(marked);
+                added += 1;
+                if (!cover) cover = full.id;
+                if (mountedRef.current) {
+                    setPhotos((current) => [
+                        full,
+                        ...current.map((item) => (item.id === photo.id ? marked : item)),
+                    ]);
+                }
+            } else {
+                failed += 1;
+            }
+            if (mountedRef.current) {
+                setImportState({
+                    done: index + 1, total: batch.length, folderName: folder.name, mode: 'promote',
+                });
+            }
+        }
+
+        const next = { ...folder, updatedAt: Date.now(), coverId: cover };
+        await putFolder(next);
+        if (mountedRef.current) {
+            setFolders((current) => current.map((item) => (item.id === folder.id ? next : item)));
+            setImportState(null);
+        }
+        return {
+            added, failed, missing, folderId: folder.id, folderName: folder.name, message: gate.message,
+        };
+    }, [photos, kept.length, usedBytes, createFolder]);
+
+    /* Aimer / ne plus aimer. Ecrit dans IndexedDB, donc le tri survit a la
+       fermeture de l'onglet - c'est toute la promesse du mode. */
+    /* Re-relie un tri a ses fichiers apres un rechargement d'onglet. */
+    const reattachScout = useCallback((folderId, fileList) => {
+        const target = photos.filter((photo) => photo.folderId === folderId && isScoutPhoto(photo));
+        const result = reattachFiles(target, Array.from(fileList || []));
+        setScoutTick((current) => current + 1);
+        return result;
+    }, [photos]);
+
+    const toggleFavorite = useCallback(async (id) => {
+        const current = photosRef.current.find((photo) => photo.id === id);
+        if (!current) return null;
+        /* Valeur absolue, decidee UNE fois: voir `photosRef`. */
+        const next = { ...current, favorite: !current.favorite };
+        setPhotos((list) => list.map((photo) => (photo.id === id ? next : photo)));
+        photosRef.current = photosRef.current.map((photo) => (photo.id === id ? next : photo));
+        await putPhoto(next);
+        return next;
+    }, []);
+
     const removePhoto = useCallback(async (id) => {
         await deletePhoto(id);
         releaseUrls(id);
+        forgetFile(id);
         setPhotos((current) => current.filter((photo) => photo.id !== id));
     }, []);
 
@@ -236,6 +509,7 @@ export default function useLibrary() {
         for (const id of ids) {
             await deletePhoto(id);
             releaseUrls(id);
+            forgetFile(id);
         }
         const removed = new Set(ids);
         setPhotos((current) => current.filter((photo) => !removed.has(photo.id)));
@@ -336,6 +610,7 @@ export default function useLibrary() {
                     .slice(0, COVER_COUNT);
                 const pending = inside.filter((photo) => photo.cloud?.state === 'error').length;
                 const synced = inside.filter((photo) => photo.cloud?.state === 'synced').length;
+                const scout = isScoutFolder(folder);
                 return {
                     ...folder,
                     count: inside.length,
@@ -343,11 +618,21 @@ export default function useLibrary() {
                     covers,
                     syncedCount: synced,
                     errorCount: pending,
+                    scout,
+                    favoriteCount: inside.reduce((total, photo) => total + (photo.favorite ? 1 : 0), 0),
+                    /* Combien de photos peuvent encore etre importees pour de
+                       vrai. Calcule seulement pour un tri: ailleurs, l'original
+                       est deja en base et la question ne se pose pas. */
+                    attachedCount: scout ? countAttached(inside) : inside.length,
                 };
             })
             .filter((folder) => (needle ? folder.name.toLowerCase().includes(needle) : true))
             .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-    }, [folders, photosByFolder, search]);
+        /* `scoutTick` est volontaire: `countAttached` lit des poignees de
+           fichiers qui vivent hors de React, donc rien d'autre ne peut
+           signaler que ce compte a change. */
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [folders, photosByFolder, search, scoutTick]);
 
     const activeFolder = useMemo(
         () => folders.find((folder) => folder.id === activeFolderId) || null,
@@ -401,9 +686,38 @@ export default function useLibrary() {
         return sorted;
     }, [folderPhotos, search, deviceFilter, presetFilter, sort]);
 
+    const activeScout = isScoutFolder(activeFolder);
+
+    /*
+     * Etat du tri ouvert: combien de favorites, et combien sont encore reliees
+     * a leur fichier. C'est ce couple qui pilote le bandeau de fin de tri.
+     */
+    const scoutState = useMemo(() => {
+        if (!activeScout) return null;
+        const favorites = folderPhotos.filter((photo) => photo.favorite);
+        const waiting = favorites.filter((photo) => !photo.promotedTo);
+        return {
+            total: folderPhotos.length,
+            favorites: favorites.length,
+            /* Deja passees dans la bibliotheque: elles ne repartiront pas. */
+            done: favorites.length - waiting.length,
+            /* Gardees, pas encore importees, et dont le fichier repond. */
+            ready: countAttached(waiting),
+            /* Gardees, pas encore importees, mais dont le fichier manque. */
+            lost: waiting.length - countAttached(waiting),
+            attached: countAttached(folderPhotos),
+        };
+        /* `scoutTick` est volontaire: `countAttached` lit des poignees de
+           fichiers qui vivent hors de React, donc rien d'autre ne peut
+           signaler que ce compte a change. */
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeScout, folderPhotos, scoutTick]);
+
     return {
         photos, folders, folderCards, folderPhotos, visible, status, importState,
         devices, presets, quota, usedBytes, takenNames,
+        activeScout, scoutState,
+        scoutFiles, cancelScout, promoteFavorites, toggleFavorite, reattachScout,
         activeFolderId, setActiveFolderId, activeFolder,
         search, setSearch,
         deviceFilter, setDeviceFilter,

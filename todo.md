@@ -13,6 +13,15 @@
 > catalogue musical, barre de lecture — sont clos et archives :
 > [docs/archive-points-etape-2026-09-04.md](docs/archive-points-etape-2026-09-04.md).
 
+> **Tri local de la bibliotheque — livre le 2026-09-05.** Un deuxieme geste a
+> cote de l'import : **Trier**. On designe un dossier entier (Telechargements et
+> ses centaines de photos), on ne stocke QUE l'apercu 1600 px, on garde au coeur
+> (bouton sur la tuile, touche **F** dans le carrousel), et un seul bouton
+> importe pour de vrai les gardees dans un nouveau dossier. Le dossier de tri est
+> `localOnly` : la synchronisation le saute, et il ne compte pas dans le quota du
+> compte. Module `src/features/vibeos/library/libraryScout.js`.
+> Gate : `npm run test:vibeos-library`.
+
 > **Room — livree le 2026-09-05.** Nouvel ecran `/creer/room` : la file d'attente
 > d'un post. Layout et Vision ont un bouton **Room** a cote d'« Exporter » qui y
 > envoie le rendu pleine definition (un panorama y entre deja decoupe en
@@ -36,24 +45,12 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après la Room** — 2026-09-05](docs/prompt-reprise-2026-09-05-room.md),
-[**après le lot 1 de Motion Studio** — 2026-09-04](docs/prompt-reprise-2026-09-04-motion-studio.md),
-[**après l'import HEIC/HEIF** — 2026-09-01](docs/prompt-reprise-2026-09-01-import-heic.md),
-[**après la correction Retoucher du carrousel** — 2026-08-31](docs/prompt-reprise-2026-08-31-carrousel-vers-vision.md),
-[**après la correction Google Safari** — 2026-08-31](docs/prompt-reprise-2026-08-31-auth-google-safari.md),
-[**après les favoris de presets Vision** — 2026-08-31](docs/prompt-reprise-2026-08-31-favoris-presets-vision.md),
-[**après les dossiers de la bibliothèque** — 2026-08-31](docs/prompt-reprise-2026-08-31-bibliotheque-dossiers.md),
-[après le recentrage du Studio — 2026-08-30 decies](docs/prompt-reprise-2026-08-30-decies.md),
-[**après la clôture du Gradient Builder** — 2026-08-30 nonies](docs/prompt-reprise-2026-08-30-nonies.md),
-[après les moteurs du Gradient Builder — 2026-08-30 octies](docs/prompt-reprise-2026-08-30-octies.md),
-[après la tranche 1 du Gradient Builder — 2026-08-30 septies](docs/prompt-reprise-2026-08-30-septies.md),
-[après l'import des quatre saisons — 2026-08-30](docs/prompt-reprise-2026-08-30.md),
-[après le mouvement de la bibliothèque — 2026-08-29](docs/prompt-reprise-2026-08-29.md),
-[après `couchant` — 2026-08-27 ter](docs/prompt-reprise-2026-08-27-ter.md),
-[la famille cine et `ambre` — 2026-08-27](docs/prompt-reprise-2026-08-27.md),
-[les presets mesures sur corpus — 2026-08-25](docs/prompt-reprise-2026-08-25.md),
-[le grain, apres l'espace de travail — 2026-08-22](docs/prompt-reprise-2026-08-22.md),
-[la série d'imports Lightroom — 2026-08-20](docs/prompt-reprise-2026-08-20.md).
+[**après le tri local de la bibliothèque** — 2026-09-05](docs/prompt-reprise-2026-09-05-tri-local.md),
+[après la Room — 2026-09-05](docs/prompt-reprise-2026-09-05-room.md),
+[après le lot 1 de Motion Studio — 2026-09-04](docs/prompt-reprise-2026-09-04-motion-studio.md),
+[après l'import HEIC/HEIF — 2026-09-01](docs/prompt-reprise-2026-09-01-import-heic.md).
+Les plus anciens (2026-08-20 à 2026-08-31) sont dans `docs/prompt-reprise-2026-08-*.md` :
+les ouvrir seulement si on retourne dans leur chantier.
 
 Archives, à ouvrir **seulement** si on travaille dans la zone concernée :
 [VibeOS](docs/archive-vibeos-2026-08-11.md) ·
@@ -237,6 +234,23 @@ sur deux images très différentes), et un panneau **Masquage** non vide.
    l'autre tant que la fiche locale existe.
 5. **Au-delà de 25 Mo, seul l'aperçu part.** L'original reste sur l'appareil et
    la photo le dit (`originalSkipped`). À revoir si des RAW entrent un jour.
+
+### Tri local — ce qui reste
+
+1. **Le carrousel avale les flèches pendant l'animation.** Enchaîner les touches
+   trop vite saute des photos : sur sept cents, ça se voit. C'est un
+   comportement d'origine du carrousel (`slideTo` refuse pendant un glissement),
+   pas du tri — mais c'est LE geste du tri, donc à corriger en premier.
+2. **Pas de touche « je jette ».** Aujourd'hui : **F** garde, la corbeille de la
+   tuile retire. Une touche X qui retire et avance d'un cran manque.
+3. **Poignées de fichiers perdues au rechargement.** Le bandeau le dit et propose
+   « Retrouver les fichiers » (rapprochement par nom + taille + date de
+   modification). Chrome pourrait faire mieux avec `showDirectoryPicker` et une
+   poignée persistante ; Safari ne l'a pas, donc le rattachement reste la
+   solution qui marche partout.
+4. **Un tri de plusieurs centaines de photos n'a pas été mesuré en vrai.** Vérifié
+   à 41 photos dans un navigateur Chromium. Sur Safari, le HEIC se décode
+   nativement (chemin `decodedFrom: 'native'`) — ce chemin-là n'a pas été joué.
 
 **Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
 bibliothèque Midjourney (routes et ledger intacts, cf. `src/config/aiLaunch.js`) ;

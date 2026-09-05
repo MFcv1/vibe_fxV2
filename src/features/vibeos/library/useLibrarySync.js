@@ -135,7 +135,7 @@ export default function useLibrarySync(library) {
     /* ---------- Montee: ce qui n'est pas encore parti ---------- */
 
     const pending = useMemo(
-        () => photos.filter((photo) => photo.blob && photo.cloud?.state !== 'synced'),
+        () => photos.filter((photo) => photo.blob && !photo.scout && photo.cloud?.state !== 'synced'),
         [photos],
     );
 
@@ -143,8 +143,12 @@ export default function useLibrarySync(library) {
         if (!enabled || runningRef.current) return;
         if (failures >= MAX_FAILURES) return;
         const next = pending[0];
+        /* Un dossier de tri reste sur l'appareil: rien de ce qu'il contient
+           n'a d'original a envoyer, et l'utilisateur n'a pas encore dit qu'il
+           voulait garder ces photos. Voir `libraryScout.js`. */
         const staleFolder = folders.find((folder) => (
-            (folder.cloud?.syncedAt || 0) < (folder.updatedAt || folder.createdAt || 0)
+            !folder.localOnly
+            && (folder.cloud?.syncedAt || 0) < (folder.updatedAt || folder.createdAt || 0)
         ));
         if (!next && !staleFolder) return;
 

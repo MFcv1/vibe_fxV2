@@ -51,7 +51,9 @@ export function quotaState({ photoCount = 0, bytes = 0, quota = LIBRARY_QUOTA } 
  * simples `{ size }` dans les tests). On coupe au premier des deux plafonds
  * atteint, et on dit lequel.
  */
-export function checkImport({ photoCount = 0, bytes = 0, files = [], quota = LIBRARY_QUOTA } = {}) {
+export function checkImport({
+    photoCount = 0, bytes = 0, files = [], quota = LIBRARY_QUOTA, scope = 'library',
+} = {}) {
     const state = quotaState({ photoCount, bytes, quota });
     let accepted = 0;
     let acceptedBytes = 0;
@@ -73,17 +75,22 @@ export function checkImport({ photoCount = 0, bytes = 0, files = [], quota = LIB
         rejected,
         blockedBy,
         state,
-        message: buildMessage({ accepted, rejected, blockedBy, state }),
+        message: buildMessage({ accepted, rejected, blockedBy, state, scope }),
     };
 }
 
-function buildMessage({ accepted, rejected, blockedBy, state }) {
+function buildMessage({ accepted, rejected, blockedBy, state, scope = 'library' }) {
     if (!rejected) return '';
     const limit = blockedBy === 'bytes'
         ? `${Math.round(state.quota.bytes / (1024 * 1024 * 1024))} Go`
         : `${state.quota.photos} photos`;
     if (!accepted) {
-        return `Quota atteint : ta bibliothèque est pleine (${limit}). Supprime un dossier pour importer à nouveau.`;
+        return scope === 'scout'
+            ? `Trop de photos d’un coup (${limit} au maximum). Termine ou supprime un tri en cours, puis recommence.`
+            : `Quota atteint : ta bibliothèque est pleine (${limit}). Supprime un dossier pour importer à nouveau.`;
+    }
+    if (scope === 'scout') {
+        return `Limite du tri à ${limit} : ${accepted} photo${accepted > 1 ? 's' : ''} à passer en revue, ${rejected} laissée${rejected > 1 ? 's' : ''} de côté.`;
     }
     return `Quota atteint à ${limit} : ${accepted} photo${accepted > 1 ? 's' : ''} importée${accepted > 1 ? 's' : ''}, ${rejected} laissée${rejected > 1 ? 's' : ''} de côté.`;
 }

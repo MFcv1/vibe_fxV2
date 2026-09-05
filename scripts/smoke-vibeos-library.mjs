@@ -123,6 +123,9 @@ try {
     const heicModule = await importAppModule(
         p("src", "features", "vibeos", "library", "heicImport.js"), "heicImport",
     );
+    const scoutModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "libraryScout.js"), "libraryScout",
+    );
 
     /* ---------- 0. Reconnaissance HEIC ---------- */
     console.log("HEIC");
@@ -369,6 +372,100 @@ try {
         assert.equal(sources[1].input.webkitdirectory, true);
         assert.equal(isMobilePlatform(platform), false);
     });
+
+    /* ---------- 6. Tri local ----------
+     * Le tri promet deux choses: rien n'est copie, et le lien vers le fichier
+     * d'origine se retrouve apres un rechargement. La deuxieme est la seule
+     * fragile - elle repose sur une signature - donc c'est elle qu'on teste.
+     */
+    console.log("Tri local");
+    const {
+        countAttached, fileSignature, forgetFile, hasSourceFile, isScoutFolder,
+        isScoutPhoto, reattachFiles, rememberFile, SCOUT_QUOTA,
+    } = scoutModule;
+
+    check("la signature d'un fichier ne depend que de ce que le web donne", () => {
+        const file = { name: "IMG_6330.HEIC", size: 2_481_920, lastModified: 1_756_000_000_000 };
+        assert.equal(fileSignature(file), "IMG_6330.HEIC|2481920|1756000000000");
+        /* Un selecteur de dossier renvoie un chemin relatif: seul le nom compte,
+           sinon la meme photo ne se retrouverait plus apres un rechargement. */
+        assert.equal(
+            fileSignature({ ...file, name: "Telechargements/IMG_6330.HEIC" }),
+            fileSignature(file),
+        );
+    });
+
+    check("deux photos differentes n'ont pas la meme signature", () => {
+        const a = { name: "a.jpg", size: 100, lastModified: 1 };
+        assert.notEqual(fileSignature(a), fileSignature({ ...a, size: 101 }));
+        assert.notEqual(fileSignature(a), fileSignature({ ...a, lastModified: 2 }));
+        assert.notEqual(fileSignature(a), fileSignature({ ...a, name: "b.jpg" }));
+    });
+
+    check("une photo de tri se reconnait, un dossier de tri aussi", () => {
+        assert.equal(isScoutPhoto({ scout: true }), true);
+        assert.equal(isScoutPhoto({ blob: {} }), false);
+        assert.equal(isScoutFolder({ kind: "scout" }), true);
+        assert.equal(isScoutFolder({ kind: "library" }), false);
+    });
+
+    check("une poignee retenue rend la photo prete a importer", () => {
+        const file = { name: "keep.jpg", size: 42, lastModified: 7 };
+        const photo = { id: "ph-1", scout: true, source: { signature: fileSignature(file) } };
+        assert.equal(hasSourceFile(photo), false);
+        rememberFile(photo.id, file);
+        assert.equal(hasSourceFile(photo), true);
+        assert.equal(countAttached([photo, { id: "ph-2", source: { signature: "x|0|0" } }]), 1);
+        forgetFile(photo.id);
+        assert.equal(hasSourceFile(photo), false);
+    });
+
+    check("apres un rechargement, redonner le dossier relie les memes photos", () => {
+        const files = [
+            { name: "un.jpg", size: 10, lastModified: 1 },
+            { name: "deux.jpg", size: 20, lastModified: 2 },
+            { name: "trois.jpg", size: 30, lastModified: 3 },
+        ];
+        /* Les identifiants survivent (IndexedDB), les poignees non: c'est
+           exactement l'etat d'un onglet rouvert. */
+        const photos = files.map((file, index) => ({
+            id: `ph-reload-${index}`,
+            scout: true,
+            source: { signature: fileSignature(file) },
+        }));
+        assert.equal(countAttached(photos), 0);
+
+        /* Le dossier a bouge: une photo a disparu, une intruse s'est ajoutee. */
+        const picked = [files[0], { name: "autre.jpg", size: 99, lastModified: 9 }, files[2]];
+        const result = reattachFiles(photos, picked);
+        assert.equal(result.matched, 2);
+        assert.equal(result.missing, 1);
+        assert.equal(countAttached(photos), 2);
+        assert.equal(hasSourceFile(photos[1]), false);
+        photos.forEach((photo) => forgetFile(photo.id));
+    });
+
+    check("le tri a son propre plafond, bien plus haut que la bibliotheque", () => {
+        assert.ok(SCOUT_QUOTA.photos > quotaModule.LIBRARY_QUOTA.photos);
+        /* Sept cents photos passent le tri sans toucher au quota du compte. */
+        const files = Array.from({ length: 700 }, () => ({ size: 200 * 1024 }));
+        const gate = quotaModule.checkImport({
+            photoCount: 0, bytes: 0, files, quota: SCOUT_QUOTA, scope: "scout",
+        });
+        assert.equal(gate.accepted, 700);
+        assert.equal(gate.rejected, 0);
+    });
+
+    check("depasser le plafond du tri le dit avec les mots du tri", () => {
+        const files = Array.from({ length: 5 }, () => ({ size: 1 }));
+        const gate = quotaModule.checkImport({
+            photoCount: SCOUT_QUOTA.photos - 2, bytes: 0, files, quota: SCOUT_QUOTA, scope: "scout",
+        });
+        assert.equal(gate.accepted, 2);
+        assert.match(gate.message, /tri/i);
+        assert.doesNotMatch(gate.message, /biblioth/i);
+    });
+
 } finally {
     await rm(tempDir, { recursive: true, force: true });
 }

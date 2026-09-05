@@ -385,13 +385,14 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |-- home/
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant + « Nouvel espace vierge », 6 cartes d'espaces (Bibliothèque/Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
-|   |   |-- library/                    # Photothèque VibeOS (2026-08-11 ; dossiers + sauvegarde compte le 2026-08-31) : les photos importees vivent ici et ne sont jamais reimportees
+|   |   |-- library/                    # Photothèque VibeOS (2026-08-11 ; dossiers + sauvegarde compte le 2026-08-31 ; mode tri local le 2026-09-05) : les photos importees vivent ici et ne sont jamais reimportees
 |   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` v2 : stores `photos` (index addedAt, exif.device, folderId) et `folders`. Base separee de celle des projets. La migration v1 -> v2 range les photos deja presentes dans un dossier de reprise, et `deleteFolderDeep` supprime dossier + photos dans une seule transaction
 |   |   |   |-- exif.js                 # Lecteur EXIF maison, sans dependance : APP1 JPEG / TIFF, marque, modele, objectif, ISO, ouverture, vitesse, focale, orientation, date de prise de vue. Ne lit que les 128 premiers Ko et ne rejette jamais
-|   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 1600px stockee une fois pour toutes, EXIF, dimensions, `folderId`, etat de sauvegarde. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari)
+|   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 1600px stockee une fois pour toutes, EXIF, dimensions, `folderId`, etat de sauvegarde. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari). `buildScoutRecord` fait la version LEGERE du mode tri : apercu seul, aucun original, et pas de conversion HEIC quand le navigateur sait deja decoder
 |   |   |   |-- platform.js             # Reconnaissance iPhone / Android / Mac / Windows / Linux et sources d'import qui vont avec (photothèque, appareil photo, fichiers, dossier entier). Module pur, teste hors navigateur
 |   |   |   |-- folderNaming.js         # Nommage a la mode OS : nom du dossier choisi (webkitRelativePath), sinon la date en toutes lettres, suffixe « (2) » si le nom est pris, nettoyage des separateurs. Module pur, teste hors navigateur
-|   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. Module pur, teste hors navigateur
+|   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. `scope: 'scout'` change les mots du message. Module pur, teste hors navigateur
+|   |   |   |-- libraryScout.js         # Mode TRI (2026-09-05) : regarder des centaines de photos sans en copier une. Poignees `File` de la session (par id ET par signature nom|taille|date), rattachement apres rechargement d'onglet, plafond propre au tri (3000 / 2 Go) qui protege l'onglet et pas la facture. Module pur, teste hors navigateur
 |   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. Lecture Blob par chemin SDK authentifié puis URL tokenisée en repli ; la fiche Firestore est écrite EN DERNIER
 |   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
@@ -658,6 +659,64 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 septies (bibliotheque : trier avant d'importer)
+
+**Le probleme.** Choisir sept cents photos de Telechargements pour en garder
+cinquante demandait d'ouvrir Apercu, fermer, rouvrir. Et l'import de la
+bibliotheque etait le mauvais outil pour ca : il convertit chaque HEIC avec
+libheif et stocke l'original entier, soit une vingtaine de minutes et plusieurs
+Go dans le navigateur — pour des photos qu'on va jeter a quatre-vingt-dix pour
+cent.
+
+**Le geste ajoute.** A cote d'« Importer », un bouton **Trier**. La fenetre
+d'ajout pose maintenant d'abord la question qui change tout — importer, ou trier
+— et le reste du formulaire change avec elle : « Ranger dans » et le quota
+disparaissent en mode tri, remplaces par « Nom du tri » et par la promesse
+explicite que rien ne part.
+
+**Ce qui est stocke.** Rien de l'original. `buildScoutRecord` ne garde que
+l'apercu WebP 1600 px (~200 Ko) plus la signature du fichier ; la poignee `File`
+reste en memoire pour la session. Un dossier de tri porte `kind: 'scout'` et
+`localOnly: true` : `useLibrarySync` le saute, et `useLibrary` le sort du quota
+du compte. 700 photos tiennent dans ~150 Mo au lieu de plusieurs Go.
+
+**Le tri.** Un coeur en bas a droite de chaque tuile — visible en permanence des
+que la photo est gardee, pour lire son tri en balayant la grille — et la touche
+**F** dans le carrousel. « Retoucher » et « Telecharger » disparaissent pour une
+photo de tri : elle n'a pas d'original a leur donner.
+
+**La fin du tri.** Un bandeau flottant compte les gardees et importe pour de
+vrai, dans un NOUVEAU dossier, en relisant les fichiers d'origine. Le dossier de
+tri reste intact.
+
+**Trois pieges fermes en route, tous trouves en testant dans le navigateur :**
+
+- **Favoris incoherents entre l'ecran et la base.** `toggleFavorite` calculait
+  la valeur RELATIVE (« l'inverse de l'actuel ») a l'interieur du reducteur
+  d'etat, que React peut rejouer : l'ecran affichait un etat, IndexedDB en
+  ecrivait l'inverse. Corrige par `photosRef` — la valeur absolue est decidee
+  une fois, hors reducteur, et poussee aux deux endroits.
+- **Le dossier de tri arrivait a l'envers.** Chaque fiche prenait l'heure de la
+  fin de son decodage, donc la grille — triee du plus recent au plus ancien —
+  commencait par la derniere photo du dossier. Horodatage decroissant d'un cran
+  par fichier.
+- **Un second clic sur « Importer » aurait cree des doublons.** Une photo de tri
+  deja importee porte `promotedTo` ; le bandeau dit « 3 deja importees » et le
+  bouton passe a « Tout est importe ».
+
+**Verifie dans le navigateur** (Chromium, 41 puis 12 photos generees plus un vrai
+HEIC de 665 Ko) : rien ne se copie pendant le tri (0 photo avec original en
+base), le HEIC se decode et se convertit a l'import final, les favoris survivent
+au rechargement, le rattachement par signature marche, le double import est
+bloque, et l'import NORMAL est inchange. Non verifie : Safari, ou le HEIC se
+decode nativement, et un vrai lot de plusieurs centaines.
+
+Fichiers ajoutes : `libraryScout.js`.
+Fichiers touches : `photoImport.js`, `useLibrary.js`, `useLibrarySync.js`,
+`libraryQuota.js`, `ImportSheet.jsx`, `LibraryScreen.jsx`, `FolderCard.jsx`,
+`Lightbox.jsx`, `library.module.css`, `scripts/smoke-vibeos-library.mjs`.
+Gate : `npm run test:vibeos-library`.
 
 ## Journal — 2026-09-05 sexies (Room : la file d'attente d'un post)
 

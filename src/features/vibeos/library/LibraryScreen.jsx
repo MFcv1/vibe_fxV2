@@ -5,7 +5,8 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    Camera, Check, ChevronLeft, FolderPlus, Grid2x2, Images, Minus, Plus, Trash2, Upload, Wand2, X,
+    Camera, Check, ChevronLeft, FolderPlus, Grid2x2, Heart, Images, Laptop, Minus, Plus,
+    Trash2, Upload, Wand2, X,
 } from 'lucide-react';
 import { Button, SearchField, useToast } from '../primitives';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
@@ -17,6 +18,7 @@ import { DENSITY_MAX, DENSITY_MIN, layoutMasonry, resolveColumns } from './mason
 import { formatBytes, totalBytes } from './libraryDb';
 import { ACCEPTED_TYPES, deviceLabel } from './photoImport';
 import useLibrary, { SORTS, thumbUrl } from './useLibrary';
+import { hasSourceFile } from './libraryScout';
 import styles from './library.module.css';
 
 /*
@@ -124,7 +126,7 @@ function createRevealer() {
  */
 const Tile = React.memo(function Tile({
     photo, position, rect, selected, revealer, onOpen, onEdit, onDelete, onToggle, onNeedPixels,
-    opening,
+    onFavorite, opening,
 }) {
     const nodeRef = useRef(null);
     const [loaded, setLoaded] = useState(false);
@@ -201,18 +203,40 @@ const Tile = React.memo(function Tile({
                     ) : null}
                 </figcaption>
 
-                <div className={styles.tileTools}>
+                {/* Pendant un tri, le coeur reste visible meme sans survol quand
+                    la photo est gardee: c'est l'etat du tri, pas une action au
+                    survol, et il doit se lire en balayant la grille. */}
+                {photo.scout ? (
                     <button
                         type="button"
-                        className={styles.tileTool}
-                        onClick={() => onEdit(photo)}
-                        disabled={opening}
-                        aria-busy={opening ? 'true' : undefined}
-                        aria-label="Retoucher dans Vision"
-                        title="Retoucher dans Vision"
+                        className={styles.tileKeep}
+                        data-active={photo.favorite ? 'true' : 'false'}
+                        onClick={() => onFavorite?.(photo)}
+                        aria-pressed={Boolean(photo.favorite)}
+                        aria-label={photo.favorite ? `Ne plus garder ${photo.name}` : `Garder ${photo.name}`}
+                        title={photo.favorite ? 'Gardée' : 'Garder'}
                     >
-                        <Wand2 size={14} />
+                        <Heart size={14} fill={photo.favorite ? 'currentColor' : 'none'} />
                     </button>
+                ) : null}
+
+                <div className={styles.tileTools}>
+                    {/* Retoucher demande l'original; une photo de tri ne l'a pas
+                        encore en base. Le bouton n'apparait donc pas plutot que
+                        d'ouvrir Vision sur une image vide. */}
+                    {photo.scout ? null : (
+                        <button
+                            type="button"
+                            className={styles.tileTool}
+                            onClick={() => onEdit(photo)}
+                            disabled={opening}
+                            aria-busy={opening ? 'true' : undefined}
+                            aria-label="Retoucher dans Vision"
+                            title="Retoucher dans Vision"
+                        >
+                            <Wand2 size={14} />
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={styles.tileTool}
@@ -243,7 +267,7 @@ const Tile = React.memo(function Tile({
 
 
 /* Barre du dessus, vue DOSSIERS: ce qu'on possede et par ou on entre. */
-function FolderToolbar({ folderCount, photoCount, weight, quota, search, onSearch, onImport }) {
+function FolderToolbar({ folderCount, photoCount, weight, quota, search, onSearch, onImport, onScout }) {
     return (
         <header className={styles.toolbar}>
             <div className={styles.toolbarLead}>
@@ -264,15 +288,28 @@ function FolderToolbar({ folderCount, photoCount, weight, quota, search, onSearc
                 <QuotaBar quota={quota} compact />
             </div>
 
-            <Button
-                variant="primary"
-                size="sm"
-                icon={<Upload size={13} />}
-                onClick={onImport}
-                data-testid="vibeos-library-import"
-            >
-                Importer
-            </Button>
+            {/* Deux boutons, deux gestes. Un seul bouton "Ajouter" cacherait
+                le tri derriere une fenetre, et personne ne l'y chercherait. */}
+            <div className={styles.toolbarActions}>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Heart size={13} />}
+                    onClick={onScout}
+                    data-testid="vibeos-library-scout"
+                >
+                    Trier
+                </Button>
+                <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Upload size={13} />}
+                    onClick={onImport}
+                    data-testid="vibeos-library-import"
+                >
+                    Importer
+                </Button>
+            </div>
         </header>
     );
 }
@@ -402,6 +439,8 @@ export default function LibraryScreen() {
         presetFilter, setPresetFilter, sort, setSort,
         importFiles, renameFolder, removeFolder,
         removePhoto, removeAll, ensurePreview,
+        activeScout, scoutState, scoutFiles, cancelScout, promoteFavorites, toggleFavorite,
+        reattachScout,
     } = library;
 
     /* Sauvegarde dans le compte utilisateur. Le hook ne fait rien tant que
@@ -424,7 +463,9 @@ export default function LibraryScreen() {
     const [zoomedOut, setZoomedOut] = useState(false);
     const [selection, setSelection] = useState(() => new Set());
     const [isDropping, setIsDropping] = useState(false);
-    const [importOpen, setImportOpen] = useState(false);
+    /* `null` quand la fenetre est fermee; sinon le geste avec lequel elle
+       s'ouvre, pour que le bouton clique et la fenetre disent la meme chose. */
+    const [sheetMode, setSheetMode] = useState(null);
 
     const gridRef = useRef(null);
     const gridObserver = useRef(null);
@@ -435,6 +476,7 @@ export default function LibraryScreen() {
 
     /* Un seul observateur pour toute la grille, cree au premier rendu client. */
     const [revealer] = useState(createRevealer);
+    const reattachRef = useRef(null);
     useEffect(() => () => revealer?.disconnect(), [revealer]);
 
     /*
@@ -564,6 +606,70 @@ export default function LibraryScreen() {
         return result;
     }, [importFiles, push, setActiveFolderId]);
 
+    /* ---------- Tri ---------- */
+
+    /*
+     * Ouvrir un tri, c'est l'inverse d'un import: on entre dans le dossier tout
+     * de suite, pendant que les apercus continuent d'arriver derriere. Sur sept
+     * cents photos, attendre la fin avant de montrer quoi que ce soit voudrait
+     * dire fixer une barre pendant plusieurs minutes.
+     */
+    const handleScout = useCallback(async (files, options = {}) => {
+        const result = await scoutFiles(files, options);
+        if (result.blocked) {
+            push(result.message, { tone: 'danger', duration: 6000 });
+            return result;
+        }
+        if (result.folderId) setActiveFolderId(result.folderId);
+        if (result.stopped) {
+            push(`Tri arrêté : ${result.added} photo${result.added > 1 ? 's' : ''} prête${result.added > 1 ? 's' : ''} à regarder.`, { tone: 'default' });
+        } else if (result.added && result.skipped) {
+            push(`${result.added} photos à regarder, ${result.skipped} illisible${result.skipped > 1 ? 's' : ''}.`, { tone: 'success' });
+        } else if (result.added) {
+            push(`${result.added} photo${result.added > 1 ? 's' : ''} à regarder. Rien n’a été copié.`, { tone: 'success' });
+        } else if (result.skipped) {
+            push(`${result.skipped} fichier(s) illisible(s) sur cet appareil.`, { tone: 'danger' });
+        }
+        return result;
+    }, [scoutFiles, push, setActiveFolderId]);
+
+    const handleFavorite = useCallback((photo) => {
+        if (photo?.id) toggleFavorite(photo.id);
+    }, [toggleFavorite]);
+
+    /*
+     * Fin du tri. Le message compte les photos qui manquent a l'appel plutot que
+     * de les taire: apres un rechargement d'onglet, les poignees de fichiers
+     * sont perdues, et l'utilisateur doit savoir que son lot est incomplet AVANT
+     * de supprimer son dossier de tri.
+     */
+    const handlePromote = useCallback(async () => {
+        if (!activeFolder) return;
+        const result = await promoteFavorites(activeFolder.id, {
+            folderName: `${activeFolder.name} · gardées`,
+        });
+        if (result.blocked) {
+            push(result.message, { tone: 'danger', duration: 6000 });
+            return;
+        }
+        if (!result.added && result.missing) {
+            push('Les fichiers d’origine ne sont plus reliés. Reprends « Retrouver les fichiers » ci-dessous.', { tone: 'danger', duration: 7000 });
+            return;
+        }
+        if (!result.added) {
+            push('Aucune photo gardée pour l’instant.', { tone: 'default' });
+            return;
+        }
+        if (result.folderId) setActiveFolderId(result.folderId);
+        const missing = result.missing
+            ? ` ${result.missing} n’a pas pu être retrouvée${result.missing > 1 ? 's' : ''}.`
+            : '';
+        push(`${result.added} photo${result.added > 1 ? 's' : ''} importée${result.added > 1 ? 's' : ''} dans « ${result.folderName} ».${missing}`, {
+            tone: missing ? 'default' : 'success',
+            duration: missing ? 7000 : 4000,
+        });
+    }, [activeFolder, promoteFavorites, push, setActiveFolderId]);
+
     /* Depot de fichiers n'importe ou sur l'ecran. Le compteur de profondeur
        evite le clignotement quand le curseur passe au-dessus d'un enfant. */
     const onDragEnter = (event) => {
@@ -582,9 +688,14 @@ export default function LibraryScreen() {
         event.preventDefault();
         dragDepth.current = 0;
         setIsDropping(false);
-        if (event.dataTransfer?.files?.length) {
-            handleFiles(event.dataTransfer.files, activeFolderId ? { folderId: activeFolderId } : {});
+        if (!event.dataTransfer?.files?.length) return;
+        /* Deposer dans un tri ouvert ajoute au tri, pas a la bibliotheque: on ne
+           copie jamais quoi que ce soit sans que l'utilisateur l'ait demande. */
+        if (activeScout && activeFolderId) {
+            handleScout(event.dataTransfer.files, { folderId: activeFolderId });
+            return;
         }
+        handleFiles(event.dataTransfer.files, activeFolderId ? { folderId: activeFolderId } : {});
     };
 
     /* ---------- Selection ---------- */
@@ -764,7 +875,7 @@ export default function LibraryScreen() {
                     onSort={setSort}
                     search={search}
                     onSearch={setSearch}
-                    onImport={() => setImportOpen(true)}
+                    onImport={() => setSheetMode('import')}
                     onBack={backToFolders}
                 />
             ) : (
@@ -775,7 +886,8 @@ export default function LibraryScreen() {
                     quota={quota}
                     search={search}
                     onSearch={setSearch}
-                    onImport={() => setImportOpen(true)}
+                    onImport={() => setSheetMode('import')}
+                    onScout={() => setSheetMode('scout')}
                 />
             )}
 
@@ -786,9 +898,16 @@ export default function LibraryScreen() {
                         style={{ width: `${Math.round((importState.done / importState.total) * 100)}%` }}
                     />
                     <span className={styles.importLabel} data-numeric>
-                        Import {importState.done}/{importState.total}
+                        {importState.mode === 'scout' ? 'Lecture' : 'Import'} {importState.done}/{importState.total}
                         {importState.folderName ? ` · ${importState.folderName}` : ''}
                     </span>
+                    {/* Un tri de sept cents photos doit pouvoir s'arreter: on a
+                        deja de quoi commencer a regarder au bout de vingt. */}
+                    {importState.mode === 'scout' ? (
+                        <button type="button" className={styles.importStop} onClick={cancelScout}>
+                            Arrêter
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -817,7 +936,7 @@ export default function LibraryScreen() {
                                 variant="primary"
                                 size="lg"
                                 icon={<Upload size={15} />}
-                                onClick={() => setImportOpen(true)}
+                                onClick={() => setSheetMode('import')}
                             >
                                 Importer des photos
                             </Button>
@@ -840,7 +959,7 @@ export default function LibraryScreen() {
                             <button
                                 type="button"
                                 className={styles.folderNew}
-                                onClick={() => setImportOpen(true)}
+                                onClick={() => setSheetMode('import')}
                                 data-testid="vibeos-library-new-folder"
                             >
                                 <span className={styles.folderNewIcon}><FolderPlus size={20} /></span>
@@ -872,6 +991,7 @@ export default function LibraryScreen() {
                                         onDelete={handleDelete}
                                         onToggle={toggleSelect}
                                         onNeedPixels={ensurePreview}
+                                        onFavorite={handleFavorite}
                                         opening={openingPhotoId === photo.id}
                                     />
                                 );
@@ -894,7 +1014,7 @@ export default function LibraryScreen() {
                                 variant="primary"
                                 size="lg"
                                 icon={<Upload size={15} />}
-                                onClick={() => setImportOpen(true)}
+                                onClick={() => setSheetMode('import')}
                             >
                                 Importer des photos
                             </Button>
@@ -906,6 +1026,88 @@ export default function LibraryScreen() {
                     ) : null}
                 </div>
             </div>
+
+            {/*
+              * Le bandeau de fin de tri. Il ne dit que deux choses, et toujours
+              * dans cet ordre: ou en est le tri, et ce qui se passera si on
+              * appuie. Le mot "importées" n'apparait qu'ici, parce que c'est le
+              * seul endroit de l'ecran ou quelque chose est vraiment copie.
+              */}
+            {activeScout && scoutState && !selection.size ? (
+                <div className={styles.scoutBar} role="status" data-testid="vibeos-library-scout-bar">
+                    <span className={styles.scoutBarLead}>
+                        <Laptop size={14} aria-hidden="true" />
+                        <span>
+                            <strong data-numeric>{scoutState.favorites}</strong> gardée{scoutState.favorites > 1 ? 's' : ''}
+                            <span className={styles.scoutBarDim}> sur {scoutState.total}</span>
+                            {scoutState.done ? (
+                                <span className={styles.scoutBarDim}> · {scoutState.done} déjà importée{scoutState.done > 1 ? 's' : ''}</span>
+                            ) : null}
+                        </span>
+                    </span>
+
+                    {scoutState.lost ? (
+                        <span className={styles.scoutBarWarn}>
+                            {scoutState.lost} fichier{scoutState.lost > 1 ? 's' : ''} d’origine
+                            {scoutState.lost > 1 ? ' introuvables' : ' introuvable'} depuis le rechargement de la page.
+                        </span>
+                    ) : null}
+
+                    <span className={styles.scoutBarActions}>
+                        {scoutState.attached < scoutState.total ? (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<FolderPlus size={13} />}
+                                onClick={() => reattachRef.current?.click()}
+                            >
+                                Retrouver les fichiers
+                            </Button>
+                        ) : null}
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<Upload size={13} />}
+                            onClick={handlePromote}
+                            disabled={!scoutState.ready}
+                            data-testid="vibeos-library-promote"
+                        >
+                            {/* Trois etats, trois phrases: rien de garde, des
+                                photos gardees mais dont le fichier manque, et le
+                                cas normal. Dire "rien de garde" alors que six
+                                photos le sont ferait croire a un tri perdu. */}
+                            {/* Quatre etats, quatre phrases. Dire "rien de garde"
+                                quand six photos le sont, ou reproposer un import
+                                deja fait, ferait douter du tri entier. */}
+                            {scoutState.ready ? `Importer ${scoutState.ready} photo${scoutState.ready > 1 ? 's' : ''}`
+                                : scoutState.lost ? 'Fichiers à retrouver'
+                                    : scoutState.favorites ? 'Tout est importé'
+                                        : 'Rien de gardé'}
+                        </Button>
+                    </span>
+                </div>
+            ) : null}
+
+            {/* Re-designer le dossier source apres un rechargement: on ne relit
+                aucun fichier, on refait juste le lien par nom et par taille. */}
+            <input
+                ref={reattachRef}
+                type="file"
+                className={styles.hiddenInput}
+                multiple
+                webkitdirectory=""
+                onChange={(event) => {
+                    const files = event.target.files;
+                    if (files?.length && activeFolderId) {
+                        const { matched } = reattachScout(activeFolderId, files);
+                        push(matched
+                            ? `${matched} photo${matched > 1 ? 's' : ''} reliée${matched > 1 ? 's' : ''} à son fichier.`
+                            : 'Aucune photo de ce tri n’a été retrouvée dans ce dossier.',
+                        { tone: matched ? 'success' : 'danger' });
+                    }
+                    event.target.value = '';
+                }}
+            />
 
             {selection.size ? (
                 <div className={styles.selectionBar} role="status">
@@ -931,12 +1133,14 @@ export default function LibraryScreen() {
             ) : null}
 
             <ImportSheet
-                open={importOpen}
-                onClose={() => setImportOpen(false)}
-                folders={folderCards}
+                open={Boolean(sheetMode)}
+                defaultMode={sheetMode || 'import'}
+                onClose={() => setSheetMode(null)}
+                folders={folderCards.filter((folder) => !folder.scout)}
                 quota={quota}
-                defaultFolderId={activeFolderId}
+                defaultFolderId={activeScout ? null : activeFolderId}
                 onFiles={handleFiles}
+                onScout={handleScout}
             />
 
             {lightboxIndex >= 0 && visible[lightboxIndex] ? (
@@ -949,6 +1153,7 @@ export default function LibraryScreen() {
                     onEdit={openInVision}
                     opening={openingPhotoId === visible[lightboxIndex]?.id}
                     onDelete={handleDelete}
+                    onFavorite={handleFavorite}
                     getTileRect={getTileRect}
                     onNeedPixels={ensurePreview}
                 />

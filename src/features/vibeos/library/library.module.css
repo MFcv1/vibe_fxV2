@@ -1807,3 +1807,304 @@
         display: none;
     }
 }
+
+/* ==========================================================================
+   Ajouter des photos : importer, ou trier d'abord
+   ========================================================================== */
+
+/*
+ * Les deux gestes sont cote a cote, de meme taille, sans hierarchie visuelle
+ * entre eux: aucun des deux n'est "le bon". C'est le texte qui differencie, pas
+ * le poids graphique - un des deux mis en avant ferait cliquer sans lire.
+ */
+.modeGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--vo-space-2);
+}
+
+.mode {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-4);
+    border-radius: var(--vo-radius-lg);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color var(--vo-dur-2) var(--vo-ease),
+        background var(--vo-dur-2) var(--vo-ease);
+}
+
+.mode:hover {
+    border-color: var(--vo-line-strong);
+    background: var(--vo-surface-3);
+}
+
+.mode[data-active="true"] {
+    border-color: var(--vo-accent);
+    background: var(--vo-accent-quiet);
+}
+
+.mode:focus-visible {
+    outline: none;
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+}
+
+.modeIcon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface-3);
+    color: var(--vo-text-2);
+    transition: background var(--vo-dur-2) var(--vo-ease), color var(--vo-dur-2) var(--vo-ease);
+}
+
+.mode[data-active="true"] .modeIcon {
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+.modeTitle {
+    font-size: var(--vo-text-base);
+    font-weight: 590;
+    letter-spacing: -0.01em;
+}
+
+.modeHint {
+    font-size: var(--vo-text-xs);
+    line-height: 1.45;
+    color: var(--vo-text-2);
+}
+
+/* La promesse du mode tri. Encadree comme une note, pas comme une alerte: il
+   n'y a rien a corriger, il y a quelque chose a comprendre. */
+.promise {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vo-space-3);
+    margin: 0;
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    font-size: var(--vo-text-xs);
+    line-height: 1.55;
+    color: var(--vo-text-2);
+}
+
+.promise svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--vo-text-3);
+}
+
+.promise strong {
+    color: var(--vo-text);
+    font-weight: 590;
+}
+
+@media (max-width: 560px) {
+    .modeGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   Dossier de tri : il ne doit jamais passer pour une collection sauvegardee
+   ========================================================================== */
+
+.folderCloud[data-state="local"] { color: var(--vo-text-2); }
+
+/*
+ * La poche hachuree. C'est le signe qui se lit sans lire: un dossier en pointille
+ * n'est pas encore range, exactement comme un dossier a la corbeille n'est pas
+ * un dossier normal.
+ */
+.folderCard[data-scout="true"] .folderPocket {
+    border-style: dashed;
+    border-color: var(--vo-line-strong);
+}
+
+.folderCard[data-scout="true"] .folderBack {
+    opacity: 0.72;
+}
+
+/* Le compteur de photos gardees, en bas a droite de la pile: c'est le seul
+   chiffre qui bouge pendant un tri, donc le seul qui merite d'etre affiche. */
+.folderKept {
+    position: absolute;
+    right: var(--vo-space-2);
+    top: var(--vo-space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: var(--vo-radius-pill);
+    font-size: 10px;
+    color: var(--vo-accent);
+    background: rgba(10, 10, 12, 0.7);
+    border: 1px solid var(--vo-accent-line);
+}
+
+/* Le bouton "Garder" du carrousel, une fois la photo gardee: il se remplit,
+   comme un coeur qu'on aurait appuye. C'est le seul retour visuel du tri, il
+   doit se voir du coin de l'oeil sans regarder. */
+.lightboxButton[data-active="true"] {
+    color: var(--vo-text-on-accent);
+    background: var(--vo-accent);
+    border-color: var(--vo-accent);
+}
+
+/* ==========================================================================
+   Le tri : garder une photo, et voir ou on en est
+   ========================================================================== */
+
+/*
+ * Le coeur d'une tuile. En bas a droite, a l'oppose de la case de selection:
+ * les deux gestes ne doivent jamais se disputer le meme coin, sinon on garde
+ * une photo en croyant la selectionner.
+ *
+ * Invisible au repos, VISIBLE des que la photo est gardee: en balayant la
+ * grille, on doit voir son tri, pas devoir survoler chaque image.
+ */
+.tileKeep {
+    position: absolute;
+    right: var(--vo-space-2);
+    bottom: var(--vo-space-2);
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(10, 10, 12, 0.55);
+    backdrop-filter: blur(8px);
+    color: var(--vo-text);
+    opacity: 0;
+    cursor: pointer;
+    transition:
+        opacity var(--vo-dur-2) var(--vo-ease),
+        transform var(--vo-dur-1) var(--vo-ease-out),
+        background var(--vo-dur-2) var(--vo-ease);
+}
+
+.tile:hover .tileKeep,
+.tile:focus-within .tileKeep,
+.tileKeep[data-active="true"] {
+    opacity: 1;
+}
+
+.tileKeep:hover {
+    transform: scale(1.08);
+}
+
+.tileKeep[data-active="true"] {
+    border-color: var(--vo-accent);
+    background: var(--vo-accent);
+    color: var(--vo-text-on-accent);
+}
+
+/* Arreter une lecture en cours, dans la barre de progression. */
+.importStop {
+    position: relative;
+    z-index: 1;
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: var(--vo-text-2);
+    font: inherit;
+    font-size: var(--vo-text-xs);
+    cursor: pointer;
+}
+
+.importStop:hover {
+    color: var(--vo-text);
+}
+
+/* Deux boutons dans la barre du haut: trier, et importer. */
+.toolbarActions {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+}
+
+/*
+ * Le bandeau de fin de tri. Meme famille que la barre de selection - flottant,
+ * arrondi, translucide - mais rectangulaire et plus large: il porte une
+ * decision, pas un raccourci.
+ */
+.scoutBar {
+    position: absolute;
+    left: 50%;
+    bottom: var(--vo-space-6);
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-4);
+    max-width: min(680px, calc(100vw - var(--vo-space-8)));
+    padding: var(--vo-space-2) var(--vo-space-2) var(--vo-space-2) var(--vo-space-4);
+    border-radius: var(--vo-radius-pill);
+    border: 1px solid var(--vo-line-strong);
+    background: rgba(22, 22, 26, 0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: var(--vo-shadow-3);
+    font-size: var(--vo-text-xs);
+    color: var(--vo-text-2);
+}
+
+.scoutBarLead {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    white-space: nowrap;
+}
+
+.scoutBarLead strong {
+    color: var(--vo-text);
+    font-weight: 590;
+}
+
+.scoutBarLead svg {
+    color: var(--vo-text-3);
+}
+
+.scoutBarDim {
+    color: var(--vo-text-3);
+}
+
+.scoutBarWarn {
+    min-width: 0;
+    color: var(--vo-warning);
+    line-height: 1.4;
+}
+
+.scoutBarActions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    margin-left: auto;
+}
+
+@media (max-width: 640px) {
+    .scoutBar {
+        flex-wrap: wrap;
+        border-radius: var(--vo-radius-lg);
+        padding: var(--vo-space-3);
+    }
+
+    .scoutBarActions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+}

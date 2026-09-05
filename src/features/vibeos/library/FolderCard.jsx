@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, CloudOff, Cloud, FolderPlus, Pencil, Trash2 } from 'lucide-react';
+import { Check, CloudOff, Cloud, FolderPlus, Heart, Laptop, Pencil, Trash2 } from 'lucide-react';
 import { formatBytes } from './libraryDb';
 import { thumbUrl } from './useLibrary';
 import { FOLDER_NAME_MAX } from './folderNaming';
@@ -19,6 +19,12 @@ import styles from './library.module.css';
  *
  * Le nom se renomme sur place, comme sur un bureau: un clic sur le crayon, on
  * tape, Entree valide, Echap annule.
+ *
+ * Un dossier de TRI se lit d'un coup d'oeil comme different: sa poche est
+ * hachuree, il porte "Sur cet appareil" au lieu de l'etat de sauvegarde, et sa
+ * ligne de stats compte les photos gardees plutot que le poids. Rien de tout
+ * cela n'est decoratif: c'est ce qui empeche de croire qu'un tri en cours est
+ * une collection sauvegardee.
  */
 const FolderCard = React.memo(function FolderCard({
     folder, position, revealer, onOpen, onRename, onDelete,
@@ -65,6 +71,7 @@ const FolderCard = React.memo(function FolderCard({
             data-position={position}
             data-testid="vibeos-library-folder"
             data-folder-id={folder.id}
+            data-scout={folder.scout ? 'true' : 'false'}
         >
             <button
                 type="button"
@@ -124,7 +131,9 @@ const FolderCard = React.memo(function FolderCard({
                 )}
                 <p className={styles.folderStats} data-numeric>
                     {folder.count} photo{folder.count > 1 ? 's' : ''}
-                    {folder.count ? ` · ${formatBytes(folder.bytes)}` : ''}
+                    {folder.scout
+                        ? ` · ${folder.favoriteCount || 0} gardée${(folder.favoriteCount || 0) > 1 ? 's' : ''}`
+                        : folder.count ? ` · ${formatBytes(folder.bytes)}` : ''}
                 </p>
             </div>
 
@@ -149,7 +158,21 @@ const FolderCard = React.memo(function FolderCard({
                 </button>
             </div>
 
-            {folder.cloudBadge ? (
+            {folder.scout ? (
+                <span className={styles.folderCloud} data-state="local" title="Ces photos ne sont pas sauvegardées : elles sont juste affichées depuis ton appareil.">
+                    <Laptop size={11} />
+                    <span>Sur cet appareil</span>
+                </span>
+            ) : null}
+
+            {folder.scout && folder.favoriteCount ? (
+                <span className={styles.folderKept} title={`${folder.favoriteCount} photo(s) gardée(s)`}>
+                    <Heart size={10} fill="currentColor" />
+                    <span data-numeric>{folder.favoriteCount}</span>
+                </span>
+            ) : null}
+
+            {!folder.scout && folder.cloudBadge ? (
                 <span
                     className={styles.folderCloud}
                     data-state={folder.cloudBadge.state}
