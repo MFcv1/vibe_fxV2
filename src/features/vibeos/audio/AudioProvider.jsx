@@ -30,6 +30,7 @@ export function VibeOsAudioProvider({ children }) {
     const queueRef = useRef([]);
     const resolverRef = useRef(null);
     const shuffleRef = useRef(false);
+    const repeatRef = useRef(false);
     const playTrackRef = useRef(null);
     const requestIdRef = useRef(0);
 
@@ -40,6 +41,7 @@ export function VibeOsAudioProvider({ children }) {
     const [progress, setProgress] = useState({ currentTime: 0, duration: 0 });
     const [volume, setVolumeState] = useState(DEFAULT_VOLUME);
     const [shuffle, setShuffle] = useState(false);
+    const [repeat, setRepeat] = useState(false);
     const [queueLength, setQueueLength] = useState(0);
 
     useEffect(() => {
@@ -58,6 +60,14 @@ export function VibeOsAudioProvider({ children }) {
             setStatus((current) => (current === 'error' ? current : 'paused'));
         };
         const onEnded = () => {
+            /* Repeter relit la MEME piste sans repasser par la resolution de
+               source: on rembobine l'element, ce qui evite un re-telechargement
+               et garde la boucle sans coupure. */
+            if (repeatRef.current) {
+                audio.currentTime = 0;
+                audio.play().catch(() => setIsPlaying(false));
+                return;
+            }
             setIsPlaying(false);
             playTrackRef.current?.stepQueue(1, { auto: true });
         };
@@ -102,6 +112,13 @@ export function VibeOsAudioProvider({ children }) {
     const toggleShuffle = useCallback(() => {
         setShuffle((current) => {
             shuffleRef.current = !current;
+            return !current;
+        });
+    }, []);
+
+    const toggleRepeat = useCallback(() => {
+        setRepeat((current) => {
+            repeatRef.current = !current;
             return !current;
         });
     }, []);
@@ -238,6 +255,8 @@ export function VibeOsAudioProvider({ children }) {
         setVolume,
         shuffle,
         toggleShuffle,
+        repeat,
+        toggleRepeat,
         queueLength,
         setQueue,
         setSourceResolver,
@@ -249,7 +268,8 @@ export function VibeOsAudioProvider({ children }) {
         stop,
     }), [
         track, isPlaying, status, error, progress, volume, setVolume, shuffle, toggleShuffle,
-        queueLength, setQueue, setSourceResolver, playTrack, toggle, seek, next, previous, stop,
+        repeat, toggleRepeat, queueLength, setQueue, setSourceResolver, playTrack, toggle, seek,
+        next, previous, stop,
     ]);
 
     return <AudioContextVo.Provider value={value}>{children}</AudioContextVo.Provider>;

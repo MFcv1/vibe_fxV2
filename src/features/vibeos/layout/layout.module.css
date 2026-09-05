@@ -1100,24 +1100,8 @@
 }
 
 /* ---------- Apercu Instagram ---------- */
-.previewAuditHead {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--vo-space-3);
-    padding: var(--vo-space-3) var(--vo-space-4);
-    border: 1px solid var(--vo-line);
-    border-radius: var(--vo-radius-md);
-    background: var(--vo-surface-2);
-}
-
-.previewAuditHead div { display: grid; gap: 2px; }
-.previewAuditHead strong { font-size: var(--vo-text-sm); }
-.previewAuditHead div span { color: var(--vo-text-2); font-size: var(--vo-text-xs); font-variant-numeric: tabular-nums; }
-.previewReady { padding: 4px 9px; border-radius: var(--vo-radius-pill); background: var(--vo-success-quiet, rgba(34, 197, 94, 0.12)); color: var(--vo-success, #55c98a); font-size: var(--vo-text-xs); font-weight: 600; }
 .previewState { display: grid; min-height: 220px; place-items: center; color: var(--vo-text-2); }
 .previewStateError { color: var(--vo-danger); }
-.referencePhoneStage { width: 100%; height: min(72dvh, 760px); min-height: 440px; overflow: hidden; }
 
 /* ---------- Export ---------- */
 .exportRow {
@@ -1180,4 +1164,527 @@
     .templateCategory {
         white-space: nowrap;
     }
+}
+
+/* ---------- Apercu Instagram plein cadre (mode immersive) ----------
+   Trois colonnes: images du post / iPhone / ambiance sonore. La hauteur vient
+   du panneau immersive (100dvh - bandeau VibeOS), donc chaque colonne defile
+   pour son compte et la page ne scrolle jamais. */
+.previewStageGrid {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr) 340px;
+    height: 100%;
+    min-height: 0;
+    background: var(--vo-bg-sunken);
+}
+
+/* ---------- Colonne gauche: images du post ---------- */
+.postRail,
+.postRailPlaceholder {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--vo-line);
+}
+
+.postRail {
+    gap: var(--vo-space-3);
+    padding: var(--vo-space-4) var(--vo-space-3);
+    overflow-y: auto;
+}
+
+.postRailHead {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+}
+
+.postRailList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.postRailItem {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--vo-space-2);
+    width: 100%;
+    padding: var(--vo-space-1);
+    border: 0;
+    border-radius: var(--vo-radius-md);
+    background: transparent;
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.postRailItem:hover { background: var(--vo-surface-2); }
+.postRailItem[data-active='true'] { background: var(--vo-accent-quiet); }
+
+.postRailIndex {
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    font-variant-numeric: tabular-nums;
+}
+
+.postRailItem[data-active='true'] .postRailIndex { color: var(--vo-accent); }
+
+.postRailThumb {
+    display: block;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--vo-radius-sm);
+    background: var(--vo-surface-2);
+    box-shadow: inset 0 0 0 1px var(--vo-line);
+}
+
+.postRailItem[data-active='true'] .postRailThumb { box-shadow: inset 0 0 0 1px var(--vo-accent-line); }
+.postRailThumb img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- Colonne centre: l'iPhone ---------- */
+.previewStageMain {
+    /* Positionne: c'est LUI qui doit ancrer la bascule, sinon elle s'accroche
+       au panneau immersif et atterrit sur la colonne musique. */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--vo-space-6) var(--vo-space-4) var(--vo-space-5);
+}
+
+/* En `grid` + `place-items: center`, l'item est centre donc dimensionne par son
+   contenu: le `height: 100%` du telephone ne se resout plus contre une hauteur
+   definie, et l'echelle calculee par ScaledStage reste celle d'AVANT
+   l'apparition de la barre - le telephone deborde alors sur le player. En
+   `flex` avec l'etirement par defaut, l'emplacement impose sa hauteur, et
+   ScaledStage recalcule juste. `overflow: hidden` est la ceinture: quoi qu'il
+   arrive, rien ne sort de l'emplacement. */
+.previewStagePhone {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Une legende, pas une carte: les metadonnees de format n'ont pas a porter un
+   fond, une bordure et une pastille au-dessus de l'apercu. */
+.previewStageCaption {
+    flex: none;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+/* ---------- Colonne droite: ambiance sonore ---------- */
+.soundPanel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-left: 1px solid var(--vo-line);
+    background: var(--vo-surface);
+}
+
+.soundPanelBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+    flex: 1;
+    min-height: 0;
+    padding: var(--vo-space-4);
+}
+
+.soundChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vo-space-2);
+}
+
+.soundChip {
+    padding: 5px var(--vo-space-3);
+    border: 1px solid var(--vo-line);
+    border-radius: var(--vo-radius-pill);
+    background: transparent;
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-xs);
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease), border-color var(--vo-dur-1) var(--vo-ease);
+}
+
+.soundChip:hover { color: var(--vo-text); border-color: var(--vo-line-strong); }
+.soundChip[data-active='true'] { color: var(--vo-accent); border-color: var(--vo-accent-line); }
+
+.soundResults {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0 calc(-1 * var(--vo-space-2));
+}
+
+.soundLoading {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    padding: var(--vo-space-4) var(--vo-space-2);
+    color: var(--vo-text-2);
+    font-size: var(--vo-text-sm);
+}
+
+.soundRow {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--vo-space-3);
+    width: 100%;
+    min-height: 52px;
+    padding: var(--vo-space-2);
+    border: 0;
+    border-radius: var(--vo-radius-md);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease);
+}
+
+.soundRow:hover { background: var(--vo-surface-2); }
+.soundRow[data-active='true'] { background: var(--vo-accent-quiet); }
+
+.soundRowArt { position: relative; display: grid; place-items: center; }
+
+.soundRowArtIcon {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--vo-radius-sm);
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    opacity: 0;
+    transition: opacity var(--vo-dur-1) var(--vo-ease);
+}
+
+.soundRow:hover .soundRowArtIcon,
+.soundRow[data-active='true'] .soundRowArtIcon { opacity: 1; }
+
+.soundRowMain { display: grid; gap: 1px; min-width: 0; }
+
+.soundRowTitle {
+    overflow: hidden;
+    color: var(--vo-text);
+    font-size: var(--vo-text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soundRowArtist {
+    overflow: hidden;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soundRowDuration {
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    font-variant-numeric: tabular-nums;
+}
+
+.soundNowPlaying {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--vo-space-3);
+    flex: none;
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border-top: 1px solid var(--vo-line);
+}
+
+.soundNowMain { display: grid; gap: 1px; min-width: 0; }
+
+.soundNowTitle {
+    overflow: hidden;
+    font-size: var(--vo-text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soundNowArtist {
+    overflow: hidden;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.soundHint {
+    display: flex;
+    align-items: center;
+    gap: var(--vo-space-2);
+    flex: none;
+    padding: var(--vo-space-3) var(--vo-space-4);
+    border-top: 1px solid var(--vo-line);
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+}
+
+/* Sous 1180px la pellicule se resserre, sous 1024px elle sort: l'iPhone et le
+   choix de la musique passent avant l'index des images. */
+@media (max-width: 1180px) {
+    .previewStageGrid { grid-template-columns: 104px minmax(0, 1fr) 304px; }
+}
+
+@media (max-width: 1024px) {
+    .previewStageGrid { grid-template-columns: minmax(0, 1fr) 300px; }
+    .postRail,
+    .postRailPlaceholder { display: none; }
+}
+
+@media (max-width: 820px) {
+    .previewStageGrid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+    .soundPanel { border-left: 0; border-top: 1px solid var(--vo-line); max-height: 46%; }
+}
+
+/* ---------- Pochettes du catalogue CC ---------- */
+.soundArt,
+.soundArtFallback {
+    display: block;
+    flex: none;
+    border-radius: var(--vo-radius-sm);
+    object-fit: cover;
+    background: var(--vo-surface-3);
+}
+
+.soundArtFallback {
+    display: grid;
+    place-items: center;
+    color: var(--vo-text-3);
+}
+
+.soundNowArtist a,
+.soundHint a {
+    color: var(--vo-text-2);
+    text-decoration: none;
+    border-bottom: 1px solid var(--vo-line-strong);
+}
+
+.soundNowArtist a:hover,
+.soundHint a:hover { color: var(--vo-accent); border-bottom-color: var(--vo-accent-line); }
+
+.soundHint { align-items: flex-start; line-height: 1.45; }
+.soundHint svg { flex: none; margin-top: 2px; }
+
+/* ---------- Bascule Grand / Écoute ----------
+   En mode « grand » la barre n'est pas masquee, elle n'est pas rendue: zero
+   pixel pris au telephone. */
+.modeBascule {
+    /* Dans le noir vide en haut a gauche de la scene: elle ne recouvre ni le
+       telephone ni la colonne musique. */
+    position: absolute;
+    top: var(--vo-space-3);
+    left: var(--vo-space-4);
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--vo-radius-pill);
+    background: color-mix(in srgb, var(--vo-surface) 78%, transparent);
+    box-shadow: inset 0 0 0 1px var(--vo-line-strong);
+    backdrop-filter: blur(18px) saturate(160%);
+}
+
+.modeBascule button {
+    padding: 4px 11px;
+    border: 0;
+    border-radius: var(--vo-radius-pill);
+    background: transparent;
+    color: var(--vo-text-3);
+    font: inherit;
+    font-size: var(--vo-text-xs);
+    cursor: pointer;
+    transition: background var(--vo-dur-1) var(--vo-ease), color var(--vo-dur-1) var(--vo-ease);
+}
+
+.modeBascule button:hover { color: var(--vo-text-2); }
+.modeBascule button[aria-pressed='true'] { background: var(--vo-surface-3); color: var(--vo-text); }
+.modeBascule button:focus-visible { outline: 2px solid var(--vo-accent); outline-offset: 1px; }
+
+/* ---------- Barre de lecture du mode écoute (72 px) ---------- */
+.playerBar {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) minmax(0, 2.1fr) minmax(150px, 1fr);
+    align-items: center;
+    gap: var(--vo-space-4);
+    flex: none;
+    width: 100%;
+    max-width: 940px;
+    height: 72px;
+    padding: 0 var(--vo-space-4);
+    border-radius: var(--vo-radius-md);
+    background: var(--vo-surface);
+    box-shadow: inset 0 0 0 1px var(--vo-line);
+}
+
+.playerBar[data-vide='true'] { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+.playerVide { color: var(--vo-text-3); font-size: var(--vo-text-sm); text-align: center; }
+
+.playerIdent {
+    display: grid;
+    grid-template-columns: 48px minmax(0, auto);
+    justify-content: start;
+    align-items: center;
+    gap: var(--vo-space-3);
+    min-width: 0;
+}
+
+.playerArt,
+.playerArtVide {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--vo-radius-sm);
+    object-fit: cover;
+    background: var(--vo-surface-3);
+}
+
+.playerTxt { display: grid; gap: 2px; min-width: 0; }
+
+.playerTitre {
+    overflow: hidden;
+    font-size: var(--vo-text-base);
+    font-weight: 500;
+    letter-spacing: -0.006em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playerSous {
+    overflow: hidden;
+    color: var(--vo-text-3);
+    font-size: var(--vo-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playerCentre { display: grid; justify-items: center; gap: 5px; width: 100%; min-width: 0; }
+.playerCmd { display: flex; align-items: center; gap: var(--vo-space-3); }
+
+.pbtn {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--vo-radius-pill);
+    background: transparent;
+    color: var(--vo-text-2);
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease), transform var(--vo-dur-1) var(--vo-ease), background var(--vo-dur-1) var(--vo-ease);
+}
+
+.pbtn:hover { color: var(--vo-text); transform: scale(1.06); }
+.pbtn:active { transform: scale(0.94); }
+.pbtn:focus-visible { outline: 2px solid var(--vo-accent); outline-offset: 2px; }
+.pbtn[aria-pressed='true'] { color: var(--vo-accent); }
+
+/* Le seul objet plein de la barre. */
+.pbtn[data-principal='true'] {
+    width: 34px;
+    height: 34px;
+    background: var(--vo-text);
+    color: var(--vo-bg-sunken);
+}
+
+.pbtn[data-principal='true']:hover { background: #fff; transform: scale(1.07); }
+
+.playerScrub {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    align-items: center;
+    gap: var(--vo-space-2);
+    width: 100%;
+}
+
+.playerScrub time { color: var(--vo-text-3); font-size: var(--vo-text-xs); font-variant-numeric: tabular-nums; }
+.playerScrub time:last-child { text-align: right; }
+
+.rail,
+.railVolume {
+    position: relative;
+    display: block;
+    height: 4px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-surface-3);
+    cursor: pointer;
+    touch-action: none;
+}
+
+/* Zone de clic plus haute que le trait: viser 4 px a la souris est injouable. */
+.rail::before,
+.railVolume::before { content: ''; position: absolute; inset: -8px 0; }
+
+.railVolume { width: 68px; }
+
+.railFill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-text-2);
+}
+
+.railTete {
+    position: absolute;
+    top: 50%;
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+    border-radius: var(--vo-radius-pill);
+    background: var(--vo-text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    transition: opacity var(--vo-dur-1) var(--vo-ease);
+}
+
+.rail:hover .railFill,
+.railVolume:hover .railFill { background: var(--vo-accent); }
+.rail:hover .railTete,
+.railVolume:hover .railTete,
+.rail:focus-visible .railTete,
+.railVolume:focus-visible .railTete { opacity: 1; }
+
+.rail:focus-visible,
+.railVolume:focus-visible { outline: 2px solid var(--vo-accent); outline-offset: 4px; }
+
+.playerOutils { display: flex; align-items: center; justify-content: flex-end; gap: var(--vo-space-2); }
+
+.obtn {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--vo-radius-sm);
+    background: transparent;
+    color: var(--vo-text-3);
+    cursor: pointer;
+    transition: color var(--vo-dur-1) var(--vo-ease), background var(--vo-dur-1) var(--vo-ease);
+}
+
+.obtn:hover { color: var(--vo-text); background: var(--vo-surface-2); }
+.obtn:focus-visible { outline: 2px solid var(--vo-accent); outline-offset: 2px; }
+
+@media (max-width: 1024px) {
+    .playerBar { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+    .playerOutils { display: none; }
 }

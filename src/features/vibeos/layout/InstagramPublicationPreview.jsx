@@ -42,9 +42,18 @@ function Avatar({ small = false }) {
     return <span className={small ? styles.avatarSmall : styles.avatar}>VF</span>;
 }
 
-function InstagramScreen({ galleryItems, name, description, hashtags }) {
+function InstagramScreen({ galleryItems, name, description, hashtags, activeIndex = null, onActiveIndexChange }) {
     const availableItems = galleryItems.slice(0, 10);
-    const [activeImageIndex, setActiveImageIndex] = React.useState(0);
+    /* Index controle quand la pellicule du mode immersif le pilote, interne
+       partout ailleurs: les autres appels gardent le comportement d'origine. */
+    const [internalIndex, setInternalIndex] = React.useState(0);
+    const controlled = Number.isInteger(activeIndex);
+    const activeImageIndex = controlled ? activeIndex : internalIndex;
+    const setActiveImageIndex = React.useCallback((update) => {
+        const next = typeof update === 'function' ? update(controlled ? activeIndex : internalIndex) : update;
+        if (!controlled) setInternalIndex(next);
+        onActiveIndexChange?.(next);
+    }, [activeIndex, controlled, internalIndex, onActiveIndexChange]);
     const pointerStart = React.useRef(null);
     const story = String(description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const title = String(name || '').trim() || 'Ton visuel VibeFX';
@@ -101,8 +110,23 @@ function InstagramScreen({ galleryItems, name, description, hashtags }) {
     );
 }
 
-export default function InstagramPublicationPreview({ galleryItems = [], name = '', description = '', hashtags = '', expanded = false }) {
-    return <ScaledPhone label="Aperçu Instagram sur iPhone 17 Pro" expanded={expanded}><PhoneChrome /><InstagramScreen galleryItems={galleryItems} name={name} description={description} hashtags={hashtags} /></ScaledPhone>;
+export default function InstagramPublicationPreview({
+    galleryItems = [], name = '', description = '', hashtags = '', expanded = false,
+    activeIndex = null, onActiveIndexChange,
+}) {
+    return (
+        <ScaledPhone label="Aperçu Instagram sur iPhone 17 Pro" expanded={expanded}>
+            <PhoneChrome />
+            <InstagramScreen
+                galleryItems={galleryItems}
+                name={name}
+                description={description}
+                hashtags={hashtags}
+                activeIndex={activeIndex}
+                onActiveIndexChange={onActiveIndexChange}
+            />
+        </ScaledPhone>
+    );
 }
 
 export function InstagramStoryPreview({ item, expanded = false }) {
