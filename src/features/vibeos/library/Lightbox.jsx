@@ -9,6 +9,7 @@ import {
 import { describeExif } from './exif';
 import { deviceLabel } from './photoImport';
 import { fullUrl, thumbUrl } from './useLibrary';
+import { SLIDE_MS, slideDuration } from './carouselCadence';
 import styles from './library.module.css';
 
 /*
@@ -53,8 +54,8 @@ const EXPO = 'cubic-bezier(0.25, 1, 0.5, 1)';
 /* Le renvoi vers la tuile est un trajet, pas une disparition: il part et il
    arrive, donc il s'amortit aux deux bouts. */
 const FLIGHT = 'cubic-bezier(0.45, 0, 0.15, 1)';
-const SLIDE_MS = 620;
 const CLOSE_MS = 620;
+
 /* Duree pendant laquelle les animations d'ouverture restent accrochees. Doit
    couvrir la plus tardive (fleches: 460 + 660 ms). */
 const ENTER_MS = 1200;
@@ -219,7 +220,6 @@ export default function Lightbox({
     photos, index, onIndexChange, onClose, onCloseStart, onEdit, onDelete, onFavorite,
     getTileRect, onNeedPixels, opening = false,
 }) {
-    const photo = photos[index] || null;
     const trackRef = useRef(null);
     const stageRef = useRef(null);
     const dragRef = useRef(null);
@@ -235,6 +235,10 @@ export default function Lightbox({
        termine. */
     const [pending, setPending] = useState(null);
     const visual = pending ?? index;
+    /* L'habillage suit le MOUVEMENT, pas l'etat pose: compteur, legende et
+       bouton Garder parlent de la photo vers laquelle on va. Sans ca, appuyer
+       sur F en plein glissement garderait celle qu'on vient de quitter. */
+    const photo = photos[visual] || null;
     const [strip, setStrip] = useState(false);
 
     /* Minuteries centralisees: a la fermeture, aucun rappel ne doit survivre au
@@ -290,10 +294,10 @@ export default function Lightbox({
         return (stage.width - item.width) / 2 - item.x;
     }, [layout, stage.width]);
 
-    const setTrackX = useCallback((x, animate) => {
+    const setTrackX = useCallback((x, animate, ms = SLIDE_MS) => {
         const node = trackRef.current;
         if (!node) return;
-        node.style.transition = animate ? `transform ${SLIDE_MS}ms ${EXPO}` : 'none';
+        node.style.transition = animate && ms > 0 ? `transform ${ms}ms ${EXPO}` : 'none';
         node.style.transform = `translate3d(${x}px, -50%, 0)`;
     }, []);
 
@@ -339,12 +343,20 @@ export default function Lightbox({
         });
     }, []);
 
-    /* Recentrage instantane a chaque changement de photo ou de taille. */
+    /*
+     * Recentrage instantane a chaque changement de photo ou de taille.
+     *
+     * Sauf pendant un glissement: `layout` se refabrique des que la liste de
+     * photos change d'identite - garder une photo au coeur suffit - et sans
+     * cette reserve, appuyer sur F pendant que le rail bouge le ferait sauter
+     * a sa position finale au milieu du mouvement.
+     */
     useLayoutEffect(() => {
         if (!layout) return;
+        if (pending !== null) return;
         setTrackX(offsetFor(index), false);
         slidingRef.current = false;
-    }, [layout, index, offsetFor, setTrackX]);
+    }, [layout, index, pending, offsetFor, setTrackX]);
 
     /*
      * Ouverture: la photo est CUEILLIE sur sa tuile.
@@ -393,24 +405,80 @@ export default function Lightbox({
         return () => window.clearTimeout(id);
     }, []);
 
+    /*
+     * Un appui n'est JAMAIS refuse.
+     *
+     * L'ancienne version rendait la main seulement a la fin des 620 ms et
+     * ignorait tout ce qui arrivait entre-temps : au clavier, quatre fleches
+     * rapides n'avancaient que d'une photo, sans rien signaler. On garde donc
+     * ici la photo VISEE (`aimRef`), qui avance a chaque appui, et on adapte la
+     * facon d'y aller :
+     *
+     * - au calme, le glissement complet ;
+     * - en rythme soutenu, un glissement plus court, taille dans l'ecart entre
+     *   deux appuis (`slideDuration`) ;
+     * - en rafale, ou pour un saut de plusieurs crans, une bascule seche - un
+     *   glissement sur dix photos n'aurait rien a montrer de toute facon.
+     */
+    const aimRef = useRef(index);
+    const cadenceRef = useRef(0);
+    const commitRef = useRef(null);
+
+    /* La visee doit suivre un changement d'index venu d'ailleurs (frise,
+       ouverture, suppression), sinon le prochain appui repartirait d'un cran
+       fantome. */
+    useEffect(() => {
+        if (pending === null) aimRef.current = index;
+    }, [index, pending]);
+
     const slideTo = useCallback((next) => {
-        if (slidingRef.current || state === 'closing') return;
-        if (next < 0 || next >= photos.length || next === index) return;
+        if (state === 'closing' || !photos.length) return;
+        const target = Math.max(0, Math.min(photos.length - 1, next));
+        if (target === aimRef.current) return;
+
+        const now = typeof performance === 'undefined' ? Date.now() : performance.now();
+        const gap = now - cadenceRef.current;
+        cadenceRef.current = now;
         setState((current) => (current === 'open' ? 'idle' : current));
-        /* Saut lointain (frise): bascule directe. Glisser sur dix photos
-           n'aurait aucun sens. */
-        if (Math.abs(next - index) !== 1 || !layout) {
-            onIndexChange(next);
+
+        /* Le rappel de la photo precedente n'a plus lieu d'etre: c'est lui qui,
+           en se declenchant en retard, faisait revenir le rail en arriere. */
+        if (commitRef.current !== null) {
+            window.clearTimeout(commitRef.current);
+            commitRef.current = null;
+        }
+
+        const pas = Math.abs(target - aimRef.current) === 1;
+        /*
+         * Le rail ne peut glisser que vers une diapositive REELLEMENT montee.
+         * La fenetre en tient `WINDOW` de chaque cote de l'index valide, et
+         * c'est bien `index` — pas la visee — qui la definit : pendant un
+         * glissement, l'index n'a pas encore bouge. La marge de WINDOW est ce
+         * qui permet d'INTERROMPRE un glissement lent par un glissement court
+         * au lieu de basculer sec, qui est le cas le plus courant quand on
+         * accelere en cours de route.
+         */
+        const montee = layout && Math.abs(target - index) <= WINDOW;
+        const ms = pas && montee ? slideDuration(gap) : 0;
+
+        aimRef.current = target;
+
+        if (ms === 0) {
+            slidingRef.current = false;
+            setPending(null);
+            onIndexChange(target);
             return;
         }
+
         slidingRef.current = true;
-        setPending(next);
-        restDistances(next);
-        setTrackX(offsetFor(next), true);
-        later(() => {
+        setPending(target);
+        restDistances(target);
+        setTrackX(offsetFor(target), true, ms);
+        commitRef.current = later(() => {
+            commitRef.current = null;
             setPending(null);
-            onIndexChange(next);
-        }, SLIDE_MS);
+            onIndexChange(target);
+        }, ms);
     }, [state, photos.length, index, layout, offsetFor, setTrackX, onIndexChange, later, restDistances]);
 
     /* ---------- Fermeture ---------- */
@@ -472,21 +540,48 @@ export default function Lightbox({
     }, [state, onClose, onCloseStart, later, index, photo, getTileRect]);
 
     /* ---------- Clavier ---------- */
+    /*
+     * Tout ce qui ressemble a "avance" avance.
+     *
+     * Les quatre fleches, parce qu'on ne regarde pas son clavier quand on trie
+     * et que le pouce tombe aussi bien sur bas que sur droite; Page suivante et
+     * l'espace, parce que c'est ce que fait un lecteur de documents; Debut et
+     * Fin pour les deux bouts d'un dossier de sept cents.
+     *
+     * `event.repeat` n'est PAS filtre: maintenir la fleche est la facon la plus
+     * rapide de parcourir un gros dossier, et c'est `slideDuration` qui absorbe
+     * la cadence. La visee part de `aimRef` et non de `index`, sinon deux
+     * appuis dans la meme animation viseraient deux fois la meme photo.
+     */
     useEffect(() => {
         const onKey = (event) => {
-            if (event.key === 'Escape') { event.preventDefault(); close(); }
-            else if (event.key === 'ArrowRight') slideTo(index + 1);
-            else if (event.key === 'ArrowLeft') slideTo(index - 1);
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
+            const cible = event.target;
+            const tag = cible?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || cible?.isContentEditable) return;
+
+            const aim = aimRef.current;
+            const key = event.key;
+
+            if (key === 'Escape') { event.preventDefault(); close(); return; }
+            if (key === 'ArrowRight' || key === 'ArrowDown' || key === 'PageDown' || key === ' ' || key === 'Spacebar') {
+                event.preventDefault(); slideTo(aim + 1); return;
+            }
+            if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp') {
+                event.preventDefault(); slideTo(aim - 1); return;
+            }
+            if (key === 'Home') { event.preventDefault(); slideTo(0); return; }
+            if (key === 'End') { event.preventDefault(); slideTo(photos.length - 1); return; }
             /* Trier sans lacher le clavier: la main droite garde les fleches,
                le pouce fait F. C'est le geste repete sept cents fois. */
-            else if ((event.key === 'f' || event.key === 'F') && photos[index]?.scout) {
+            if ((key === 'f' || key === 'F') && photos[aim]?.scout) {
                 event.preventDefault();
-                onFavorite?.(photos[index]);
+                onFavorite?.(photos[aim]);
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [close, slideTo, index, photos, onFavorite]);
+    }, [close, slideTo, photos, onFavorite]);
 
     /* Le fond de page ne doit pas defiler derriere le carrousel. */
     useEffect(() => {
@@ -601,7 +696,7 @@ export default function Lightbox({
 
             <header className={styles.lightboxBar}>
                 <span className={styles.lightboxCount} data-numeric>
-                    {index + 1} / {photos.length}
+                    {visual + 1} / {photos.length}
                 </span>
                 <div className={styles.lightboxActions}>
                     {/* Pendant un tri, il n'y a qu'un geste qui compte, et il

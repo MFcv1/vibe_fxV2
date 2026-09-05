@@ -395,12 +395,13 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- libraryScout.js         # Mode TRI (2026-09-05) : regarder des centaines de photos sans en copier une. Poignees `File` de la session (par id ET par signature nom|taille|date), rattachement apres rechargement d'onglet, plafond propre au tri (3000 / 2 Go) qui protege l'onglet et pas la facture. Module pur, teste hors navigateur
 |   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. Lecture Blob par chemin SDK authentifié puis URL tokenisée en repli ; la fiche Firestore est écrite EN DERNIER
 |   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
+|   |   |   |-- carouselCadence.js      # Duree du glissement du carrousel en fonction du RYTHME des appuis (2026-09-05) : glissement complet au calme, taille dans l'ecart en rythme soutenu, bascule seche en rafale. Regle tenue : le glissement finit avant l'appui suivant. Module pur, teste hors navigateur
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
 |   |   |   |-- useLibrary.js           # Etat : dossiers + photos, import sequentiel avec progression dans un dossier, renommage, suppression profonde, filtres appareil/look/recherche, tris, quota, cache des URLs d'objet
 |   |   |   |-- LibraryScreen.jsx       # Deux vues dans un seul écran : cartes de DOSSIERS et GRILLE masonry. « Retoucher » crée un projet photo puis pousse /creer/vision, avec état Ouverture, verrou anti-double-clic et erreur explicite
 |   |   |   |-- FolderCard.jsx          # Carte de dossier : dos + onglet, deux epaisseurs de tirages, couverture, rabat translucide portant le compteur ; renommage sur place, suppression, pastille de sauvegarde
 |   |   |   |-- ImportSheet.jsx         # Fenetre d'import : destination (nouveau dossier nomme ou dossier existant), sources adaptees a l'appareil, jauge de quota. Montee seulement quand elle est ouverte
-|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement, frise, clavier. Un aperçu cassé est relancé avec URL versionnée (cache Safari), puis retente l'original avant démontage : jamais d'icône « ? »
+|   |   |   |-- Lightbox.jsx            # Carrousel plein écran : zoom partagé FLIP, vignette avant pleine résolution, rail de 3 diapositives, glissement à cadence adaptative (aucun appui perdu, voir `carouselCadence.js`), frise, clavier complet (4 flèches, Espace, Page, Début/Fin, F pour garder). Un aperçu cassé est relancé avec URL versionnée (cache Safari), puis retente l'original avant démontage : jamais d'icône « ? »
 |   |   |   `-- library.module.css
 |   |   |-- layout/                     # Ecran Layout reel (phase B tranches 1+2+3) - moteurs vibefx-studio importes, jamais reecrits
 |   |   |   |-- useLayoutEditor.js      # Composition des moteurs existants (useLayoutState/CanvasRenderer/CanvasEvents/LayoutHelpers/ImageUpload/Export) + fonds generes (applyLayoutMesh/applyLumenBackground/clearGeneratedBackground, smoothBlur), textures multiples + opacite, zones custom (add/update/delete/clear via utils/customLayout), grilles editoriales (applyGridPreset/transformGrid + recompilation au changement de format, sauf grille retouchee a la main), historique undo/redo 30 etats (miroir VibeFxStudio) + Cmd+Z/Shift+Cmd+Z, import par slot, templates thematiques, reprise et sauvegarde du projet (Blobs IndexedDB) + vignette 256px
@@ -659,6 +660,57 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 octies (carrousel : il suit le rythme, il ne perd plus rien)
+
+**Le constat, sur de vraies photos.** Sur un dossier de tri de 264 photos, le
+carrousel etait « lent et a moitie bugge des qu'on veut aller vite ». C'etait
+exact et l'explication tient en une ligne : `slideTo` commencait par
+`if (slidingRef.current) return;`. Chaque fleche verrouillait le carrousel
+pendant 620 ms et JETAIT tout ce qui arrivait pendant ce temps. Plafond reel :
+une photo et demie par seconde, sans le moindre signal. D'ou l'impression que le
+clavier ne repondait pas — alors que les fleches a l'ecran, elles, marchaient
+(on ne clique pas plus vite que toutes les 620 ms).
+
+**Ce qui remplace le verrou.** Une photo VISEE (`aimRef`) qui avance a chaque
+appui, quoi qu'il arrive, et une duree d'animation taillee dans le rythme
+(`carouselCadence.js`). La regle : le glissement doit etre fini avant l'appui
+suivant.
+
+- appui isole apres une pause : les 620 ms, inchangees ;
+- rythme soutenu : duree = 90 % de l'ecart mesure (320 ms d'ecart -> 288 ms) ;
+- rafale, typiquement une touche maintenue qui se repete toutes les 35 ms :
+  plus d'animation, bascule seche, comme l'apercu du Finder.
+
+Une premiere formule interpolait lineairement entre les deux seuils. Le test
+`LA promesse` l'a prise en defaut : 215 ms d'animation pour 214 ms d'ecart. D'ou
+la marge de 90 %.
+
+**Clavier elargi.** Les quatre fleches (on ne regarde pas son clavier en
+triant), Espace et Page suivante/precedente, Debut et Fin. `event.repeat` n'est
+pas filtre : maintenir la fleche est la facon la plus rapide de parcourir sept
+cents photos, et c'est la cadence qui absorbe. Les champs de saisie et les
+raccourcis a modificateur sont laisses tranquilles.
+
+**Deux corrections de fond trouvees en route :**
+
+- l'habillage (compteur, legende, bouton Garder) suivait `index`, pose a la FIN
+  du glissement : appuyer sur F en plein mouvement gardait la photo qu'on venait
+  de quitter. Il suit maintenant `visual` ;
+- le recentrage instantane se declenchait des que `layout` changeait d'identite
+  — garder une photo suffisait — et coupait le glissement en cours. Il s'abstient
+  tant qu'un glissement est en vol.
+
+**Verifie dans le navigateur, sur 60 photos.** 15 vraies frappes clavier
+enchainees font exactement 15 photos (1 -> 16) ; avant, une dizaine de frappes
+rapides en faisaient une. La duree reellement ecrite dans le DOM suit la
+cadence : 620 ms isole, 288 ms a 320 ms d'ecart, aucune animation en rafale.
+Toutes les touches ajoutees repondent. Non verifie : la sensation a 60 images
+par seconde sous Safari — c'est un jugement d'oeil, pas une mesure.
+
+Fichiers ajoutes : `carouselCadence.js`.
+Fichiers touches : `Lightbox.jsx`, `scripts/smoke-vibeos-library.mjs`.
+Gate : `npm run test:vibeos-library`.
 
 ## Journal — 2026-09-05 septies (bibliotheque : trier avant d'importer)
 

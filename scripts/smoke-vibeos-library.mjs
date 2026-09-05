@@ -126,6 +126,9 @@ try {
     const scoutModule = await importAppModule(
         p("src", "features", "vibeos", "library", "libraryScout.js"), "libraryScout",
     );
+    const cadenceModule = await importAppModule(
+        p("src", "features", "vibeos", "library", "carouselCadence.js"), "carouselCadence",
+    );
 
     /* ---------- 0. Reconnaissance HEIC ---------- */
     console.log("HEIC");
@@ -464,6 +467,63 @@ try {
         assert.equal(gate.accepted, 2);
         assert.match(gate.message, /tri/i);
         assert.doesNotMatch(gate.message, /biblioth/i);
+    });
+
+
+    /* ---------- 7. Cadence du carrousel ----------
+     * La promesse est verifiable en une phrase: le glissement doit etre fini
+     * avant l'appui suivant. Si ce n'est pas vrai, les appuis se marchent
+     * dessus et le carrousel a l'air casse — c'est le defaut constate sur un
+     * dossier de 264 photos.
+     */
+    console.log("Cadence du carrousel");
+    const {
+        slideDuration, SLIDE_MS, SLIDE_MIN, CADENCE_CALME, CADENCE_RAFALE,
+    } = cadenceModule;
+
+    check("le premier appui, sans passe, obtient le glissement complet", () => {
+        assert.equal(slideDuration(Number.NaN), SLIDE_MS);
+        assert.equal(slideDuration(Infinity), SLIDE_MS);
+        assert.equal(slideDuration(5000), SLIDE_MS);
+    });
+
+    check("qui prend son temps garde le glissement complet", () => {
+        assert.equal(slideDuration(CADENCE_CALME), SLIDE_MS);
+        assert.equal(slideDuration(CADENCE_CALME + 200), SLIDE_MS);
+    });
+
+    check("une touche maintenue ne glisse plus du tout", () => {
+        /* Une repetition clavier tombe vers 30-40 ms. */
+        assert.equal(slideDuration(33), 0);
+        assert.equal(slideDuration(CADENCE_RAFALE), 0);
+    });
+
+    check("LA promesse : en regime rapide, le glissement finit avant l'appui suivant", () => {
+        /* Le regime calme (au-dela de CADENCE_CALME) en est exempt par choix :
+           voir le commentaire de `slideDuration`. */
+        for (let gap = CADENCE_RAFALE + 1; gap < CADENCE_CALME; gap += 1) {
+            const duree = slideDuration(gap);
+            assert.ok(
+                duree <= gap,
+                `a ${gap} ms d'ecart le glissement dure ${duree} ms : il deborde sur l'appui suivant`,
+            );
+        }
+    });
+
+    check("entre les deux, la duree ne fait que monter avec l'ecart", () => {
+        let precedent = -1;
+        for (let gap = 0; gap <= CADENCE_CALME + 50; gap += 5) {
+            const duree = slideDuration(gap);
+            assert.ok(duree >= precedent, `duree en baisse a ${gap} ms`);
+            precedent = duree;
+        }
+    });
+
+    check("une duree animee n'est jamais un tremblement", () => {
+        for (let gap = 0; gap <= 1000; gap += 1) {
+            const duree = slideDuration(gap);
+            assert.ok(duree === 0 || duree >= SLIDE_MIN, `duree batarde ${duree} ms a ${gap} ms`);
+        }
     });
 
 } finally {

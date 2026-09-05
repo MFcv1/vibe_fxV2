@@ -33,22 +33,48 @@ Module central : `src/features/vibeos/library/libraryScout.js`.
 ## État des gates
 
 - `npm run lint` : passe (avertissements préexistants ailleurs seulement).
-- `npm run test:vibeos-library` : passe, 7 vérifications ajoutées pour le tri.
-- Vérifié dans un navigateur Chromium sur 41 puis 12 photos générées plus un
-  vrai HEIC de 665 Ko.
+- `npm run test:vibeos-library` : passe, 13 vérifications ajoutées (7 pour le
+  tri, 6 pour la cadence du carrousel).
+- `npm run build` : passe.
+- Vérifié dans un navigateur Chromium sur 41, 12 puis 60 photos générées, plus
+  un vrai HEIC de 665 Ko.
+
+## Déploiement — à savoir
+
+Le rollout automatique est **désactivé** sur le backend App Hosting
+(`ABIU: Disabled`) : pousser sur `master` ne déploie rien, contrairement à ce
+que laisse croire `docs/developpement-local-et-couts.md`. Le rollout se lance à
+la main :
+
+    npx firebase-tools@latest apphosting:rollouts:create vibefx-v2-web --project vibefx-v2 -g <commit>
+
+La CI GitHub « Verify » est rouge depuis plusieurs commits, sur une fausse
+alerte : l'audit interdit le mot « Chawi » et le trouve à l'intérieur du LUT
+base64 de `src/features/vibefx-studio/utils/presets/lf08.js`. Ne pas toucher au
+preset ; c'est l'audit qu'il faut rendre aveugle aux charges encodées.
+
+## Le carrousel, corrigé dans la foulée
+
+Constaté sur 264 vraies photos : « lent et à moitié buggué si on veut aller
+vite ». `slideTo` verrouillait 620 ms et **jetait** les appuis reçus pendant ce
+temps. Remplacé par une photo visée qui avance à chaque appui, et une durée
+d'animation taillée dans le rythme (`carouselCadence.js`) : 620 ms au calme,
+90 % de l'écart en rythme soutenu, bascule sèche en rafale. Clavier élargi
+(4 flèches, Espace, Page, Début/Fin), répétition comprise.
 
 ## Non vérifié, à faire en premier
 
 1. **Safari sur Mac**, où le HEIC se décode NATIVEMENT (chemin
    `source.decodedFrom === 'native'` de `buildScoutRecord`). C'est le chemin
-   rapide et c'est le navigateur de Matthis ; il n'a jamais été joué.
+   rapide et c'est le navigateur de Matthis ; il n'a jamais été joué par un
+   agent.
 2. **Un vrai lot de plusieurs centaines de photos** : durée réelle, poids réel
    dans IndexedDB, fluidité de la grille.
-3. **Le carrousel avale les flèches pendant son animation** (`slideTo` refuse
-   pendant un glissement). Sur sept cents photos ça saute des images, et c'est
-   LE geste du tri : à corriger en premier.
-4. **Pas de touche « je jette »** : une touche X qui retire du tri et avance
-   d'un cran manque.
+3. **La sensation du carrousel à 60 images/seconde.** La cadence est mesurée
+   (durées écrites dans le DOM, aucun appui perdu sur 15 frappes enchaînées),
+   la fluidité perçue ne l'est pas.
+4. **Pas de touche « je jette »** : une touche X manque, et il faut trancher ce
+   qu'elle fait — supprimer l'aperçu, ou marquer « écartée » et masquer.
 
 ## Interdits
 

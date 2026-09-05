@@ -237,20 +237,24 @@ sur deux images très différentes), et un panneau **Masquage** non vide.
 
 ### Tri local — ce qui reste
 
-1. **Le carrousel avale les flèches pendant l'animation.** Enchaîner les touches
-   trop vite saute des photos : sur sept cents, ça se voit. C'est un
-   comportement d'origine du carrousel (`slideTo` refuse pendant un glissement),
-   pas du tri — mais c'est LE geste du tri, donc à corriger en premier.
-2. **Pas de touche « je jette ».** Aujourd'hui : **F** garde, la corbeille de la
-   tuile retire. Une touche X qui retire et avance d'un cran manque.
-3. **Poignées de fichiers perdues au rechargement.** Le bandeau le dit et propose
+1. **Pas de touche « je jette ».** Aujourd'hui : **F** garde, la corbeille de la
+   tuile retire. Une touche X manque — et il faut trancher ce qu'elle fait :
+   supprimer l'aperçu (irréversible sans re-scanner le dossier) ou marquer la
+   photo « écartée » et la masquer du parcours (réversible, mais demande un
+   filtre). La suppression actuelle passe par un `window.confirm`, incompatible
+   avec un tri rapide.
+2. **Poignées de fichiers perdues au rechargement.** Le bandeau le dit et propose
    « Retrouver les fichiers » (rapprochement par nom + taille + date de
    modification). Chrome pourrait faire mieux avec `showDirectoryPicker` et une
    poignée persistante ; Safari ne l'a pas, donc le rattachement reste la
    solution qui marche partout.
-4. **Un tri de plusieurs centaines de photos n'a pas été mesuré en vrai.** Vérifié
-   à 41 photos dans un navigateur Chromium. Sur Safari, le HEIC se décode
-   nativement (chemin `decodedFrom: 'native'`) — ce chemin-là n'a pas été joué.
+3. **Un tri de plusieurs centaines de photos n'a pas été mesuré en vrai.** Vérifié
+   à 41 puis 60 photos dans un navigateur Chromium. Sur Safari, le HEIC se
+   décode nativement (chemin `decodedFrom: 'native'`) — ce chemin-là n'a pas été
+   joué par un agent.
+4. **La sensation du carrousel à 60 images/seconde n'est pas mesurable ici.** La
+   cadence est vérifiée (durées, aucun appui perdu) ; la fluidité perçue sous
+   Safari reste un jugement d'œil.
 
 **Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
 bibliothèque Midjourney (routes et ledger intacts, cf. `src/config/aiLaunch.js`) ;
