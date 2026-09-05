@@ -294,6 +294,15 @@ passant.
    d'œil. Les trois seuils sont isolés dans `carouselCadence.js` — `SLIDE_MS`
    (calme), `SLIDE_MIN` (plancher), `CADENCE_CALME` — pour être recalés vite.
 
+### Gates rouges connus, non causés par le chantier en cours
+
+- `npm run test:vibeos-layout` : les 5 specs passent une par une et échouent
+  toutes ensemble (contournement d'authentification qui n'aboutit pas au
+  démarrage à froid, échec masqué par un `.catch(() => {})`). Vérifié sur arbre
+  propre.
+- CI GitHub « Verify » : fausse alerte, l'audit trouve le mot interdit à
+  l'intérieur du LUT base64 de `vibefx-studio/utils/presets/lf08.js`.
+
 **Hors chantier** — du choix produit, pas de la dette cachée : rail agents IA et
 bibliothèque Midjourney (routes et ledger intacts, cf. `src/config/aiLaunch.js`) ;
 synchro Google Drive de la photothèque ; couverture émulateurs du parcours

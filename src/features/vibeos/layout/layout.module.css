@@ -1688,3 +1688,167 @@
     .playerBar { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
     .playerOutils { display: none; }
 }
+
+/* ==========================================================================
+   Choisir une photo : les dossiers, puis les photos du dossier
+   ========================================================================== */
+
+/*
+ * Les dossiers d'abord. Le panneau deversait toute la photothèque en vignettes
+ * carrees minuscules: a six cents photos on ne distinguait plus rien. Une carte
+ * de dossier se lit, se compte, et divise le probleme.
+ */
+.pickerFolders {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: var(--vo-space-4);
+    padding-top: var(--vo-space-2);
+}
+
+.pickerFolder {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--vo-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.pickerFolderCover {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-3);
+    overflow: hidden;
+    transition: border-color var(--vo-dur-2) var(--vo-ease), transform var(--vo-dur-2) var(--vo-ease-out);
+}
+
+.pickerFolderCover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pickerFolder:hover .pickerFolderCover {
+    transform: translateY(-2px);
+    border-color: var(--vo-accent-line);
+}
+
+.pickerFolder:focus-visible .pickerFolderCover {
+    outline: none;
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+}
+
+.pickerFolderCount {
+    position: absolute;
+    right: var(--vo-space-2);
+    bottom: var(--vo-space-2);
+    padding: 3px 7px;
+    border-radius: var(--vo-radius-pill);
+    font-family: var(--vo-font-numeric);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--vo-text);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.pickerFolderName {
+    font-size: var(--vo-text-sm);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- A l'interieur d'un dossier ---- */
+
+.pickerInside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+}
+
+.pickerBack {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--vo-text-2);
+    font: inherit;
+    font-size: var(--vo-text-xs);
+    cursor: pointer;
+}
+
+.pickerBack:hover {
+    color: var(--vo-text);
+}
+
+.pickerFolderTitle {
+    font-size: var(--vo-text-sm);
+    font-weight: 590;
+    color: var(--vo-text);
+}
+
+.pickerFolderTitle span {
+    font-weight: 400;
+    color: var(--vo-text-3);
+}
+
+/* Maconnerie: chaque photo garde son rapport de forme, et la largeur est celle
+   reellement disponible dans le panneau - pas une colonne devinee. */
+.pickerGrid {
+    position: relative;
+    width: 100%;
+    margin-top: var(--vo-space-1);
+}
+
+.pickerPhoto {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--vo-radius-md);
+    border: 1px solid var(--vo-line);
+    background: var(--vo-surface-2);
+    color: var(--vo-text-3);
+    cursor: pointer;
+    transition: border-color var(--vo-dur-2) var(--vo-ease), opacity var(--vo-dur-2) var(--vo-ease);
+}
+
+.pickerPhoto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pickerPhoto:hover {
+    border-color: var(--vo-accent);
+}
+
+.pickerPhoto:focus-visible {
+    outline: none;
+    border-color: var(--vo-accent);
+    box-shadow: 0 0 0 3px var(--vo-accent-quiet);
+}
+
+.pickerPhoto:disabled {
+    opacity: 0.5;
+    cursor: progress;
+}

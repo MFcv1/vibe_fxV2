@@ -411,7 +411,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- gridCatalog.js          # Liste unique partagee par le panneau et la bibliotheque : 24 grilles compilees + les 3 grilles historiques rangees en famille "Classiques", avec le compte par famille
 |   |   |   |-- GridCategoryMenu.jsx    # Selecteur de famille dans le panneau : le panneau affiche TOUTE la famille choisie, sans ouvrir la bibliotheque
 |   |   |   |-- SlotOverlay.jsx         # Couche posee sur l'apercu, une boite par case : « Importer » au survol d'une case vide ; sur une case pleine, poignee d'echange (haut gauche), corbeille rouge (haut droite) et barre de cadrage (bas) ; case selectionnee = deplacement de la photo a la souris + zoom a la molette. Les commandes s'adaptent a la taille de la case
-|   |   |   |-- SlotImportSheet.jsx     # « Ajouter des photos » : fichier de l'appareil ou photo de la bibliotheque VibeOS (lecture directe d'IndexedDB + rapatriement d'une photo qui n'existe que dans le compte). Deux modes : vers UNE case (elle se referme apres le choix) ou import general (elle reste ouverte pour en prendre plusieurs)
+|   |   |   |-- SlotImportSheet.jsx    # Choisir une photo pour une case : DOSSIERS puis maconnerie du dossier ouvert (2026-09-05). Les dossiers de tri sont exclus (apercus seuls). Lit IndexedDB directement, redescend du compte a la demande     # « Ajouter des photos » : fichier de l'appareil ou photo de la bibliotheque VibeOS (lecture directe d'IndexedDB + rapatriement d'une photo qui n'existe que dans le compte). Deux modes : vers UNE case (elle se referme apres le choix) ou import general (elle reste ouverte pour en prendre plusieurs)
 |   |   |   |-- GridLibrarySheet.jsx    # Navigateur des grilles (6 familles + recherche) ; chaque carte montre la meme grille en 4:5 ET en 1:1, le format actif encadre. Les 3 grilles historiques y entrent comme grilles figees
 |   |   |   |-- ZoneOverlay.jsx         # Editeur de zones du modele personnalise pose sur l'apercu : deplacement, poignee de redimension, suppression (geometrie d'interface uniquement, le rendu reste au moteur)
 |   |   |   |-- InstaPreviewSheet.jsx   # Apercu plein cadre (Sheet `immersive` : le bandeau VibeOS reste, pas d'en-tete de sheet) en 3 colonnes : images du post / iPhone / ambiance sonore. Porte l'index actif du carrousel
@@ -663,6 +663,36 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-05 quaterdecies (choisir une photo : les dossiers, puis une vraie grille)
+
+**Constate en usage.** Le panneau « Ajouter une photo » de la mise en page
+deversait TOUTE la photothèque en vignettes carrees minuscules, a ratio fixe.
+Avec six cents photos, on ne distinguait plus rien et il fallait faire defiler
+des milliers de pixels pour trouver la bonne.
+
+Le panneau a maintenant deux etapes, comme la bibliotheque : les DOSSIERS
+d'abord (couverture, nom, compte), puis les photos du dossier choisi, posees en
+maconnerie — chacune a son vrai rapport de forme, dans la largeur reellement
+mesuree du panneau, avec un retour « Tous les dossiers ».
+
+Les dossiers de TRI n'y apparaissent pas : ils ne contiennent que des apercus,
+sans fichier utilisable pour une mise en page. Leurs photos deviennent
+disponibles ici une fois passees par « Importer » depuis le tri.
+
+Verifie dans le navigateur : deux dossiers listes avec leur couverture et leur
+compte, le tri correctement absent, la grille en maconnerie remplie sur toute la
+largeur du panneau, le retour, et surtout la non-regression — choisir une photo
+la pose toujours dans la mise en page.
+
+**Gate `npm run test:vibeos-layout` : rouge, et elle l'etait DEJA.** Les cinq
+specs passent une par une (4,4 s) et echouent toutes ensemble, sur un
+contournement d'authentification qui n'aboutit pas au demarrage a froid — le
+clic est avale par un `.catch(() => {})`, donc l'echec se manifeste 30 s plus
+tard sur une assertion trompeuse. Verifie sur arbre propre, changements mis de
+cote : memes cinq echecs. Ce n'est donc pas ce lot.
+
+Fichiers touches : `SlotImportSheet.jsx`, `layout.module.css`.
 
 ## Journal — 2026-09-05 terdecies (Room : les vignettes en point d'interrogation)
 
