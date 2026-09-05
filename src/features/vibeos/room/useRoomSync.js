@@ -81,13 +81,22 @@ export default function useRoomSync({ status, reload }) {
                 remotes.forEach((remote) => {
                     const local = parId.get(remote.id);
                     if (!local) { aEcrire.push(recordFromRemote(remote)); return; }
-                    /* Deja la: seul l'ordre peut avoir bouge ailleurs. */
+                    /* Deja la: l'ordre peut avoir bouge ailleurs. */
                     const memeOrdre = (local.order || 0) === (remote.order || 0);
                     const memeUrl = (local.cloud?.url || null) === (remote.url || null);
-                    if (memeOrdre && memeUrl) return;
+                    /*
+                     * Le poids manque aux fiches ecrites avant qu'il existe. Sans
+                     * cette reprise, elles ne l'auraient JAMAIS: rien d'autre ne
+                     * les fait reecrire, et « deja dans ce dossier » ne peut plus
+                     * les reconnaitre. C'est ce qui faisait reproposer les
+                     * trente-cinq images d'une file deja rangee.
+                     */
+                    const poidsManquant = !local.bytes && Boolean(remote.bytes);
+                    if (memeOrdre && memeUrl && !poidsManquant) return;
                     aEcrire.push({
                         ...local,
                         order: remote.order || 0,
+                        bytes: local.bytes || remote.bytes || 0,
                         cloud: {
                             state: 'synced',
                             path: remote.path || null,
