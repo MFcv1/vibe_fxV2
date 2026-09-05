@@ -100,12 +100,12 @@ const LOCAL_PART = 0.01;    /* ...a condition que ca touche au moins 1 % du cadr
  */
 const REGLAGES = [
     /* --- Lumiere --- */
-    { cle: 'brightness', label: 'Luminosité', panneau: true, sur: [85, 92, 108, 115], libre: [60, 140] },
+    { cle: 'brightness', label: 'Luminosité', panneau: true, sur: [85, 92, 108, 115], libre: [40, 200] },
     { cle: 'contrast', label: 'Contraste', panneau: true, sur: [80, 90, 112, 125], libre: [60, 180] },
     { cle: 'highlights', label: 'Hautes lumières', panneau: true, sur: [-45, -20, 20, 35], libre: [-50, 50] },
     { cle: 'shadows', label: 'Ombres', panneau: true, sur: [-35, -15, 20, 45], libre: [-50, 50] },
     /* --- Couleur --- */
-    { cle: 'temperature', label: 'Température', panneau: true, sur: [-22, -10, 10, 22], libre: [-30, 30] },
+    { cle: 'temperature', label: 'Température', panneau: true, sur: [-45, -22, 22, 45], libre: [-120, 120] },
     { cle: 'saturation', label: 'Saturation', panneau: true, sur: [45, 80, 110, 120], libre: [0, 180] },
     { cle: 'vibrance', label: 'Éclat des couleurs', panneau: true, sur: [-45, -20, 20, 45], libre: [-50, 50] },
     { cle: 'skinSaturation', label: 'Teintes de peau', panneau: true, sur: [-20, -10, 8, 15], libre: [-30, 30] },
