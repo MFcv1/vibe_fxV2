@@ -33,11 +33,17 @@ import styles from './layout.module.css';
 const GAP = 8;
 const DENSITY = 4;
 export default function SlotImportSheet({
-    open, slotLabel = '', targetsSlot = true, onClose, onPickFile, onPickBlob, onPickDevice,
+    open, slotLabel = '', targetsSlot = true, title = null,
+    onClose, onPickFile, onPickBlob, onPickDevice,
 }) {
     const [photos, setPhotos] = useState(null);
     const [folders, setFolders] = useState([]);
-    /* On rouvre toujours sur les dossiers: c'est la vue qui permet de choisir. */
+    /*
+     * Le dossier ouvert SURVIT a la fermeture du panneau, et c'est voulu: on
+     * pioche presque toujours plusieurs photos de suite dans le meme dossier.
+     * « Tous les dossiers » ramene en arriere, et un dossier disparu retombe
+     * tout seul sur la liste.
+     */
     const [openFolderId, setOpenFolderId] = useState(null);
     const [busyId, setBusyId] = useState(null);
     const [error, setError] = useState('');
@@ -127,7 +133,7 @@ export default function SlotImportSheet({
         <Sheet
             open={open}
             onClose={onClose}
-            title={targetsSlot ? `Ajouter une photo — ${slotLabel}` : 'Ajouter des photos'}
+            title={title || (targetsSlot ? `Ajouter une photo — ${slotLabel}` : 'Ajouter des photos')}
             wide
         >
             <div className={styles.slotImportActions}>

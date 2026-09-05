@@ -5,7 +5,6 @@ import {
     Columns2, Download, ImageOff, ImagePlus, Images, Layers, Redo2, RotateCcw, Search,
     ShieldCheck, Sparkles, Star, Undo2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
-import Link from 'next/link';
 import {
     Badge, Button, Collapsible, IconButton, Segmented, Sheet, Slider, useToast,
 } from '../primitives';
@@ -14,6 +13,7 @@ import { visionBoundsFor } from '../../vibefx-studio/utils/visionColorScience';
 import BeforeAfter, { COMPARE_MODES } from '../shared/BeforeAfter';
 import PipelineSourceNote from '../project/PipelineSourceNote';
 import useVisionEditor from './useVisionEditor';
+import SlotImportSheet from '../layout/SlotImportSheet';
 import { describeSignals } from './autoEnhance';
 import {
     buildPresetCollections, filterAndGroupPresets, PRESET_COLLECTION_ALL,
@@ -245,6 +245,43 @@ export default function VisionScreen() {
     const [presetQuery, setPresetQuery] = useState('');
     const [favoritesOnly, setFavoritesOnly] = useState(false);
     const importRef = useRef(null);
+    /*
+     * Choisir dans la bibliotheque SANS quitter Vision.
+     *
+     * Le bouton menait vers `/creer/bibliotheque`: on perdait l'ecran, ses
+     * reglages et son historique pour aller chercher une photo, puis il fallait
+     * revenir. Layout ouvre un panneau lateral pour la meme chose; Vision fait
+     * desormais pareil, avec le meme composant.
+     */
+    const [libraryOpen, setLibraryOpen] = useState(false);
+
+    /*
+     * La photo choisie passe par le VRAI champ de fichiers de l'ecran.
+     *
+     * `handleImageUpload` attend un evenement de champ (`event.target.files`,
+     * puis remise a zero de sa valeur) et fait bien plus que charger une image:
+     * il efface la composition Layout et reecrit la source du projet. Rejouer ce
+     * chemin exactement, plutot que d'en fabriquer un seul autre, evite d'avoir
+     * deux facons differentes d'entrer une photo dans Vision.
+     */
+    const pickFromLibrary = useCallback((blob, name = 'photo.jpg') => {
+        const input = importRef.current;
+        if (!input) return;
+        const file = blob instanceof File
+            ? blob
+            : new File([blob], name, { type: blob.type || 'image/jpeg' });
+        try {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch {
+            /* Navigateur sans `DataTransfer` constructible: on appelle le
+               gestionnaire avec la meme forme d'evenement. */
+            handleImageUpload({ target: { files: [file], value: '' } });
+        }
+        setLibraryOpen(false);
+    }, [handleImageUpload]);
 
     const {
         exportName, setExportName, exportFormat, setExportFormat,
@@ -437,9 +474,13 @@ export default function VisionScreen() {
                             >
                                 <Columns2 size={15} />
                             </IconButton>
+                            {/* Une seule porte pour changer de photo: le panneau
+                                offre l'appareil ET la bibliotheque. Aller droit au
+                                selecteur de fichiers privait des photos deja
+                                triees des qu'une image etait chargee. */}
                             <IconButton
                                 label="Changer de photo"
-                                onClick={() => importRef.current?.click()}
+                                onClick={() => setLibraryOpen(true)}
                                 data-testid="vibeos-vision-change-photo"
                             >
                                 <ImagePlus size={15} />
@@ -495,13 +536,13 @@ export default function VisionScreen() {
                                 Importer une photo
                             </Button>
                             <Button
-                                as={Link}
-                                href="/creer/bibliotheque"
                                 variant="secondary"
                                 size="lg"
                                 icon={<Images size={15} />}
+                                onClick={() => setLibraryOpen(true)}
+                                data-testid="vibeos-vision-open-library"
                             >
-                                Ouvrir la bibliothèque
+                                Depuis ma bibliothèque
                             </Button>
                         </div>
                     </div>
@@ -534,7 +575,7 @@ export default function VisionScreen() {
                                 variant="ghost"
                                 size="sm"
                                 icon={<ImagePlus size={13} />}
-                                onClick={() => importRef.current?.click()}
+                                onClick={() => setLibraryOpen(true)}
                             >
                                 Changer de photo
                             </Button>
@@ -862,6 +903,17 @@ export default function VisionScreen() {
                     Télécharger
                 </Button>
             </Sheet>
+
+            {/* Le meme panneau que dans Layout: dossiers, puis maconnerie. */}
+            <SlotImportSheet
+                open={libraryOpen}
+                title="Choisir une photo"
+                targetsSlot
+                onClose={() => setLibraryOpen(false)}
+                onPickBlob={pickFromLibrary}
+                onPickFile={pickFromLibrary}
+                onPickDevice={() => importRef.current?.click()}
+            />
         </div>
     );
 }

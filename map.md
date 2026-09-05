@@ -664,6 +664,37 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 quindecies (Vision choisit sa photo sans quitter l'ecran)
+
+**Demande de l'utilisateur, apres avoir vu les deux comportements cote a cote.**
+Layout ouvre un panneau lateral pour choisir une photo; Vision, lui, envoyait
+sur `/creer/bibliotheque` — on perdait l'ecran, ses reglages et son historique
+pour aller chercher une image, puis il fallait revenir.
+
+Vision monte desormais le MEME composant (`SlotImportSheet`), avec son titre a
+lui. La photo choisie passe par le vrai champ de fichiers de l'ecran plutot que
+par un second chemin d'entree: `handleImageUpload` ne fait pas que charger une
+image, il efface la composition Layout et reecrit la source du projet. Rejouer
+exactement ce chemin evite d'avoir deux facons differentes d'entrer une photo
+dans Vision. Repli si `DataTransfer` n'est pas constructible: on appelle le
+gestionnaire avec la meme forme d'evenement.
+
+**Corrige au passage.** « Changer de photo » — deux boutons — allait droit au
+selecteur de fichiers de l'appareil: des qu'une photo etait chargee, la
+bibliotheque devenait inaccessible depuis Vision. Les deux ouvrent maintenant le
+panneau, qui offre les deux sources.
+
+Le panneau garde le dossier ouvert d'une fois sur l'autre: on pioche presque
+toujours plusieurs photos de suite dans le meme dossier. `SlotImportSheet` gagne
+une prop `title`.
+
+Verifie dans le navigateur: le panneau s'ouvre sans quitter `/creer/vision`, les
+dossiers puis la maconnerie s'affichent, choisir une photo la charge dans Vision
+et referme le panneau, et « Changer de photo » ouvre bien le meme panneau une
+fois une photo en place. `npm run test:vibeos-vision` : 3 passent.
+
+Fichiers touches : `VisionScreen.jsx`, `SlotImportSheet.jsx`.
+
 ## Journal — 2026-09-05 quaterdecies (choisir une photo : les dossiers, puis une vraie grille)
 
 **Constate en usage.** Le panneau « Ajouter une photo » de la mise en page
