@@ -282,7 +282,24 @@ export default function RoomScreen() {
                                 </div>
 
                                 <div className={styles.cardThumb}>
-                                    <img src={item.url} alt={`Image ${index + 1} du post`} draggable={false} />
+                                    {/*
+                                      * Filet de securite: si l'adresse locale ne
+                                      * repond plus, on bascule sur la copie du
+                                      * compte plutot que de laisser un point
+                                      * d'interrogation. Une vignette cassee sur
+                                      * une file de dix images fait douter de tout
+                                      * le reste.
+                                      */}
+                                    <img
+                                        src={item.url || item.cloud?.url || undefined}
+                                        alt={`Image ${index + 1} du post`}
+                                        draggable={false}
+                                        onError={(event) => {
+                                            const secours = item.cloud?.url;
+                                            if (!secours || event.currentTarget.src === secours) return;
+                                            event.currentTarget.src = secours;
+                                        }}
+                                    />
                                 </div>
 
                                 <div className={styles.cardBottom}>

@@ -664,6 +664,40 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-05 terdecies (Room : les vignettes en point d'interrogation)
+
+**Constate en usage, sur la vraie Room.** Pendant la premiere montee vers le
+compte, des vignettes devenaient des points d'interrogation : les premieres
+d'abord, puis le defaut avancait avec l'envoi, et la derniere restait cassee.
+
+**Cause, et elle vient du lot precedent.** `itemFromRecord` fabriquait une
+NOUVELLE adresse d'objet a chaque relecture de la file, et `trackUrls` revoquait
+l'ancienne dans la foulee. Or chaque envoi vers le compte declenche une
+notification Firestore, donc une relecture : plusieurs relectures se
+chevauchaient, se terminaient dans le desordre, et l'ecran gardait des adresses
+qu'une autre venait de revoquer. Le navigateur affichait alors l'icone d'image
+cassee — exactement le symptome, y compris sa progression au rythme des envois.
+
+Trois corrections, de la racine vers la surface :
+
+- **une adresse par element, fabriquee une seule fois** (`urlFor`), gardee tant
+  que l'element est la. Elle ne change que dans un cas : un rendu venu du compte
+  qui recupere son fichier local ;
+- **`trackUrls` ne revoque plus que ce qui a quitte la file**, au lieu de tout
+  refaire a chaque passage ;
+- **un garde-fou d'ordre sur `reload`** : deux relectures lancees coup sur coup
+  se terminent parfois dans le desordre, seule la plus recente ecrit l'ecran.
+
+Plus un filet dans `RoomScreen` : une vignette dont l'adresse ne repond plus
+bascule sur la copie du compte au lieu de rester cassee.
+
+Verifie en local : les adresses restent identiques apres huit reordonnancements
+enchaines (avant, chacun en fabriquait de nouvelles), toutes les vignettes
+restent chargees, et une adresse cassee de force se retablit toute seule.
+
+Fichiers touches : `RoomProvider.jsx`, `RoomScreen.jsx`.
+Gate : `npm run test:vibeos-room`.
+
 ## Journal — 2026-09-05 duodecies (la Room suit le compte, plus le navigateur)
 
 **Constate par l'utilisateur.** File preparee sur le portable, introuvable sur

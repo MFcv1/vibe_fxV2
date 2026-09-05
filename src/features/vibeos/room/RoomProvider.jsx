@@ -44,7 +44,7 @@ export const ROOM_CAROUSEL_MAX = 10;
 
 const RoomContext = createContext(null);
 
-function itemFromRecord(record) {
+function itemFromRecord(record, url) {
     return {
         id: record.id,
         /* Venue du compte et pas encore rapatriee: elle s'affiche depuis son
@@ -59,7 +59,7 @@ function itemFromRecord(record) {
         formatLabel: record.formatLabel,
         projectTitle: record.projectTitle,
         createdAt: record.createdAt,
-        url: record.blob ? URL.createObjectURL(record.blob) : (record.cloud?.url || null),
+        url,
     };
 }
 
@@ -82,14 +82,32 @@ export function VibeOsRoomProvider({ children }) {
         itemsRef.current = items;
     }, [items]);
 
+    /*
+     * L'adresse d'affichage d'une image, fabriquee UNE SEULE FOIS par element.
+     *
+     * Elle etait refabriquee a chaque relecture de la file, et l'ancienne
+     * revoquee dans la foulee. Deux relectures qui se chevauchent - ce qui
+     * arrive a chaque envoi vers le compte, puisque chacun declenche une
+     * notification - pouvaient alors se terminer dans le desordre : l'ecran
+     * gardait des adresses que l'autre venait de revoquer, et les vignettes
+     * devenaient des points d'interrogation. Une adresse par element, gardee
+     * tant que l'element est la, supprime le probleme a la racine.
+     */
+    const urlFor = useCallback((record) => {
+        const connue = urlsRef.current.get(record.id);
+        /* Un rendu rapatrie depuis le compte remplace son adresse distante par
+           son fichier local: c'est le seul cas ou l'adresse doit changer. */
+        if (connue && !(record.blob && !isObjectUrl(connue))) return connue;
+        if (connue && isObjectUrl(connue)) URL.revokeObjectURL(connue);
+        const url = record.blob ? URL.createObjectURL(record.blob) : (record.cloud?.url || null);
+        if (url) urlsRef.current.set(record.id, url);
+        else urlsRef.current.delete(record.id);
+        return url;
+    }, []);
+
+    /* Ne revoque QUE ce qui a quitte la file. */
     const trackUrls = useCallback((nextItems) => {
-        const seen = new Set();
-        nextItems.forEach((item) => {
-            seen.add(item.id);
-            const ancienne = urlsRef.current.get(item.id);
-            if (ancienne && ancienne !== item.url && isObjectUrl(ancienne)) URL.revokeObjectURL(ancienne);
-            urlsRef.current.set(item.id, item.url);
-        });
+        const seen = new Set(nextItems.map((item) => item.id));
         urlsRef.current.forEach((url, id) => {
             if (seen.has(id)) return;
             if (isObjectUrl(url)) URL.revokeObjectURL(url);
@@ -99,13 +117,19 @@ export function VibeOsRoomProvider({ children }) {
 
     /* Relit la file depuis IndexedDB. La synchronisation s'en sert quand le
        compte a apporte quelque chose que cet appareil ne connaissait pas. */
+    /* Deux relectures lancees coup sur coup peuvent se terminer dans le
+       desordre. Seule la plus recente a le droit d'ecrire l'ecran. */
+    const reloadSeq = useRef(0);
     const reload = useCallback(async () => {
+        reloadSeq.current += 1;
+        const moi = reloadSeq.current;
         const records = await listRoomItems();
-        const loaded = records.map(itemFromRecord);
+        if (moi !== reloadSeq.current) return;
+        const loaded = records.map((record) => itemFromRecord(record, urlFor(record)));
         trackUrls(loaded);
         itemsRef.current = loaded;
         setItems(loaded);
-    }, [trackUrls]);
+    }, [trackUrls, urlFor]);
 
     useEffect(() => {
         let cancelled = false;
@@ -115,7 +139,7 @@ export function VibeOsRoomProvider({ children }) {
                 readRoomValidatedAt(),
             ]);
             if (cancelled) return;
-            const loaded = records.map(itemFromRecord);
+            const loaded = records.map((record) => itemFromRecord(record, urlFor(record)));
             trackUrls(loaded);
             setItems(loaded);
             setValidatedAt(storedValidatedAt || null);
@@ -124,7 +148,7 @@ export function VibeOsRoomProvider({ children }) {
         return () => {
             cancelled = true;
         };
-    }, [trackUrls]);
+    }, [trackUrls, urlFor]);
 
     /* Sauvegarde de la file dans le compte: c'est elle qui fait qu'une Room
        preparee sur un appareil se retrouve sur l'autre. */
@@ -199,12 +223,11 @@ export function VibeOsRoomProvider({ children }) {
         }));
 
         await putRoomItems(records);
-        const addedItems = records.map(itemFromRecord);
-        addedItems.forEach((item) => urlsRef.current.set(item.id, item.url));
+        const addedItems = records.map((record) => itemFromRecord(record, urlFor(record)));
         setItems((current) => [...current, ...addedItems]);
         invalidate();
         return { added: addedItems.length, total: existing.length + addedItems.length };
-    }, [invalidate]);
+    }, [invalidate, urlFor]);
 
     const removeItem = useCallback(async (id) => {
         const rows = await listRoomItems();
