@@ -212,6 +212,7 @@ export function VibeOsRoomProvider({ children }) {
             id: createRoomItemId(),
             order: existing.length + index,
             blob: slide.blob,
+            bytes: slide.blob?.size || 0,
             width: slide.width,
             height: slide.height,
             source: meta.source || 'layout',

@@ -35,6 +35,9 @@ export const COMPARE_MODES = [
 
 const clamp = (value) => Math.max(0, Math.min(100, value));
 
+/* Cote long maximal du canvas de l'original: voir le commentaire du dessin. */
+const MAX_BEFORE_SIDE = 2560;
+
 export default function BeforeAfter({
     beforeSrc,
     /* Rapport largeur/hauteur de la photo. Sans lui, le cadre ne serait borne
@@ -52,6 +55,7 @@ export default function BeforeAfter({
     testId = 'vibeos-before-after',
 }) {
     const stackRef = useRef(null);
+    const beforeRef = useRef(null);
     const handleRef = useRef(null);
     const draggingRef = useRef(false);
     const positionRef = useRef(defaultPosition);
@@ -69,6 +73,42 @@ export default function BeforeAfter({
     useEffect(() => {
         write(positionRef.current);
     }, [write, mode, active]);
+
+    const showBefore = active && beforeSrc && (mode !== 'hold' || holding);
+
+    /*
+     * Dessine l'original dans son canvas. Le cadre a
+     * deja le rapport de la photo, donc aucune deformation n'est possible, et
+     * le canvas se comporte exactement comme celui du rendu.
+     */
+    useEffect(() => {
+        const node = beforeRef.current;
+        if (!node || !showBefore || !beforeSrc) return undefined;
+        let vivant = true;
+        const img = new window.Image();
+        img.onload = () => {
+            if (!vivant) return;
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            if (!w || !h) return;
+            /*
+             * Borne obligatoire: une photo d'iPhone recente fait 9180 x 16320,
+             * soit 150 millions de pixels — un canvas de cette taille depasse
+             * les limites du navigateur et ne dessine rien du tout (ecran noir).
+             * Ce canvas ne sert qu'a AFFICHER l'original a cote du rendu; le
+             * cote long a 2560 px couvre largement un ecran Retina.
+             */
+            const echelle = Math.min(1, MAX_BEFORE_SIDE / Math.max(w, h));
+            node.width = Math.max(1, Math.round(w * echelle));
+            node.height = Math.max(1, Math.round(h * echelle));
+            const ctx = node.getContext('2d');
+            if (!ctx) return;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, node.width, node.height);
+        };
+        img.src = beforeSrc;
+        return () => { vivant = false; };
+    }, [beforeSrc, showBefore]);
 
     const positionFromEvent = useCallback((event) => {
         const rect = stackRef.current?.getBoundingClientRect();
@@ -142,7 +182,6 @@ export default function BeforeAfter({
         };
     }, []);
 
-    const showBefore = active && beforeSrc && (mode !== 'hold' || holding);
     const effectiveMode = !active ? 'off' : mode;
 
     return (
@@ -165,12 +204,26 @@ export default function BeforeAfter({
             {/* Le rendu courant: passe tel quel par l'ecran appelant (canvas). */}
             <div className={styles.after}>{children}</div>
 
+            {/*
+              * L'original passe par un CANVAS, comme le rendu.
+              *
+              * Il etait affiche par une balise image, et c'est ce qui faisait
+              * mentir la comparaison: le navigateur applique le profil couleur
+              * de la photo a une balise image (les photos d'iPhone sont en P3),
+              * alors qu'un canvas travaille en sRGB. Memes pixels, deux couleurs
+              * a l'ecran — on voyait donc un ecart au repos, sans avoir touche a
+              * un seul reglage.
+              *
+              * Les deux cotes suivent desormais le meme chemin: ce qui reste
+              * visible est ce que les reglages ont VRAIMENT change, et rien
+              * d'autre.
+              */}
             {showBefore ? (
-                <img
-                    src={beforeSrc}
-                    alt="Photo d'origine"
+                <canvas
+                    ref={beforeRef}
                     className={styles.before}
-                    draggable={false}
+                    aria-label="Photo d'origine"
+                    role="img"
                     data-testid={`${testId}-before`}
                 />
             ) : null}

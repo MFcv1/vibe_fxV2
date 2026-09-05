@@ -65,7 +65,20 @@ export async function listTargetFolders() {
 }
 
 /*
- * Ce qui reste vraiment a enregistrer dans un dossier.
+ * Signature d'un rendu: ses dimensions et son poids exact.
+ *
+ * Elle sert UNIQUEMENT a rattraper les dossiers remplis avant que le lien
+ * `fromRoomId` n'existe. Deux rendus differents de la meme photo n'ont pas le
+ * meme poids a l'octet pres - un preset change forcement quelques milliers
+ * d'octets de JPEG - donc la confusion demanderait deux images identiques, qui
+ * sont de toute facon interchangeables.
+ */
+function empreinte(largeur, hauteur, octets) {
+    return `${largeur || 0}x${hauteur || 0}:${octets || 0}`;
+}
+
+/*
+ * Ce qui est deja dans un dossier, et par quoi on le sait.
  *
  * La photo creee garde l'identifiant de l'element de Room dont elle vient
  * (`fromRoomId`). « Deja enregistree ici » se lit donc dans le dossier lui-meme,
@@ -73,17 +86,49 @@ export async function listTargetFolders() {
  * si on enregistre depuis un autre appareil, puisque la bibliotheque, elle, se
  * synchronise.
  *
+ * Les dossiers remplis AVANT l'existence de ce lien n'en ont pas. Sans
+ * rattrapage, ils reproposeraient indefiniment de tout reimporter — c'est
+ * exactement ce qui a ete constate. On les reconnait donc a l'empreinte, et on
+ * en profite pour ECRIRE le lien manquant: la fois d'apres, c'est exact.
+ */
+async function dejaDansLeDossier(folderId, items) {
+    if (!folderId) return { ids: new Set(), aReparer: [] };
+    const photos = (await listPhotos()).filter((photo) => photo.folderId === folderId);
+    const ids = new Set();
+    photos.forEach((photo) => { if (photo.fromRoomId) ids.add(photo.fromRoomId); });
+
+    const orphelines = photos.filter((photo) => !photo.fromRoomId);
+    const aReparer = [];
+    if (orphelines.length) {
+        const parEmpreinte = new Map();
+        items.forEach((item) => {
+            if (ids.has(item.id)) return;
+            const cle = empreinte(item.width, item.height, item.bytes || item.blob?.size);
+            if (!parEmpreinte.has(cle)) parEmpreinte.set(cle, []);
+            parEmpreinte.get(cle).push(item.id);
+        });
+        orphelines.forEach((photo) => {
+            const file = parEmpreinte.get(empreinte(photo.width, photo.height, photo.bytes));
+            const id = file?.shift();
+            if (!id) return;
+            ids.add(id);
+            aReparer.push({ ...photo, fromRoomId: id });
+        });
+    }
+    return { ids, aReparer };
+}
+
+/*
+ * Ce qui reste vraiment a enregistrer dans un dossier.
+ *
  * Un dossier NEUF ne filtre rien: le choisir est un geste explicite, on veut y
  * mettre toute la file.
  */
 export async function roomItemsLeftFor(folderId) {
     const items = await listRoomItems();
     if (!folderId) return { total: items.length, restants: items.length, deja: 0 };
-    const photos = await listPhotos();
-    const deja = new Set(photos
-        .filter((photo) => photo.folderId === folderId && photo.fromRoomId)
-        .map((photo) => photo.fromRoomId));
-    const restants = items.filter((item) => !deja.has(item.id)).length;
+    const { ids } = await dejaDansLeDossier(folderId, items);
+    const restants = items.filter((item) => !ids.has(item.id)).length;
     return { total: items.length, restants, deja: items.length - restants };
 }
 
@@ -105,13 +150,10 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
      * quatre images a une file de trente-six proposait de reimporter les
      * trente-six, et le dossier se remplissait de doublons.
      */
-    let dejaLa = new Set();
-    if (folderId) {
-        const photos = await listPhotos();
-        dejaLa = new Set(photos
-            .filter((photo) => photo.folderId === folderId && photo.fromRoomId)
-            .map((photo) => photo.fromRoomId));
-    }
+    const { ids: dejaLa, aReparer } = await dejaDansLeDossier(folderId, tous);
+    /* On pose le lien manquant sur les photos d'avant: la prochaine fois, la
+       reconnaissance sera exacte et ne dependra plus d'une empreinte. */
+    for (const photo of aReparer) await putPhoto(photo);
     const items = tous.filter((item) => !dejaLa.has(item.id));
     const ignorees = tous.length - items.length;
     if (!items.length) {

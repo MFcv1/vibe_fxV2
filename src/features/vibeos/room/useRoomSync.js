@@ -37,6 +37,10 @@ function recordFromRemote(remote) {
         /* Pas de fichier local: l'image s'affiche depuis son URL, et n'est
            rapatriee que si on en a besoin (enregistrement en bibliotheque). */
         blob: null,
+        /* Le poids sert a reconnaitre un rendu deja range en bibliotheque quand
+           le lien `fromRoomId` manque (voir `roomToLibrary`). Sans lui, un
+           element venu du compte serait toujours vu comme nouveau. */
+        bytes: remote.bytes || 0,
         width: remote.width || 0,
         height: remote.height || 0,
         source: remote.source || 'layout',

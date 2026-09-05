@@ -664,6 +664,53 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-06 quater (le avant/apres arrete de mentir, et Room reconnait l'existant)
+
+**1. L'ecart au repos etait un ecart d'AFFICHAGE, pas de traitement.**
+
+Constate et reconstate par l'utilisateur : sans toucher un seul reglage, l'apres
+n'etait pas l'avant. Le correctif du 2026-09-05 (`visionFiltersAreIdentity`)
+etait juste — les filtres sortent bien avant tout traitement — mais il ne
+pouvait pas regler ca, parce que la cause n'est pas dans le rendu.
+
+Mesure : le fichier de l'utilisateur est en **DCI-P3 D65** (`sips -g profile`).
+Or `BeforeAfter` affichait l'original dans une BALISE IMAGE, que le navigateur
+colorimetrie avec le profil du fichier, et le rendu dans un CANVAS, qui travaille
+en sRGB. Memes pixels — verifie, 1/255 d'ecart d'arrondi — deux couleurs a
+l'ecran. Sur un ciel, ca se voit.
+
+L'original passe donc par un canvas lui aussi. Les deux cotes suivent le meme
+chemin : ce qui reste visible est ce que les reglages ont vraiment change.
+
+Borne obligatoire au passage : une photo d'iPhone recente fait 9180 x 16320, soit
+150 millions de pixels. Un canvas de cette taille ne dessine RIEN (constate :
+ecran noir). Le cote long est ramene a 2560 px, largement au-dessus de ce qu'un
+ecran Retina affiche de cette zone.
+
+Ce qui n'est PAS fait : passer le moteur en P3. Les 261 presets sont cales a
+l'oeil sur le rendu sRGB actuel; c'est un chantier a part, avec mesure preset par
+preset.
+
+**2. Room ne reconnaissait pas les dossiers remplis avant `fromRoomId`.**
+
+Le lien pose sur la photo ne vaut que pour les enregistrements faits APRES sa
+mise en place : un dossier rempli avant reproposait de tout reimporter. C'est ce
+qui a ete constate sur « Room 5 09 », 32 images.
+
+Les photos sans lien sont donc rattrapees a l'empreinte (dimensions + poids
+exact), et le lien manquant est ECRIT au passage : la fois suivante, la
+reconnaissance est exacte et ne depend plus d'une empreinte. Un element de Room
+porte maintenant son poids (`bytes`), en local comme depuis le compte, sans quoi
+un element venu de l'autre appareil serait toujours vu comme nouveau.
+
+Verifie : dossier de 5 photos prive de tous ses liens, puis re-enregistrement —
+4 reconnues sur 5, la cinquieme etant une fiche de test synthetique sans poids ni
+fichier, donc traitee comme nouvelle. C'est le bon sens de l'erreur : reimporter
+une image de trop plutot qu'en sauter une.
+
+Fichiers touches : `BeforeAfter.jsx`, `roomToLibrary.js`, `RoomProvider.jsx`,
+`useRoomSync.js`.
+
 ## Journal — 2026-09-06 ter (Room : n'enregistrer que ce qui a ete ajoute depuis)
 
 **Constate en usage.** Une Room de 36 images deja enregistrees dans « Room 5 09 »
