@@ -17,7 +17,7 @@ import useLibrarySync from './useLibrarySync';
 import { DENSITY_MAX, DENSITY_MIN, layoutMasonry, resolveColumns } from './masonry';
 import { formatBytes, totalBytes } from './libraryDb';
 import { ACCEPTED_TYPES, deviceLabel } from './photoImport';
-import useLibrary, { SORTS, thumbUrl } from './useLibrary';
+import useLibrary, { fallbackUrl, SORTS, thumbUrl } from './useLibrary';
 import { hasSourceFile } from './libraryScout';
 import styles from './library.module.css';
 
@@ -181,14 +181,27 @@ const Tile = React.memo(function Tile({
                 >
                     {/* La photo se fond une fois decodee: on ne voit jamais un
                         rectangle vide monter puis se remplir. */}
+                    {/*
+                      * Une adresse d'objet peut mourir sans que ce soit un bug
+                      * (fichier deplace sur le disque, onglet reveille). Plutot
+                      * qu'un point d'interrogation au milieu de la grille, on
+                      * bascule une fois sur la copie du compte.
+                      */}
                     <img
-                        src={thumbUrl(photo)}
+                        src={thumbUrl(photo) || fallbackUrl(photo) || undefined}
                         alt=""
                         loading="lazy"
                         decoding="async"
                         data-loaded={loaded ? 'true' : 'false'}
                         onLoad={checkPixels}
-                        onError={() => setLoaded(true)}
+                        onError={(event) => {
+                            const secours = fallbackUrl(photo);
+                            if (secours && event.currentTarget.src !== secours) {
+                                event.currentTarget.src = secours;
+                                return;
+                            }
+                            setLoaded(true);
+                        }}
                     />
                 </button>
 

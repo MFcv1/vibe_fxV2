@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, Images, ImagePlus, Upload } from 'lucide-react';
 import { listFolders, listPhotos } from '../library/libraryDb';
 import { fetchBlob } from '../library/libraryCloud';
-import { thumbUrl } from '../library/useLibrary';
+import { fallbackUrl, thumbUrl } from '../library/useLibrary';
 import { layoutMasonry, resolveColumns } from '../library/masonry';
 import { Button, Sheet, Spinner } from '../primitives';
 import styles from './layout.module.css';
@@ -195,9 +195,18 @@ export default function SlotImportSheet({
                             title={folder.name}
                         >
                             <span className={styles.pickerFolderCover}>
-                                {folder.cover && thumbUrl(folder.cover)
-                                    ? <img src={thumbUrl(folder.cover)} alt="" />
-                                    : <Images size={18} />}
+                                {folder.cover && (thumbUrl(folder.cover) || fallbackUrl(folder.cover)) ? (
+                                    <img
+                                        src={thumbUrl(folder.cover) || fallbackUrl(folder.cover)}
+                                        alt=""
+                                        onError={(event) => {
+                                            const secours = fallbackUrl(folder.cover);
+                                            if (secours && event.currentTarget.src !== secours) {
+                                                event.currentTarget.src = secours;
+                                            }
+                                        }}
+                                    />
+                                ) : <Images size={18} />}
                                 <span className={styles.pickerFolderCount} data-numeric>
                                     {folder.photos.length}
                                 </span>
@@ -248,9 +257,21 @@ export default function SlotImportSheet({
                                     disabled={busyId === photo.id}
                                     title={photo.name || 'Photo'}
                                 >
-                                    {thumbUrl(photo)
-                                        ? <img src={thumbUrl(photo)} alt={photo.name || 'Photo de la bibliothèque'} />
-                                        : <ImagePlus size={16} />}
+                                    {/* Meme filet que dans la grille: ce panneau
+                                        partage le cache d'adresses, il subissait
+                                        donc les memes vignettes cassees. */}
+                                    {thumbUrl(photo) || fallbackUrl(photo) ? (
+                                        <img
+                                            src={thumbUrl(photo) || fallbackUrl(photo)}
+                                            alt={photo.name || 'Photo de la bibliothèque'}
+                                            onError={(event) => {
+                                                const secours = fallbackUrl(photo);
+                                                if (secours && event.currentTarget.src !== secours) {
+                                                    event.currentTarget.src = secours;
+                                                }
+                                            }}
+                                        />
+                                    ) : <ImagePlus size={16} />}
                                     {busyId === photo.id
                                         ? <span className={styles.slotLibraryBusy}><Spinner label="Ouverture" /></span>
                                         : null}

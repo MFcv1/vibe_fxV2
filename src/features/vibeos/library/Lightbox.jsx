@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { describeExif } from './exif';
 import { deviceLabel } from './photoImport';
-import { fullUrl, thumbUrl } from './useLibrary';
+import { fallbackUrl, fullUrl, thumbUrl } from './useLibrary';
 import { SLIDE_MS, slideDuration } from './carouselCadence';
 import styles from './library.module.css';
 
@@ -853,7 +853,7 @@ export default function Lightbox({
                             }
                         }}
                     >
-                        <img src={thumbUrl(item)} alt="" />
+                        <img src={thumbUrl(item) || fallbackUrl(item) || undefined} alt="" />
                     </button>
                 ))}
             </div>

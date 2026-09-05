@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, CloudOff, Cloud, FolderPlus, Heart, Laptop, Pencil, Trash2 } from 'lucide-react';
 import { formatBytes } from './libraryDb';
-import { thumbUrl } from './useLibrary';
+import { fallbackUrl, thumbUrl } from './useLibrary';
 import { FOLDER_NAME_MAX } from './folderNaming';
 import styles from './library.module.css';
 
@@ -91,7 +91,7 @@ const FolderCard = React.memo(function FolderCard({
                             key={photo.id}
                             className={styles.folderSheet}
                             data-depth={covers.length - 1 - depth}
-                            style={{ backgroundImage: `url(${thumbUrl(photo)})` }}
+                            style={{ backgroundImage: `url(${thumbUrl(photo) || fallbackUrl(photo) || ''})` }}
                         />
                     ))}
                     {empty ? (
@@ -99,7 +99,7 @@ const FolderCard = React.memo(function FolderCard({
                     ) : (
                         <span
                             className={styles.folderCover}
-                            style={{ backgroundImage: `url(${thumbUrl(covers[0])})` }}
+                            style={{ backgroundImage: `url(${thumbUrl(covers[0]) || fallbackUrl(covers[0]) || ''})` }}
                         />
                     )}
                     {/* La poche: c'est elle qui fait lire "dossier" et pas

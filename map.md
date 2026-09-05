@@ -664,6 +664,43 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-06 bis (bibliotheque : les vignettes en point d'interrogation)
+
+**Constate en usage**, dans la grille ET dans le panneau « Ajouter une photo ».
+
+**Audit.** Le cache d'adresses d'affichage (`thumbUrls`, `fullUrls` dans
+`useLibrary.js`) est un objet MODULE, indexe sur le seul identifiant de photo.
+Deux consequences, et les deux produisent des vignettes cassees :
+
+1. il est **partage** par la grille, le carrousel, les cartes de dossier et le
+   panneau de choix de photo. Quand un ecran revoquait l'adresse d'une photo —
+   `ensurePreview` le faisait a chaque vignette refabriquee — les autres
+   continuaient d'afficher une adresse morte, et rien ne les faisait se
+   redessiner. Le panneau, qui lit sa propre liste depuis IndexedDB, ne se
+   redessine JAMAIS pour cette raison : d'ou les « ? » persistants ;
+2. il n'etait **jamais invalide** quand l'image changeait. Une photo rapatriee
+   du compte (`hydrate` reecrit `thumbBlob`) ou dont la vignette venait d'etre
+   refaite gardait l'adresse de l'ANCIEN fichier.
+
+**Corrige.** L'entree de cache porte desormais le fichier qui l'a produite :
+meme fichier, meme adresse (donc toujours stable); fichier different, nouvelle
+adresse, et l'ancienne n'est revoquee qu'a l'instant ou la nouvelle la remplace.
+La revocation a distance disparait : `ensurePreview` ne revoque plus a la main,
+et seule la suppression d'une photo libere ses adresses.
+
+**Filet.** `fallbackUrl` (nouveau) rend la copie du compte, et la grille, le
+panneau, les couvertures de dossier et la frise du carrousel s'en servent quand
+une adresse refuse de se charger — une adresse d'objet peut mourir sans que ce
+soit un bug (fichier deplace sur le disque, onglet reveille).
+
+**Non reproduit chez moi.** Le defaut se declenche sur une photothèque
+synchronisee avec un compte, ce que le contournement d'authentification ne
+permet pas. Les causes ci-dessus sont lues dans le code et corrigees; la
+disparition du symptome se constatera en usage.
+
+Fichiers touches : `useLibrary.js`, `LibraryScreen.jsx`, `SlotImportSheet.jsx`,
+`FolderCard.jsx`, `Lightbox.jsx`.
+
 ## Journal — 2026-09-06 (Vision: retirer sa photo depuis la photo; Layout: comparer comme Vision)
 
 **Vision — une corbeille sur l'apercu.** Le seul bouton pour retirer la photo

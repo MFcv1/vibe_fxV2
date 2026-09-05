@@ -28,18 +28,48 @@ import {
  * garderait chaque Blob en memoire jusqu'a la fermeture de l'onglet.
  */
 
-const thumbUrls = new Map();
+/*
+ * Cache d'adresses d'affichage.
+ *
+ * Il etait indexe sur le SEUL identifiant de photo, et c'est ce qui produisait
+ * les vignettes en point d'interrogation :
+ *
+ * 1. il est MODULE, donc partage par la grille, le carrousel et le panneau
+ *    « Ajouter une photo ». Quand un ecran revoquait l'adresse d'une photo,
+ *    l'autre continuait d'afficher une adresse morte, et rien ne le faisait se
+ *    redessiner ;
+ * 2. il n'etait jamais invalide quand l'image changeait. Une photo rapatriee du
+ *    compte ou dont la vignette venait d'etre refaite gardait l'adresse de
+ *    l'ANCIEN fichier.
+ *
+ * On garde donc le cache - sans lui, chaque rendu de la grille recreerait une
+ * URL par vignette - mais l'entree porte desormais le fichier qui l'a produite.
+ * Si le fichier change, l'adresse change; s'il ne change pas, l'adresse est
+ * stable. Et on ne revoque plus une adresse tant qu'un autre ecran peut encore
+ * l'afficher : la revocation n'a lieu qu'a la suppression de la photo.
+ */
+const thumbUrls = new Map(); // id -> { blob, url }
 const fullUrls = new Map();
+
+function urlFromCache(cache, id, blob) {
+    const known = cache.get(id);
+    if (known && known.blob === blob) return known.url;
+    /* Le fichier a change: l'ancienne adresse ne designe plus cette photo. On
+       la revoque, mais seulement parce qu'on en pose une nouvelle dans la
+       foulee - jamais pour laisser un trou. */
+    if (known) URL.revokeObjectURL(known.url);
+    const url = URL.createObjectURL(blob);
+    cache.set(id, { blob, url });
+    return url;
+}
 
 export function thumbUrl(photo) {
     if (!photo) return null;
     /* Photo encore dans le nuage: on affiche l'apercu distant tel quel, il n'y a
        pas de Blob local a transformer en URL. */
-    if (!photo.thumbBlob && !photo.blob) return photo.previewUrl || null;
-    if (!thumbUrls.has(photo.id)) {
-        thumbUrls.set(photo.id, URL.createObjectURL(photo.thumbBlob || photo.blob));
-    }
-    return thumbUrls.get(photo.id);
+    const blob = photo.thumbBlob || photo.blob;
+    if (!blob) return photo.previewUrl || null;
+    return urlFromCache(thumbUrls, photo.id, blob);
 }
 
 export function fullUrl(photo) {
@@ -49,26 +79,28 @@ export function fullUrl(photo) {
        fait pour ca. Sans ce recours, l'ecran plein serait vide. */
     if (!photo.blob && photo.scout) return thumbUrl(photo);
     if (!photo.blob) return photo.originalUrl || photo.previewUrl || null;
-    if (!fullUrls.has(photo.id)) {
-        fullUrls.set(photo.id, URL.createObjectURL(photo.blob));
-    }
-    return fullUrls.get(photo.id);
+    return urlFromCache(fullUrls, photo.id, photo.blob);
+}
+
+/*
+ * L'adresse de secours d'une photo: sa copie dans le compte.
+ *
+ * Une adresse d'objet peut mourir pour des raisons qui ne sont pas des bugs -
+ * le fichier d'origine deplace sur le disque, un onglet qui a repris la main
+ * apres une mise en veille. L'ecran s'en sert quand une vignette refuse de se
+ * charger, plutot que d'afficher un point d'interrogation.
+ */
+export function fallbackUrl(photo) {
+    if (!photo) return null;
+    return photo.previewUrl || photo.originalUrl || null;
 }
 
 function releaseUrls(id) {
     [thumbUrls, fullUrls].forEach((cache) => {
-        const url = cache.get(id);
-        if (url) URL.revokeObjectURL(url);
+        const entry = cache.get(id);
+        if (entry) URL.revokeObjectURL(entry.url);
         cache.delete(id);
     });
-}
-
-/* Seule la vignette est liberee: la pleine resolution peut etre affichee au
-   meme instant par le carrousel, la revoquer la ferait disparaitre. */
-function releaseThumbUrl(id) {
-    const url = thumbUrls.get(id);
-    if (url) URL.revokeObjectURL(url);
-    thumbUrls.delete(id);
 }
 
 export const SORTS = [
@@ -539,7 +571,10 @@ export default function useLibrary() {
         if (!preview) return;
         const next = { ...photo, ...preview };
         await putPhoto(next);
-        releaseThumbUrl(photo.id);
+        /* Plus de revocation manuelle ici: elle laissait un trou entre le
+           moment ou l'adresse mourait et celui ou l'ecran se redessinait - et
+           les autres ecrans, eux, ne se redessinaient jamais. Le cache change
+           d'adresse tout seul parce que la vignette a change de fichier. */
         if (!mountedRef.current) return;
         setPhotos((current) => current.map((item) => (item.id === photo.id ? next : item)));
     }, []);
