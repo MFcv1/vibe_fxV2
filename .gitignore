@@ -55,6 +55,8 @@ next-env.d.ts
 
 # Reglages Claude Code personnels (permissions gcloud) — non versionnes
 .claude/settings.local.json
+# Copies de travail creees par les agents : locales a une machine
+.claude/worktrees/
 presets-lightroom/
 
 # Corpus de reference de `powlisher` : ces photos ne sont pas les notres.
