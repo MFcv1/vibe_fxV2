@@ -770,6 +770,19 @@ etant syntaxiquement valide. Elle a immediatement trouve un deuxieme cas,
 vrai bug, mais dans une UI qui n'est plus montee, donc laisse en avertissement
 plutot que reecrit a l'aveugle.
 
+**Rattrapage des presets (meme jour)** : les photos rangees avant le
+2026-09-06 s'affichaient sans etiquette de preset, alors que l'information
+existait toujours - dans la Room, sur l'image dont la photo vient
+(`formatLabel`). `planReconcile` la recopie desormais sur les fiches qui n'en
+ont pas (`presetDe`, `plan.aPreset`), et une fiche qui cumule deux corrections
+- lien manquant ET preset manquant - n'est ecrite qu'UNE fois. Seuls les rendus
+de Vision sont concernes: le `formatLabel` d'un rendu de Layout est un format
+d'export. **A faire tant que la Room porte encore les images**: une fois la
+file videe, le nom du look est perdu. Le rattrapage n'ecrit qu'en local: la
+fiche distante garde son ancien preset, donc un autre appareil doit jouer sa
+propre synchronisation (re-envoyer 100 images pleine definition pour une
+etiquette ne se justifie pas).
+
 **Deploiement** : le site se met en ligne avec `firebase deploy --only
 apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
 GitHub affiche par App Hosting (`ECFN15-vibe_fxV2`) est un vieux reste fige au

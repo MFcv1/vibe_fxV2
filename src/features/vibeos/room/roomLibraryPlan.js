@@ -89,6 +89,21 @@ function meilleure(liste, canonique) {
 }
 
 /*
+ * Le preset porte par une image de la Room, s'il y en a un.
+ *
+ * Vision range le nom du look applique dans `formatLabel` au moment d'envoyer
+ * le rendu vers la Room. Les rendus de Layout ne sont PAS concernes: leur
+ * `formatLabel` est un format d'export (« 4:5 », « Story »), pas un preset, et
+ * l'afficher comme tel serait un mensonge sur la vignette.
+ */
+export function presetDe(item) {
+    if (!item || item.source !== 'vision') return null;
+    const label = item.formatLabel;
+    if (!label || label === 'Photo') return null;
+    return { label };
+}
+
+/*
  * Le plan de synchronisation d'un dossier avec la file de la Room.
  *
  * Trois garanties tenues ici, et elles sont le coeur du sujet:
@@ -123,7 +138,20 @@ export function planReconcile({ roomItems = [], folderPhotos = [], folderId = nu
      * en entier a chaque enregistrement - c'est litteralement ce qui a rempli
      * le dossier de cent cinquante-quatre photos pour cent six images.
      */
-    const aReparer = [];
+    /*
+     * Les corrections a ecrire sur des fiches qui restent.
+     *
+     * Une meme photo peut en cumuler deux - retrouver son lien vers la Room ET
+     * recuperer le nom de son preset - donc on les empile sur la MEME entree
+     * plutot que d'ecrire deux fois la fiche, la seconde ecriture effacant la
+     * premiere.
+     */
+    const patchs = new Map();
+    const patcher = (photo, champs) => {
+        const suivant = { ...(patchs.get(photo.id) || photo), ...champs };
+        patchs.set(photo.id, suivant);
+        return suivant;
+    };
     const parEmpreinte = new Map();
     roomItems.forEach((item) => {
         if (parRoom.has(item.id)) return;
@@ -138,8 +166,7 @@ export function planReconcile({ roomItems = [], folderPhotos = [], folderId = nu
         const file = cle ? parEmpreinte.get(cle) : null;
         const roomId = file?.shift();
         if (!roomId) { orphelines.push(photo); return; }
-        const repare = { ...photo, fromRoomId: roomId };
-        aReparer.push(repare);
+        const repare = patcher(photo, { fromRoomId: roomId });
         if (!parRoom.has(roomId)) parRoom.set(roomId, []);
         parRoom.get(roomId).push(repare);
     });
@@ -148,13 +175,37 @@ export function planReconcile({ roomItems = [], folderPhotos = [], folderId = nu
     const aSupprimer = [];
     const gardees = [];
     const retenues = [];
+    const gardeParRoom = new Map();
     roomItems.forEach((item) => {
         const copies = parRoom.get(item.id);
         if (!copies?.length) return;
         const garde = meilleure(copies, canonique(item));
         gardees.push({ roomId: item.id, photoId: garde.id });
         retenues.push(garde);
+        gardeParRoom.set(item.id, garde);
         copies.forEach((photo) => { if (photo.id !== garde.id) aSupprimer.push(photo.id); });
+    });
+
+    /*
+     * Le preset des fiches d'avant.
+     *
+     * Le nom du look n'a commence a suivre la photo que le 2026-09-06: tout ce
+     * qui avait ete range avant s'affiche sans etiquette, alors que
+     * l'information existe toujours - dans la Room, sur l'image dont la photo
+     * vient. On la recopie donc, tant que la Room la porte encore. Une fois la
+     * file videe, elle est perdue: c'est la seule raison de faire ce
+     * rattrapage MAINTENANT et pas plus tard.
+     */
+    const aPreset = [];
+    roomItems.forEach((item) => {
+        const preset = presetDe(item);
+        if (!preset) return;
+        const photo = gardeParRoom.get(item.id);
+        if (!photo) return;
+        const actuel = (patchs.get(photo.id) || photo).preset?.label || null;
+        if (actuel === preset.label) return;
+        patcher(photo, { preset });
+        aPreset.push(photo.id);
     });
 
     /*
@@ -217,9 +268,15 @@ export function planReconcile({ roomItems = [], folderPhotos = [], folderId = nu
         .filter((item) => !dejaLa.has(item.id))
         .map((item) => ({ item, photoId: canonique(item) }));
 
+    /* Une fiche corrigee puis jugee en trop ne doit pas etre reecrite avant
+       d'etre effacee: on la retire des corrections. */
+    const partantes = new Set(aSupprimer);
+    const aReparer = [...patchs.values()].filter((photo) => !partantes.has(photo.id));
+
     return {
         aCreer,
         aReparer,
+        aPreset: aPreset.filter((id) => !partantes.has(id)).length,
         aSupprimer: [...new Set(aSupprimer)],
         gardees,
         horsRoom: isolees.length,

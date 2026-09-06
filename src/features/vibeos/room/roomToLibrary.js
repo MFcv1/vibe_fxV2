@@ -2,7 +2,7 @@
 
 import { listRoomItems } from './roomDb';
 import { fetchRoomBlob } from './roomCloud';
-import { planReconcile, planVide, roomPhotoId } from './roomLibraryPlan';
+import { planReconcile, planVide, presetDe, roomPhotoId } from './roomLibraryPlan';
 import {
     createFolderId, deletePhoto, dropTombstones, listFolders, listPhotos, putFolder, putPhoto,
     putTombstones,
@@ -84,6 +84,7 @@ export async function previewRoomFolderSync(folderId) {
             aCreer: roomItems.length,
             aSupprimer: 0,
             aReparer: 0,
+            aPreset: 0,
             dejaLa: 0,
             horsRoom: 0,
             rienAFaire: !roomItems.length,
@@ -95,7 +96,10 @@ export async function previewRoomFolderSync(folderId) {
         total: plan.total,
         aCreer: plan.aCreer.length,
         aSupprimer: plan.aSupprimer.length,
-        aReparer: plan.aReparer.length,
+        /* Les liens seuls: le rattrapage des presets se dit a part, parce que
+           c'est ce que l'utilisateur VOIT changer sur ses vignettes. */
+        aReparer: plan.aReparer.length - plan.aPreset,
+        aPreset: plan.aPreset,
         dejaLa: plan.gardees.length,
         horsRoom: plan.horsRoom,
         rienAFaire: planVide(plan),
@@ -210,18 +214,10 @@ export async function syncRoomToFolder({ folderId = null, folderName = null, onP
                        peut pas fabriquer une copie. */
                     record.id = paire.photoId || record.id;
                     record.fromRoomId = paire.item.id;
-                    /*
-                     * Le preset applique suit la photo dans la bibliotheque.
-                     * Vision range son nom de preset dans `formatLabel` au
-                     * moment de l'envoi vers la Room; sans cette reprise,
-                     * l'information se perdait et la grille ne pouvait plus
-                     * afficher quel look avait ete pose. Les rendus de Layout ne
-                     * sont pas concernes: leur `formatLabel` est un format.
-                     */
-                    if (paire.item.source === 'vision' && paire.item.formatLabel
-                        && paire.item.formatLabel !== 'Photo') {
-                        record.preset = { label: paire.item.formatLabel };
-                    }
+                    /* Le preset applique suit la photo dans la bibliotheque.
+                       Meme regle que pour le rattrapage des fiches d'avant -
+                       une seule definition, dans `roomLibraryPlan`. */
+                    record.preset = presetDe(paire.item);
                     await putPhoto(record);
                     if (!cover) cover = record.id;
                     added += 1;
@@ -245,7 +241,8 @@ export async function syncRoomToFolder({ folderId = null, folderName = null, onP
         neuf: dossier.neuf,
         added,
         supprimees: plan.aSupprimer.length,
-        reparees: plan.aReparer.length,
+        reparees: plan.aReparer.length - plan.aPreset,
+        presets: plan.aPreset,
         introuvables,
         dejaLa: plan.gardees.length,
         /* Le compte final du dossier: c'est le chiffre que l'utilisateur va

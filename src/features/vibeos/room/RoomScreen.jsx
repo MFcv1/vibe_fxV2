@@ -137,6 +137,7 @@ export default function RoomScreen() {
         if (result.added) faits.push(`${result.added} ajoutée${result.added > 1 ? 's' : ''}`);
         if (result.supprimees) faits.push(`${result.supprimees} doublon${result.supprimees > 1 ? 's' : ''} supprimé${result.supprimees > 1 ? 's' : ''}`);
         if (result.reparees) faits.push(`${result.reparees} fiche${result.reparees > 1 ? 's' : ''} réparée${result.reparees > 1 ? 's' : ''}`);
+        if (result.presets) faits.push(`${result.presets} preset${result.presets > 1 ? 's' : ''} retrouvé${result.presets > 1 ? 's' : ''}`);
         if (result.introuvables) faits.push(`${result.introuvables} image${result.introuvables > 1 ? 's' : ''} illisible${result.introuvables > 1 ? 's' : ''}`);
         toast.push(
             faits.length
@@ -426,6 +427,13 @@ export default function RoomScreen() {
                                     <strong data-numeric>{planCourant.aReparer}</strong> fiche
                                     {planCourant.aReparer > 1 ? 's' : ''} d’avant à rattacher à leur image
                                     — elles ne seront plus jamais réimportées.
+                                </li>
+                            ) : null}
+                            {planCourant.aPreset ? (
+                                <li data-tone="add">
+                                    <strong data-numeric>{planCourant.aPreset}</strong> photo
+                                    {planCourant.aPreset > 1 ? 's' : ''} vont récupérer le nom de
+                                    leur preset, repris sur l’image de la Room dont elles viennent.
                                 </li>
                             ) : null}
                             {planCourant.horsRoom ? (

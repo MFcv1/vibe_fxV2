@@ -26,10 +26,15 @@
  *     que ces quatre-la.
  *  6. ON NE PERD RIEN - une photo unique dont l'element de Room a disparu (file
  *     videe apres publication) reste dans le dossier.
+ *  7. LE PRESET DES FICHES D'AVANT - le nom du look n'a commence a suivre la
+ *     photo que le 2026-09-06; avant, la vignette s'affichait sans etiquette
+ *     alors que l'information existait toujours dans la Room. La synchro la
+ *     recopie, et seulement pour les rendus de Vision: le `formatLabel` d'un
+ *     rendu de Layout est un format d'export, pas un preset.
  */
 
 import assert from 'node:assert/strict';
-import { planReconcile, planVide, roomPhotoId } from '../src/features/vibeos/room/roomLibraryPlan.js';
+import { planReconcile, planVide, presetDe, roomPhotoId } from '../src/features/vibeos/room/roomLibraryPlan.js';
 
 const echecs = [];
 function verifier(titre, run) {
@@ -163,6 +168,59 @@ verifier('6. une photo unique ne disparait jamais', () => {
     const apres = appliquer(folderPhotos, plan, 'fd-3');
     assert.equal(apres.length, 3);
     assert.ok(planVide(planReconcile({ roomItems, folderPhotos: apres, folderId: 'fd-3' })));
+});
+
+verifier('7. le preset des fiches d avant est repris sur la Room', () => {
+    const vision = { ...roomItem(1), source: 'vision', formatLabel: 'Powlisher Main' };
+    const layout = { ...roomItem(2), source: 'layout', formatLabel: '4:5' };
+    const sansLook = { ...roomItem(3), source: 'vision', formatLabel: 'Photo' };
+    const roomItems = [vision, layout, sansLook];
+
+    assert.deepEqual(presetDe(vision), { label: 'Powlisher Main' });
+    assert.equal(presetDe(layout), null, 'un format d export n est pas un preset');
+    assert.equal(presetDe(sansLook), null);
+
+    /* Trois fiches rangees avant la feature: lien present, preset absent. */
+    const folderPhotos = roomItems.map((item, index) => ({
+        id: `vieux-${index}`,
+        folderId: 'fd-preset',
+        fromRoomId: item.id,
+        width: item.width,
+        height: item.height,
+        bytes: item.bytes,
+        preset: null,
+        addedAt: 100 + index,
+        blob: {},
+    }));
+
+    const plan = planReconcile({ roomItems, folderPhotos, folderId: 'fd-preset' });
+    assert.equal(plan.aCreer.length, 0);
+    assert.equal(plan.aSupprimer.length, 0, 'un rattrapage de preset ne supprime rien');
+    assert.equal(plan.aPreset, 1, 'seul le rendu Vision recupere une etiquette');
+    const repare = plan.aReparer.find((photo) => photo.fromRoomId === 'room-1');
+    assert.deepEqual(repare.preset, { label: 'Powlisher Main' });
+    /* Le reste de la fiche est intact: on complete, on ne reecrit pas. */
+    assert.equal(repare.id, 'vieux-0');
+    assert.equal(repare.blob, folderPhotos[0].blob);
+
+    const apres = appliquer(folderPhotos, plan, 'fd-preset');
+    const second = planReconcile({ roomItems, folderPhotos: apres, folderId: 'fd-preset' });
+    assert.equal(second.aPreset, 0, 'deuxieme passage: plus rien a recopier');
+    assert.ok(planVide(second));
+});
+
+verifier('8. un lien ET un preset manquants tiennent sur une seule ecriture', () => {
+    const item = { ...roomItem(1), source: 'vision', formatLabel: 'CN02' };
+    /* Fiche d avant: ni lien vers la Room, ni preset. */
+    const folderPhotos = [{
+        id: 'vieux', folderId: 'fd-2', fromRoomId: null, preset: null,
+        width: item.width, height: item.height, bytes: item.bytes, addedAt: 1, blob: {},
+    }];
+    const plan = planReconcile({ roomItems: [item], folderPhotos, folderId: 'fd-2' });
+    assert.equal(plan.aReparer.length, 1, 'une seule fiche ecrite, pas deux');
+    assert.equal(plan.aReparer[0].fromRoomId, 'room-1');
+    assert.deepEqual(plan.aReparer[0].preset, { label: 'CN02' });
+    assert.equal(plan.aCreer.length, 0);
 });
 
 if (echecs.length) {
