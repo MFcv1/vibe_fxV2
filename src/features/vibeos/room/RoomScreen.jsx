@@ -4,8 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, ArrowRight, Check, Download, Eye, FolderPlus, Images, LayoutGrid, RefreshCw,
-    Save, Smartphone, Trash2,
+    ArrowLeft, ArrowRight, Check, Download, Eye, FolderOpen, FolderPlus, Images, LayoutGrid,
+    RefreshCw, Save, Smartphone, Trash2,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, IconButton, Sheet, useToast } from '../primitives';
 import InstaPreviewSheet from '../layout/InstaPreviewSheet';
@@ -13,7 +13,9 @@ import { ROOM_CAROUSEL_MAX, useRoom } from './RoomProvider';
 import {
     listTargetFolders, previewRoomFolderSync, suggestRoomFolderName, syncRoomToFolder,
 } from './roomToLibrary';
-import { downloadRoomItem } from './roomDownload';
+import {
+    canPickDirectory, downloadRoomAll, downloadRoomItem, pickDownloadDirectory, roomDownloadPlan,
+} from './roomDownload';
 import styles from './room.module.css';
 
 /*
@@ -30,6 +32,16 @@ import styles from './room.module.css';
  */
 
 const cx = (...values) => values.filter(Boolean).join(' ');
+
+/* Un poids que l'on lit d'un coup d'oeil. Pas de decimale au-dela de dix
+   unites: « 1,4 Go » aide, « 1 432,7 Mo » non. */
+function formatPoids(bytes) {
+    if (!bytes) return '0 Mo';
+    const mo = bytes / (1024 * 1024);
+    if (mo < 1) return `${Math.round(bytes / 1024)} Ko`;
+    if (mo < 1024) return `${mo.toFixed(mo < 10 ? 1 : 0)} Mo`;
+    return `${(mo / 1024).toFixed(1)} Go`;
+}
 
 export default function RoomScreen() {
     const {
@@ -158,6 +170,61 @@ export default function RoomScreen() {
     }, [aEnregistrer, cible, destination, folderName, router, toast]);
 
     /*
+     * Tout recuperer d'un coup.
+     *
+     * `stopRef` plutot qu'un state: la boucle de telechargement tourne pendant
+     * plusieurs minutes en dehors de React, et elle doit lire l'ordre d'arret
+     * a l'instant ou il est donne, pas au rendu suivant.
+     */
+    const [batchOpen, setBatchOpen] = useState(false);
+    const [batchPlan, setBatchPlan] = useState(null);
+    const [batchDir, setBatchDir] = useState(null);
+    const [batchRun, setBatchRun] = useState(null); // { done, total }
+    const stopRef = useRef(false);
+    /* Lu une fois: la capacite du navigateur ne change pas en cours de session,
+       et la tester pendant le rendu evite un etat de plus. */
+    const canPick = canPickDirectory();
+
+    const openBatch = useCallback(async () => {
+        setBatchDir(null);
+        setBatchRun(null);
+        setBatchPlan(null);
+        setBatchOpen(true);
+        setBatchPlan(await roomDownloadPlan());
+    }, []);
+
+    const chooseDir = useCallback(async () => {
+        const handle = await pickDownloadDirectory();
+        if (handle) setBatchDir(handle);
+    }, []);
+
+    const startBatch = useCallback(async () => {
+        stopRef.current = false;
+        setBatchRun({ done: 0, total: batchPlan?.total || count });
+        const result = await downloadRoomAll({
+            directory: batchDir,
+            shouldStop: () => stopRef.current,
+            onProgress: (done, total) => setBatchRun({ done, total }),
+        });
+        setBatchRun(null);
+        setBatchOpen(false);
+        if (!result.ok) {
+            toast.push(result.message || 'Rien à télécharger.', { tone: 'danger' });
+            return;
+        }
+        const ou = batchDir?.name ? ` dans « ${batchDir.name} »` : '';
+        const rates = result.failed
+            ? ` ${result.failed} n’${result.failed > 1 ? 'ont' : 'a'} pas pu être lue${result.failed > 1 ? 's' : ''}.`
+            : '';
+        toast.push(
+            result.stopped
+                ? `Arrêté : ${result.done} image${result.done > 1 ? 's' : ''} sur ${result.total} récupérée${result.done > 1 ? 's' : ''}${ou}.${rates}`
+                : `${result.done} image${result.done > 1 ? 's' : ''} récupérée${result.done > 1 ? 's' : ''}${ou}.${rates}`,
+            { tone: result.failed ? 'warn' : 'success', duration: 7000 },
+        );
+    }, [batchDir, batchPlan, count, toast]);
+
+    /*
      * Recuperer une image sur l'appareil.
      *
      * C'est le rendu pleine definition qui part, pas la vignette: le preset est
@@ -249,6 +316,17 @@ export default function RoomScreen() {
                         data-testid="vibeos-room-save"
                     >
                         {saving ? `Enregistrement ${saving.done}/${saving.total}` : 'Enregistrer'}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Download size={13} />}
+                        onClick={openBatch}
+                        disabled={!count || Boolean(batchRun)}
+                        title="Télécharger toutes les images de la Room en pleine définition"
+                        data-testid="vibeos-room-download-all"
+                    >
+                        {batchRun ? `${batchRun.done}/${batchRun.total}` : 'Tout télécharger'}
                     </Button>
                     <Button
                         variant={confirmClear ? 'danger' : 'ghost'}
@@ -555,6 +633,107 @@ export default function RoomScreen() {
                                 if (rienAFaire) return 'Tout est déjà calé';
                                 return 'Synchroniser ce dossier';
                             })()}
+                        </Button>
+                    </div>
+                </div>
+            </Sheet>
+
+            <Sheet
+                open={batchOpen}
+                onClose={() => (batchRun ? null : setBatchOpen(false))}
+                title="Télécharger toutes les images"
+            >
+                <div className={styles.saveBody}>
+                    <p className={styles.saveIntro}>
+                        Les <strong data-numeric>{batchPlan?.total ?? count}</strong> images partent
+                        en <strong>pleine définition</strong>, preset compris, numérotées dans
+                        l’ordre du carrousel — <code>001</code>, <code>002</code>, et ainsi de
+                        suite, pour qu’elles se rangent toutes seules.
+                    </p>
+
+                    {batchPlan ? (
+                        <ul className={styles.planList}>
+                            <li>
+                                <strong data-numeric>{formatPoids(batchPlan.bytes)}</strong> au
+                                total.
+                            </li>
+                            {batchPlan.aRapatrier ? (
+                                <li data-tone="add">
+                                    <strong data-numeric>{batchPlan.aRapatrier}</strong> image
+                                    {batchPlan.aRapatrier > 1 ? 's' : ''} ne sont pas sur cet
+                                    appareil : elles seront rapatriées depuis ton compte, ce qui
+                                    prend un moment.
+                                </li>
+                            ) : null}
+                        </ul>
+                    ) : null}
+
+                    {/* Deux mondes: choisir un vrai dossier (Chrome, Edge) ou
+                        laisser le navigateur ranger dans ses telechargements
+                        (Safari, Firefox, telephone). On dit lequel s'applique
+                        plutot que de promettre un choix qui n'existe pas. */}
+                    {canPick ? (
+                        <>
+                            <div className={styles.saveField}>
+                                <button
+                                    type="button"
+                                    className={styles.saveChoice}
+                                    data-active={batchDir ? 'true' : 'false'}
+                                    onClick={chooseDir}
+                                    disabled={Boolean(batchRun)}
+                                >
+                                    <FolderOpen size={14} />
+                                    <span className={styles.saveChoiceName}>
+                                        {batchDir ? batchDir.name : 'Choisir un dossier'}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={styles.saveChoice}
+                                    data-active={batchDir ? 'false' : 'true'}
+                                    onClick={() => setBatchDir(null)}
+                                    disabled={Boolean(batchRun)}
+                                >
+                                    <Download size={14} />
+                                    Téléchargements
+                                </button>
+                            </div>
+                            <p className={styles.saveIntro}>
+                                {batchDir
+                                    ? <>Les images seront écrites directement dans <strong>{batchDir.name}</strong>, sans une seule question de plus.</>
+                                    : <>Sans dossier choisi, elles iront dans le dossier de téléchargements du navigateur, une par une — et Chrome demandera une autorisation au bout de quelques-unes.</>}
+                            </p>
+                        </>
+                    ) : (
+                        <p className={styles.saveIntro}>
+                            Ce navigateur ne sait pas choisir un dossier de destination. Les images
+                            iront dans ton dossier de <strong>téléchargements</strong>, une par une.
+                            Sur Chrome ou Edge, tu pourrais désigner le dossier de ton choix.
+                        </p>
+                    )}
+
+                    <div className={styles.saveFoot}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                if (batchRun) { stopRef.current = true; return; }
+                                setBatchOpen(false);
+                            }}
+                        >
+                            {batchRun ? 'Arrêter' : 'Annuler'}
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<Download size={13} />}
+                            onClick={startBatch}
+                            disabled={Boolean(batchRun) || !count}
+                            data-testid="vibeos-room-download-all-confirm"
+                        >
+                            {batchRun
+                                ? `Téléchargement ${batchRun.done}/${batchRun.total}`
+                                : `Télécharger ${batchPlan?.total ?? count} image${(batchPlan?.total ?? count) > 1 ? 's' : ''}`}
                         </Button>
                     </div>
                 </div>

@@ -313,6 +313,10 @@
 }
 
 .saveChoice {
+    /* Sans `min-width: 0`, un element de grille refuse de descendre sous la
+       largeur de son contenu: un dossier au nom a rallonge faisait deborder la
+       feuille au lieu d'etre coupe. */
+    min-width: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -326,6 +330,13 @@
     font-size: var(--vo-text-sm);
     cursor: pointer;
     transition: border-color var(--vo-dur-2) var(--vo-ease), background var(--vo-dur-2) var(--vo-ease);
+}
+
+/* Le nom du dossier choisi: il est coupe, jamais il n'elargit le bouton. */
+.saveChoiceName {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .saveChoice:hover:not(:disabled) {

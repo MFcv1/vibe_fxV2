@@ -440,7 +440,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
 |   |   |   |-- roomCloud.js           # Room dans le compte (2026-09-05) : Firestore `users/{uid}/roomItems` + Storage `users/{uid}/room/{id}/image.jpg`, plafond 40 Mo (un panorama 4592x8160 depasse les 25 Mo de la bibliotheque). Le fichier part AVANT la fiche
 |   |   |   |-- useRoomSync.js         # File d'envoi un par un + ecoute des fiches distantes + repercussion d'une suppression faite ailleurs. Le local fait autorite pour l'affichage
-|   |   |   |-- roomDownload.js        # Recuperer une image de la Room sur son appareil (2026-09-06) : le RENDU pleine definition, preset deja cuit dans les pixels, jamais la vignette. Le fichier vient d'IndexedDB, ou du compte s'il n'est pas sur cet appareil. Toujours via un Blob local : sur une adresse Storage d'un autre domaine, le navigateur ignore `download` et ouvre l'image au lieu de l'enregistrer
+|   |   |   |-- roomDownload.js        # Recuperer une image de la Room sur son appareil, une par une ou TOUTES (2026-09-06) : `downloadRoomAll` traite une image a la fois - cent trente rendus pleine definition en memoire feraient tomber l'onglet - avec progression et arret en cours de route. Sur Chrome/Edge, `showDirectoryPicker` donne un vrai dossier ou l'on ECRIT les fichiers (`createWritable`), donc aucune question par fichier ; ailleurs, chaque image passe par un lien de telechargement, avec une pause de 350 ms sans laquelle Chrome prend la rafale pour un abus. Pour une seule image : le RENDU pleine definition, preset deja cuit dans les pixels, jamais la vignette. Le fichier vient d'IndexedDB, ou du compte s'il n'est pas sur cet appareil. Toujours via un Blob local : sur une adresse Storage d'un autre domaine, le navigateur ignore `download` et ouvre l'image au lieu de l'enregistrer
 |   |   |   |-- roomFileName.js        # Le nom du fichier telecharge. Module PUR, teste : numero sur trois chiffres (l'ordre du carrousel tient au-dela de la centieme image), projet et preset pour le reconnaitre, et aucun caractere que macOS, Windows ou iOS refuseraient
 |   |   |   |-- roomLibraryPlan.js     # Le contrat Room <-> dossier (2026-09-06) : `roomPhotoId(folderId, roomItemId)` donne une identite DEDUITE, plus jamais tiree au hasard — un doublon n'est plus detecte, il est impossible a ecrire. `planReconcile` calcule ajouts / copies en trop / liens a reparer. Module pur, teste par `npm run test:room-library`
 |   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05 ; devenu une SYNCHRONISATION le 2026-09-06) : `previewRoomFolderSync` annonce, `syncRoomToFolder` applique le plan (ajoute, supprime les copies, repare les liens). Idempotent. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
@@ -833,6 +833,14 @@ telecharges » alors qu'il parle d'acces. Une feuille les annonce, et NOMME le
 dossier a redonner quand on le connait : le dossier du disque est retenu sur la
 fiche du tri (`sourceDir`), a la creation du tri et au premier rattachement
 reussi.
+
+**Telechargement global de la Room (meme jour)** : « Tout telecharger » a cote
+d'« Enregistrer ». La feuille annonce le nombre, le poids total et combien
+d'images devront redescendre du compte, puis laisse choisir un vrai dossier
+(Chrome/Edge) ou le dossier de telechargements du navigateur. Les fichiers sont
+numerotes dans l'ordre du carrousel, donc ils se rangent seuls. Arret possible
+en cours : un lot de 130 images rapatriees depuis le compte prend plusieurs
+minutes, et rester coince dedans serait pire que de ne pas l'avoir propose.
 
 **Deploiement** : le site se met en ligne avec `firebase deploy --only
 apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
