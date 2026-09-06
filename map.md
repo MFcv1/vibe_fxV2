@@ -759,16 +759,35 @@ jamais le compte, qui la reinstallait a la reouverture.
    pas de fichier local (rien a perdre). Une photo encore posee sur cet
    appareil n'est jamais effacee par le serveur.
 
+**Correctif du meme jour, apres mise en ligne** : appuyer sur « Enregistrer »
+dans la Room ne faisait RIEN. `openSave` appelait encore `setReste(null)`, reste
+d'un etat renomme en `plan` : ReferenceError avant l'ouverture de la feuille.
+Deuxieme fois en trois jours qu'un nom inexistant part en production (le premier
+etait `enterre`). La regle ESLint **`no-undef` est donc activee sur `src/**`** —
+ni `next build` ni les autres regles ne voient ce genre de faute, le fichier
+etant syntaxiquement valide. Elle a immediatement trouve un deuxieme cas,
+`slotRectsState` dans `vibefx-layout/components/canvas/CanvasWorkspace.jsx` :
+vrai bug, mais dans une UI qui n'est plus montee, donc laisse en avertissement
+plutot que reecrit a l'aveugle.
+
+**Deploiement** : le site se met en ligne avec `firebase deploy --only
+apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
+GitHub affiche par App Hosting (`ECFN15-vibe_fxV2`) est un vieux reste fige au
+12 juin ; `apphosting:rollouts:create` deploie DEPUIS LUI et a remis en ligne,
+ce jour, une version vieille de trois mois (routes `/creer/*` et `/video` en
+404). Ne jamais utiliser cette commande sur ce projet.
+
 **Verifie**: `npm run test:room-library` (six cas, dont le cas reel 106/154 qui
 retombe a 106 et ne bouge plus au deuxieme passage), `npm run lint`,
-`npm run build`. **Non verifie par un agent**: le parcours dans le navigateur
+`npm run build`, et le bundle reellement servi en ligne (`setReste` absent,
+« Synchroniser ce dossier » present). **Non verifie par un agent**: le parcours dans le navigateur
 connecte — le compte de l'utilisateur est necessaire, et la session locale
 s'arrete a l'ecran de connexion.
 
 Fichiers ajoutes : `roomLibraryPlan.js`, `scripts/smoke-room-library-sync.mjs`.
 Fichiers touches : `roomToLibrary.js`, `RoomScreen.jsx`, `room.module.css`,
 `libraryDb.js`, `libraryCloud.js`, `useLibrarySync.js`, `LibraryScreen.jsx`,
-`library.module.css`, `package.json`.
+`library.module.css`, `package.json`, `eslint.config.mjs`.
 
 ## Journal — 2026-09-06 sexies (doublons qui revenaient, centrage de Layout, preset visible)
 

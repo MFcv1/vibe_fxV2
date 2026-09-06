@@ -85,7 +85,8 @@ export default function RoomScreen() {
         setFolderId(liste[0]?.id || '');
         setDestination(liste.length ? 'new' : 'new');
         setFolderName(suggestRoomFolderName(items, liste.map((folder) => folder.name)));
-        setReste(null);
+        /* Le plan de la fois d'avant ne vaut plus rien: la Room a pu changer. */
+        setPlan(null);
         setSaveOpen(true);
     }, [items]);
 
