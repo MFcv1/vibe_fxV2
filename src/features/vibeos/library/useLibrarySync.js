@@ -89,6 +89,21 @@ export default function useLibrarySync(library) {
     const photosRef = useRef(photos);
     const foldersRef = useRef(folders);
 
+    /*
+     * Une photo qu'on vient de supprimer ne doit ni remonter, ni redescendre.
+     *
+     * Declaree ICI, avant tout ce qui la lit: la file d'envoi l'appelle pendant
+     * le rendu, et une declaration plus bas faisait planter l'ecran entier
+     * (`enterre is not defined`).
+     */
+    const enterre = useCallback((id) => {
+        const at = tombstonesRef.current.get(id);
+        if (!at) return false;
+        if (Date.now() - at < TOMBSTONE_MS) return true;
+        tombstonesRef.current.delete(id);
+        return false;
+    }, []);
+
     useEffect(() => { photosRef.current = photos; }, [photos]);
     useEffect(() => { foldersRef.current = folders; }, [folders]);
 
@@ -147,21 +162,21 @@ export default function useLibrarySync(library) {
                 setFailures((current) => current + 1);
             },
         });
-    }, [enabled, uid, status, upsertFolder, upsertPhoto, patchPhoto]);
+    }, [enabled, uid, status, upsertFolder, upsertPhoto, patchPhoto, enterre]);
 
     /* ---------- Montee: ce qui n'est pas encore parti ---------- */
 
     const pending = useMemo(
-        () => photos.filter((photo) => (
-            photo.blob && !photo.scout && photo.cloud?.state !== 'synced' && !enterre(photo.id)
-        )),
+        () => photos.filter((photo) => photo.blob && !photo.scout && photo.cloud?.state !== 'synced'),
         [photos],
     );
 
     useEffect(() => {
         if (!enabled || runningRef.current) return;
         if (failures >= MAX_FAILURES) return;
-        const next = pending[0];
+        /* Le registre des suppressions se lit ICI, dans un effet, et pas dans le
+           calcul de `pending`: une reference ne se lit pas pendant le rendu. */
+        const next = pending.find((photo) => !enterre(photo.id));
         /* Un dossier de tri reste sur l'appareil: rien de ce qu'il contient
            n'a d'original a envoyer, et l'utilisateur n'a pas encore dit qu'il
            voulait garder ces photos. Voir `libraryScout.js`. */
@@ -200,7 +215,7 @@ export default function useLibrarySync(library) {
                 runningRef.current = false;
             }
         })();
-    }, [enabled, uid, pending, folders, failures, patchPhoto, upsertFolder]);
+    }, [enabled, uid, pending, folders, failures, patchPhoto, upsertFolder, enterre]);
 
     /* ---------- Suppressions ---------- */
 
