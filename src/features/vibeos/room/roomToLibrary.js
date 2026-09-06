@@ -214,7 +214,20 @@ export async function saveRoomToLibrary({ folderId = null, folderName = null, on
         if (record) {
             /* Le lien avec l'element de Room: c'est lui qui evitera de
                reimporter cette image la prochaine fois. */
-            record.fromRoomId = paires[index]?.item?.id || null;
+            const source = paires[index]?.item || null;
+            record.fromRoomId = source?.id || null;
+            /*
+             * Le preset appliqué suit la photo dans la bibliotheque.
+             *
+             * Vision range son nom de preset dans `formatLabel` au moment de
+             * l'envoi vers la Room; sans cette reprise, l'information se perdait
+             * a l'enregistrement et la grille ne pouvait plus afficher quel look
+             * avait ete pose. Les rendus de Layout ne sont pas concernes: leur
+             * `formatLabel` est un format, pas un preset.
+             */
+            if (source?.source === 'vision' && source.formatLabel && source.formatLabel !== 'Photo') {
+                record.preset = { label: source.formatLabel };
+            }
             await putPhoto(record);
             if (!cover) cover = record.id;
             added += 1;

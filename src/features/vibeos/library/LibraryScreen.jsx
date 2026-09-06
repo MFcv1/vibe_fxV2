@@ -684,8 +684,12 @@ export default function LibraryScreen() {
             return;
         }
         setConfirmDedupe(false);
-        await removeAll(ids);
+        /* Le distant d'ABORD: `forgetPhotos` lit les chemins Storage sur la
+           fiche locale, et `removeAll` vient justement de la retirer de l'etat.
+           Dans l'autre sens, on effacait la fiche Firestore mais on laissait le
+           fichier derriere. */
         await sync.forgetPhotos(ids);
+        await removeAll(ids);
         push(
             `${ids.length} doublon${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''} · un exemplaire gardé de chaque image.`,
             { tone: 'success', duration: 5000 },
@@ -771,8 +775,9 @@ export default function LibraryScreen() {
         const ids = [...selection];
         if (!ids.length) return;
         if (!window.confirm(`Supprimer ${ids.length} photo(s) de la bibliothèque ?`)) return;
-        await removeAll(ids);
+        /* Distant d'abord: voir `handleDedupe`. */
         await sync.forgetPhotos(ids);
+        await removeAll(ids);
         setSelection(new Set());
         push('Photos supprimées.');
     }, [selection, removeAll, sync, push]);
@@ -836,8 +841,8 @@ export default function LibraryScreen() {
 
     const handleDelete = useCallback(async (photo) => {
         if (!window.confirm(`Supprimer « ${photo.name} » ?`)) return;
-        await removePhoto(photo.id);
         await sync.forgetPhotos([photo.id]);
+        await removePhoto(photo.id);
         /* Si le carrousel est ouvert: il se ferme sur la derniere photo, sinon
            il reste sur la place liberee (donc sur la photo suivante). */
         setLightboxIndex((current) => {

@@ -29,6 +29,17 @@ import { makePreview } from './photoImport';
    echouent - et si c'est un probleme de droits, elles echoueront toutes. */
 const MAX_FAILURES = 3;
 
+/*
+ * Combien de temps une photo supprimee reste « interdite de retour ».
+ *
+ * Supprimer efface la fiche locale ET la fiche distante, mais deux choses
+ * peuvent la ressusciter dans la seconde qui suit: un envoi deja en vol qui se
+ * termine et reecrit la fiche, et l'ecoute Firestore qui recoit un instantane
+ * pris avant la suppression. C'est ce qui faisait revenir les doublons au
+ * rechargement de la page. Une minute couvre tres largement les deux.
+ */
+const TOMBSTONE_MS = 60000;
+
 function remoteToLocal(remote) {
     return {
         id: remote.id,
@@ -71,6 +82,8 @@ export default function useLibrarySync(library) {
     } = library;
 
     const [failures, setFailures] = useState(0);
+    /* id -> instant de suppression. Voir `TOMBSTONE_MS`. */
+    const tombstonesRef = useRef(new Map());
     const [lastError, setLastError] = useState('');
     const runningRef = useRef(false);
     const photosRef = useRef(photos);
@@ -104,6 +117,9 @@ export default function useLibrarySync(library) {
             },
             onPhotos: (remotePhotos) => {
                 remotePhotos.forEach((remote) => {
+                    /* Supprimee a l'instant: l'instantane peut avoir ete pris
+                       avant, on ne la fait pas revenir. */
+                    if (enterre(remote.id)) return;
                     const local = photosRef.current.find((photo) => photo.id === remote.id);
                     if (!local) {
                         upsertPhoto(remoteToLocal(remote));
@@ -136,7 +152,9 @@ export default function useLibrarySync(library) {
     /* ---------- Montee: ce qui n'est pas encore parti ---------- */
 
     const pending = useMemo(
-        () => photos.filter((photo) => photo.blob && !photo.scout && photo.cloud?.state !== 'synced'),
+        () => photos.filter((photo) => (
+            photo.blob && !photo.scout && photo.cloud?.state !== 'synced' && !enterre(photo.id)
+        )),
         [photos],
     );
 
@@ -187,6 +205,10 @@ export default function useLibrarySync(library) {
     /* ---------- Suppressions ---------- */
 
     const forgetPhotos = useCallback(async (ids) => {
+        /* La pierre tombale se pose MEME sans compte: elle protege aussi de
+           l'envoi en vol, qui n'a pas encore fini d'ecrire. */
+        const now = Date.now();
+        (ids || []).forEach((id) => tombstonesRef.current.set(id, now));
         if (!enabled) return;
         for (const id of ids) {
             const photo = photosRef.current.find((item) => item.id === id) || { id };

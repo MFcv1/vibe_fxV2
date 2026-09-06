@@ -664,6 +664,42 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
 
+## Journal — 2026-09-06 sexies (doublons qui revenaient, centrage de Layout, preset visible)
+
+**1. Les doublons revenaient apres un rechargement, et la suppression semblait
+partielle.** Constate: dossier ramene au bon compte, page fermee puis rouverte,
+et les photos etaient de retour. Deux causes, toutes deux des courses:
+
+- l'ecran supprimait le LOCAL avant le distant. Or `forgetPhotos` lit les
+  chemins Storage sur la fiche locale, que `removeAll` venait justement de
+  retirer de l'etat: la fiche Firestore partait, le fichier restait. L'ordre est
+  inverse partout (doublons, selection, suppression a l'unite);
+- rien n'empechait une photo supprimee de revenir. Un envoi deja en vol qui se
+  termine reecrit la fiche, et l'ecoute recoit des instantanes pris avant la
+  suppression. Un registre de « pierres tombales » (une minute) fait ignorer ces
+  deux chemins pour une photo qu'on vient de supprimer — a la montee comme a la
+  descente.
+
+**2. L'etat vide de Layout n'etait plus centre.** Regression du passage de la
+scene en colonne: il se collait en haut a gauche. `margin: auto`, comme dans
+Vision, qui avait deja resolu exactement ca.
+
+**3. Le preset ne suivait pas les photos venues de la Room.** Vision range son
+nom de preset dans `formatLabel` a l'envoi; il se perdait a l'enregistrement en
+bibliotheque. Il devient `photo.preset`, donc la pastille de la grille l'affiche.
+Les rendus de Layout ne sont pas concernes: leur `formatLabel` est un format.
+
+**4. « Composition vers Vision » : NON livre, et c'est deliberе.** Le bouton a
+ete ecrit puis retire. Vision lit `resolveProjectPhotoSource`, qui ignore
+VOLONTAIREMENT la composition — le commentaire de `pipeline.js` le dit: appliquer
+un preset au montage aplati teinterait aussi le texte, les stickers et les
+marges. La demande (« un preset commun a chacune des images du modele ») demande
+en fait d'appliquer le preset aux IMAGES SOURCES puis de recomposer, ce qui est
+un autre chantier. Livrer le bouton en l'etat aurait donne un bouton sans effet.
+
+Fichiers touches : `useLibrarySync.js`, `LibraryScreen.jsx`, `layout.module.css`,
+`roomToLibrary.js`.
+
 ## Journal — 2026-09-06 quinquies (nettoyer les doublons d'un dossier)
 
 Suite directe du defaut precedent: la Room reimportait tout a chaque

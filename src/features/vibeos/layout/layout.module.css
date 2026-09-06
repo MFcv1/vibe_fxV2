@@ -456,12 +456,17 @@
     outline-offset: -8px;
 }
 
+/* `margin: auto` recentre l'etat vide dans la scene, devenue une colonne
+   etiree depuis que la barre d'actions a sa propre ligne. Sans lui, il se
+   collait en haut a gauche — c'est la regression introduite avec la barre. */
 .emptyStage {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: var(--vo-space-4);
     max-width: 380px;
+    margin: auto;
     text-align: center;
 }
 
