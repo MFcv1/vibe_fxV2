@@ -1112,7 +1112,16 @@ export default function LibraryScreen() {
               * seul endroit de l'ecran ou quelque chose est vraiment copie.
               */}
             {activeScout && scoutState && !selection.size ? (
-                <div className={styles.scoutBar} role="status" data-testid="vibeos-library-scout-bar">
+                <div
+                    className={styles.scoutBar}
+                    role="status"
+                    /* Un message a afficher = la pilule devient une carte, et la
+                       phrase prend sa propre ligne. Sans ca, elle etait ecrasee
+                       entre deux blocs insecables et tombait a un mot par
+                       ligne. */
+                    data-warn={scoutState.lost ? 'true' : undefined}
+                    data-testid="vibeos-library-scout-bar"
+                >
                     <span className={styles.scoutBarLead}>
                         <Laptop size={14} aria-hidden="true" />
                         <span>
@@ -1126,8 +1135,13 @@ export default function LibraryScreen() {
 
                     {scoutState.lost ? (
                         <span className={styles.scoutBarWarn}>
-                            {scoutState.lost} fichier{scoutState.lost > 1 ? 's' : ''} d’origine
-                            {scoutState.lost > 1 ? ' introuvables' : ' introuvable'} depuis le rechargement de la page.
+                            {/* Dire ce qui manque ne suffit pas: il faut dire
+                                quoi faire, et que ca ne coute rien. */}
+                            <strong data-numeric>{scoutState.lost}</strong> fichier
+                            {scoutState.lost > 1 ? 's' : ''} d’origine ne sont plus reliés depuis
+                            le rechargement de la page. Redonne-moi le dossier source avec
+                            <strong> Retrouver les fichiers</strong> : rien n’est relu ni recopié,
+                            on refait juste le lien, et tes photos gardées ne bougent pas.
                         </span>
                     ) : null}
 

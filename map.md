@@ -798,6 +798,24 @@ meme nom vivait dans `soundtrack.module.css` - donc hachee a la compilation, don
 inaccessible. L'icone ne tournait pas. La regle est desormais globale, dans
 `vibeos.css`.
 
+**Bandeau du tri illisible (meme jour)** : « 56 fichiers d'origine
+introuvables... » s'affichait en colonne, un mot par ligne. La phrase etait un
+element de la rangee flex, coincee entre deux blocs `nowrap` qui ne se
+retrecissent pas ; avec `min-width: 0`, c'est elle qui encaissait tout le manque
+de place. Elle prend desormais sa propre ligne (`order: 3; flex: 1 0 100%`), et
+la barre passe de la pilule a la carte quand il y a un message
+(`[data-warn="true"]`). Le texte dit aussi quoi faire, et que ca ne coute rien :
+« Redonne-moi le dossier source... rien n'est relu ni recopie ». **Verifie a
+l'ecran** sur une maquette fidele du bandeau, en 1440 px et en 420 px.
+
+Rappel du modele, qui n'est pas un bug : un `File` venu d'un `<input
+webkitdirectory>` est une poignee vers le disque, pas une copie, et elle meurt
+avec l'onglet. Apres un rechargement il reste les apercus et les favoris (dans
+IndexedDB) mais plus les poignees, d'ou « Retrouver les fichiers », qui refait
+le lien par signature sans rien relire. La cure definitive serait
+`showDirectoryPicker` + poignee persistee en IndexedDB, Chrome seulement : pas
+encore fait.
+
 **Deploiement** : le site se met en ligne avec `firebase deploy --only
 apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
 GitHub affiche par App Hosting (`ECFN15-vibe_fxV2`) est un vieux reste fige au

@@ -2131,10 +2131,36 @@
     color: var(--vo-text-3);
 }
 
+/*
+ * Le message d'alerte prend sa propre ligne, sous le compteur et les boutons.
+ *
+ * Il etait un simple element de la rangee, coince entre deux blocs `nowrap`
+ * qui, eux, ne se laissent pas retrecir. Avec `min-width: 0`, c'est donc LUI
+ * qui encaissait tout le manque de place: sur un ecran large, la phrase
+ * tombait a un mot par ligne, en colonne, illisible. Une phrase entiere n'a
+ * rien a faire dans la meme rangee que des elements insecables.
+ */
 .scoutBarWarn {
+    order: 3;
+    flex: 1 0 100%;
     min-width: 0;
     color: var(--vo-warning);
-    line-height: 1.4;
+    line-height: 1.45;
+}
+
+.scoutBarWarn strong {
+    color: var(--vo-warning);
+    font-weight: 590;
+}
+
+/* Une pilule sur deux lignes fait une forme molle: des qu'il y a un message,
+   la barre redevient une carte. */
+.scoutBar[data-warn="true"] {
+    flex-wrap: wrap;
+    row-gap: var(--vo-space-2);
+    max-width: min(760px, calc(100vw - var(--vo-space-8)));
+    padding: var(--vo-space-3);
+    border-radius: var(--vo-radius-lg);
 }
 
 .scoutBarActions {
