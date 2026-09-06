@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Bold, Columns2, Download, Eraser, FlipHorizontal2, FlipVertical2, ImagePlus, Images, Italic,
+    Bold, Columns2, Download, Eraser, Eye, FlipHorizontal2, FlipVertical2, ImagePlus, Images, Italic,
     LayoutGrid, LayoutTemplate, Layers, Maximize2, Plus, Redo2, Shuffle, Smartphone, Sparkles,
     Sticker, Trash2, Type, Undo2, Upload, Waves, X,
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
     CUSTOM_LAYOUT_PRESETS, CUSTOM_SHAPE_LIBRARY, FONT_OPTIONS, FORMATS, TEMPLATES,
 } from '../../vibefx-studio/data/constants';
 import { buildSocialImages } from '../../vibefx-studio/utils/socialExport';
+import { useRouter } from 'next/navigation';
 import {
     Button, Collapsible, IconButton, Progress, Segmented, Sheet, Slider, Tile, TileGrid, useToast,
 } from '../primitives';
@@ -119,6 +120,7 @@ export default function LayoutScreen() {
         updateSlotConfig, slotConfigs,
         undo, redo, canUndo, canRedo,
         exportController,
+        visionPresetActive,
     } = editor;
 
     const [isTemplateSheetOpen, setIsTemplateSheetOpen] = useState(false);
@@ -129,6 +131,7 @@ export default function LayoutScreen() {
     const [isComparing, setIsComparing] = useState(false);
     const [instaPreview, setInstaPreview] = useState(null);
     const [isSendingToRoom, setIsSendingToRoom] = useState(false);
+    const router = useRouter();
     const [isZoneEditOpen, setIsZoneEditOpen] = useState(false);
     const [isGridLibraryOpen, setIsGridLibraryOpen] = useState(false);
     /* `null` = feuille fermee. `{ slotId }` = une case precise. `{ slotId: null }`
@@ -418,6 +421,24 @@ export default function LayoutScreen() {
                             <IconButton label="Plein écran" onClick={handleFullscreen}>
                                 <Maximize2 size={15} />
                             </IconButton>
+                            {/*
+                              * Le preset commun du modele. Il se choisit dans
+                              * Vision, qui ouvre deja sur la premiere photo du
+                              * modele: on y voit donc l'effet sur une vraie
+                              * image avant de l'appliquer a toutes.
+                              */}
+                            <Button
+                                size="sm"
+                                variant={visionPresetActive ? 'primary' : 'default'}
+                                icon={<Eye size={13} />}
+                                onClick={() => router.push('/creer/vision')}
+                                title={visionPresetActive
+                                    ? 'Un preset commun est appliqué à toutes les photos du modèle — le modifier dans Vision'
+                                    : 'Choisir dans Vision un preset commun à toutes les photos du modèle'}
+                                data-testid="vibeos-layout-common-preset"
+                            >
+                                {visionPresetActive ? 'Preset actif' : 'Preset commun'}
+                            </Button>
                             <Button
                                 size="sm"
                                 icon={<Layers size={13} />}

@@ -15,6 +15,9 @@ import {
     DEFAULT_GRID_TRANSFORM, buildGridZones, findGridPreset, mirrorZones, rotateZoneImages,
 } from './gridLibrary';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
+import {
+    slotConfigsWithVisionPreset, visionSignature, withVisionPreset,
+} from './layoutVisionPreset';
 import { canvasToBlob, visionRevision } from '../project/pipeline';
 import { hasStoredComposition, restoreComposition, snapshotComposition } from './layoutPersistence';
 
@@ -169,13 +172,35 @@ export default function useLayoutEditor() {
     const textMetrics = useRef({ w: 0, h: 0 });
 
     /* ---- Moteurs branches ---- */
+    /*
+     * Le preset commun du modele.
+     *
+     * `project.vision` est le reglage choisi dans Vision. On ne l'applique pas
+     * au montage — ca teinterait textes et cadres — mais a CHAQUE photo, avant
+     * que le moteur ne compose. Le modele reste exactement ce qu'il est, et
+     * toutes ses images partagent le meme look.
+     *
+     * L'apercu et l'export traversent le meme `renderPipeline`: filtrer ici
+     * suffit pour les deux.
+     */
+    const visionPreset = project?.vision || null;
+    const visionKey = useMemo(() => visionSignature(visionPreset), [visionPreset]);
+    const renderImages = useMemo(
+        () => (visionKey ? images.map((img) => withVisionPreset(img, visionPreset, visionKey)) : images),
+        [images, visionPreset, visionKey],
+    );
+    const renderSlotConfigs = useMemo(
+        () => slotConfigsWithVisionPreset(slotConfigs, visionPreset, visionKey),
+        [slotConfigs, visionPreset, visionKey],
+    );
+
     const { getCanvasDimensions, renderPipeline } = useCanvasRenderer({
-        canvasRef, images, view: 'layout',
+        canvasRef, images: renderImages, view: 'layout',
         activeFormat, activeTemplate, overlayMode,
         padding, gap, customLayoutGap, radius,
         layoutBgColor, layoutBgBlur, layoutBgGradient, layoutBgMeshColors, layoutLumenBackground, layoutBgTexture, layoutSmoothBlur,
         layoutTextures, activeTextureId, layoutTextureOpacity,
-        selectedSlotIndex, slotConfigs,
+        selectedSlotIndex, slotConfigs: renderSlotConfigs,
         slotRects, bgCanvasRef,
         texts, assets, activeTextId, activeAssetId,
         isDraggingText, activeGuides,
@@ -1217,6 +1242,11 @@ export default function useLayoutEditor() {
         layoutLumenBackground, layoutSmoothBlur, texts, assets, slotConfigs, hasRenderableOutput]);
 
     return {
+        /* Le preset commun applique aux photos du modele, pour que l'ecran
+           puisse le nommer et proposer de l'enlever. */
+        visionPresetActive: Boolean(visionKey),
+        visionPresetId: visionPreset?.presetId || null,
+
         /* etat */
         ...layoutState,
         images, setImages,

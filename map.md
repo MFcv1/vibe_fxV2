@@ -411,6 +411,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- gridCatalog.js          # Liste unique partagee par le panneau et la bibliotheque : 24 grilles compilees + les 3 grilles historiques rangees en famille "Classiques", avec le compte par famille
 |   |   |   |-- GridCategoryMenu.jsx    # Selecteur de famille dans le panneau : le panneau affiche TOUTE la famille choisie, sans ouvrir la bibliotheque
 |   |   |   |-- SlotOverlay.jsx         # Couche posee sur l'apercu, une boite par case : « Importer » au survol d'une case vide ; sur une case pleine, poignee d'echange (haut gauche), corbeille rouge (haut droite) et barre de cadrage (bas) ; case selectionnee = deplacement de la photo a la souris + zoom a la molette. Les commandes s'adaptent a la taille de la case
+|   |   |   |-- layoutVisionPreset.js   # Preset COMMUN a toutes les photos d'un modele (2026-09-06) : le preset est cuit dans chaque photo source avant composition, pas sur le montage — textes, cadres et marges n'en recoivent rien. Cache par photo + signature du reglage, une seule passe a 2048 px qui sert l'apercu ET l'export
 |   |   |   |-- SlotImportSheet.jsx    # Choisir une photo pour une case : DOSSIERS puis maconnerie du dossier ouvert (2026-09-05). Les dossiers de tri sont exclus (apercus seuls). Lit IndexedDB directement, redescend du compte a la demande     # « Ajouter des photos » : fichier de l'appareil ou photo de la bibliotheque VibeOS (lecture directe d'IndexedDB + rapatriement d'une photo qui n'existe que dans le compte). Deux modes : vers UNE case (elle se referme apres le choix) ou import general (elle reste ouverte pour en prendre plusieurs)
 |   |   |   |-- GridLibrarySheet.jsx    # Navigateur des grilles (6 familles + recherche) ; chaque carte montre la meme grille en 4:5 ET en 1:1, le format actif encadre. Les 3 grilles historiques y entrent comme grilles figees
 |   |   |   |-- ZoneOverlay.jsx         # Editeur de zones du modele personnalise pose sur l'apercu : deplacement, poignee de redimension, suppression (geometrie d'interface uniquement, le rendu reste au moteur)
@@ -663,6 +664,52 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 - `/api/music/ai-import` : API interne d'import audio IA pour data URL audio serveur ou URL audio allowlistee, avec verification MIME/poids.
 - `/robots.txt` : genere par `src/app/robots.js`, disallow `/studio`, `/account`, `/api`, `/admin`, `/backoffice`.
 - `/sitemap.xml` : genere par `src/app/sitemap.js` avec home + pages SEO publiques.
+
+## Journal — 2026-09-06 septies (un preset commun a toutes les photos d'un modele)
+
+**La demande.** « Le modele reste comme il est, et chaque image dans le modele
+recoit le preset. » C'est l'option A de l'arbitrage precedent, et c'est celle qui
+respecte la decision deja prise: Vision ignore volontairement la composition
+aplatie, parce qu'un preset pose dessus teinterait aussi le texte, les stickers
+et les marges.
+
+**Ce qui a rendu ca petit.** Trois choses existaient deja et n'attendaient que
+d'etre reliees:
+
+- `project.vision` porte le reglage choisi dans Vision (preset, intensite,
+  filtres) et se synchronise entre les onglets sans attendre IndexedDB;
+- Vision ouvre deja sur `project.images[0]`, c'est-a-dire la PREMIERE PHOTO DU
+  MODELE: on choisit donc le preset en le voyant sur une vraie image du montage;
+- le moteur de mise en page dessine avec `ctx.drawImage`, qui accepte un canvas
+  aussi bien qu'une image.
+
+**Ce qui a ete ajoute.** `layoutVisionPreset.js` cuit le preset dans chaque
+photo source et rend un canvas, que `useLayoutEditor` substitue aux images avant
+`useCanvasRenderer`. Les cases qui portent leur propre photo (`cfg.image`) sont
+traitees pareil, sinon une case echangee serait restee sans preset. Le moteur
+n'a pas ete touche.
+
+Deux details qui comptent:
+
+- **une seule passe sert l'apercu ET l'export**, parce que les deux traversent
+  le meme `renderPipeline`. Filtrer a 2048 px de grand cote suffit pour un
+  visuel final de 1080 px, au lieu de faire passer quatre photos de 24 millions
+  de pixels dans le pipeline couleur a chaque rendu;
+- **cache par photo + signature du reglage**: changer de preset refabrique, ne
+  rien changer ne refabrique rien.
+
+Un bouton « Preset commun » mene a Vision, et passe a « Preset actif » quand un
+reglage est en place.
+
+**Verifie a l'oeil**, sur un modele Double (2): les deux photos passent
+ensemble du vert et du bleu vifs a l'olive de CN03, et le cadre blanc, les
+marges et la mise en page ne bougent pas. `smoke-vibeos-layout-b1` et
+`-slots` passent. NON reverifie: le libelle « Preset actif » du bouton, corrige
+APRES ce test (il etait destructure depuis le mauvais objet); il lit le meme
+drapeau que le filtrage, qui lui est demontre.
+
+Fichiers ajoutes : `layoutVisionPreset.js`.
+Fichiers touches : `useLayoutEditor.js`, `LayoutScreen.jsx`.
 
 ## Journal — 2026-09-06 sexies (doublons qui revenaient, centrage de Layout, preset visible)
 
