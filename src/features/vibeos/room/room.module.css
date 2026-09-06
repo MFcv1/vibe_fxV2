@@ -118,7 +118,8 @@
 
 .cardTop {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Numero, source, puis les deux actions de la carte. */
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--vo-space-2);
     min-height: 26px;
@@ -146,16 +147,23 @@
     text-overflow: ellipsis;
 }
 
-/* L'action destructive ne s'affiche qu'au survol de sa carte - au clavier elle
-   reste atteignable, le focus la fait reapparaitre. */
-.cardRemove {
+/* Les actions d'une carte ne s'affichent qu'a son survol - au clavier elles
+   restent atteignables, le focus les fait reapparaitre. Une action en cours
+   reste visible meme si la souris part ailleurs: un bouton qui disparait
+   pendant son propre travail donne l'impression que rien ne se passe. */
+.cardAction {
     opacity: 0;
     transition: opacity var(--vo-dur-1) var(--vo-ease);
 }
 
-.card:hover .cardRemove,
-.cardRemove:focus-visible {
+.card:hover .cardAction,
+.cardAction:focus-visible,
+.cardAction[data-busy="true"] {
     opacity: 1;
+}
+
+.cardAction:disabled {
+    cursor: default;
 }
 
 /* Hauteur commune a toutes les vignettes: les cartes s'alignent, et le ratio

@@ -4,8 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, ArrowRight, Check, Eye, FolderPlus, Images, LayoutGrid, RefreshCw, Save,
-    Smartphone, Trash2,
+    ArrowLeft, ArrowRight, Check, Download, Eye, FolderPlus, Images, LayoutGrid, RefreshCw,
+    Save, Smartphone, Trash2,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, IconButton, Sheet, useToast } from '../primitives';
 import InstaPreviewSheet from '../layout/InstaPreviewSheet';
@@ -13,6 +13,7 @@ import { ROOM_CAROUSEL_MAX, useRoom } from './RoomProvider';
 import {
     listTargetFolders, previewRoomFolderSync, suggestRoomFolderName, syncRoomToFolder,
 } from './roomToLibrary';
+import { downloadRoomItem } from './roomDownload';
 import styles from './room.module.css';
 
 /*
@@ -38,6 +39,10 @@ export default function RoomScreen() {
     const toast = useToast();
     const router = useRouter();
     const [previewOpen, setPreviewOpen] = useState(false);
+    /* L'image en cours de recuperation. Un rendu pleine definition venu du
+       compte pese plusieurs megaoctets: sans ce reperage, le bouton reste muet
+       le temps du telechargement et passe pour un bouton casse. */
+    const [downloading, setDownloading] = useState(null);
     const [confirmClear, setConfirmClear] = useState(false);
     const [dragIndex, setDragIndex] = useState(null);
     const [dropIndex, setDropIndex] = useState(null);
@@ -151,6 +156,23 @@ export default function RoomScreen() {
            les suppressions et les envois partent vraiment vers le serveur. */
         router.push('/creer/bibliotheque');
     }, [aEnregistrer, cible, destination, folderName, router, toast]);
+
+    /*
+     * Recuperer une image sur l'appareil.
+     *
+     * C'est le rendu pleine definition qui part, pas la vignette: le preset est
+     * deja cuit dans les pixels par l'atelier, il n'y a rien a reappliquer ici.
+     */
+    const handleDownload = useCallback(async (item, index) => {
+        if (downloading) return;
+        setDownloading(item.id);
+        try {
+            const result = await downloadRoomItem(item.id, index);
+            if (!result.ok) toast.push(result.message, { tone: 'danger', duration: 6000 });
+        } finally {
+            setDownloading(null);
+        }
+    }, [downloading, toast]);
 
     const openPreview = useCallback(async () => {
         if (!count) return;
@@ -316,8 +338,18 @@ export default function RoomScreen() {
                                         {item.formatLabel ? ` · ${item.formatLabel}` : ''}
                                     </span>
                                     <IconButton
+                                        label={`Télécharger l’image ${index + 1} en pleine définition`}
+                                        className={styles.cardAction}
+                                        onClick={() => handleDownload(item, index)}
+                                        disabled={Boolean(downloading)}
+                                        data-busy={downloading === item.id ? 'true' : undefined}
+                                        data-testid="vibeos-room-download"
+                                    >
+                                        <Download size={14} className={downloading === item.id ? 'vo-spin' : undefined} />
+                                    </IconButton>
+                                    <IconButton
                                         label={`Retirer l’image ${index + 1}`}
-                                        className={styles.cardRemove}
+                                        className={styles.cardAction}
                                         onClick={() => handleRemove(item)}
                                     >
                                         <Trash2 size={14} />

@@ -197,6 +197,24 @@
     border: 0;
 }
 
+/*
+ * Rotation continue, pour les icones qui disent « ca travaille ».
+ *
+ * Definie ICI, en global, et pas dans un module CSS: un `@keyframes` declare
+ * dans un module voit son nom hache a la compilation. C'est pourquoi le
+ * `className="vo-spin"` du bandeau de sauvegarde de la bibliotheque ne faisait
+ * tourner strictement rien - le nom existait dans `soundtrack.module.css`, donc
+ * sous un autre nom une fois compile. Le bloc « mouvement reduit » plus bas
+ * l'arrete deja avec tout le reste.
+ */
+@keyframes vo-spin {
+    to { transform: rotate(360deg); }
+}
+
+.vo-spin {
+    animation: vo-spin 900ms linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .vibeos *,
     .vibeos *::before,

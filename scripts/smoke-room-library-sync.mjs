@@ -31,10 +31,14 @@
  *     alors que l'information existait toujours dans la Room. La synchro la
  *     recopie, et seulement pour les rendus de Vision: le `formatLabel` d'un
  *     rendu de Layout est un format d'export, pas un preset.
+ *  9. LE NOM DU FICHIER TELECHARGE - il doit se ranger dans l'ordre du
+ *     carrousel et survivre a macOS, Windows et iOS. Un nom refuse par le
+ *     systeme, c'est un telechargement qui echoue sans rien dire.
  */
 
 import assert from 'node:assert/strict';
 import { planReconcile, planVide, presetDe, roomPhotoId } from '../src/features/vibeos/room/roomLibraryPlan.js';
+import { roomFileName } from '../src/features/vibeos/room/roomFileName.js';
 
 const echecs = [];
 function verifier(titre, run) {
@@ -221,6 +225,34 @@ verifier('8. un lien ET un preset manquants tiennent sur une seule ecriture', ()
     assert.equal(plan.aReparer[0].fromRoomId, 'room-1');
     assert.deepEqual(plan.aReparer[0].preset, { label: 'CN02' });
     assert.equal(plan.aCreer.length, 0);
+});
+
+verifier('9. le nom du fichier telecharge tient sur les trois systemes', () => {
+    const item = { projectTitle: 'Agadir', formatLabel: 'Powlisher Main', type: 'image/jpeg' };
+
+    /* Numero sur trois chiffres: 010 se range apres 009, pas apres 001. */
+    assert.equal(roomFileName(item, 0), '001 - Agadir - Powlisher Main.jpg');
+    assert.equal(roomFileName(item, 9), '010 - Agadir - Powlisher Main.jpg');
+    assert.equal(roomFileName(item, 105), '106 - Agadir - Powlisher Main.jpg');
+
+    /* Les caracteres que macOS, Windows ou iOS refusent ne passent jamais. */
+    const sale = { projectTitle: 'Ete 2026 : le "sud"', formatLabel: '4:5 / carre*', type: 'image/jpeg' };
+    const nom = roomFileName(sale, 0);
+    assert.ok(!/[\\/:*?"<>|]/.test(nom), `nom encore interdit : ${nom}`);
+    assert.ok(nom.endsWith('.jpg'));
+    assert.ok(!/[.\s]\.jpg$/.test(nom), 'ni point ni espace juste avant l extension');
+
+    /* Le PNG reste un PNG. */
+    assert.ok(roomFileName(item, 0, 'image/png').endsWith('.png'));
+
+    /* Sans titre ni preset, il reste un nom utilisable. */
+    assert.equal(roomFileName({}, 3), '004.jpg');
+    assert.equal(roomFileName(null, 3), '004.jpg');
+
+    /* Un titre a rallonge ne fait pas un nom que le systeme refuse. */
+    const long = roomFileName({ projectTitle: 'x'.repeat(400) }, 0);
+    assert.ok(long.length <= 124, `nom trop long : ${long.length}`);
+    assert.ok(long.endsWith('.jpg'));
 });
 
 if (echecs.length) {

@@ -440,6 +440,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
 |   |   |   |-- roomCloud.js           # Room dans le compte (2026-09-05) : Firestore `users/{uid}/roomItems` + Storage `users/{uid}/room/{id}/image.jpg`, plafond 40 Mo (un panorama 4592x8160 depasse les 25 Mo de la bibliotheque). Le fichier part AVANT la fiche
 |   |   |   |-- useRoomSync.js         # File d'envoi un par un + ecoute des fiches distantes + repercussion d'une suppression faite ailleurs. Le local fait autorite pour l'affichage
+|   |   |   |-- roomDownload.js        # Recuperer une image de la Room sur son appareil (2026-09-06) : le RENDU pleine definition, preset deja cuit dans les pixels, jamais la vignette. Le fichier vient d'IndexedDB, ou du compte s'il n'est pas sur cet appareil. Toujours via un Blob local : sur une adresse Storage d'un autre domaine, le navigateur ignore `download` et ouvre l'image au lieu de l'enregistrer
+|   |   |   |-- roomFileName.js        # Le nom du fichier telecharge. Module PUR, teste : numero sur trois chiffres (l'ordre du carrousel tient au-dela de la centieme image), projet et preset pour le reconnaitre, et aucun caractere que macOS, Windows ou iOS refuseraient
 |   |   |   |-- roomLibraryPlan.js     # Le contrat Room <-> dossier (2026-09-06) : `roomPhotoId(folderId, roomItemId)` donne une identite DEDUITE, plus jamais tiree au hasard — un doublon n'est plus detecte, il est impossible a ecrire. `planReconcile` calcule ajouts / copies en trop / liens a reparer. Module pur, teste par `npm run test:room-library`
 |   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05 ; devenu une SYNCHRONISATION le 2026-09-06) : `previewRoomFolderSync` annonce, `syncRoomToFolder` applique le plan (ajoute, supprime les copies, repare les liens). Idempotent. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
 |   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
@@ -782,6 +784,19 @@ file videe, le nom du look est perdu. Le rattrapage n'ecrit qu'en local: la
 fiche distante garde son ancien preset, donc un autre appareil doit jouer sa
 propre synchronisation (re-envoyer 100 images pleine definition pour une
 etiquette ne se justifie pas).
+
+**Telechargement d'une image de la Room (meme jour)** : une icone sur chaque
+carte enregistre le rendu pleine definition sur l'appareil. Rien a reappliquer -
+le preset est deja cuit dans les pixels par l'atelier. Le fichier passe TOUJOURS
+par un Blob local : sur une adresse Storage d'un autre domaine, le navigateur
+ignore l'attribut `download` et ouvre l'image dans un onglet. Modules
+`roomDownload.js` et `roomFileName.js` (celui-ci pur et teste, cas 9).
+
+Au passage : `.vo-spin` n'existait nulle part. Le bandeau de sauvegarde de la
+bibliotheque posait `className="vo-spin"` sur son icone, mais la `@keyframes` du
+meme nom vivait dans `soundtrack.module.css` - donc hachee a la compilation, donc
+inaccessible. L'icone ne tournait pas. La regle est desormais globale, dans
+`vibeos.css`.
 
 **Deploiement** : le site se met en ligne avec `firebase deploy --only
 apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
