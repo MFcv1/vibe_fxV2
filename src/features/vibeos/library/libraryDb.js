@@ -14,12 +14,15 @@
  *   base64 pese ~33% de plus et sature le quota.
  * - `folders`: les dossiers d'import. Un import = un dossier, comme sur un OS.
  *   C'est la seule unite que l'utilisateur deplace, renomme ou supprime en bloc.
+ * - `tombstones`: les photos supprimees. Voir plus bas - c'est ce magasin qui
+ *   empeche une suppression de se faire annuler par le compte.
  */
 
 const DB_NAME = 'vibeos-library';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const PHOTOS_STORE = 'photos';
 const FOLDERS_STORE = 'folders';
+const TOMBSTONES_STORE = 'tombstones';
 
 /* Dossier d'accueil des photos importees AVANT l'arrivee des dossiers. Elles
    ne peuvent pas rester sans parent: l'ecran ne montre que des dossiers. */
@@ -83,6 +86,9 @@ function openDb() {
             if (!db.objectStoreNames.contains(FOLDERS_STORE)) {
                 const folders = db.createObjectStore(FOLDERS_STORE, { keyPath: 'id' });
                 folders.createIndex('createdAt', 'createdAt');
+            }
+            if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
+                db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'id' });
             }
             if (!fresh && event.oldVersion < 2) adoptOrphans(tx);
         };
@@ -228,6 +234,122 @@ export async function deleteFolderDeep(folderId) {
         });
     } catch {
         return [];
+    }
+}
+
+
+/* ---------- Suppressions ---------- */
+
+/*
+ * Les pierres tombales, et pourquoi elles sont ECRITES SUR LE DISQUE.
+ *
+ * Supprimer une photo, c'est trois gestes: retirer la fiche locale, retirer la
+ * fiche du compte, retirer les fichiers de Storage. Les deux derniers passent
+ * par le reseau. Si l'utilisateur ferme l'onglet, perd sa connexion, ou n'est
+ * simplement pas encore identifie quand il clique, ils n'ont pas lieu - et a la
+ * reouverture, l'ecoute du compte fait revenir tout ce qu'il croyait avoir
+ * supprime. C'est exactement le « je supprime les doublons, je reviens, tout
+ * est revenu » constate en usage.
+ *
+ * Une pierre tombale repond aux deux moities du probleme:
+ * - `remoteDone: false` est une TACHE A FINIR. Tant qu'elle est la, la
+ *   suppression distante sera retentee, cette session ou la suivante.
+ * - sa seule presence INTERDIT LE RETOUR de la photo. La descente depuis le
+ *   compte la refuse, meme si la fiche distante existe encore.
+ *
+ * Elles ne durent pas eternellement: une fois la suppression distante
+ * confirmee, la pierre est gardee `TOMBSTONE_KEEP_MS` puis nettoyee. Assez
+ * longtemps pour couvrir un cache Firestore qui traine, assez court pour ne pas
+ * accumuler du bruit pendant des annees.
+ */
+export const TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+/*
+ * `entries` accepte un identifiant, ou un objet `{ id, previewPath,
+ * originalPath }`.
+ *
+ * Les chemins Storage sont recopies ICI parce que la fiche locale, elle, va
+ * disparaitre. Une pierre honoree la session suivante n'aurait plus de quoi
+ * retrouver le fichier d'origine, et il resterait a payer dans le bucket sans
+ * que rien ne le reference.
+ */
+export async function putTombstones(entries, { remoteDone = false } = {}) {
+    if (!entries?.length) return true;
+    try {
+        const now = Date.now();
+        const rows = entries.filter(Boolean).map((entry) => (
+            typeof entry === 'string'
+                ? { id: entry, at: now, remoteDone }
+                : {
+                    id: entry.id,
+                    at: now,
+                    remoteDone,
+                    previewPath: entry.previewPath || null,
+                    originalPath: entry.originalPath || null,
+                }
+        ));
+        await withStores(TOMBSTONES_STORE, 'readwrite', (store) => Promise.all(
+            rows.map((row) => requestToPromise(store.put(row))),
+        ));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function listTombstones() {
+    try {
+        const all = await withStores(TOMBSTONES_STORE, 'readonly', (store) => requestToPromise(store.getAll()));
+        return all || [];
+    } catch {
+        return [];
+    }
+}
+
+/* La date est celle de la CONFIRMATION, pas celle du clic: la pierre doit
+   survivre trente jours a la suppression reellement passee, pas a l'intention.
+   Ecriture directe, sans relire d'abord - une lecture suivie d'une ecriture
+   dans la meme transaction se fait refermer la porte au nez sur Safari. */
+export async function markTombstoneDone(row) {
+    const base = typeof row === 'string' ? { id: row } : (row || {});
+    if (!base.id) return false;
+    try {
+        await withStores(TOMBSTONES_STORE, 'readwrite', (store) => (
+            requestToPromise(store.put({ ...base, at: Date.now(), remoteDone: true }))
+        ));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/* Lever une pierre: la photo est volontairement recreee sous la meme cle.
+   Sans ce geste, reenregistrer une image de Room supprimee par erreur donnerait
+   une photo invisible - ecrite en local, puis refusee a la remontee. */
+export async function dropTombstones(ids) {
+    if (!ids?.length) return true;
+    try {
+        await withStores(TOMBSTONES_STORE, 'readwrite', (store) => Promise.all(
+            ids.filter(Boolean).map((id) => requestToPromise(store.delete(id))),
+        ));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/* Ne garde que ce qui sert encore: les taches non finies, et les suppressions
+   recentes. */
+export async function purgeTombstones(now = Date.now()) {
+    try {
+        const rows = await listTombstones();
+        const perimes = rows
+            .filter((row) => row.remoteDone && now - (row.at || 0) > TOMBSTONE_KEEP_MS)
+            .map((row) => row.id);
+        if (perimes.length) await dropTombstones(perimes);
+        return perimes.length;
+    } catch {
+        return 0;
     }
 }
 

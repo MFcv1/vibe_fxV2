@@ -4,13 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, ArrowRight, Check, Eye, FolderPlus, Images, LayoutGrid, Save, Smartphone, Trash2,
+    ArrowLeft, ArrowRight, Check, Eye, FolderPlus, Images, LayoutGrid, RefreshCw, Save,
+    Smartphone, Trash2,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, IconButton, Sheet, useToast } from '../primitives';
 import InstaPreviewSheet from '../layout/InstaPreviewSheet';
 import { ROOM_CAROUSEL_MAX, useRoom } from './RoomProvider';
 import {
-    listTargetFolders, roomItemsLeftFor, saveRoomToLibrary, suggestRoomFolderName,
+    listTargetFolders, previewRoomFolderSync, suggestRoomFolderName, syncRoomToFolder,
 } from './roomToLibrary';
 import styles from './room.module.css';
 
@@ -74,8 +75,9 @@ export default function RoomScreen() {
     const [folderName, setFolderName] = useState('');
     const [folderId, setFolderId] = useState('');
     const [saving, setSaving] = useState(null); // { done, total }
-    /* Ce qui reste vraiment a enregistrer dans la destination choisie. */
-    const [reste, setReste] = useState(null); // { total, restants, deja }
+    /* Ce que la synchronisation ferait sur la destination choisie, annonce
+       AVANT le clic: ce bouton peut supprimer des dizaines de fiches. */
+    const [plan, setPlan] = useState(null);
 
     const openSave = useCallback(async () => {
         const liste = await listTargetFolders();
@@ -91,42 +93,62 @@ export default function RoomScreen() {
      * Recompte a chaque changement de destination: un dossier deja servi ne
      * reprend que les images ajoutees depuis, un dossier neuf prend tout.
      */
+    /* La destination a laquelle un plan se rapporte. Le plan porte cette cle
+       avec lui: sans elle, changer de dossier laisserait afficher les chiffres
+       du precedent pendant la lecture du suivant - donc des chiffres faux. */
+    const cible = destination === 'existing' ? folderId : null;
     useEffect(() => {
         if (!saveOpen) return undefined;
         let vivant = true;
-        const cible = destination === 'existing' ? folderId : null;
-        roomItemsLeftFor(cible).then((valeur) => { if (vivant) setReste(valeur); });
+        previewRoomFolderSync(cible).then((valeur) => {
+            if (vivant) setPlan({ ...valeur, cle: cible || 'new' });
+        });
         return () => { vivant = false; };
-    }, [saveOpen, destination, folderId, count]);
+    }, [saveOpen, cible, count]);
 
-    const aEnregistrer = reste ? reste.restants : count;
+    const planCourant = plan && plan.cle === (cible || 'new') ? plan : null;
+    const aEnregistrer = planCourant ? planCourant.aCreer : count;
+    const rienAFaire = Boolean(planCourant?.rienAFaire);
 
+    /*
+     * Aligner le dossier sur la Room.
+     *
+     * Ce n'est plus « ajouter ce qui manque » mais « rendre les deux d'accord »:
+     * ajouter, retirer les copies en trop, reparer les liens des fiches
+     * d'avant. Rejouable: la deuxieme fois, il n'y a plus rien a faire, et le
+     * bouton le dit.
+     */
     const handleSave = useCallback(async () => {
         setSaving({ done: 0, total: aEnregistrer });
-        const result = await saveRoomToLibrary({
-            folderId: destination === 'existing' ? folderId : null,
+        const result = await syncRoomToFolder({
+            folderId: cible,
             folderName: destination === 'new' ? folderName : null,
             onProgress: (done, total) => setSaving({ done, total }),
         });
         setSaving(null);
         setSaveOpen(false);
-        if (result.blocked) {
-            toast.push(result.message, { tone: 'danger', duration: 6000 });
+        if (!result.ok) {
+            toast.push(result.message || 'Rien à enregistrer.', { tone: 'danger' });
             return;
         }
-        if (!result.added) {
-            toast.push('Aucune image n’a pu être enregistrée.', { tone: 'danger' });
-            return;
-        }
+        /* On raconte ce qui a ete fait, pas ce qui aurait du l'etre. */
+        const faits = [];
+        if (result.added) faits.push(`${result.added} ajoutée${result.added > 1 ? 's' : ''}`);
+        if (result.supprimees) faits.push(`${result.supprimees} doublon${result.supprimees > 1 ? 's' : ''} supprimé${result.supprimees > 1 ? 's' : ''}`);
+        if (result.reparees) faits.push(`${result.reparees} fiche${result.reparees > 1 ? 's' : ''} réparée${result.reparees > 1 ? 's' : ''}`);
+        if (result.introuvables) faits.push(`${result.introuvables} image${result.introuvables > 1 ? 's' : ''} illisible${result.introuvables > 1 ? 's' : ''}`);
         toast.push(
-            `${result.added} image${result.added > 1 ? 's' : ''} enregistrée${result.added > 1 ? 's' : ''} dans « ${result.folderName} ». La sauvegarde dans ton compte démarre.`,
-            { tone: 'success', duration: 6000 },
+            faits.length
+                ? `« ${result.folderName} » · ${faits.join(', ')} · ${result.totalDossier} photo${result.totalDossier > 1 ? 's' : ''} dans le dossier.`
+                : `« ${result.folderName} » était déjà à jour · ${result.totalDossier} photo${result.totalDossier > 1 ? 's' : ''}.`,
+            { tone: result.message ? 'warn' : 'success', duration: 7000 },
         );
+        if (result.message) toast.push(result.message, { tone: 'danger', duration: 7000 });
         /* On emmene l'utilisateur dans la bibliotheque: c'est cet ecran qui
-           porte la synchronisation, donc c'est en y arrivant que la montee
-           vers le compte commence vraiment. */
+           porte la synchronisation avec le compte, donc c'est en y arrivant que
+           les suppressions et les envois partent vraiment vers le serveur. */
         router.push('/creer/bibliotheque');
-    }, [aEnregistrer, destination, folderId, folderName, router, toast]);
+    }, [aEnregistrer, cible, destination, folderName, router, toast]);
 
     const openPreview = useCallback(async () => {
         if (!count) return;
@@ -376,26 +398,47 @@ export default function RoomScreen() {
                         <strong>La Room n’est pas vidée</strong> : ton post en cours reste tel quel.
                     </p>
 
-                    {/* Ce qui est deja dans le dossier vise n'y retourne pas: sans
-                        ca, ajouter quatre images a une file de trente-six
-                        proposait de reimporter les trente-six. */}
-                    {reste && reste.deja ? (
-                        <p className={styles.saveIntro}>
-                            {reste.restants ? (
-                                <>
-                                    <strong data-numeric>{reste.deja}</strong> de ces images sont
-                                    déjà dans ce dossier : seule{reste.restants > 1 ? 's' : ''} l
-                                    {reste.restants > 1 ? 'es ' : 'a '}
-                                    <strong data-numeric>{reste.restants}</strong> ajoutée
-                                    {reste.restants > 1 ? 's' : ''} depuis sera
-                                    {reste.restants > 1 ? 'ont' : ''} enregistrée
-                                    {reste.restants > 1 ? 's' : ''}.
-                                </>
-                            ) : (
-                                <>Toutes ces images sont déjà dans ce dossier. Choisis un autre
-                                dossier, ou ajoute d’abord des images à la Room.</>
-                            )}
-                        </p>
+                    {/* Ce que le bouton va faire, en clair et avant le clic. Il
+                        peut supprimer des dizaines de fiches: l'annoncer n'est
+                        pas une politesse, c'est la condition pour oser cliquer. */}
+                    {planCourant && destination === 'existing' ? (
+                        <ul className={styles.planList} data-testid="vibeos-room-sync-plan">
+                            <li>
+                                <strong data-numeric>{planCourant.dejaLa}</strong> de ces{' '}
+                                {planCourant.total} image{planCourant.total > 1 ? 's' : ''} sont déjà dans ce
+                                dossier, bien rangées.
+                            </li>
+                            {planCourant.aCreer ? (
+                                <li data-tone="add">
+                                    <strong data-numeric>{planCourant.aCreer}</strong> à ajouter.
+                                </li>
+                            ) : null}
+                            {planCourant.aSupprimer ? (
+                                <li data-tone="drop">
+                                    <strong data-numeric>{planCourant.aSupprimer}</strong>{' '}
+                                    copie{planCourant.aSupprimer > 1 ? 's' : ''} en trop à supprimer, ici
+                                    et dans ton compte.
+                                </li>
+                            ) : null}
+                            {planCourant.aReparer ? (
+                                <li>
+                                    <strong data-numeric>{planCourant.aReparer}</strong> fiche
+                                    {planCourant.aReparer > 1 ? 's' : ''} d’avant à rattacher à leur image
+                                    — elles ne seront plus jamais réimportées.
+                                </li>
+                            ) : null}
+                            {planCourant.horsRoom ? (
+                                <li>
+                                    <strong data-numeric>{planCourant.horsRoom}</strong> photo
+                                    {planCourant.horsRoom > 1 ? 's' : ''} de ce dossier ne vien
+                                    {planCourant.horsRoom > 1 ? 'nent' : 't'} pas de la Room : on n’y
+                                    touche pas.
+                                </li>
+                            ) : null}
+                            {planCourant.rienAFaire ? (
+                                <li data-tone="ok">Tout est déjà calé. Rien à faire.</li>
+                            ) : null}
+                        </ul>
                     ) : null}
 
                     <div className={styles.saveField} role="radiogroup" aria-label="Destination">
@@ -454,16 +497,23 @@ export default function RoomScreen() {
                         <Button
                             variant="primary"
                             size="sm"
-                            icon={<Save size={13} />}
+                            icon={destination === 'existing' ? <RefreshCw size={13} /> : <Save size={13} />}
                             onClick={handleSave}
-                            disabled={Boolean(saving) || !aEnregistrer || (destination === 'existing' && !folderId)}
+                            disabled={
+                                Boolean(saving)
+                                || (destination === 'existing' && (!folderId || rienAFaire))
+                                || (destination === 'new' && !count)
+                            }
                             data-testid="vibeos-room-save-confirm"
                         >
-                            {saving
-                                ? `Enregistrement ${saving.done}/${saving.total}`
-                                : aEnregistrer
-                                    ? `Enregistrer ${aEnregistrer} image${aEnregistrer > 1 ? 's' : ''}`
-                                    : 'Déjà tout enregistré'}
+                            {(() => {
+                                if (saving) return `Enregistrement ${saving.done}/${saving.total}`;
+                                if (destination === 'new') {
+                                    return `Enregistrer ${count} image${count > 1 ? 's' : ''}`;
+                                }
+                                if (rienAFaire) return 'Tout est déjà calé';
+                                return 'Synchroniser ce dossier';
+                            })()}
                         </Button>
                     </div>
                 </div>

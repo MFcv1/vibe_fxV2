@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CloudOff, RefreshCw } from 'lucide-react';
+import { CloudOff, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
     cloudReady, cloudUid, deleteFolderRemote, deletePhotoRemote, fetchBlob,
     pushFolder, pushPhoto, subscribeLibrary,
 } from './libraryCloud';
+import {
+    listTombstones, markTombstoneDone, purgeTombstones, putTombstones,
+} from './libraryDb';
 import { makePreview } from './photoImport';
 
 /*
@@ -30,15 +33,33 @@ import { makePreview } from './photoImport';
 const MAX_FAILURES = 3;
 
 /*
- * Combien de temps une photo supprimee reste « interdite de retour ».
+ * Une photo supprimee ne revient pas. Jamais.
  *
- * Supprimer efface la fiche locale ET la fiche distante, mais deux choses
- * peuvent la ressusciter dans la seconde qui suit: un envoi deja en vol qui se
- * termine et reecrit la fiche, et l'ecoute Firestore qui recoit un instantane
- * pris avant la suppression. C'est ce qui faisait revenir les doublons au
- * rechargement de la page. Une minute couvre tres largement les deux.
+ * Le registre des suppressions n'est plus une minute de memoire vive: il est
+ * ECRIT SUR LE DISQUE (magasin `tombstones`, voir `libraryDb.js`). C'est la
+ * difference entre « ca tient tant que l'onglet reste ouvert » et « ca tient ».
+ *
+ * Une suppression, c'est trois gestes: la fiche locale, la fiche du compte, les
+ * fichiers de Storage. Les deux derniers passent par le reseau et peuvent ne
+ * pas avoir lieu - onglet ferme, connexion coupee, session pas encore
+ * identifiee. Avant, l'ecoute du compte reinstallait alors tout ce que
+ * l'utilisateur croyait avoir supprime: c'est le « je supprime les doublons, je
+ * reviens, tout est revenu ».
+ *
+ * Maintenant la pierre tombale fait deux choses a la fois: elle INTERDIT le
+ * retour des la premiere milliseconde, et elle reste une TACHE A FINIR tant que
+ * la suppression distante n'est pas confirmee - cette session ou la suivante.
  */
-const TOMBSTONE_MS = 60000;
+
+/* Suppressions distantes menees de front. Quarante-neuf doublons a la file,
+   c'est trois requetes chacun: en serie, l'utilisateur attendait une demi-
+   minute devant un ecran fige. */
+const DELETE_LANES = 4;
+
+/* Echecs d'envoi tolerés pour UNE photo avant de la mettre de cote. Sans ce
+   compteur par photo, un seul fichier illisible bloquait toute la file: c'est
+   ce qui laissait « 46 photos en attente » pour toujours. */
+const MAX_PHOTO_FAILURES = 3;
 
 function remoteToLocal(remote) {
     return {
@@ -78,31 +99,30 @@ function remoteToLocal(remote) {
 export default function useLibrarySync(library) {
     const { user } = useAuth();
     const {
-        photos, folders, status, upsertPhoto, upsertFolder, patchPhoto,
+        photos, folders, status, upsertPhoto, upsertFolder, patchPhoto, removeAll,
     } = library;
 
     const [failures, setFailures] = useState(0);
-    /* id -> instant de suppression. Voir `TOMBSTONE_MS`. */
+    /* id -> { id, at, remoteDone }, charge depuis le disque au montage. */
     const tombstonesRef = useRef(new Map());
+    const [tombsLoaded, setTombsLoaded] = useState(false);
+    const [aEffacer, setAEffacer] = useState(0);
+    const drainingRef = useRef(false);
+    /* id -> nombre d'echecs d'envoi pour CETTE photo. Voir `MAX_PHOTO_FAILURES`. */
+    const echecsRef = useRef(new Map());
     const [lastError, setLastError] = useState('');
     const runningRef = useRef(false);
     const photosRef = useRef(photos);
     const foldersRef = useRef(folders);
 
     /*
-     * Une photo qu'on vient de supprimer ne doit ni remonter, ni redescendre.
+     * Une photo supprimee ne doit ni remonter, ni redescendre.
      *
      * Declaree ICI, avant tout ce qui la lit: la file d'envoi l'appelle pendant
      * le rendu, et une declaration plus bas faisait planter l'ecran entier
      * (`enterre is not defined`).
      */
-    const enterre = useCallback((id) => {
-        const at = tombstonesRef.current.get(id);
-        if (!at) return false;
-        if (Date.now() - at < TOMBSTONE_MS) return true;
-        tombstonesRef.current.delete(id);
-        return false;
-    }, []);
+    const enterre = useCallback((id) => tombstonesRef.current.has(id), []);
 
     useEffect(() => { photosRef.current = photos; }, [photos]);
     useEffect(() => { foldersRef.current = folders; }, [folders]);
@@ -110,10 +130,78 @@ export default function useLibrarySync(library) {
     const uid = cloudUid(user);
     const enabled = Boolean(uid) && cloudReady();
 
+    /* ---------- Le registre des suppressions ---------- */
+
+    /* Il se lit AVANT d'ecouter le compte. Ecouter d'abord, ce serait laisser
+       revenir, l'espace d'un instant, tout ce qui a ete supprime hors ligne. */
+    useEffect(() => {
+        let vivant = true;
+        (async () => {
+            await purgeTombstones();
+            const rows = await listTombstones();
+            if (!vivant) return;
+            tombstonesRef.current = new Map(rows.map((row) => [row.id, row]));
+            setAEffacer(rows.filter((row) => !row.remoteDone).length);
+            setTombsLoaded(true);
+        })();
+        return () => { vivant = false; };
+    }, []);
+
+    /*
+     * Finir les suppressions distantes qui n'ont pas eu lieu.
+     *
+     * Y compris celles decidees ailleurs: la synchronisation Room -> dossier
+     * ecrit ses pierres tombales sans toucher au reseau, et c'est ici qu'elles
+     * sont honorees. Plusieurs de front, sinon cinquante suppressions font
+     * attendre une demi-minute.
+     */
+    const drainTombstones = useCallback(async () => {
+        if (!enabled || drainingRef.current) return;
+        const file = [...tombstonesRef.current.values()].filter((row) => !row.remoteDone);
+        if (!file.length) return;
+        drainingRef.current = true;
+        setAEffacer(file.length);
+        try {
+            const lanes = Array.from({ length: Math.min(DELETE_LANES, file.length) }, async () => {
+                for (;;) {
+                    const row = file.shift();
+                    if (!row) return;
+                    /* La pierre porte les chemins Storage de la photo: la fiche
+                       locale, elle, n'existe plus. */
+                    const photo = photosRef.current.find((item) => item.id === row.id) || {
+                        id: row.id,
+                        cloud: { previewPath: row.previewPath, originalPath: row.originalPath },
+                    };
+                    try {
+                        await deletePhotoRemote(uid, photo);
+                    } catch (error) {
+                        /* La pierre reste « a finir »: on reessaiera. Marquer
+                           fait sur un echec, c'est reprogrammer le retour de la
+                           photo pour dans trente jours. */
+                        setLastError(error?.message || 'Suppression dans le compte impossible.');
+                        continue;
+                    }
+                    const fait = { ...row, remoteDone: true, at: Date.now() };
+                    tombstonesRef.current.set(row.id, fait);
+                    await markTombstoneDone(fait);
+                    setAEffacer((current) => Math.max(0, current - 1));
+                }
+            });
+            await Promise.all(lanes);
+        } finally {
+            drainingRef.current = false;
+        }
+    }, [enabled, uid]);
+
+    useEffect(() => {
+        if (!enabled || !tombsLoaded) return;
+        void drainTombstones();
+    }, [enabled, tombsLoaded, drainTombstones]);
+
     /* ---------- Descente: ce que le compte contient deja ---------- */
 
     useEffect(() => {
-        if (!enabled || status !== 'ready') return undefined;
+        if (!enabled || status !== 'ready' || !tombsLoaded) return undefined;
         return subscribeLibrary(uid, {
             onFolders: (remoteFolders) => {
                 remoteFolders.forEach((remote) => {
@@ -131,6 +219,22 @@ export default function useLibrarySync(library) {
                 });
             },
             onPhotos: (remotePhotos) => {
+                /*
+                 * Supprimee ailleurs: on suit.
+                 *
+                 * Uniquement pour ce qui n'existe QUE dans le compte - pas de
+                 * fichier local, donc rien a perdre. Une photo encore posee sur
+                 * cet appareil n'est jamais effacee par le serveur: elle peut
+                 * etre absente du compte simplement parce qu'elle n'y est pas
+                 * ENCORE montee. Sans ce passage, supprimer sur le portable ne
+                 * se voyait jamais sur le fixe.
+                 */
+                const vus = new Set(remotePhotos.map((remote) => remote.id));
+                const fantomes = photosRef.current
+                    .filter((photo) => photo.remote && !photo.blob && !vus.has(photo.id))
+                    .map((photo) => photo.id);
+                if (fantomes.length) void removeAll(fantomes);
+
                 remotePhotos.forEach((remote) => {
                     /* Supprimee a l'instant: l'instantane peut avoir ete pris
                        avant, on ne la fait pas revenir. */
@@ -162,12 +266,25 @@ export default function useLibrarySync(library) {
                 setFailures((current) => current + 1);
             },
         });
-    }, [enabled, uid, status, upsertFolder, upsertPhoto, patchPhoto, enterre]);
+    }, [enabled, uid, status, tombsLoaded, upsertFolder, upsertPhoto, patchPhoto, removeAll, enterre]);
 
     /* ---------- Montee: ce qui n'est pas encore parti ---------- */
 
     const pending = useMemo(
-        () => photos.filter((photo) => photo.blob && !photo.scout && photo.cloud?.state !== 'synced'),
+        () => photos.filter((photo) => (
+            photo.blob && !photo.scout
+            && photo.cloud?.state !== 'synced'
+            /* Mise de cote apres trois echecs: elle ne doit plus retenir la
+               file derriere elle. L'utilisateur peut la relancer a la main. */
+            && photo.cloud?.state !== 'blocked'
+        )),
+        [photos],
+    );
+
+    /* Les photos qui ne partiront pas toutes seules. Affichees telles quelles:
+       un compteur « en attente » qui n'avance plus est un mensonge. */
+    const bloquees = useMemo(
+        () => photos.filter((photo) => photo.cloud?.state === 'blocked'),
         [photos],
     );
 
@@ -204,11 +321,28 @@ export default function useLibrarySync(library) {
                 setFailures(0);
                 setLastError('');
             } catch (error) {
-                setFailures((current) => current + 1);
-                setLastError(error?.message || 'Sauvegarde impossible.');
+                const raison = error?.message || 'Sauvegarde impossible.';
+                setLastError(raison);
+                /*
+                 * Un refus de droits concerne TOUTE la file: insister n'a pas de
+                 * sens. Un fichier illisible ne concerne que lui: avant, il
+                 * comptait quand meme dans le compteur global et faisait
+                 * s'arreter la sauvegarde de toutes les autres photos apres
+                 * trois essais. C'est ce qui figeait « 46 photos en attente ».
+                 */
+                const global = ['permission-denied', 'unauthenticated', 'storage/unauthorized']
+                    .includes(error?.code);
+                if (global) setFailures((current) => current + 1);
                 if (next) {
+                    const essais = (echecsRef.current.get(next.id) || 0) + 1;
+                    echecsRef.current.set(next.id, essais);
+                    const fini = !global && essais >= MAX_PHOTO_FAILURES;
                     await patchPhoto(next.id, {
-                        cloud: { ...(next.cloud || {}), state: 'error', error: error?.message || 'échec' },
+                        cloud: {
+                            ...(next.cloud || {}),
+                            state: fini ? 'blocked' : 'error',
+                            error: raison,
+                        },
                     });
                 }
             } finally {
@@ -219,23 +353,52 @@ export default function useLibrarySync(library) {
 
     /* ---------- Suppressions ---------- */
 
+    /*
+     * Oublier des photos.
+     *
+     * La pierre tombale est posee et ECRITE tout de suite, meme sans compte et
+     * meme hors ligne: c'est elle, et pas la reussite d'une requete, qui decide
+     * qu'une photo ne revient pas. Le travail reseau part ensuite, en fond -
+     * cinquante doublons ne doivent pas faire attendre l'utilisateur devant un
+     * ecran fige, et s'il ferme l'onglet avant la fin, la session suivante
+     * reprendra la ou on en est.
+     */
     const forgetPhotos = useCallback(async (ids) => {
-        /* La pierre tombale se pose MEME sans compte: elle protege aussi de
-           l'envoi en vol, qui n'a pas encore fini d'ecrire. */
+        const liste = (ids || []).filter(Boolean);
+        if (!liste.length) return;
         const now = Date.now();
-        (ids || []).forEach((id) => tombstonesRef.current.set(id, now));
-        if (!enabled) return;
-        for (const id of ids) {
-            const photo = photosRef.current.find((item) => item.id === id) || { id };
-            await deletePhotoRemote(uid, photo);
-        }
-    }, [enabled, uid]);
+        const pierres = liste.map((id) => {
+            const photo = photosRef.current.find((item) => item.id === id);
+            return {
+                id,
+                at: now,
+                remoteDone: false,
+                previewPath: photo?.cloud?.previewPath || null,
+                originalPath: photo?.cloud?.originalPath || null,
+            };
+        });
+        pierres.forEach((row) => tombstonesRef.current.set(row.id, row));
+        await putTombstones(pierres);
+        setAEffacer((current) => current + liste.length);
+        void drainTombstones();
+    }, [drainTombstones]);
 
     const forgetFolder = useCallback(async (folderId, photoIds = []) => {
-        if (!enabled) return;
         await forgetPhotos(photoIds);
+        if (!enabled) return;
         await deleteFolderRemote(uid, folderId);
     }, [enabled, uid, forgetPhotos]);
+
+    /* Relancer ce qui a ete mis de cote. Geste explicite: on remet le compteur
+       d'echecs a zero, sinon la photo repartirait pour etre rebloquee aussitot. */
+    const retryBlocked = useCallback(async () => {
+        for (const photo of bloquees) {
+            echecsRef.current.delete(photo.id);
+            await patchPhoto(photo.id, { cloud: { ...(photo.cloud || {}), state: 'local', error: null } });
+        }
+        setFailures(0);
+        setLastError('');
+    }, [bloquees, patchPhoto]);
 
     /* ---------- Rapatriement ---------- */
 
@@ -300,6 +463,17 @@ export default function useLibrarySync(library) {
                 icon: <CloudOff size={13} />,
             };
         }
+        /* Ce qui ne partira pas se dit AVANT ce qui est en cours: une photo mise
+           de cote n'avance plus, et un compteur qui n'avance pas sans le dire
+           est ce qui a fait perdre confiance dans cette barre. */
+        if (bloquees.length) {
+            return {
+                tone: 'danger',
+                label: `${bloquees.length} photo${bloquees.length > 1 ? 's' : ''} n’${bloquees.length > 1 ? 'ont' : 'a'} pas pu être sauvegardée${bloquees.length > 1 ? 's' : ''} : ${lastError}`,
+                icon: <CloudOff size={13} />,
+                action: { label: 'Réessayer', run: retryBlocked },
+            };
+        }
         if (pending.length) {
             return {
                 tone: 'busy',
@@ -307,8 +481,15 @@ export default function useLibrarySync(library) {
                 icon: <RefreshCw size={13} className="vo-spin" />,
             };
         }
+        if (aEffacer) {
+            return {
+                tone: 'busy',
+                label: `Suppression dans ton compte · ${aEffacer} photo${aEffacer > 1 ? 's' : ''} restante${aEffacer > 1 ? 's' : ''}`,
+                icon: <RefreshCw size={13} className="vo-spin" />,
+            };
+        }
         return null;
-    }, [enabled, failures, lastError, pending.length]);
+    }, [enabled, failures, lastError, pending.length, bloquees.length, aEffacer, retryBlocked]);
 
     /* Chiffre affichable ailleurs: combien de photos sont a l'abri. */
     const syncedCount = useMemo(
@@ -317,7 +498,7 @@ export default function useLibrarySync(library) {
     );
 
     return {
-        enabled, banner, pending: pending.length, syncedCount,
-        forgetPhotos, forgetFolder, hydrate,
+        enabled, banner, pending: pending.length, blocked: bloquees.length, syncedCount,
+        forgetPhotos, forgetFolder, hydrate, retryBlocked, drainTombstones,
     };
 }

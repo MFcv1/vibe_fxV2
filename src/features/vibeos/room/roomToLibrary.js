@@ -2,30 +2,30 @@
 
 import { listRoomItems } from './roomDb';
 import { fetchRoomBlob } from './roomCloud';
+import { planReconcile, planVide, roomPhotoId } from './roomLibraryPlan';
 import {
-    createFolderId, listFolders, listPhotos, putFolder, putPhoto,
+    createFolderId, deletePhoto, dropTombstones, listFolders, listPhotos, putFolder, putPhoto,
+    putTombstones,
 } from '../library/libraryDb';
 import { buildPhotoRecord } from '../library/photoImport';
 import { sanitizeFolderName, uniqueFolderName } from '../library/folderNaming';
 import { checkImport } from '../library/libraryQuota';
 
 /*
- * Mettre la Room a l'abri : ses rendus deviennent de vraies photos.
+ * Le pont entre la Room et la bibliotheque.
  *
- * La Room vit dans IndexedDB, c'est-a-dire DANS CE NAVIGATEUR et nulle part
- * ailleurs. Elle ne connait pas le compte de l'utilisateur : vider les donnees
- * du site, changer d'ordinateur ou passer en navigation privee, et dix rendus
- * disparaissent. Tant qu'un rendu n'est qu'un element de Room, il n'est pas
- * sauvegarde - il est juste en attente.
+ * La Room est une FILE D'ATTENTE: elle se vide quand le post part. La
+ * bibliotheque est un LIEU OU L'ON GARDE. Ce module fait passer les rendus de
+ * l'une a l'autre, et surtout: il maintient les deux d'accord.
  *
- * Ce module fait le pont : chaque rendu entre dans la bibliotheque comme une
- * photo normale, dans un dossier neuf ou existant. A partir de la, c'est la
- * synchronisation de la bibliotheque qui l'envoie dans le compte, avec le meme
- * chemin que n'importe quel import - donc dans Storage, donc recuperable
- * ailleurs.
+ * Ce n'est plus une operation d'ajout, c'est une SYNCHRONISATION. On ne
+ * demande plus « qu'est-ce qui est nouveau ? » - question a laquelle on
+ * repondait mal - mais « a quoi ce dossier doit-il ressembler ? », et on
+ * corrige l'ecart. La regle tient en une phrase: un element de Room = au plus
+ * une photo dans le dossier. Le calcul est dans `roomLibraryPlan.js`, teste a
+ * part; ici il n'y a que les ecritures.
  *
- * La Room n'est PAS videe au passage : on met a l'abri, on ne deplace pas. Le
- * post en cours reste intact, et l'utilisateur decide seul quand vider sa file.
+ * La Room n'est PAS videe au passage: on met a l'abri, on ne deplace pas.
  */
 
 /* Un rendu de Room est un PNG ou un JPEG deja fabrique par l'export social. */
@@ -64,190 +64,197 @@ export async function listTargetFolders() {
     return folders.filter((folder) => !folder.localOnly);
 }
 
-/*
- * Signature d'un rendu: ses dimensions et son poids exact.
- *
- * Elle sert UNIQUEMENT a rattraper les dossiers remplis avant que le lien
- * `fromRoomId` n'existe. Deux rendus differents de la meme photo n'ont pas le
- * meme poids a l'octet pres - un preset change forcement quelques milliers
- * d'octets de JPEG - donc la confusion demanderait deux images identiques, qui
- * sont de toute facon interchangeables.
- */
-function empreinte(largeur, hauteur, octets) {
-    return `${largeur || 0}x${hauteur || 0}:${octets || 0}`;
+async function photosDuDossier(folderId) {
+    if (!folderId) return [];
+    return (await listPhotos()).filter((photo) => photo.folderId === folderId);
 }
 
 /*
- * Ce qui est deja dans un dossier, et par quoi on le sait.
+ * Ce que la synchronisation ferait, sans rien faire.
  *
- * La photo creee garde l'identifiant de l'element de Room dont elle vient
- * (`fromRoomId`). « Deja enregistree ici » se lit donc dans le dossier lui-meme,
- * pas dans une marque posee sur la Room: c'est la seule version qui reste vraie
- * si on enregistre depuis un autre appareil, puisque la bibliotheque, elle, se
- * synchronise.
- *
- * Les dossiers remplis AVANT l'existence de ce lien n'en ont pas. Sans
- * rattrapage, ils reproposeraient indefiniment de tout reimporter — c'est
- * exactement ce qui a ete constate. On les reconnait donc a l'empreinte, et on
- * en profite pour ECRIRE le lien manquant: la fois d'apres, c'est exact.
+ * L'ecran l'affiche AVANT le clic. Un bouton destructeur qui n'annonce pas ce
+ * qu'il va detruire est un piege, et ici il peut supprimer des dizaines de
+ * fiches d'un coup.
  */
-async function dejaDansLeDossier(folderId, items) {
-    if (!folderId) return { ids: new Set(), aReparer: [] };
-    const photos = (await listPhotos()).filter((photo) => photo.folderId === folderId);
-    const ids = new Set();
-    photos.forEach((photo) => { if (photo.fromRoomId) ids.add(photo.fromRoomId); });
-
-    const orphelines = photos.filter((photo) => !photo.fromRoomId);
-    const aReparer = [];
-    if (orphelines.length) {
-        const parEmpreinte = new Map();
-        items.forEach((item) => {
-            if (ids.has(item.id)) return;
-            const cle = empreinte(item.width, item.height, item.bytes || item.blob?.size);
-            if (!parEmpreinte.has(cle)) parEmpreinte.set(cle, []);
-            parEmpreinte.get(cle).push(item.id);
-        });
-        orphelines.forEach((photo) => {
-            const file = parEmpreinte.get(empreinte(photo.width, photo.height, photo.bytes));
-            const id = file?.shift();
-            if (!id) return;
-            ids.add(id);
-            aReparer.push({ ...photo, fromRoomId: id });
-        });
+export async function previewRoomFolderSync(folderId) {
+    const roomItems = await listRoomItems();
+    if (!folderId) {
+        return {
+            total: roomItems.length,
+            aCreer: roomItems.length,
+            aSupprimer: 0,
+            aReparer: 0,
+            dejaLa: 0,
+            horsRoom: 0,
+            rienAFaire: !roomItems.length,
+        };
     }
-    return { ids, aReparer };
+    const folderPhotos = await photosDuDossier(folderId);
+    const plan = planReconcile({ roomItems, folderPhotos, folderId });
+    return {
+        total: plan.total,
+        aCreer: plan.aCreer.length,
+        aSupprimer: plan.aSupprimer.length,
+        aReparer: plan.aReparer.length,
+        dejaLa: plan.gardees.length,
+        horsRoom: plan.horsRoom,
+        rienAFaire: planVide(plan),
+    };
+}
+
+/* Le dossier vise, cree si besoin. Fait AVANT le plan: l'identifiant canonique
+   d'une photo depend du dossier, donc le dossier doit exister d'abord. */
+async function resoudreDossier(folderId, folderName, roomItems) {
+    const folders = await listFolders();
+    if (folderId) {
+        const trouve = folders.find((folder) => folder.id === folderId);
+        return { id: folderId, name: trouve?.name || '', base: trouve || null, neuf: false };
+    }
+    const propre = uniqueFolderName(
+        sanitizeFolderName(folderName) || suggestRoomFolderName(roomItems, folders.map((f) => f.name)),
+        folders.map((f) => f.name),
+    );
+    const folder = {
+        id: createFolderId(),
+        name: propre,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        source: 'room',
+        kind: 'library',
+        localOnly: false,
+        coverId: null,
+    };
+    await putFolder(folder);
+    return {
+        id: folder.id, name: folder.name, base: folder, neuf: true,
+    };
 }
 
 /*
- * Ce qui reste vraiment a enregistrer dans un dossier.
+ * Aligne un dossier de bibliotheque sur la file de la Room.
  *
- * Un dossier NEUF ne filtre rien: le choisir est un geste explicite, on veut y
- * mettre toute la file.
+ * Rejouable autant de fois qu'on veut: la deuxieme execution ne trouve plus
+ * rien a faire. C'est precisement ce qui manquait - une operation dont on peut
+ * douter du resultat sans avoir a tout verifier a la main.
+ *
+ * `onProgress(fait, total)` sert a l'ecran: une centaine de rendus pleine
+ * definition prennent plusieurs dizaines de secondes a decoder, et un bouton
+ * muet pendant ce temps passe pour un bouton casse.
  */
-export async function roomItemsLeftFor(folderId) {
-    const items = await listRoomItems();
-    if (!folderId) return { total: items.length, restants: items.length, deja: 0 };
-    const { ids } = await dejaDansLeDossier(folderId, items);
-    const restants = items.filter((item) => !ids.has(item.id)).length;
-    return { total: items.length, restants, deja: items.length - restants };
-}
+export async function syncRoomToFolder({ folderId = null, folderName = null, onProgress = null } = {}) {
+    const roomItems = await listRoomItems();
+    if (!roomItems.length && !folderId) {
+        return { ok: false, message: 'La Room est vide.' };
+    }
 
-/*
- * Enregistre la Room dans la bibliotheque.
- *
- * `onProgress(fait, total)` sert a l'ecran: une dizaine de rendus pleine
- * definition prennent plusieurs secondes a decoder, et un bouton muet pendant
- * ce temps passe pour un bouton casse.
- */
-export async function saveRoomToLibrary({ folderId = null, folderName = null, onProgress = null } = {}) {
-    /* Les blobs ne sont pas dans l'etat React - il n'y garde que des URLs -
-       donc on relit la file depuis IndexedDB. */
-    const tous = await listRoomItems();
-    if (!tous.length) return { added: 0, folderId: null, message: 'La Room est vide.' };
+    const dossier = await resoudreDossier(folderId, folderName, roomItems);
+    const folderPhotos = await photosDuDossier(dossier.id);
+    const plan = planReconcile({ roomItems, folderPhotos, folderId: dossier.id });
+
+    /* 1. Les liens manquants, d'abord. Une fiche d'avant reconnue une fois
+       n'aura plus jamais besoin de l'etre par son poids. */
+    for (const photo of plan.aReparer) await putPhoto(photo);
 
     /*
-     * On ne repasse pas ce qui est deja dans le dossier vise. Sans ca, ajouter
-     * quatre images a une file de trente-six proposait de reimporter les
-     * trente-six, et le dossier se remplissait de doublons.
+     * 2. Les copies en trop. La fiche locale part, et une pierre tombale est
+     * ecrite SUR LE DISQUE: c'est elle qui empechera le compte de les faire
+     * revenir, et qui fera finir le travail cote serveur meme si l'onglet se
+     * ferme maintenant. Voir `libraryDb.js`.
      */
-    const { ids: dejaLa, aReparer } = await dejaDansLeDossier(folderId, tous);
-    /* On pose le lien manquant sur les photos d'avant: la prochaine fois, la
-       reconnaissance sera exacte et ne dependra plus d'une empreinte. */
-    for (const photo of aReparer) await putPhoto(photo);
-    const items = tous.filter((item) => !dejaLa.has(item.id));
-    const ignorees = tous.length - items.length;
-    if (!items.length) {
-        return {
-            added: 0, ignorees, folderId, message: 'Tout est déjà dans ce dossier.',
-        };
+    if (plan.aSupprimer.length) {
+        const parId = new Map(folderPhotos.map((photo) => [photo.id, photo]));
+        await putTombstones(plan.aSupprimer.map((id) => ({
+            id,
+            previewPath: parId.get(id)?.cloud?.previewPath || null,
+            originalPath: parId.get(id)?.cloud?.originalPath || null,
+        })));
+        for (const id of plan.aSupprimer) await deletePhoto(id);
     }
 
-    const blobs = await Promise.all(items.map(blobOf));
-    const paires = items
-        .map((item, index) => ({ item, blob: blobs[index] }))
-        .filter((paire) => paire.blob);
-    if (!paires.length) {
-        return { added: 0, folderId: null, message: 'Aucune image de la Room n’a pu être lue.' };
-    }
-    const introuvables = items.length - paires.length;
-    const files = paires.map((paire, index) => fileFromItem(paire.item, index, paire.blob));
-    const existing = await listPhotos();
-    const gardees = existing.filter((photo) => !photo.scout);
-    const gate = checkImport({
-        photoCount: gardees.length,
-        bytes: gardees.reduce((sum, photo) => sum + (photo.bytes || 0), 0),
-        files,
-    });
-    if (!gate.ok) return { added: 0, folderId: null, blocked: true, message: gate.message };
-    const retenus = files.slice(0, gate.accepted);
-
-    let cible = folderId;
-    let nom = folderName;
-    if (!cible) {
-        const folders = await listFolders();
-        const propre = uniqueFolderName(
-            sanitizeFolderName(folderName) || suggestRoomFolderName(items, folders.map((f) => f.name)),
-            folders.map((f) => f.name),
-        );
-        const folder = {
-            id: createFolderId(),
-            name: propre,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            source: 'room',
-            kind: 'library',
-            localOnly: false,
-            coverId: null,
-        };
-        await putFolder(folder);
-        cible = folder.id;
-        nom = folder.name;
-    } else {
-        const folders = await listFolders();
-        nom = folders.find((folder) => folder.id === cible)?.name || '';
-    }
-
+    /* 3. Ce qui manque. */
     let added = 0;
     let cover = null;
-    for (let index = 0; index < retenus.length; index += 1) {
-        const record = await buildPhotoRecord(retenus[index], { folderId: cible });
-        if (record) {
-            /* Le lien avec l'element de Room: c'est lui qui evitera de
-               reimporter cette image la prochaine fois. */
-            const source = paires[index]?.item || null;
-            record.fromRoomId = source?.id || null;
-            /*
-             * Le preset appliqué suit la photo dans la bibliotheque.
-             *
-             * Vision range son nom de preset dans `formatLabel` au moment de
-             * l'envoi vers la Room; sans cette reprise, l'information se perdait
-             * a l'enregistrement et la grille ne pouvait plus afficher quel look
-             * avait ete pose. Les rendus de Layout ne sont pas concernes: leur
-             * `formatLabel` est un format, pas un preset.
-             */
-            if (source?.source === 'vision' && source.formatLabel && source.formatLabel !== 'Photo') {
-                record.preset = { label: source.formatLabel };
+    let bloque = null;
+    let introuvables = 0;
+    if (plan.aCreer.length) {
+        const items = plan.aCreer.map((entree) => entree.item);
+        const blobs = await Promise.all(items.map(blobOf));
+        const paires = plan.aCreer
+            .map((entree, index) => ({ ...entree, blob: blobs[index] }))
+            .filter((paire) => paire.blob);
+        introuvables = plan.aCreer.length - paires.length;
+
+        /* Le plafond se calcule sur ce qui reste apres le menage: sinon les
+           doublons qu'on vient de supprimer compteraient encore. */
+        const restantes = (await listPhotos()).filter((photo) => !photo.scout);
+        const files = paires.map((paire, index) => fileFromItem(paire.item, index, paire.blob));
+        const gate = checkImport({
+            photoCount: restantes.length,
+            bytes: restantes.reduce((sum, photo) => sum + (photo.bytes || 0), 0),
+            files,
+        });
+        if (!gate.ok) {
+            bloque = gate.message;
+        } else {
+            const retenus = paires.slice(0, gate.accepted);
+            /* Une cle canonique peut porter une pierre tombale d'une
+               suppression precedente. On la leve ici, et seulement ici: c'est
+               un ajout volontaire, pas un retour du compte. */
+            await dropTombstones(retenus.map((paire) => paire.photoId));
+            for (let index = 0; index < retenus.length; index += 1) {
+                const paire = retenus[index];
+                const record = await buildPhotoRecord(files[index], { folderId: dossier.id });
+                if (record) {
+                    /* L'identite deduite du couple (dossier, element de Room):
+                       reenregistrer la meme image ecrit la meme cle, donc ne
+                       peut pas fabriquer une copie. */
+                    record.id = paire.photoId || record.id;
+                    record.fromRoomId = paire.item.id;
+                    /*
+                     * Le preset applique suit la photo dans la bibliotheque.
+                     * Vision range son nom de preset dans `formatLabel` au
+                     * moment de l'envoi vers la Room; sans cette reprise,
+                     * l'information se perdait et la grille ne pouvait plus
+                     * afficher quel look avait ete pose. Les rendus de Layout ne
+                     * sont pas concernes: leur `formatLabel` est un format.
+                     */
+                    if (paire.item.source === 'vision' && paire.item.formatLabel
+                        && paire.item.formatLabel !== 'Photo') {
+                        record.preset = { label: paire.item.formatLabel };
+                    }
+                    await putPhoto(record);
+                    if (!cover) cover = record.id;
+                    added += 1;
+                }
+                onProgress?.(index + 1, retenus.length);
             }
-            await putPhoto(record);
-            if (!cover) cover = record.id;
-            added += 1;
+            if (gate.accepted < paires.length) bloque = gate.message;
         }
-        onProgress?.(index + 1, retenus.length);
     }
 
     /* Le dossier retient sa couverture et sa date, comme apres un import. */
     const folders = await listFolders();
-    const base = folders.find((folder) => folder.id === cible);
+    const base = folders.find((folder) => folder.id === dossier.id);
     if (base) await putFolder({ ...base, updatedAt: Date.now(), coverId: base.coverId || cover });
 
+    const restantes = await photosDuDossier(dossier.id);
     return {
+        ok: true,
+        folderId: dossier.id,
+        folderName: base?.name || dossier.name,
+        neuf: dossier.neuf,
         added,
-        failed: retenus.length - added,
-        rejected: files.length - retenus.length,
+        supprimees: plan.aSupprimer.length,
+        reparees: plan.aReparer.length,
         introuvables,
-        ignorees,
-        folderId: cible,
-        folderName: nom,
-        message: gate.message,
+        dejaLa: plan.gardees.length,
+        /* Le compte final du dossier: c'est le chiffre que l'utilisateur va
+           voir dans la bibliotheque, donc c'est celui qu'on lui annonce. */
+        totalDossier: restantes.length,
+        totalRoom: plan.total,
+        message: bloque,
+        rienAFaire: planVide(plan),
     };
 }
+
+export { roomPhotoId };

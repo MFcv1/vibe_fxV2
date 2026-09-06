@@ -37,6 +37,22 @@
 > montent dans le compte. La Room n'est pas videe au passage. Module
 > `roomToLibrary.js`.
 
+> **Room et bibliotheque : un modele qui converge — 2026-09-06.** Le dossier
+> rempli par la Room accumulait des doublons a chaque « Enregistrer » (106
+> images -> 154 photos), et les supprimer ne tenait pas d'une session a l'autre.
+> Trois changements de fond : l'identifiant d'une photo venue de la Room est
+> **deduit** du couple (dossier, element) et non plus tire au hasard — ecrire
+> deux fois la meme image ecrit la meme cle, donc le doublon est impossible a
+> fabriquer ; « Enregistrer » est devenu une **synchronisation** rejouable qui
+> annonce ce qu'elle va faire (ajouter / supprimer les copies / reparer les
+> liens) et dit « Tout est deja cale » quand il n'y a rien a faire ; une
+> suppression est **ecrite sur le disque** (`vibeos-library` v3, store
+> `tombstones`), donc elle interdit le retour tout de suite et reste une tache a
+> finir tant que le compte n'a pas suivi. En prime : un fichier illisible ne
+> bloque plus la sauvegarde des autres (echecs comptes par photo, bouton
+> « Réessayer »). Gate : `npm run test:room-library`.
+> **Non verifie par un agent** : le parcours dans le navigateur connecte.
+
 > **La Room suit le compte — 2026-09-05.** Elle ne vivait que dans un
 > navigateur ; elle est maintenant sauvegardee dans Storage
 > (`users/{uid}/room/{id}/image.jpg`, plafond 40 Mo) et Firestore
@@ -60,7 +76,8 @@
    zone que tu touches**.
 
 Reprendre dans un chat neuf :
-[**après le tri local de la bibliothèque** — 2026-09-05](docs/prompt-reprise-2026-09-05-tri-local.md),
+[**après le modèle Room <-> bibliothèque** — 2026-09-06](docs/prompt-reprise-2026-09-06-room-bibliotheque.md),
+[après le tri local de la bibliothèque — 2026-09-05](docs/prompt-reprise-2026-09-05-tri-local.md),
 [après la Room — 2026-09-05](docs/prompt-reprise-2026-09-05-room.md),
 [après le lot 1 de Motion Studio — 2026-09-04](docs/prompt-reprise-2026-09-04-motion-studio.md),
 [après l'import HEIC/HEIF — 2026-09-01](docs/prompt-reprise-2026-09-01-import-heic.md).

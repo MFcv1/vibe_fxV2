@@ -25,6 +25,7 @@
     "test:smooth-blur": "node --no-warnings scripts/audit-smooth-blur.mjs",
     "lint": "eslint",
     "test:scope": "node scripts/audit-scope.mjs",
+    "test:room-library": "node scripts/smoke-room-library-sync.mjs",
     "test:account-deletion": "node scripts/smoke-account-deletion.mjs",
     "test:billing-products": "node scripts/smoke-billing-products.mjs",
     "test:billing-ledger": "node scripts/smoke-billing-ledger.mjs",

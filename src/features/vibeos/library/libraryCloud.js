@@ -140,13 +140,22 @@ export async function pushPhoto(uid, photo) {
     return { previewPath, previewUrl, originalPath, originalUrl, originalSkipped };
 }
 
+/*
+ * Supprime la photo du compte.
+ *
+ * Les fichiers Storage pardonnent l'echec: un objet deja absent, c'est le
+ * resultat voulu. La FICHE Firestore, non - et elle ne l'avalait plus
+ * silencieusement qu'a un prix: l'appelant croyait la suppression faite, la
+ * marquait comme telle, et la photo revenait a la session suivante. Une erreur
+ * ici doit remonter pour que la suppression reste une tache a finir.
+ */
 export async function deletePhotoRemote(uid, photo) {
     const paths = [
         photo?.cloud?.previewPath || photoStoragePath(uid, photo.id, 'preview.webp'),
         photo?.cloud?.originalPath || null,
     ].filter(Boolean);
     await Promise.all(paths.map((path) => deleteObject(ref(storage, path)).catch(() => null)));
-    await deleteDoc(doc(db, 'users', uid, PHOTOS, photo.id)).catch(() => null);
+    await deleteDoc(doc(db, 'users', uid, PHOTOS, photo.id));
 }
 
 export async function deleteFolderRemote(uid, folderId) {

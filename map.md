@@ -386,7 +386,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- HomeScreen.jsx          # Accueil incubateur : reprise du projet courant + « Nouvel espace vierge », 6 cartes d'espaces (Bibliothèque/Layout/Studio/Vision/Soundtrack/VibeCut), recents avec dupliquer/supprimer
 |   |   |   `-- home.module.css
 |   |   |-- library/                    # Photothèque VibeOS (2026-08-11 ; dossiers + sauvegarde compte le 2026-08-31 ; mode tri local le 2026-09-05) : les photos importees vivent ici et ne sont jamais reimportees
-|   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` v2 : stores `photos` (index addedAt, exif.device, folderId) et `folders`. Base separee de celle des projets. La migration v1 -> v2 range les photos deja presentes dans un dossier de reprise, et `deleteFolderDeep` supprime dossier + photos dans une seule transaction
+|   |   |   |-- libraryDb.js            # IndexedDB `vibeos-library` v3 (store `tombstones` depuis le 2026-09-06 : une suppression est ECRITE sur le disque, donc elle survit a la fermeture de l'onglet et reste une tache a finir tant que le compte n'a pas suivi) : stores `photos` (index addedAt, exif.device, folderId) et `folders`. Base separee de celle des projets. La migration v1 -> v2 range les photos deja presentes dans un dossier de reprise, et `deleteFolderDeep` supprime dossier + photos dans une seule transaction
 |   |   |   |-- exif.js                 # Lecteur EXIF maison, sans dependance : APP1 JPEG / TIFF, marque, modele, objectif, ISO, ouverture, vitesse, focale, orientation, date de prise de vue. Ne lit que les 128 premiers Ko et ne rejette jamais
 |   |   |   |-- photoImport.js          # Fichier -> enregistrement : decodage oriente (createImageBitmap `from-image`), vignette WebP 1600px stockee une fois pour toutes, EXIF, dimensions, `folderId`, etat de sauvegarde. Rend `null` si le navigateur ne sait pas decoder (HEIC hors Safari). `buildScoutRecord` fait la version LEGERE du mode tri : apercu seul, aucun original, et pas de conversion HEIC quand le navigateur sait deja decoder
 |   |   |   |-- platform.js             # Reconnaissance iPhone / Android / Mac / Windows / Linux et sources d'import qui vont avec (photothèque, appareil photo, fichiers, dossier entier). Module pur, teste hors navigateur
@@ -394,7 +394,7 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- libraryQuota.js         # Plafonds 1000 photos ET 5 Go, verifies AVANT l'import : un import trop gros est coupe net avec le nombre de places restantes. `scope: 'scout'` change les mots du message. Module pur, teste hors navigateur
 |   |   |   |-- libraryScout.js         # Mode TRI (2026-09-05) : regarder des centaines de photos sans en copier une. Poignees `File` de la session (par id ET par signature nom|taille|date), rattachement apres rechargement d'onglet, plafond propre au tri (3000 / 2 Go) qui protege l'onglet et pas la facture. Module pur, teste hors navigateur
 |   |   |   |-- libraryCloud.js         # Firestore `users/{uid}/libraryFolders|libraryPhotos` + Storage `users/{uid}/library/{photoId}/{preview.webp,original.ext}`. Lecture Blob par chemin SDK authentifié puis URL tokenisée en repli ; la fiche Firestore est écrite EN DERNIER
-|   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
+|   |   |   |-- useLibrarySync.js       # Sauvegarde automatique dans le compte : file d'envoi UN par UN (echecs comptes PAR PHOTO depuis le 2026-09-06 : un fichier illisible ne bloque plus la file), pierres tombales persistantes + suppressions distantes menees 4 de front, ecoute des fiches distantes, rapatriement original puis aperçu à la retouche. Le Blob est rendu immédiatement à Vision ; vignette + cache IndexedDB finissent en arrière-plan. Arrêt après 3 échecs ; aucun cloud sans compte réel
 |   |   |   |-- carouselCadence.js      # Duree du glissement du carrousel en fonction du RYTHME des appuis (2026-09-05) : glissement complet au calme, taille dans l'ecart en rythme soutenu, bascule seche en rafale. Regle tenue : le glissement finit avant l'appui suivant. Module pur, teste hors navigateur
 |   |   |   |-- masonry.js              # Calcul de la grille en colonnes (placement dans la colonne la plus courte, ordre de lecture preserve) + bornage de la densite selon la largeur reelle
 |   |   |   |-- useLibrary.js           # Etat : dossiers + photos, import sequentiel avec progression dans un dossier, renommage, suppression profonde, filtres appareil/look/recherche, tris, quota, cache des URLs d'objet
@@ -440,7 +440,8 @@ Mettre a jour ce fichier a chaque creation, suppression, renommage, deplacement 
 |   |   |   |-- RoomProvider.jsx        # Contexte de la file : ajout depuis un canvas (decoupe panorama par `buildSocialImages`), retrait, deplacement, vidage, « ordre valide ». Object URLs crees et revoques ici ; plafond 10 images
 |   |   |   |-- roomCloud.js           # Room dans le compte (2026-09-05) : Firestore `users/{uid}/roomItems` + Storage `users/{uid}/room/{id}/image.jpg`, plafond 40 Mo (un panorama 4592x8160 depasse les 25 Mo de la bibliotheque). Le fichier part AVANT la fiche
 |   |   |   |-- useRoomSync.js         # File d'envoi un par un + ecoute des fiches distantes + repercussion d'une suppression faite ailleurs. Le local fait autorite pour l'affichage
-|   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05 ; incrementiel le 2026-09-06) : chaque rendu devient une vraie photo dans un dossier neuf ou existant, donc il entre dans le circuit de sauvegarde du compte. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
+|   |   |   |-- roomLibraryPlan.js     # Le contrat Room <-> dossier (2026-09-06) : `roomPhotoId(folderId, roomItemId)` donne une identite DEDUITE, plus jamais tiree au hasard — un doublon n'est plus detecte, il est impossible a ecrire. `planReconcile` calcule ajouts / copies en trop / liens a reparer. Module pur, teste par `npm run test:room-library`
+|   |   |   |-- roomToLibrary.js       # Pont Room -> bibliotheque (2026-09-05 ; devenu une SYNCHRONISATION le 2026-09-06) : `previewRoomFolderSync` annonce, `syncRoomToFolder` applique le plan (ajoute, supprime les copies, repare les liens). Idempotent. La Room n'est PAS videe : on met a l'abri, on ne deplace pas
 |   |   |   |-- roomDb.js               # Store `room` d'IndexedDB `vibeos` : une ligne par image (Blob + `order`), plus l'horodatage de validation dans `meta`
 |   |   |   |-- RoomScreen.jsx          # L'ecran : file horizontale numerotee, glisser-deposer ET fleches, retrait, vidage a double clic de confirmation, « Valider l'ordre » -> InstaPreviewSheet
 |   |   |   `-- room.module.css
@@ -710,6 +711,64 @@ drapeau que le filtrage, qui lui est demontre.
 
 Fichiers ajoutes : `layoutVisionPreset.js`.
 Fichiers touches : `useLayoutEditor.js`, `LayoutScreen.jsx`.
+
+## Journal — 2026-09-06 septies (Room et bibliotheque : un modele qui converge)
+
+**Le probleme, tel qu'il se vivait.** Cent six images dans la Room, cent
+cinquante-quatre photos dans le dossier « ROOM 5 09 » qu'elle avait rempli,
+quarante-neuf doublons annonces, et une suppression qui ne tenait pas: fermer
+l'onglet, revenir, tout etait revenu. Chaque « Enregistrer » rajoutait des
+copies. Trois correctifs successifs (`edcfaef`, `d3df542`, `4618b97`) n'avaient
+pas suffi, et ce n'etait pas un manque de soin: le modele lui-meme ne pouvait
+pas converger.
+
+**La cause.** Chaque enregistrement ecrivait des fiches avec un identifiant TIRE
+AU HASARD, puis essayait, apres coup, de deviner si l'image etait deja la.
+Deviner juste a 100 %, a travers deux bases, deux appareils et des envois qui se
+croisent, est impossible; une seule reconnaissance ratee installait une copie de
+plus. Et le registre des suppressions vivait en memoire vive, une minute: une
+suppression decidee hors ligne, ou pendant que l'onglet se fermait, n'atteignait
+jamais le compte, qui la reinstallait a la reouverture.
+
+**Ce qui a change.**
+
+1. **L'identite est deduite, plus tiree au hasard.** Une image de Room rangee
+   dans un dossier a la cle `ph-r-<hash du dossier>-<id de l'element>`
+   (`roomLibraryPlan.js`). Deux enregistrements de la meme image dans le meme
+   dossier ecrivent la MEME cle, depuis n'importe quel appareil: la deuxieme
+   remplace la premiere. Le doublon n'est plus filtre, il est impossible.
+2. **« Enregistrer » est devenu « Synchroniser ».** `syncRoomToFolder` ne
+   demande plus « qu'est-ce qui est nouveau ? » mais « a quoi ce dossier
+   doit-il ressembler ? »: il ajoute ce qui manque, retire les copies en trop,
+   et rattache les fiches d'avant a leur image. Rejouable a volonte; le bouton
+   annonce le detail avant le clic et passe a « Tout est deja cale » quand il
+   n'y a plus rien a faire.
+3. **Une suppression est ecrite sur le disque.** Store `tombstones`
+   (`vibeos-library` v3). La pierre interdit le retour des la premiere
+   milliseconde, ET reste une tache a finir tant que le compte n'a pas suivi —
+   cette session ou la suivante. `deletePhotoRemote` ne masque plus l'echec de
+   la suppression Firestore: le masquer revenait a reprogrammer le retour de la
+   photo. Les suppressions partent quatre de front, en fond: quarante-neuf
+   doublons ne figent plus l'ecran une demi-minute.
+4. **Un fichier illisible ne bloque plus la sauvegarde des autres.** Les echecs
+   d'envoi se comptent PAR PHOTO; apres trois essais la photo est mise de cote
+   et la file continue. Seul un refus de droits arrete tout. Le bandeau le dit
+   et propose « Réessayer » — c'est ce qui laissait « 46 photos en attente »
+   pour toujours.
+5. **Une suppression faite ailleurs se voit ici**, pour les photos qui n'ont
+   pas de fichier local (rien a perdre). Une photo encore posee sur cet
+   appareil n'est jamais effacee par le serveur.
+
+**Verifie**: `npm run test:room-library` (six cas, dont le cas reel 106/154 qui
+retombe a 106 et ne bouge plus au deuxieme passage), `npm run lint`,
+`npm run build`. **Non verifie par un agent**: le parcours dans le navigateur
+connecte — le compte de l'utilisateur est necessaire, et la session locale
+s'arrete a l'ecran de connexion.
+
+Fichiers ajoutes : `roomLibraryPlan.js`, `scripts/smoke-room-library-sync.mjs`.
+Fichiers touches : `roomToLibrary.js`, `RoomScreen.jsx`, `room.module.css`,
+`libraryDb.js`, `libraryCloud.js`, `useLibrarySync.js`, `LibraryScreen.jsx`,
+`library.module.css`, `package.json`.
 
 ## Journal — 2026-09-06 sexies (doublons qui revenaient, centrage de Layout, preset visible)
 

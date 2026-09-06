@@ -260,6 +260,44 @@
     font-weight: 590;
 }
 
+/*
+ * Ce que la synchronisation va faire, ligne par ligne.
+ *
+ * Chaque ligne dit UNE chose, avec son chiffre en tete. La suppression est la
+ * seule marquee d'une couleur d'alerte: c'est la seule qui retire quelque
+ * chose, et c'est celle que l'utilisateur doit voir avant de cliquer.
+ */
+.planList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-1);
+    margin: 0;
+    padding: var(--vo-space-3);
+    list-style: none;
+    font-size: var(--vo-text-xs);
+    line-height: 1.6;
+    color: var(--vo-text-2);
+    background: var(--vo-surface-2);
+    border-radius: var(--vo-radius-md);
+}
+
+.planList strong {
+    color: var(--vo-text);
+    font-weight: 590;
+}
+
+.planList li[data-tone="drop"] strong {
+    color: var(--vo-danger);
+}
+
+.planList li[data-tone="add"] strong {
+    color: var(--vo-accent);
+}
+
+.planList li[data-tone="ok"] {
+    color: var(--vo-text);
+}
+
 .saveField {
     display: grid;
     grid-template-columns: 1fr 1fr;

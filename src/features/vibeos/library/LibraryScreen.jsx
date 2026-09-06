@@ -982,6 +982,17 @@ export default function LibraryScreen() {
                 <div className={styles.syncBar} role="status" data-tone={sync.banner.tone}>
                     {sync.banner.icon}
                     <span>{sync.banner.label}</span>
+                    {/* Une photo mise de cote doit pouvoir repartir sans passer
+                        par un rechargement de page. */}
+                    {sync.banner.action ? (
+                        <button
+                            type="button"
+                            className={styles.syncBarAction}
+                            onClick={sync.banner.action.run}
+                        >
+                            {sync.banner.action.label}
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
 

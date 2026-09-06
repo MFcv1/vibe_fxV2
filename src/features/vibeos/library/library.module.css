@@ -1580,6 +1580,24 @@
     background: var(--vo-danger-quiet);
 }
 
+/* Relance de ce qui a ete mis de cote: pousse a droite, discret tant que rien
+   ne bloque - ce bouton n'apparait que dans le bandeau d'alerte. */
+.syncBarAction {
+    margin-left: auto;
+    padding: 2px var(--vo-space-2);
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: var(--vo-radius-sm);
+    cursor: pointer;
+}
+
+.syncBarAction:hover {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
 /* =========================================================================
    FENETRE D'IMPORT
    ========================================================================= */
