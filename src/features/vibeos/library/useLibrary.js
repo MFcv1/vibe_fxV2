@@ -8,7 +8,9 @@ import {
     buildPhotoRecord, buildScoutRecord, deviceLabel, makePreview, PREVIEW_MAX,
 } from './photoImport';
 import { isHeicFile } from './heicImport';
-import { sanitizeFolderName, suggestFolderName, uniqueFolderName } from './folderNaming';
+import {
+    directoryNameOf, sanitizeFolderName, suggestFolderName, uniqueFolderName,
+} from './folderNaming';
 import { checkImport, quotaState } from './libraryQuota';
 import {
     countAttached, forgetFile, isScoutFolder, isScoutPhoto, reattachFiles, rememberFile,
@@ -179,7 +181,9 @@ export default function useLibrary() {
 
     const takenNames = useMemo(() => folders.map((folder) => folder.name), [folders]);
 
-    const createFolder = useCallback(async ({ name, source = 'manual', kind = 'library' } = {}) => {
+    const createFolder = useCallback(async ({
+        name, source = 'manual', kind = 'library', sourceDir = null,
+    } = {}) => {
         const finalName = uniqueFolderName(sanitizeFolderName(name) || suggestFolderName({ taken: takenNames }), takenNames);
         const folder = {
             id: createFolderId(),
@@ -191,6 +195,11 @@ export default function useLibrary() {
             /* Un dossier de tri ne monte jamais dans le compte: la
                synchronisation le saute sur ce seul drapeau. */
             localOnly: kind === SCOUT_FOLDER_KIND,
+            /* Le nom du dossier du disque d'ou viennent les fichiers. Il ne
+               sert qu'a une chose, mais elle compte: apres un rechargement, on
+               peut DIRE quel dossier redonner, au lieu de laisser l'utilisateur
+               chercher dans son Finder. */
+            sourceDir: sourceDir || null,
             coverId: null,
         };
         await putFolder(folder);
@@ -349,6 +358,7 @@ export default function useLibrary() {
             name: options.folderName || suggestFolderName({ files, taken: takenNames }),
             source: options.source || 'files',
             kind: SCOUT_FOLDER_KIND,
+            sourceDir: directoryNameOf(accepted),
         });
 
         scoutCancel.current = false;
@@ -458,7 +468,27 @@ export default function useLibrary() {
         if (!gate.ok) return { added: 0, missing, folderId: null, blocked: true, message: gate.message };
         const batch = ready.slice(0, gate.accepted);
 
-        const folder = await createFolder({
+        /*
+         * Une deuxieme fournee rejoint la premiere.
+         *
+         * Un tri interrompu puis repris - parce que les poignees de fichiers
+         * ont ete perdues au rechargement, ce qui est le cas normal - c'est UN
+         * lot pour l'utilisateur. En creant un dossier a chaque appel, on lui
+         * en fabriquait deux (« ... gardees » et « ... gardees 2 ») qu'il ne
+         * pouvait plus reunir. La destination est deja connue: les photos deja
+         * parties portent son identifiant.
+         */
+        const comptes = new Map();
+        photos.forEach((photo) => {
+            if (photo.folderId !== folderId || !isScoutPhoto(photo) || !photo.promotedTo) return;
+            comptes.set(photo.promotedTo, (comptes.get(photo.promotedTo) || 0) + 1);
+        });
+        const dejaVu = [...comptes.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([id]) => folders.find((item) => item.id === id))
+            .find(Boolean);
+
+        const folder = dejaVu || await createFolder({
             name: options.folderName || `${options.baseName || 'Favoris'}`,
             source: 'favorites',
             kind: 'library',
@@ -498,7 +528,9 @@ export default function useLibrary() {
             }
         }
 
-        const next = { ...folder, updatedAt: Date.now(), coverId: cover };
+        /* La couverture d'un dossier deja rempli ne change pas: on complete un
+           lot, on ne le rebaptise pas. */
+        const next = { ...folder, updatedAt: Date.now(), coverId: folder.coverId || cover };
         await putFolder(next);
         if (mountedRef.current) {
             setFolders((current) => current.map((item) => (item.id === folder.id ? next : item)));
@@ -507,17 +539,65 @@ export default function useLibrary() {
         return {
             added, failed, missing, folderId: folder.id, folderName: folder.name, message: gate.message,
         };
-    }, [photos, kept.length, usedBytes, createFolder]);
+    }, [photos, folders, kept.length, usedBytes, createFolder]);
+
+    /*
+     * Deplacer des photos d'un dossier a un autre.
+     *
+     * Rendu necessaire par le defaut ci-dessus: deux fournees d'un meme tri
+     * avaient atterri dans deux dossiers, et il n'existait aucun geste pour les
+     * reunir - a part tout resupprimer et tout reimporter. Le fichier ne bouge
+     * pas d'un octet, seule l'etiquette de rangement change.
+     */
+    const movePhotos = useCallback(async (ids, folderId) => {
+        const cible = folders.find((item) => item.id === folderId);
+        if (!cible || !ids?.length) return { moved: 0, folderName: '' };
+        const aDeplacer = new Set(ids);
+        const suivantes = [];
+        for (const photo of photosRef.current) {
+            if (!aDeplacer.has(photo.id) || photo.folderId === folderId) continue;
+            const next = { ...photo, folderId };
+            await putPhoto(next);
+            suivantes.push(next);
+        }
+        if (!suivantes.length) return { moved: 0, folderName: cible.name };
+        const parId = new Map(suivantes.map((photo) => [photo.id, photo]));
+        if (mountedRef.current) {
+            setPhotos((current) => current.map((photo) => parId.get(photo.id) || photo));
+        }
+        photosRef.current = photosRef.current.map((photo) => parId.get(photo.id) || photo);
+        const next = { ...cible, updatedAt: Date.now() };
+        await putFolder(next);
+        if (mountedRef.current) {
+            setFolders((current) => current.map((item) => (item.id === folderId ? next : item)));
+        }
+        return { moved: suivantes.length, folderName: cible.name, photos: suivantes };
+    }, [folders]);
 
     /* Aimer / ne plus aimer. Ecrit dans IndexedDB, donc le tri survit a la
        fermeture de l'onglet - c'est toute la promesse du mode. */
     /* Re-relie un tri a ses fichiers apres un rechargement d'onglet. */
     const reattachScout = useCallback((folderId, fileList) => {
+        const files = Array.from(fileList || []);
         const target = photos.filter((photo) => photo.folderId === folderId && isScoutPhoto(photo));
-        const result = reattachFiles(target, Array.from(fileList || []));
+        const result = reattachFiles(target, files);
+        /* Le dossier qui a marche est retenu: la prochaine fois, l'ecran peut le
+           NOMMER au lieu de dire « redonne-moi le dossier source ». C'est la
+           difference entre une consigne et une devinette. */
+        const dir = result.matched ? directoryNameOf(files) : '';
+        const folder = dir ? folders.find((item) => item.id === folderId) : null;
+        if (folder && folder.sourceDir !== dir) {
+            /* Ecriture directe plutot que par `upsertFolder`: celui-ci est
+               declare plus bas dans ce hook, et le citer dans le tableau de
+               dependances le lirait AVANT son initialisation - la faute qui a
+               deja fait planter cet ecran une fois. */
+            const next = { ...folder, sourceDir: dir };
+            void putFolder(next);
+            setFolders((current) => current.map((item) => (item.id === folderId ? next : item)));
+        }
         setScoutTick((current) => current + 1);
         return result;
-    }, [photos]);
+    }, [photos, folders]);
 
     const toggleFavorite = useCallback(async (id) => {
         const current = photosRef.current.find((photo) => photo.id === id);
@@ -800,6 +880,6 @@ export default function useLibrary() {
         presetFilter, setPresetFilter,
         sort, setSort,
         importFiles, createFolder, renameFolder, removeFolder,
-        removePhoto, removeAll, patchPhoto, upsertPhoto, upsertFolder, ensurePreview,
+        removePhoto, removeAll, movePhotos, patchPhoto, upsertPhoto, upsertFolder, ensurePreview,
     };
 }

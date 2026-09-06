@@ -141,6 +141,22 @@ export async function pushPhoto(uid, photo) {
 }
 
 /*
+ * Change quelques champs d'une fiche deja dans le compte, sans toucher aux
+ * fichiers.
+ *
+ * Deplacer une photo d'un dossier a l'autre ne change pas un pixel: repasser
+ * par `pushPhoto` renverrait l'apercu ET l'original - plusieurs megaoctets - pour
+ * ecrire un identifiant de dossier. Ici on n'ecrit que la fiche.
+ */
+export async function patchPhotoRemote(uid, photoId, fields) {
+    await setDoc(
+        doc(db, 'users', uid, PHOTOS, photoId),
+        prune({ ...fields, updatedAt: Date.now() }),
+        { merge: true },
+    );
+}
+
+/*
  * Supprime la photo du compte.
  *
  * Les fichiers Storage pardonnent l'echec: un objet deja absent, c'est le

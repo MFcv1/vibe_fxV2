@@ -816,6 +816,24 @@ le lien par signature sans rien relire. La cure definitive serait
 `showDirectoryPicker` + poignee persistee en IndexedDB, Chrome seulement : pas
 encore fait.
 
+**Deux dossiers « gardees » au lieu d'un (meme jour)** : `promoteFavorites`
+appelait `createFolder` A CHAQUE fois. Un tri interrompu puis repris - le cas
+normal, puisque les poignees de fichiers meurent au rechargement - fabriquait
+donc « ... gardees » ET « ... gardees 2 », que rien ne permettait de reunir. La
+destination est desormais relue sur les photos deja parties (`promotedTo`, la
+plus frequente gagne), et la couverture d'un dossier deja rempli ne change plus.
+Pour reunir ce qui a deja ete separe : **« Deplacer vers... »** dans la barre de
+selection (`movePhotos` + `patchPhotoRemote`, qui n'ecrit QUE la fiche - renvoyer
+l'image pour un changement d'etiquette serait plusieurs megaoctets pour rien).
+
+**La fenetre de dossier du systeme, expliquee avant de s'ouvrir** : trois pieges
+d'affilee - fichiers grises (c'est un dossier qu'on demande), bouton « Importer »
+qui est celui de macOS, et un avertissement Chrome traduit en « seront
+telecharges » alors qu'il parle d'acces. Une feuille les annonce, et NOMME le
+dossier a redonner quand on le connait : le dossier du disque est retenu sur la
+fiche du tri (`sourceDir`), a la creation du tri et au premier rattachement
+reussi.
+
 **Deploiement** : le site se met en ligne avec `firebase deploy --only
 apphosting` DEPUIS LE MAC (bloc `apphosting` de `firebase.json`). Le depot
 GitHub affiche par App Hosting (`ECFN15-vibe_fxV2`) est un vieux reste fige au

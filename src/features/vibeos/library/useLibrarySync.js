@@ -5,7 +5,7 @@ import { CloudOff, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
     cloudReady, cloudUid, deleteFolderRemote, deletePhotoRemote, fetchBlob,
-    pushFolder, pushPhoto, subscribeLibrary,
+    patchPhotoRemote, pushFolder, pushPhoto, subscribeLibrary,
 } from './libraryCloud';
 import {
     listTombstones, markTombstoneDone, purgeTombstones, putTombstones,
@@ -389,6 +389,23 @@ export default function useLibrarySync(library) {
         await deleteFolderRemote(uid, folderId);
     }, [enabled, uid, forgetPhotos]);
 
+    /*
+     * Repercuter un changement de dossier dans le compte.
+     *
+     * Seulement pour les photos qui y sont deja: une photo encore en attente
+     * partira de toute facon avec son nouveau dossier. Et surtout, on n'ecrit
+     * que la fiche - renvoyer l'image pour un changement d'etiquette serait
+     * plusieurs megaoctets pour rien.
+     */
+    const moveRemote = useCallback(async (photos2 = []) => {
+        if (!enabled) return;
+        for (const photo of photos2) {
+            if (photo?.cloud?.state !== 'synced') continue;
+            await patchPhotoRemote(uid, photo.id, { folderId: photo.folderId || null })
+                .catch(() => null);
+        }
+    }, [enabled, uid]);
+
     /* Relancer ce qui a ete mis de cote. Geste explicite: on remet le compteur
        d'echecs a zero, sinon la photo repartirait pour etre rebloquee aussitot. */
     const retryBlocked = useCallback(async () => {
@@ -499,6 +516,6 @@ export default function useLibrarySync(library) {
 
     return {
         enabled, banner, pending: pending.length, blocked: bloquees.length, syncedCount,
-        forgetPhotos, forgetFolder, hydrate, retryBlocked, drainTombstones,
+        forgetPhotos, forgetFolder, hydrate, retryBlocked, drainTombstones, moveRemote,
     };
 }

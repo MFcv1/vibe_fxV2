@@ -5,10 +5,10 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    Camera, Check, ChevronLeft, Copy, FolderPlus, Grid2x2, Heart, Images, Laptop, Minus, Plus,
-    Trash2, Upload, Wand2, X,
+    Camera, Check, ChevronLeft, Copy, FolderInput, FolderPlus, Grid2x2, Heart, Images, Laptop,
+    Minus, Plus, Trash2, Upload, Wand2, X,
 } from 'lucide-react';
-import { Button, SearchField, useToast } from '../primitives';
+import { Button, SearchField, Sheet, useToast } from '../primitives';
 import { useVibeOsProject } from '../project/VibeOsProjectProvider';
 import Lightbox from './Lightbox';
 import FolderCard from './FolderCard';
@@ -18,7 +18,7 @@ import { DENSITY_MAX, DENSITY_MIN, layoutMasonry, resolveColumns } from './mason
 import { formatBytes, totalBytes } from './libraryDb';
 import { ACCEPTED_TYPES, deviceLabel } from './photoImport';
 import useLibrary, { fallbackUrl, SORTS, thumbUrl } from './useLibrary';
-import { hasSourceFile } from './libraryScout';
+import { hasSourceFile, isScoutFolder } from './libraryScout';
 import styles from './library.module.css';
 
 /*
@@ -468,7 +468,7 @@ export default function LibraryScreen() {
         search, setSearch, deviceFilter, setDeviceFilter,
         presetFilter, setPresetFilter, sort, setSort,
         importFiles, renameFolder, removeFolder,
-        removePhoto, removeAll, ensurePreview,
+        removePhoto, removeAll, movePhotos, ensurePreview,
         activeScout, scoutState, duplicates, scoutFiles, cancelScout, promoteFavorites, toggleFavorite,
         reattachScout,
     } = library;
@@ -695,6 +695,40 @@ export default function LibraryScreen() {
             { tone: 'success', duration: 5000 },
         );
     }, [duplicates, confirmDedupe, removeAll, sync, push]);
+
+    /* Ou l'on peut deposer une selection: pas le dossier ouvert, pas les tris
+       (ils ne stockent aucun fichier d'origine). */
+    /* La fenetre de dossier du systeme est un piege a elle seule: fichiers
+       grises, bouton « Importer » qui est celui de macOS, et un avertissement
+       Chrome qui parle de telechargement. On explique les trois AVANT. */
+    const [reattachOpen, setReattachOpen] = useState(false);
+
+    const deplacables = useMemo(
+        () => folders.filter((folder) => folder.id !== activeFolderId && !isScoutFolder(folder)),
+        [folders, activeFolderId],
+    );
+
+    /*
+     * Reunir des photos dans un seul dossier.
+     *
+     * Le fichier ne bouge pas: seule l'etiquette de rangement change, ici et
+     * dans le compte (une ecriture de fiche, pas un renvoi d'image).
+     */
+    const handleMove = useCallback(async (folderId) => {
+        const ids = [...selection];
+        if (!folderId || !ids.length) return;
+        const result = await movePhotos(ids, folderId);
+        setSelection(new Set());
+        if (!result.moved) {
+            push('Ces photos sont déjà dans ce dossier.', { tone: 'default' });
+            return;
+        }
+        await sync.moveRemote(result.photos || []);
+        push(
+            `${result.moved} photo${result.moved > 1 ? 's' : ''} déplacée${result.moved > 1 ? 's' : ''} dans « ${result.folderName} ».`,
+            { tone: 'success', duration: 5000 },
+        );
+    }, [selection, movePhotos, sync, push]);
 
     const handleFavorite = useCallback((photo) => {
         if (photo?.id) toggleFavorite(photo.id);
@@ -1151,7 +1185,7 @@ export default function LibraryScreen() {
                                 variant="ghost"
                                 size="sm"
                                 icon={<FolderPlus size={13} />}
-                                onClick={() => reattachRef.current?.click()}
+                                onClick={() => setReattachOpen(true)}
                             >
                                 Retrouver les fichiers
                             </Button>
@@ -1191,6 +1225,7 @@ export default function LibraryScreen() {
                 onChange={(event) => {
                     const files = event.target.files;
                     if (files?.length && activeFolderId) {
+                        setReattachOpen(false);
                         const { matched } = reattachScout(activeFolderId, files);
                         push(matched
                             ? `${matched} photo${matched > 1 ? 's' : ''} reliée${matched > 1 ? 's' : ''} à son fichier.`
@@ -1201,9 +1236,82 @@ export default function LibraryScreen() {
                 }}
             />
 
+            <Sheet
+                open={reattachOpen}
+                onClose={() => setReattachOpen(false)}
+                title="Retrouver les fichiers d’origine"
+            >
+                <div className={styles.reattachBody}>
+                    <p>
+                        Tes aperçus et tes photos gardées sont intacts. Ce qui manque, c’est le
+                        lien vers les fichiers sur ton disque — il ne survit pas au rechargement
+                        de la page. On va le refaire, sans rien copier.
+                    </p>
+                    {activeFolder?.sourceDir ? (
+                        <p>
+                            Le dossier à redonner est{' '}
+                            <strong>{activeFolder.sourceDir}</strong>.
+                        </p>
+                    ) : null}
+                    <ol className={styles.reattachSteps}>
+                        <li>
+                            La fenêtre du Mac va afficher les fichiers <strong>en gris</strong>.
+                            C’est normal : on te demande un <strong>dossier</strong>, pas des
+                            fichiers. Clique une fois dessus, sans entrer dedans.
+                        </li>
+                        <li>
+                            Son bouton s’appelle <strong>Importer</strong> — c’est le mot du Mac
+                            pour « utilise ce dossier ». Ce n’est pas un import dans VibeOS.
+                        </li>
+                        <li>
+                            Chrome demandera ensuite <strong>« Importer N fichiers sur ce
+                            site ? »</strong>. Mauvaise traduction de sa part : il parle d’accès,
+                            pas d’envoi. Accepte.
+                        </li>
+                    </ol>
+                    <p className={styles.reattachDim}>
+                        VibeOS ne regarde que le nom, la taille et la date de chaque fichier pour
+                        les reconnaître. Le contenu n’est lu qu’au moment où tu cliques sur
+                        « Importer » dans le bandeau, et seulement pour les photos que tu as gardées.
+                    </p>
+                    <div className={styles.reattachFoot}>
+                        <Button variant="ghost" size="sm" onClick={() => setReattachOpen(false)}>
+                            Annuler
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<FolderPlus size={13} />}
+                            onClick={() => reattachRef.current?.click()}
+                        >
+                            Choisir le dossier
+                        </Button>
+                    </div>
+                </div>
+            </Sheet>
+
             {selection.size ? (
                 <div className={styles.selectionBar} role="status">
                     <span data-numeric>{selection.size} sélectionnée{selection.size > 1 ? 's' : ''}</span>
+                    {/* Reunir deux lots separes sans rien reimporter. La liste
+                        exclut le dossier ouvert - s'y deplacer ne ferait rien -
+                        et les tris, qui ne stockent aucun fichier. */}
+                    {deplacables.length ? (
+                        <label className={styles.selectionMove}>
+                            <FolderInput size={14} aria-hidden="true" />
+                            <span className="vibeos-visually-hidden">Déplacer vers un dossier</span>
+                            <select
+                                value=""
+                                onChange={(event) => handleMove(event.target.value)}
+                                data-testid="vibeos-library-move"
+                            >
+                                <option value="" disabled>Déplacer vers…</option>
+                                {deplacables.map((folder) => (
+                                    <option key={folder.id} value={folder.id}>{folder.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : null}
                     <button type="button" onClick={deleteSelection} className={styles.selectionDanger}>
                         <Trash2 size={14} />
                         Supprimer

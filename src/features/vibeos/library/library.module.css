@@ -2155,6 +2155,80 @@
 
 /* Une pilule sur deux lignes fait une forme molle: des qu'il y a un message,
    la barre redevient une carte. */
+/* Explication avant la fenetre de dossier du systeme. */
+.reattachBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-3);
+    font-size: var(--vo-text-xs);
+    line-height: 1.6;
+    color: var(--vo-text-2);
+}
+
+.reattachBody p {
+    margin: 0;
+}
+
+.reattachBody strong {
+    color: var(--vo-text);
+    font-weight: 590;
+}
+
+.reattachSteps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vo-space-2);
+    margin: 0;
+    padding: var(--vo-space-3) var(--vo-space-3) var(--vo-space-3) var(--vo-space-6);
+    background: var(--vo-surface-2);
+    border-radius: var(--vo-radius-md);
+}
+
+.reattachDim {
+    color: var(--vo-text-3);
+}
+
+.reattachFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--vo-space-2);
+    margin-top: var(--vo-space-1);
+}
+
+/* Le choix d'un dossier de destination, dans la barre de selection. Le `select`
+   natif est volontaire: il ouvre la liste du systeme, donc il se navigue au
+   clavier et se cherche en tapant, meme avec quarante dossiers. */
+.selectionMove {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 var(--vo-space-2);
+    color: var(--vo-text-2);
+    border-radius: var(--vo-radius-sm);
+    cursor: pointer;
+}
+
+.selectionMove:hover {
+    color: var(--vo-text);
+    background: var(--vo-surface-2);
+}
+
+.selectionMove select {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: 6px 0;
+    cursor: pointer;
+    max-width: 180px;
+}
+
+.selectionMove select:focus-visible {
+    outline: 2px solid var(--vo-accent);
+    outline-offset: 2px;
+}
+
 .scoutBar[data-warn="true"] {
     flex-wrap: wrap;
     row-gap: var(--vo-space-2);
